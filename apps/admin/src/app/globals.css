@@ -17858,3 +17858,33 @@ a.btn-primary {
     bottom: calc(9.6rem + env(safe-area-inset-bottom, 0px));
   }
 }
+
+/* Demo mode pitch banner */
+.demo-mode-banner {
+  position: sticky;
+  top: 0;
+  z-index: 200;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem 0.85rem;
+  padding: 0.45rem 1rem;
+  background: #c9302c;
+  color: #fff;
+  font-size: 0.82rem;
+  text-align: center;
+}
+
+.demo-mode-banner strong {
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  font-size: 0.72rem;
+}
+
+.demo-mode-banner code {
+  background: rgba(0, 0, 0, 0.2);
+  padding: 0.1rem 0.35rem;
+  border-radius: 4px;
+  font-size: 0.78rem;
+}

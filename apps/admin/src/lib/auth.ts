@@ -1,3 +1,6 @@
+import { demoLogin, demoRegisterSession, getDemoInvite } from './demo/users';
+import { isDemoMode } from './demo/is-demo-mode';
+
 export type AuthUser = {
   id: string;
   email: string;
@@ -88,6 +91,24 @@ export async function login(
   tenantSlug: string,
   options?: { authSource?: ClientAuthSource },
 ): Promise<AuthSession> {
+  const authSource =
+    portal === 'client' ? (options?.authSource ?? 'portal') : undefined;
+
+  if (isDemoMode()) {
+    const session = {
+      ...demoLogin(portal, email, password, tenantSlug),
+      ...(authSource ? { authSource } : {}),
+    } as AuthSession;
+    if (typeof window !== 'undefined') {
+      if (portal === 'client' && authSource) {
+        persistClientSession(session, authSource);
+      } else {
+        localStorage.setItem(sessionKey(portal), JSON.stringify(session));
+      }
+    }
+    return session;
+  }
+
   let res: Response;
   try {
     res = await fetch(`${getApiUrl()}${loginEndpoint(portal)}`, {
@@ -104,9 +125,6 @@ export async function login(
     const msg = Array.isArray(json?.message) ? json.message[0] : json?.message;
     throw new Error(msg ?? json?.error?.message ?? 'Login failed');
   }
-
-  const authSource =
-    portal === 'client' ? (options?.authSource ?? 'portal') : undefined;
 
   const session: AuthSession = {
     user: json.data.user,
@@ -186,6 +204,9 @@ function parseAuthError(json: unknown, fallback: string) {
 }
 
 export async function fetchClientInvite(token: string): Promise<ClientInvitePreview> {
+  if (isDemoMode()) {
+    return getDemoInvite(token);
+  }
   let res: Response;
   try {
     res = await fetch(`${getApiUrl()}/auth/client/invite/${encodeURIComponent(token)}`, {
@@ -203,6 +224,18 @@ export async function registerClient(
   payload: ClientRegisterPayload,
   options?: { authSource?: ClientAuthSource },
 ): Promise<AuthSession> {
+  if (isDemoMode()) {
+    const authSource = options?.authSource ?? 'portal';
+    const session = {
+      ...demoRegisterSession(payload),
+      authSource,
+    } as AuthSession;
+    persistClientSession(session, authSource);
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new Event('4ds-client-session-changed'));
+    }
+    return session;
+  }
   let res: Response;
   try {
     res = await fetch(`${getApiUrl()}/auth/client/register`, {
@@ -233,6 +266,23 @@ export async function oauthClientSignIn(
   payload: ClientOAuthPayload,
   options?: { authSource?: ClientAuthSource },
 ): Promise<AuthSession> {
+  if (isDemoMode()) {
+    const authSource = options?.authSource ?? 'site';
+    const session = {
+      ...demoRegisterSession({
+        email: payload.email,
+        firstName: payload.firstName ?? 'OAuth',
+        lastName: payload.lastName ?? 'User',
+        phone: payload.phone,
+      }),
+      authSource,
+    } as AuthSession;
+    persistClientSession(session, authSource);
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new Event('4ds-client-session-changed'));
+    }
+    return session;
+  }
   let res: Response;
   try {
     res = await fetch(`${getApiUrl()}/auth/client/oauth`, {
@@ -262,6 +312,20 @@ export async function oauthClientSignIn(
 export async function completeClientRegistration(
   payload: ClientRegisterCompletePayload,
 ): Promise<AuthSession> {
+  if (isDemoMode()) {
+    getDemoInvite(payload.token);
+    const session = {
+      ...demoRegisterSession({
+        email: 'invitee@demo.local',
+        firstName: payload.firstName ?? 'Invite',
+        lastName: payload.lastName ?? 'Client',
+        phone: payload.phone,
+      }),
+      authSource: 'portal' as const,
+    } as AuthSession;
+    persistClientSession(session, 'portal');
+    return session;
+  }
   let res: Response;
   try {
     res = await fetch(`${getApiUrl()}/auth/client/register/complete`, {
@@ -314,6 +378,16 @@ export async function fetchWithAuth<T>(
 ): Promise<T> {
   const session = getSession(portal);
   if (!session) throw new Error('Not authenticated');
+
+  if (isDemoMode()) {
+    const { handleDemoRequest } = await import('./demo/handler');
+    return handleDemoRequest<T>({
+      portal,
+      path,
+      method: 'GET',
+      session,
+    });
+  }
 
   let res: Response;
   try {

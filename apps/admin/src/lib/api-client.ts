@@ -1,4 +1,6 @@
-import { clearSession, getSession, type AuthPortal, type AuthSession } from './auth';
+import { clearSession, getSession, type AuthPortal } from './auth';
+import { handleDemoRequest } from './demo/handler';
+import { isDemoMode } from './demo/is-demo-mode';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4010/v1';
 
@@ -9,6 +11,16 @@ async function request<T>(
 ): Promise<T> {
   const session = getSession(portal);
   if (!session) throw new Error('Not authenticated');
+
+  if (isDemoMode()) {
+    return handleDemoRequest<T>({
+      portal,
+      path,
+      method: options.method ?? 'GET',
+      body: options.body,
+      session,
+    });
+  }
 
   let res: Response;
   try {
@@ -74,6 +86,14 @@ export const techApi = {
 };
 
 export async function publicApi<T>(path: string, options: RequestInit = {}): Promise<T> {
+  if (isDemoMode()) {
+    return handleDemoRequest<T>({
+      path,
+      method: options.method ?? 'GET',
+      body: options.body,
+    });
+  }
+
   let res: Response;
   try {
     res = await fetch(`${API_URL}${path}`, {
