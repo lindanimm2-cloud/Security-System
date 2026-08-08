@@ -458,19 +458,41 @@ export async function handleDemoRequest<T>({
       })),
     }) as T;
   }
+  // ——— Control room notifications shape ———
   if (clean === '/control-room/notifications' && m === 'GET') {
-    return ok([
-      {
-        id: 'demo-n-1',
-        category: 'PANIC',
-        title: 'Panic alert',
-        body: 'Nomsa Client — Umhlanga',
-        priority: 'critical',
-        isRead: false,
-        createdAt: new Date().toISOString(),
-        link: '/control-room/incidents',
-      },
-    ]) as T;
+    return ok({
+      notifications: [
+        {
+          id: 'demo-n-1',
+          category: 'PANIC',
+          title: 'Panic alert',
+          body: 'Nomsa Client — Umhlanga',
+          priority: 'critical',
+          isRead: false,
+          createdAt: new Date().toISOString(),
+          link: '/control-room/incidents',
+        },
+      ],
+      unreadCount: 1,
+    }) as T;
+  }
+  if (clean === '/client/notifications' && m === 'GET') {
+    return ok({
+      notifications: [
+        {
+          id: 'demo-cn-1',
+          type: 'SYSTEM',
+          title: 'Welcome to Nexus demo',
+          body: 'Pitch mode — no live API connected.',
+          isRead: false,
+          createdAt: new Date().toISOString(),
+        },
+      ],
+      unreadCount: 1,
+    }) as T;
+  }
+  if (clean === '/calls/active' && m === 'GET') {
+    return ok(null) as T;
   }
   if (clean.startsWith('/control-room/') && (m === 'GET' || m === 'POST' || m === 'PATCH' || m === 'DELETE')) {
     if (m === 'GET') {

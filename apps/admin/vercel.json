@@ -1,0 +1,9 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": "nextjs",
+  "installCommand": "cd ../.. && npm install",
+  "buildCommand": "cd ../.. && npm run build -w @4ds-solutions/admin",
+  "env": {
+    "NEXT_PUBLIC_DEMO_MODE": "true"
+  }
+}

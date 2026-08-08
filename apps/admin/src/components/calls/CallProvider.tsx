@@ -83,8 +83,10 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (!portal || !session) return;
+    const base = getSocketUrl();
+    if (!base) return;
 
-    const socket: Socket = io(`${getSocketUrl()}/realtime`, {
+    const socket: Socket = io(`${base}/realtime`, {
       auth: { token: session.accessToken },
     });
     socketRef.current = socket;

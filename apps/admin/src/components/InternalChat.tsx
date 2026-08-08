@@ -259,8 +259,10 @@ export function InternalChat({
   useEffect(() => {
     const s = getSession(portal);
     if (!s) return;
+    const base = getSocketUrl();
+    if (!base) return;
 
-    const socket: Socket = io(`${getSocketUrl()}/realtime`, {
+    const socket: Socket = io(`${base}/realtime`, {
       auth: { token: s.accessToken },
       transports: ['websocket', 'polling'],
     });

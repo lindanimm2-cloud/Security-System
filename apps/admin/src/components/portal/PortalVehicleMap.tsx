@@ -48,8 +48,10 @@ export function PortalVehicleMap({
   useEffect(() => {
     const session = getSession('client');
     if (!session) return;
+    const base = getSocketUrl();
+    if (!base) return;
 
-    const socket: Socket = io(`${getSocketUrl()}/realtime`, {
+    const socket: Socket = io(`${base}/realtime`, {
       auth: { token: session.accessToken },
       transports: ['websocket', 'polling'],
     });
