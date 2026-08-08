@@ -1,0 +1,1302 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  USER
+  FAMILY_MEMBER
+  OFFICER
+  DISPATCHER
+  SUPERVISOR
+  MANAGER
+  TENANT_ADMIN
+  OWNER
+  SUPER_ADMIN
+  SALES
+  TECHNICIAN
+  DEVELOPER
+}
+
+enum ProductCategory {
+  // Catalogue departments (SA security superstore)
+  FIREARMS
+  BODY_ARMOUR
+  PERSONAL_SECURITY
+  CCTV
+  NVR_STORAGE
+  SMART_HOME
+  ALARMS
+  SENSORS
+  ELECTRIC_FENCING
+  PERIMETER
+  ACCESS_CONTROL
+  GATES
+  INTERCOMS
+  GUARD_EQUIPMENT
+  GUARD_TOUR
+  VEHICLE_SECURITY
+  LIGHTING
+  NETWORKING
+  POWER
+  INSTALL_MATERIALS
+  TOOLS
+  TECH_EQUIPMENT
+  SAFES
+  LOCKS
+  PHYSICAL_PERIMETER
+  FIRE_SAFETY
+  PACKAGES
+  CONTROL_ROOM
+  SIGNS
+  INSPECTION
+  CYBER
+  SPARE_PARTS
+
+  // Legacy values (kept for existing rows until remapped)
+  VESTS
+  BATONS
+  TASERS
+  GEAR
+  ACCESSORIES
+}
+
+enum StoreOrderStatus {
+  PENDING
+  PAID
+  PROCESSING
+  SHIPPED
+  DELIVERED
+  CANCELLED
+}
+
+enum SalesLeadStatus {
+  NEW
+  CONTACTED
+  QUALIFIED
+  QUOTED
+  WON
+  LOST
+}
+
+enum InstallJobStatus {
+  SCHEDULED
+  EN_ROUTE
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+  PENDING_VERIFICATION
+  DELETED
+}
+
+enum OfficerStatus {
+  AVAILABLE
+  BUSY
+  OFF_DUTY
+  EN_ROUTE
+  RETURNING
+}
+
+enum IncidentType {
+  PANIC
+  THEFT
+  MEDICAL
+  FIRE
+  ASSAULT
+  ALARM
+  OTHER
+}
+
+enum IncidentStatus {
+  ACTIVE
+  DISPATCHED
+  EN_ROUTE
+  ON_SCENE
+  RESOLVED
+  CLOSED
+  CANCELLED
+}
+
+enum IncidentPriority {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum DispatchStatus {
+  PENDING
+  ASSIGNED
+  ACCEPTED
+  EN_ROUTE
+  ON_SCENE
+  COMPLETED
+  CANCELLED
+}
+
+enum NotificationType {
+  PANIC_ALERT
+  INCIDENT_UPDATE
+  DISPATCH_ASSIGNED
+  FAMILY_ALERT
+  THEFT_ALERT
+  SYSTEM
+  MESSAGE
+  BILLING
+  ERROR_REPORT
+}
+
+enum ConversationType {
+  INTERNAL
+  SUPPORT
+  OFFICER_DISPATCH
+  FAMILY
+  TECH_TEAM
+  DEV_SUPPORT
+}
+
+enum ErrorReportStatus {
+  OPEN
+  ACKNOWLEDGED
+  RESOLVED
+}
+
+enum MessageAttachmentKind {
+  IMAGE
+  VIDEO
+  FILE
+}
+
+enum CallChannel {
+  INTERNAL
+  WHATSAPP
+  DISPATCH_LINE
+  EXTERNAL
+}
+
+enum CallStatus {
+  RINGING
+  CONNECTED
+  ON_HOLD
+  ENDED
+  MISSED
+  DECLINED
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  TRIALING
+  PAST_DUE
+  CANCELLED
+}
+
+enum PropertyType {
+  HOUSE
+  APARTMENT
+  TOWNHOUSE
+  ESTATE
+  BUSINESS
+}
+
+enum AlarmStatus {
+  ARMED
+  DISARMED
+  TRIGGERED
+  OFFLINE
+  STAY
+  NIGHT
+  EXIT_DELAY
+  ENTRY_DELAY
+}
+
+enum CameraStatus {
+  ONLINE
+  OFFLINE
+  FAULT
+  RECORDING
+}
+
+enum CameraPlacement {
+  EXTERIOR
+  INTERIOR
+}
+
+enum SensorType {
+  PIR
+  DOOR_CONTACT
+  WINDOW_CONTACT
+  GLASS_BREAK
+  SMOKE
+  HEAT
+  GAS
+  WATER_LEAK
+  PANIC_BUTTON
+  MEDICAL_BUTTON
+  FIRE_BUTTON
+  OUTDOOR_BEAM
+  ELECTRIC_FENCE
+  VIBRATION
+  KEYPAD
+  SIREN
+  OTHER
+}
+
+enum SensorStatus {
+  NORMAL
+  OPEN
+  ALARM
+  FAULT
+  TAMPER
+  BYPASSED
+  OFFLINE
+}
+
+enum AlarmEventType {
+  MOTION
+  INTRUSION
+  CAMERA_OFFLINE
+  ALARM_TRIGGERED
+  TAMPER
+  MANUAL
+  BURGLARY
+  PERIMETER
+  FIRE
+  MEDICAL
+  PANIC
+  DURESS
+  AC_FAIL
+  LOW_BATTERY
+  FENCE_ALARM
+  BEAM_ALARM
+  ZONE_BYPASS
+  ARM
+  DISARM
+  TROUBLE
+  SUPERVISORY
+  SMOKE
+  WATER
+  GAS_LEAK
+}
+
+enum AlarmEventStatus {
+  NEW
+  ACKNOWLEDGED
+  DISPATCHED
+  RESOLVED
+  FALSE_ALARM
+}
+
+enum CompanyVehicleType {
+  PATROL
+  ARMED_RESPONSE
+  MOTORCYCLE
+  MEDICAL
+  FIRE_TRUCK
+  TACTICAL
+  UNMARKED
+}
+
+enum CompanyVehicleStatus {
+  AVAILABLE
+  DEPLOYED
+  EN_ROUTE
+  ON_SCENE
+  MAINTENANCE
+  OFFLINE
+}
+
+enum VehicleCrewRole {
+  DRIVER
+  PASSENGER
+  SUPERVISOR
+}
+
+enum DocumentCategory {
+  INCIDENT_EVIDENCE
+  DISPATCH_REPORT
+  CLIENT_RECORD
+  OFFICER_REPORT
+  POLICY_SOP
+  LEGAL_COMPLIANCE
+  TRAINING
+  VEHICLE_PROPERTY
+  OTHER
+}
+
+enum StockRequestStatus {
+  PENDING
+  APPROVED
+  FULFILLED
+  REJECTED
+}
+
+model Tenant {
+  id           String   @id @default(uuid()) @db.Uuid
+  name         String
+  slug         String   @unique
+  logoUrl      String?  @map("logo_url")
+  primaryColor String?  @map("primary_color")
+  contactEmail String   @map("contact_email")
+  contactPhone String?  @map("contact_phone")
+  settings     Json     @default("{}")
+  isActive     Boolean  @default(true) @map("is_active")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  users              User[]
+  refreshTokens      RefreshToken[]
+  officers           Officer[]
+  incidents          Incident[]
+  incidentNotes      IncidentNote[]
+  emergencyContacts  EmergencyContact[]
+  families           Family[]
+  notifications      Notification[]
+  conversations      Conversation[]
+  callSessions       CallSession[]
+  companyVehicles    CompanyVehicle[]
+  vehicles           Vehicle[]
+  properties         Property[]
+  cameras            Camera[]
+  sensors            Sensor[]
+  alarmEvents        AlarmEvent[]
+  subscriptions      Subscription[]
+  safeZones          SafeZone[]
+  branches           Branch[]
+  teams              Team[]
+  documentFolders    DocumentFolder[]
+  documents          Document[]
+  products           Product[]
+  storeOrders        StoreOrder[]
+  salesLeads         SalesLead[]
+  installJobs        InstallJob[]
+  clientLoyalties    ClientLoyalty[]
+  discountCodes      DiscountCode[]
+  stockRequests      StockRequest[]
+  errorReports       ErrorReport[]
+
+  @@map("tenants")
+}
+
+model User {
+  id              String     @id @default(uuid()) @db.Uuid
+  tenantId        String     @map("tenant_id") @db.Uuid
+  email           String
+  phone           String?
+  passwordHash    String?    @map("password_hash")
+  firstName       String     @map("first_name")
+  lastName        String     @map("last_name")
+  avatarUrl       String?    @map("avatar_url")
+  jobTitle        String?    @map("job_title")
+  role            UserRole
+  status          UserStatus @default(PENDING_VERIFICATION)
+  branchId        String?    @map("branch_id") @db.Uuid
+  lastKnownLat    Decimal?   @map("last_known_lat") @db.Decimal(10, 8)
+  lastKnownLng    Decimal?   @map("last_known_lng") @db.Decimal(11, 8)
+  lastLocationAt  DateTime?  @map("last_location_at")
+  trackingEnabled         Boolean    @default(true) @map("tracking_enabled")
+  familyMessagingEnabled  Boolean    @default(false) @map("family_messaging_enabled")
+  /** Protection clients appear in CRM; store-only shoppers do not */
+  isProtectionClient      Boolean    @default(false) @map("is_protection_client")
+  inviteToken             String?    @unique @map("invite_token")
+  inviteExpiresAt         DateTime?  @map("invite_expires_at")
+  registrationCompletedAt DateTime?  @map("registration_completed_at")
+  createdAt               DateTime   @default(now()) @map("created_at")
+  updatedAt       DateTime   @updatedAt @map("updated_at")
+
+  tenant            Tenant             @relation(fields: [tenantId], references: [id])
+  branch            Branch?            @relation(fields: [branchId], references: [id])
+  refreshTokens     RefreshToken[]
+  emergencyContacts EmergencyContact[]
+  incidents         Incident[]
+  familyMemberships FamilyMember[]
+  ownedFamilies     Family[]           @relation("FamilyOwner")
+  notifications     Notification[]
+  messages          Message[]
+  medicalProfile    MedicalProfile?
+  vehicles          Vehicle[]
+  properties        Property[]
+  subscription      Subscription?
+  safeZones         SafeZone[]
+  teamMemberships   TeamMember[]
+  initiatedCalls    CallSession[] @relation("CallInitiator")
+  receivedCalls     CallSession[] @relation("CallTarget")
+  storeOrders       StoreOrder[]  @relation("StoreOrderCustomer")
+  salesLeadsOwned   SalesLead[]   @relation("SalesLeadOwner")
+  installJobsAssigned InstallJob[] @relation("InstallJobTechnician")
+  loyalty           ClientLoyalty?
+  stockRequests     StockRequest[] @relation("StockRequestRequester")
+  stockReviews      StockRequest[] @relation("StockRequestReviewer")
+  errorReports      ErrorReport[]
+
+  @@unique([tenantId, email])
+  @@index([tenantId, status])
+  @@map("users")
+}
+
+model Officer {
+  id              String        @id @default(uuid()) @db.Uuid
+  tenantId        String        @map("tenant_id") @db.Uuid
+  email           String
+  firstName       String        @map("first_name")
+  lastName        String        @map("last_name")
+  status          OfficerStatus @default(OFF_DUTY)
+  currentLat      Decimal?      @map("current_lat") @db.Decimal(10, 8)
+  currentLng      Decimal?      @map("current_lng") @db.Decimal(11, 8)
+  zone            String?
+  branchId        String?       @map("branch_id") @db.Uuid
+  avgResponseSec  Int           @default(300) @map("avg_response_sec")
+  isActive        Boolean       @default(true) @map("is_active")
+  createdAt       DateTime      @default(now()) @map("created_at")
+  updatedAt       DateTime      @updatedAt @map("updated_at")
+
+  tenant      Tenant               @relation(fields: [tenantId], references: [id])
+  branch      Branch?              @relation(fields: [branchId], references: [id])
+  dispatches  Dispatch[]
+  vehicleCrew CompanyVehicleCrew?
+
+  @@unique([tenantId, email])
+  @@index([tenantId, status])
+  @@map("officers")
+}
+
+model CompanyVehicle {
+  id            String               @id @default(uuid()) @db.Uuid
+  tenantId      String               @map("tenant_id") @db.Uuid
+  registration  String
+  callSign      String               @map("call_sign")
+  make          String
+  model         String
+  color         String?
+  year          Int?
+  vehicleType   CompanyVehicleType   @map("vehicle_type")
+  status        CompanyVehicleStatus @default(AVAILABLE)
+  currentLat    Decimal?             @map("current_lat") @db.Decimal(10, 8)
+  currentLng    Decimal?             @map("current_lng") @db.Decimal(11, 8)
+  trackerLinked Boolean              @default(true) @map("tracker_linked")
+  isActive      Boolean              @default(true) @map("is_active")
+  createdAt     DateTime             @default(now()) @map("created_at")
+  updatedAt     DateTime             @updatedAt @map("updated_at")
+
+  tenant Tenant               @relation(fields: [tenantId], references: [id])
+  crew   CompanyVehicleCrew[]
+
+  @@unique([tenantId, registration])
+  @@unique([tenantId, callSign])
+  @@index([tenantId, status])
+  @@map("company_vehicles")
+}
+
+model CompanyVehicleCrew {
+  id               String          @id @default(uuid()) @db.Uuid
+  companyVehicleId String          @map("company_vehicle_id") @db.Uuid
+  officerId        String          @unique @map("officer_id") @db.Uuid
+  role             VehicleCrewRole @default(PASSENGER)
+  sortOrder        Int             @default(0) @map("sort_order")
+  assignedAt       DateTime        @default(now()) @map("assigned_at")
+
+  companyVehicle CompanyVehicle @relation(fields: [companyVehicleId], references: [id], onDelete: Cascade)
+  officer        Officer        @relation(fields: [officerId], references: [id], onDelete: Cascade)
+
+  @@index([companyVehicleId, sortOrder])
+  @@map("company_vehicle_crew")
+}
+
+model EmergencyContact {
+  id            String   @id @default(uuid()) @db.Uuid
+  tenantId      String   @map("tenant_id") @db.Uuid
+  userId        String   @map("user_id") @db.Uuid
+  name          String
+  phone         String
+  relationship  String?
+  priority      Int      @default(1)
+  notifyOnPanic Boolean  @default(true) @map("notify_on_panic")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("emergency_contacts")
+}
+
+model Family {
+  id          String   @id @default(uuid()) @db.Uuid
+  tenantId    String   @map("tenant_id") @db.Uuid
+  name        String
+  ownerUserId String   @map("owner_user_id") @db.Uuid
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  tenant  Tenant         @relation(fields: [tenantId], references: [id])
+  owner   User           @relation("FamilyOwner", fields: [ownerUserId], references: [id])
+  members FamilyMember[]
+
+  @@map("families")
+}
+
+model FamilyMember {
+  id              String   @id @default(uuid()) @db.Uuid
+  familyId        String   @map("family_id") @db.Uuid
+  userId          String   @map("user_id") @db.Uuid
+  nickname        String?
+  canViewLocation Boolean  @default(true) @map("can_view_location")
+  joinedAt        DateTime @default(now()) @map("joined_at")
+
+  family Family @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([familyId, userId])
+  @@map("family_members")
+}
+
+model Incident {
+  id               String           @id @default(uuid()) @db.Uuid
+  tenantId         String           @map("tenant_id") @db.Uuid
+  userId           String           @map("user_id") @db.Uuid
+  type             IncidentType
+  status           IncidentStatus   @default(ACTIVE)
+  priority         IncidentPriority @default(HIGH)
+  title            String?
+  description      String?
+  lat              Decimal          @db.Decimal(10, 8)
+  lng              Decimal          @db.Decimal(11, 8)
+  address          String?
+  vehicleMake      String?          @map("vehicle_make")
+  vehicleModel     String?          @map("vehicle_model")
+  vehicleColor     String?          @map("vehicle_color")
+  vehiclePlate     String?          @map("vehicle_plate")
+  isSilent         Boolean          @default(false) @map("is_silent")
+  resolvedAt       DateTime?        @map("resolved_at")
+  createdAt        DateTime         @default(now()) @map("created_at")
+  updatedAt        DateTime         @updatedAt @map("updated_at")
+
+  tenant     Tenant      @relation(fields: [tenantId], references: [id])
+  user       User        @relation(fields: [userId], references: [id])
+  dispatches Dispatch[]
+  media      IncidentMedia[]
+  notes      IncidentNote[]
+  documents  Document[]
+
+  @@index([tenantId, status])
+  @@index([userId])
+  @@map("incidents")
+}
+
+model DocumentFolder {
+  id          String   @id @default(uuid()) @db.Uuid
+  tenantId    String   @map("tenant_id") @db.Uuid
+  parentId    String?  @map("parent_id") @db.Uuid
+  name        String
+  description String?
+  icon        String?  @default("folder")
+  sortOrder   Int      @default(0) @map("sort_order")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  tenant    Tenant           @relation(fields: [tenantId], references: [id])
+  parent    DocumentFolder?  @relation("FolderTree", fields: [parentId], references: [id], onDelete: Cascade)
+  children  DocumentFolder[] @relation("FolderTree")
+  documents Document[]
+
+  @@index([tenantId, parentId])
+  @@map("document_folders")
+}
+
+model Document {
+  id          String           @id @default(uuid()) @db.Uuid
+  tenantId    String           @map("tenant_id") @db.Uuid
+  folderId    String?          @map("folder_id") @db.Uuid
+  incidentId  String?          @map("incident_id") @db.Uuid
+  category    DocumentCategory @default(OTHER)
+  title       String
+  description String?
+  fileName    String           @map("file_name")
+  fileType    String           @map("file_type")
+  fileUrl     String           @map("file_url")
+  fileSizeKb  Int?             @map("file_size_kb")
+  tags        String[]         @default([])
+  uploadedBy  String?          @map("uploaded_by")
+  isPinned    Boolean          @default(false) @map("is_pinned")
+  createdAt   DateTime         @default(now()) @map("created_at")
+  updatedAt   DateTime         @updatedAt @map("updated_at")
+
+  tenant   Tenant          @relation(fields: [tenantId], references: [id])
+  folder   DocumentFolder? @relation(fields: [folderId], references: [id], onDelete: SetNull)
+  incident Incident?       @relation(fields: [incidentId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, folderId])
+  @@index([tenantId, category])
+  @@index([incidentId])
+  @@map("documents")
+}
+
+model IncidentNote {
+  id         String   @id @default(uuid()) @db.Uuid
+  tenantId   String   @map("tenant_id") @db.Uuid
+  incidentId String   @map("incident_id") @db.Uuid
+  authorRole String   @map("author_role")
+  authorName String   @map("author_name")
+  content    String
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  tenant   Tenant   @relation(fields: [tenantId], references: [id])
+  incident Incident @relation(fields: [incidentId], references: [id], onDelete: Cascade)
+
+  @@index([incidentId, createdAt])
+  @@map("incident_notes")
+}
+
+model MedicalProfile {
+  id                 String   @id @default(uuid()) @db.Uuid
+  userId             String   @unique @map("user_id") @db.Uuid
+  bloodType          String?  @map("blood_type")
+  allergies          String?
+  medications        String?
+  chronicConditions  String?  @map("chronic_conditions")
+  emergencyNotes     String?  @map("emergency_notes")
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("medical_profiles")
+}
+
+model Vehicle {
+  id              String    @id @default(uuid()) @db.Uuid
+  tenantId        String    @map("tenant_id") @db.Uuid
+  userId          String    @map("user_id") @db.Uuid
+  registration    String
+  make            String
+  model           String
+  variant         String?
+  year            Int?
+  color           String?
+  vin             String?
+  engineNumber    String?   @map("engine_number")
+  licenceExpiry   DateTime? @map("licence_expiry")
+  insuranceInfo   String?   @map("insurance_info")
+  financeProvider String?   @map("finance_provider")
+  trackerLinked         Boolean   @default(false) @map("tracker_linked")
+  phoneTrackingEnabled  Boolean   @default(false) @map("phone_tracking_enabled")
+  theftRecovery         Boolean   @default(false) @map("theft_recovery")
+  lastKnownLat    Decimal?  @map("last_known_lat") @db.Decimal(10, 8)
+  lastKnownLng    Decimal?  @map("last_known_lng") @db.Decimal(11, 8)
+  immobiliserOn   Boolean   @default(false) @map("immobiliser_on")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("vehicles")
+}
+
+model Property {
+  id                 String       @id @default(uuid()) @db.Uuid
+  tenantId           String       @map("tenant_id") @db.Uuid
+  userId             String       @map("user_id") @db.Uuid
+  name               String
+  address            String
+  propertyType       PropertyType @default(HOUSE) @map("property_type")
+  accessNotes        String?      @map("access_notes")
+  gateCode           String?      @map("gate_code")
+  occupantDetails    String?      @map("occupant_details")
+  keyHolder          String?      @map("key_holder")
+  alarmStatus        AlarmStatus  @default(DISARMED) @map("alarm_status")
+  alarmLinked        Boolean      @default(false) @map("alarm_linked")
+  camerasLinked      Boolean      @default(false) @map("cameras_linked")
+  monitoringEnabled  Boolean      @default(true) @map("monitoring_enabled")
+  /** When false, interior cameras stay private unless panic/alarm unlocks them */
+  shareInteriorCameras Boolean    @default(false) @map("share_interior_cameras")
+  panelVendor        String?      @map("panel_vendor")
+  panelModel         String?      @map("panel_model")
+  communicatorType   String?      @map("communicator_type")
+  monitoringAccount  String?      @map("monitoring_account")
+  partitionLabel     String?      @default("Partition 1") @map("partition_label")
+  lat                Decimal?     @db.Decimal(10, 8)
+  lng                Decimal?     @db.Decimal(11, 8)
+  createdAt          DateTime     @default(now()) @map("created_at")
+  updatedAt          DateTime     @updatedAt @map("updated_at")
+
+  tenant      Tenant       @relation(fields: [tenantId], references: [id])
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  cameras     Camera[]
+  sensors     Sensor[]
+  alarmEvents AlarmEvent[]
+
+  @@index([userId])
+  @@index([tenantId])
+  @@map("properties")
+}
+
+model Camera {
+  id            String          @id @default(uuid()) @db.Uuid
+  tenantId      String          @map("tenant_id") @db.Uuid
+  propertyId    String          @map("property_id") @db.Uuid
+  name          String
+  locationLabel String          @map("location_label")
+  channel       Int             @default(1)
+  placement     CameraPlacement @default(EXTERIOR)
+  status        CameraStatus    @default(ONLINE)
+  snapshotUrl   String?         @map("snapshot_url")
+  streamUrl     String?         @map("stream_url")
+  vendor        String?
+  lastSeenAt    DateTime?       @map("last_seen_at")
+  createdAt     DateTime        @default(now()) @map("created_at")
+  updatedAt     DateTime        @updatedAt @map("updated_at")
+
+  tenant      Tenant       @relation(fields: [tenantId], references: [id])
+  property    Property     @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  alarmEvents AlarmEvent[]
+
+  @@index([propertyId])
+  @@index([tenantId])
+  @@map("cameras")
+}
+
+model Sensor {
+  id              String       @id @default(uuid()) @db.Uuid
+  tenantId        String       @map("tenant_id") @db.Uuid
+  propertyId      String       @map("property_id") @db.Uuid
+  zoneNumber      Int          @map("zone_number")
+  name            String
+  sensorType      SensorType   @map("sensor_type")
+  status          SensorStatus @default(NORMAL)
+  locationLabel   String       @map("location_label")
+  isPerimeter     Boolean      @default(false) @map("is_perimeter")
+  is24Hour        Boolean      @default(false) @map("is_24_hour")
+  bypassed        Boolean      @default(false)
+  cidCode         String?      @map("cid_code")
+  vendor          String?
+  lastTriggeredAt DateTime?    @map("last_triggered_at")
+  createdAt       DateTime     @default(now()) @map("created_at")
+  updatedAt       DateTime     @updatedAt @map("updated_at")
+
+  tenant      Tenant       @relation(fields: [tenantId], references: [id])
+  property    Property     @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  alarmEvents AlarmEvent[]
+
+  @@unique([propertyId, zoneNumber])
+  @@index([propertyId])
+  @@index([tenantId])
+  @@map("sensors")
+}
+
+model AlarmEvent {
+  id             String           @id @default(uuid()) @db.Uuid
+  tenantId       String           @map("tenant_id") @db.Uuid
+  propertyId     String           @map("property_id") @db.Uuid
+  cameraId       String?          @map("camera_id") @db.Uuid
+  sensorId       String?          @map("sensor_id") @db.Uuid
+  type           AlarmEventType
+  severity       IncidentPriority @default(MEDIUM)
+  status         AlarmEventStatus @default(NEW)
+  title          String
+  description    String?
+  cidCode        String?          @map("cid_code")
+  snapshotUrl    String?          @map("snapshot_url")
+  incidentId     String?          @map("incident_id") @db.Uuid
+  acknowledgedBy String?          @map("acknowledged_by") @db.Uuid
+  acknowledgedAt DateTime?        @map("acknowledged_at")
+  triggeredAt    DateTime         @default(now()) @map("triggered_at")
+  resolvedAt     DateTime?        @map("resolved_at")
+  createdAt      DateTime         @default(now()) @map("created_at")
+  updatedAt      DateTime         @updatedAt @map("updated_at")
+
+  tenant   Tenant   @relation(fields: [tenantId], references: [id])
+  property Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  camera   Camera?  @relation(fields: [cameraId], references: [id], onDelete: SetNull)
+  sensor   Sensor?  @relation(fields: [sensorId], references: [id], onDelete: SetNull)
+
+  @@index([propertyId, triggeredAt])
+  @@index([tenantId, status])
+  @@map("alarm_events")
+}
+
+model Subscription {
+  id                  String             @id @default(uuid()) @db.Uuid
+  tenantId            String             @map("tenant_id") @db.Uuid
+  userId              String             @unique @map("user_id") @db.Uuid
+  planName            String             @map("plan_name")
+  tierCode            String             @default("ESSENTIAL") @map("tier_code")
+  addons              String[]           @default([])
+  status              SubscriptionStatus @default(ACTIVE)
+  priceMonthly        Int                @map("price_monthly")
+  memberId            String             @map("member_id")
+  validUntil          DateTime           @map("valid_until")
+  lastPaidAt          DateTime?          @map("last_paid_at")
+  nextBillingAt       DateTime?          @map("next_billing_at")
+  billingFailedCount  Int                @default(0) @map("billing_failed_count")
+  lastBillingNoticeAt DateTime?          @map("last_billing_notice_at")
+  createdAt           DateTime           @default(now()) @map("created_at")
+  updatedAt           DateTime           @updatedAt @map("updated_at")
+
+  tenant   Tenant               @relation(fields: [tenantId], references: [id])
+  user     User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  payments PaymentTransaction[]
+
+  @@map("subscriptions")
+}
+
+model PaymentTransaction {
+  id                  String   @id @default(uuid()) @db.Uuid
+  tenantId            String   @map("tenant_id") @db.Uuid
+  userId              String   @map("user_id") @db.Uuid
+  reference           String   @unique
+  provider            String   @default("PAYFAST")
+  amountCents         Int      @map("amount_cents")
+  originalAmountCents Int?     @map("original_amount_cents")
+  discountCents       Int      @default(0) @map("discount_cents")
+  currency            String   @default("ZAR")
+  status              String   @default("PENDING")
+  kind                String   @default("CHECKOUT")
+  tierCode            String?  @map("tier_code")
+  addonCode           String?  @map("addon_code")
+  createdAt           DateTime @default(now()) @map("created_at")
+  updatedAt           DateTime @updatedAt @map("updated_at")
+
+  subscription Subscription @relation(fields: [userId], references: [userId], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("payment_transactions")
+}
+
+model SafeZone {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  name      String
+  lat       Decimal  @db.Decimal(10, 8)
+  lng       Decimal  @db.Decimal(11, 8)
+  radiusM   Int      @default(500) @map("radius_m")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("safe_zones")
+}
+
+model IncidentMedia {
+  id         String   @id @default(uuid()) @db.Uuid
+  incidentId String   @map("incident_id") @db.Uuid
+  fileName   String   @map("file_name")
+  fileType   String   @map("file_type")
+  fileUrl    String   @map("file_url")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  incident Incident @relation(fields: [incidentId], references: [id], onDelete: Cascade)
+
+  @@index([incidentId])
+  @@map("incident_media")
+}
+
+model Dispatch {
+  id         String         @id @default(uuid()) @db.Uuid
+  tenantId   String         @map("tenant_id") @db.Uuid
+  incidentId String         @map("incident_id") @db.Uuid
+  officerId  String         @map("officer_id") @db.Uuid
+  status     DispatchStatus @default(ASSIGNED)
+  createdAt  DateTime       @default(now()) @map("created_at")
+  updatedAt  DateTime       @updatedAt @map("updated_at")
+
+  incident Incident @relation(fields: [incidentId], references: [id], onDelete: Cascade)
+  officer  Officer  @relation(fields: [officerId], references: [id])
+
+  @@index([incidentId])
+  @@map("dispatches")
+}
+
+model Notification {
+  id        String           @id @default(uuid()) @db.Uuid
+  tenantId  String           @map("tenant_id") @db.Uuid
+  userId    String           @map("user_id") @db.Uuid
+  type      NotificationType
+  title     String
+  body      String
+  isRead    Boolean          @default(false) @map("is_read")
+  createdAt DateTime         @default(now()) @map("created_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isRead])
+  @@map("notifications")
+}
+
+model ErrorReport {
+  id           String            @id @default(uuid()) @db.Uuid
+  tenantId     String            @map("tenant_id") @db.Uuid
+  reporterId   String            @map("reporter_id") @db.Uuid
+  message      String
+  path         String?
+  userAgent    String?           @map("user_agent")
+  context      String?
+  status       ErrorReportStatus @default(OPEN)
+  resolvedAt   DateTime?         @map("resolved_at")
+  createdAt    DateTime          @default(now()) @map("created_at")
+  updatedAt    DateTime          @updatedAt @map("updated_at")
+
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+  reporter User   @relation(fields: [reporterId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, status, createdAt])
+  @@map("error_reports")
+}
+
+model Branch {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  name      String
+  code      String
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  tenant   Tenant    @relation(fields: [tenantId], references: [id])
+  teams    Team[]
+  users    User[]
+  officers Officer[]
+
+  @@unique([tenantId, code])
+  @@map("branches")
+}
+
+model Team {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  branchId  String   @map("branch_id") @db.Uuid
+  name      String
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  tenant        Tenant         @relation(fields: [tenantId], references: [id])
+  branch        Branch         @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  members       TeamMember[]
+  conversations Conversation[]
+
+  @@map("teams")
+}
+
+model TeamMember {
+  id       String   @id @default(uuid()) @db.Uuid
+  teamId   String   @map("team_id") @db.Uuid
+  userId   String   @map("user_id") @db.Uuid
+  isLead   Boolean  @default(false) @map("is_lead")
+  joinedAt DateTime @default(now()) @map("joined_at")
+
+  team Team @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([teamId, userId])
+  @@map("team_members")
+}
+
+model Conversation {
+  id        String           @id @default(uuid()) @db.Uuid
+  tenantId  String           @map("tenant_id") @db.Uuid
+  teamId    String?          @map("team_id") @db.Uuid
+  subject   String?
+  type      ConversationType @default(SUPPORT)
+  createdAt DateTime         @default(now()) @map("created_at")
+
+  tenant   Tenant    @relation(fields: [tenantId], references: [id])
+  team     Team?     @relation(fields: [teamId], references: [id], onDelete: SetNull)
+  messages Message[]
+
+  @@index([tenantId, type])
+  @@index([teamId])
+  @@map("conversations")
+}
+
+model Message {
+  id             String   @id @default(uuid()) @db.Uuid
+  conversationId String   @map("conversation_id") @db.Uuid
+  senderUserId   String   @map("sender_user_id") @db.Uuid
+  content        String
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  conversation Conversation        @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender       User                @relation(fields: [senderUserId], references: [id])
+  attachments  MessageAttachment[]
+
+  @@index([conversationId])
+  @@map("messages")
+}
+
+model MessageAttachment {
+  id        String                @id @default(uuid()) @db.Uuid
+  messageId String                @map("message_id") @db.Uuid
+  fileName  String                @map("file_name")
+  fileType  String                @map("file_type")
+  fileUrl   String                @map("file_url")
+  fileSize  Int                   @map("file_size")
+  kind      MessageAttachmentKind @default(FILE)
+  createdAt DateTime              @default(now()) @map("created_at")
+
+  message Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  @@index([messageId])
+  @@map("message_attachments")
+}
+
+model CallSession {
+  id              String      @id @default(uuid()) @db.Uuid
+  tenantId        String      @map("tenant_id") @db.Uuid
+  channel         CallChannel
+  status          CallStatus  @default(RINGING)
+  initiatorUserId String      @map("initiator_user_id") @db.Uuid
+  targetUserId    String?     @map("target_user_id") @db.Uuid
+  targetPhone     String?     @map("target_phone")
+  targetName      String      @map("target_name")
+  targetRole      String?     @map("target_role")
+  incidentId      String?     @map("incident_id") @db.Uuid
+  startedAt       DateTime?   @map("started_at")
+  endedAt         DateTime?   @map("ended_at")
+  durationSec     Int?        @map("duration_sec")
+  isMuted         Boolean     @default(false) @map("is_muted")
+  createdAt       DateTime    @default(now()) @map("created_at")
+  updatedAt       DateTime    @updatedAt @map("updated_at")
+
+  tenant    Tenant     @relation(fields: [tenantId], references: [id])
+  initiator User       @relation("CallInitiator", fields: [initiatorUserId], references: [id])
+  target    User?      @relation("CallTarget", fields: [targetUserId], references: [id])
+  notes     CallNote[]
+
+  @@index([tenantId, status])
+  @@index([initiatorUserId])
+  @@index([targetUserId])
+  @@map("call_sessions")
+}
+
+model CallNote {
+  id        String   @id @default(uuid()) @db.Uuid
+  callId    String   @map("call_id") @db.Uuid
+  authorId  String   @map("author_id") @db.Uuid
+  authorName String  @map("author_name")
+  content   String
+  noteType  String   @default("NOTE") @map("note_type")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  call CallSession @relation(fields: [callId], references: [id], onDelete: Cascade)
+
+  @@index([callId, createdAt])
+  @@map("call_notes")
+}
+
+model RefreshToken {
+  id        String    @id @default(uuid()) @db.Uuid
+  tokenHash String    @unique @map("token_hash")
+  userId    String?   @map("user_id") @db.Uuid
+  tenantId  String?   @map("tenant_id") @db.Uuid
+  expiresAt DateTime  @map("expires_at")
+  revokedAt DateTime? @map("revoked_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  user   User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tenant Tenant? @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("refresh_tokens")
+}
+
+model Product {
+  id          String          @id @default(uuid()) @db.Uuid
+  tenantId    String          @map("tenant_id") @db.Uuid
+  sku         String
+  name        String
+  description String
+  category    ProductCategory
+  priceCents  Int             @map("price_cents")
+  stock       Int             @default(0)
+  imageEmoji  String          @default("🛡️") @map("image_emoji")
+  featured    Boolean         @default(false)
+  isActive    Boolean         @default(true) @map("is_active")
+  requiresLicense Boolean     @default(false) @map("requires_license")
+  specs       Json            @default("{}")
+  createdAt   DateTime        @default(now()) @map("created_at")
+  updatedAt   DateTime        @updatedAt @map("updated_at")
+
+  tenant Tenant          @relation(fields: [tenantId], references: [id])
+  items  StoreOrderItem[]
+  stockRequests StockRequest[]
+
+  @@unique([tenantId, sku])
+  @@index([tenantId, category, isActive])
+  @@map("products")
+}
+
+model StockRequest {
+  id           String            @id @default(uuid()) @db.Uuid
+  tenantId     String            @map("tenant_id") @db.Uuid
+  requesterId  String            @map("requester_id") @db.Uuid
+  productId    String            @map("product_id") @db.Uuid
+  quantity     Int
+  status       StockRequestStatus @default(PENDING)
+  notes        String?
+  reviewedById String?           @map("reviewed_by_id") @db.Uuid
+  fulfilledAt  DateTime?         @map("fulfilled_at")
+  createdAt    DateTime          @default(now()) @map("created_at")
+  updatedAt    DateTime          @updatedAt @map("updated_at")
+
+  tenant    Tenant  @relation(fields: [tenantId], references: [id])
+  requester User    @relation("StockRequestRequester", fields: [requesterId], references: [id], onDelete: Cascade)
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  reviewedBy User?  @relation("StockRequestReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, status])
+  @@index([requesterId])
+  @@map("stock_requests")
+}
+
+model StoreOrder {
+  id                  String           @id @default(uuid()) @db.Uuid
+  tenantId            String           @map("tenant_id") @db.Uuid
+  orderNumber         String           @map("order_number")
+  customerUserId      String?          @map("customer_user_id") @db.Uuid
+  customerName        String           @map("customer_name")
+  customerEmail       String           @map("customer_email")
+  customerPhone       String?          @map("customer_phone")
+  shippingAddress     String           @map("shipping_address")
+  status              StoreOrderStatus @default(PENDING)
+  subtotalCents       Int              @map("subtotal_cents")
+  totalCents          Int              @map("total_cents")
+  discountCents       Int              @default(0) @map("discount_cents")
+  discountPercent     Int              @default(0) @map("discount_percent")
+  discountCode        String?          @map("discount_code")
+  loyaltyPointsEarned Int              @default(0) @map("loyalty_points_earned")
+  notes               String?
+  salesUserId         String?          @map("sales_user_id") @db.Uuid
+  createdAt           DateTime         @default(now()) @map("created_at")
+  updatedAt           DateTime         @updatedAt @map("updated_at")
+
+  tenant   Tenant           @relation(fields: [tenantId], references: [id])
+  customer User?            @relation("StoreOrderCustomer", fields: [customerUserId], references: [id], onDelete: SetNull)
+  items    StoreOrderItem[]
+
+  @@unique([tenantId, orderNumber])
+  @@index([tenantId, status])
+  @@map("store_orders")
+}
+
+model ClientLoyalty {
+  id                    String   @id @default(uuid()) @db.Uuid
+  tenantId              String   @map("tenant_id") @db.Uuid
+  userId                String   @unique @map("user_id") @db.Uuid
+  points                Int      @default(0)
+  lifetimePoints        Int      @default(0) @map("lifetime_points")
+  lifetimeSpendCents    Int      @default(0) @map("lifetime_spend_cents")
+  tier                  String   @default("BRONZE")
+  manualDiscountPercent Int      @default(0) @map("manual_discount_percent")
+  activePromoCode       String?  @map("active_promo_code")
+  notes                 String?
+  createdAt             DateTime @default(now()) @map("created_at")
+  updatedAt             DateTime @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, tier])
+  @@map("client_loyalties")
+}
+
+model DiscountCode {
+  id          String    @id @default(uuid()) @db.Uuid
+  tenantId    String    @map("tenant_id") @db.Uuid
+  code        String
+  percentOff  Int       @map("percent_off")
+  appliesTo   String    @default("BOTH") @map("applies_to")
+  maxUses     Int?      @map("max_uses")
+  usedCount   Int       @default(0) @map("used_count")
+  isActive    Boolean   @default(true) @map("is_active")
+  expiresAt   DateTime? @map("expires_at")
+  description String?
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@unique([tenantId, code])
+  @@index([tenantId, isActive])
+  @@map("discount_codes")
+}
+
+model StoreOrderItem {
+  id           String @id @default(uuid()) @db.Uuid
+  orderId      String @map("order_id") @db.Uuid
+  productId    String @map("product_id") @db.Uuid
+  productName  String @map("product_name")
+  unitPriceCents Int  @map("unit_price_cents")
+  quantity     Int
+  lineTotalCents Int  @map("line_total_cents")
+
+  order   StoreOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product Product    @relation(fields: [productId], references: [id])
+
+  @@index([orderId])
+  @@map("store_order_items")
+}
+
+model SalesLead {
+  id            String          @id @default(uuid()) @db.Uuid
+  tenantId      String          @map("tenant_id") @db.Uuid
+  ownerUserId   String?         @map("owner_user_id") @db.Uuid
+  companyName   String?         @map("company_name")
+  contactName   String          @map("contact_name")
+  contactEmail  String?         @map("contact_email")
+  contactPhone  String?         @map("contact_phone")
+  source        String          @default("Store")
+  status        SalesLeadStatus @default(NEW)
+  interest      String?
+  estimatedCents Int?           @map("estimated_cents")
+  notes         String?
+  nextFollowUp  DateTime?       @map("next_follow_up")
+  createdAt     DateTime        @default(now()) @map("created_at")
+  updatedAt     DateTime        @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+  owner  User?  @relation("SalesLeadOwner", fields: [ownerUserId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, status])
+  @@index([ownerUserId])
+  @@map("sales_leads")
+}
+
+model InstallJob {
+  id              String           @id @default(uuid()) @db.Uuid
+  tenantId        String           @map("tenant_id") @db.Uuid
+  technicianId    String?          @map("technician_id") @db.Uuid
+  title           String
+  description     String?
+  jobType         String           @map("job_type")
+  status          InstallJobStatus @default(SCHEDULED)
+  clientName      String           @map("client_name")
+  clientPhone     String?          @map("client_phone")
+  address         String
+  scheduledAt     DateTime         @map("scheduled_at")
+  completedAt     DateTime?        @map("completed_at")
+  equipmentNotes  String?          @map("equipment_notes")
+  lat             Decimal?         @db.Decimal(10, 8)
+  lng             Decimal?         @db.Decimal(11, 8)
+  createdAt       DateTime         @default(now()) @map("created_at")
+  updatedAt       DateTime         @updatedAt @map("updated_at")
+
+  tenant     Tenant @relation(fields: [tenantId], references: [id])
+  technician User?  @relation("InstallJobTechnician", fields: [technicianId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, status])
+  @@index([technicianId, status])
+  @@map("install_jobs")
+}

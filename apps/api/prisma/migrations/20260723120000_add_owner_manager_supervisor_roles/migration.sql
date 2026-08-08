@@ -1,0 +1,4 @@
+-- AlterEnum: add Owner / Manager / Supervisor login roles
+ALTER TYPE "UserRole" ADD VALUE IF NOT EXISTS 'SUPERVISOR';
+ALTER TYPE "UserRole" ADD VALUE IF NOT EXISTS 'MANAGER';
+ALTER TYPE "UserRole" ADD VALUE IF NOT EXISTS 'OWNER';
