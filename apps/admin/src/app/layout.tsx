@@ -1,7 +1,6 @@
 import type { Metadata } from 'next';
 import { ThemeProvider } from '@/components/ThemeProvider';
 import { CallShell } from '@/components/calls/CallShell';
-import { DemoModeBanner } from '@/components/DemoModeBanner';
 import './globals.css';
 
 export const metadata: Metadata = {
@@ -55,7 +54,6 @@ export default function RootLayout({
       </head>
       <body>
         <ThemeProvider>
-          <DemoModeBanner />
           <CallShell>{children}</CallShell>
         </ThemeProvider>
       </body>
