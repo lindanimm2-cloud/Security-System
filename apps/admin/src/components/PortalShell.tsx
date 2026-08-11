@@ -13,6 +13,7 @@ import { PortalProtectionBadge } from './portal/PortalProtectionBadge';
 import { BrandMark } from './BrandMark';
 import { ThemeToggle } from './ThemeToggle';
 import { MobileBottomNav } from './nav/MobileBottomNav';
+import { clientApi, type ApiResponse } from '@/lib/api-client';
 
 export function PortalShell({
   session,
@@ -24,6 +25,7 @@ export function PortalShell({
   const router = useRouter();
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [unread, setUnread] = useState(0);
   const { access, loading: accessLoading, tierCode } = useSubscriptionAccess();
   const navSections = useMemo(() => {
     const sections = filterPortalNav(access, accessLoading);
@@ -41,9 +43,31 @@ export function PortalShell({
         label: item.mobileLabel,
         icon: item.icon,
         exact: item.exact,
+        badge: item.href === '/portal' && unread > 0 ? unread : undefined,
       })),
-    [access, accessLoading],
+    [access, accessLoading, unread],
   );
+
+  useEffect(() => {
+    let cancelled = false;
+    async function poll() {
+      try {
+        const res = await clientApi.get<
+          ApiResponse<{ unreadCount?: number; stats?: { unreadNotifications?: number } }>
+        >('/client/notifications');
+        if (cancelled) return;
+        setUnread(res.data?.unreadCount ?? 0);
+      } catch {
+        /* keep last */
+      }
+    }
+    void poll();
+    const id = window.setInterval(() => void poll(), 30000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(id);
+    };
+  }, []);
 
   useEffect(() => {
     if (accessLoading || !access) return;

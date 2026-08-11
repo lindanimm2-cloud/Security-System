@@ -11,6 +11,7 @@ import { NavClock } from './NavClock';
 import { ThemeToggle } from './ThemeToggle';
 import { roleDisplayLabel } from '@/lib/role-labels';
 import { MobileBottomNav } from './nav/MobileBottomNav';
+import { techApi, type ApiResponse } from '@/lib/api-client';
 
 export function TechShell({
   session,
@@ -24,6 +25,29 @@ export function TechShell({
   const router = useRouter();
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [activeJobs, setActiveJobs] = useState(0);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function poll() {
+      try {
+        const res = await techApi.get<
+          ApiResponse<{ stats?: { active?: number; scheduled?: number } }>
+        >('/store/tech/me');
+        if (cancelled) return;
+        const s = res.data?.stats;
+        setActiveJobs((s?.active ?? 0) + (s?.scheduled ?? 0));
+      } catch {
+        /* keep last */
+      }
+    }
+    void poll();
+    const id = window.setInterval(() => void poll(), 30000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(id);
+    };
+  }, []);
 
   useEffect(() => {
     setMenuOpen(false);
@@ -133,6 +157,7 @@ export function TechShell({
           label: item.mobileLabel,
           icon: item.icon,
           exact: item.exact,
+          badge: item.href === '/tech' && activeJobs > 0 ? activeJobs : undefined,
         }))}
         ariaLabel="Technician"
       />

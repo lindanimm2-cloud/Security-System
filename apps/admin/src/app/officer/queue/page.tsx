@@ -7,6 +7,8 @@ import { useEffect, useState } from 'react';
 import { OfficerLayout } from '@/components/officer/OfficerLayout';
 import { DispatchStatusBadge } from '@/components/officer/StatusBadges';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
+import { OpsSwipeRow } from '@/components/ops/OpsSwipeRow';
+import { OpsUndoToast, useUndoToast } from '@/components/ops/OpsUndoToast';
 import { useApi } from '@/hooks/useApi';
 import {
   officerQueueRowClass,
@@ -42,6 +44,22 @@ type QueueData = {
   }[];
 };
 
+function actionPath(primary: ReturnType<typeof primaryTaskAction>): string | null {
+  if (primary === 'accept') return 'accept';
+  if (primary === 'enroute') return 'en-route';
+  if (primary === 'scene') return 'on-scene';
+  if (primary === 'complete') return 'complete';
+  return null;
+}
+
+function actionLabel(primary: ReturnType<typeof primaryTaskAction>): string {
+  if (primary === 'accept') return 'Accept';
+  if (primary === 'enroute') return 'En route';
+  if (primary === 'scene') return 'On scene';
+  if (primary === 'complete') return 'Complete';
+  return 'Advance';
+}
+
 export default function OfficerQueuePage() {
   return (
     <OfficerLayout title="Incident Queue">
@@ -55,6 +73,40 @@ function QueueContent() {
     () => officerApi.get<ApiResponse<QueueData>>('/officer/queue'),
     [],
   );
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [actionError, setActionError] = useState('');
+  const undo = useUndoToast();
+
+  useEffect(() => {
+    const id = window.setInterval(() => void reload({ silent: true }), 20000);
+    return () => window.clearInterval(id);
+  }, [reload]);
+
+  async function advance(d: QueueData['assigned'][number]) {
+    const primary = primaryTaskAction(d.status);
+    const path = actionPath(primary);
+    if (!path || !primary) return;
+    const prev = d.status;
+    setBusyId(d.id);
+    setActionError('');
+    try {
+      await officerApi.post(`/officer/dispatch/${d.id}/${path}`);
+      undo.show(
+        primary === 'complete'
+          ? 'Assignment completed'
+          : `Marked ${actionLabel(primary).toLowerCase()}`,
+        async () => {
+          await officerApi.post(`/officer/dispatch/${d.id}/undo`, { status: prev });
+          void reload();
+        },
+      );
+      void reload();
+    } catch (e) {
+      setActionError(friendlyErrorMessage(e) || 'Update failed');
+    } finally {
+      setBusyId(null);
+    }
+  }
 
   if (loading) return <LoadingSpinner label="Loading queue..." fullScreen />;
   if (error) return <ErrorAlert error={error} onRetry={reload} />;
@@ -63,46 +115,66 @@ function QueueContent() {
 
   return (
     <>
+      {actionError ? <ErrorAlert message={actionError} /> : null}
       <section className="portal-card">
         <h2>Your assignments</h2>
         {q.assigned.length === 0 ? (
           <p className="text-muted">No assignments in your queue.</p>
         ) : (
           <div className="list-card">
-            {q.assigned.map((d) => (
-              <div
-                key={d.id}
-                className={`list-row list-row--stack ${officerQueueRowClass(d.status, d.incident.type)}`}
-              >
-                <div className="list-row-top">
-                  <span className={`incident-type incident-type--${d.incident.priority.toLowerCase()}`}>
-                    {d.incident.type}
-                  </span>
-                  <DispatchStatusBadge status={d.status} />
-                </div>
-                <strong>{d.incident.client}</strong>
-                <span className="text-muted">{d.incident.address ?? 'See map'}</span>
-                <div className="officer-action-row officer-task-actions">
-                  <Link
-                    href="/officer"
-                    className={`btn-sm ${officerTaskButtonClass(primaryTaskAction(d.status) ?? 'accept', d.status, 'link')}`}
+            {q.assigned.map((d) => {
+              const primary = primaryTaskAction(d.status);
+              const label = actionLabel(primary);
+              return (
+                <OpsSwipeRow
+                  key={d.id}
+                  disabled={!primary || busyId === d.id}
+                  label={label}
+                  onSwipePrimary={() => void advance(d)}
+                >
+                  <div
+                    className={`list-row list-row--stack ${officerQueueRowClass(d.status, d.incident.type)}`}
                   >
-                    Manage
-                  </Link>
-                  <Link href="/officer/report" className={`btn-sm ${officerTaskButtonClass('report', d.status, 'link')}`}>
-                    Report
-                  </Link>
-                  <Link
-                    href={`https://www.google.com/maps/dir/?api=1&destination=${d.incident.lat},${d.incident.lng}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className={`btn-sm ${officerTaskButtonClass('navigate', d.status, 'link')}`}
-                  >
-                    Navigate
-                  </Link>
-                </div>
-              </div>
-            ))}
+                    <div className="list-row-top">
+                      <span
+                        className={`incident-type incident-type--${d.incident.priority.toLowerCase()}`}
+                      >
+                        {d.incident.type}
+                      </span>
+                      <DispatchStatusBadge status={d.status} />
+                    </div>
+                    <strong>{d.incident.client}</strong>
+                    <span className="text-muted">{d.incident.address ?? 'See map'}</span>
+                    <div className="officer-action-row officer-task-actions">
+                      {primary && (
+                        <button
+                          type="button"
+                          className={`btn-sm ${officerTaskButtonClass(primary, d.status)}`}
+                          disabled={busyId === d.id}
+                          onClick={() => void advance(d)}
+                        >
+                          {busyId === d.id ? '…' : label}
+                        </button>
+                      )}
+                      <Link
+                        href="/officer/report"
+                        className={`btn-sm ${officerTaskButtonClass('report', d.status, 'link')}`}
+                      >
+                        Report
+                      </Link>
+                      <Link
+                        href={`https://www.google.com/maps/dir/?api=1&destination=${d.incident.lat},${d.incident.lng}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className={`btn-sm ${officerTaskButtonClass('navigate', d.status, 'link')}`}
+                      >
+                        Navigate
+                      </Link>
+                    </div>
+                  </div>
+                </OpsSwipeRow>
+              );
+            })}
           </div>
         )}
       </section>
@@ -120,7 +192,9 @@ function QueueContent() {
             {q.unassigned.map((i) => (
               <div key={i.id} className="list-row list-row--stack">
                 <div className="list-row-top">
-                  <span className={`incident-type incident-type--${i.priority.toLowerCase()}`}>{i.type}</span>
+                  <span className={`incident-type incident-type--${i.priority.toLowerCase()}`}>
+                    {i.type}
+                  </span>
                   <span className="badge badge--alert">Awaiting dispatch</span>
                 </div>
                 <div className="officer-open-incident-row">
@@ -139,6 +213,7 @@ function QueueContent() {
           </div>
         )}
       </section>
+      <OpsUndoToast toast={undo.toast} onDismiss={undo.clear} />
     </>
   );
 }
@@ -155,7 +230,7 @@ function IncidentVolunteerButton({
   const [volunteered, setVolunteered] = useState(initialVolunteered);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
-  const [actionError, setActionError] = useState('');
+  const [volError, setVolError] = useState('');
 
   useEffect(() => {
     setVolunteered(initialVolunteered);
@@ -163,7 +238,7 @@ function IncidentVolunteerButton({
 
   async function handleVolunteer() {
     setLoading(true);
-    setActionError('');
+    setVolError('');
     setMessage('');
     try {
       const res = await officerApi.post<
@@ -173,7 +248,7 @@ function IncidentVolunteerButton({
       setMessage(res.data?.message ?? 'Dispatch notified.');
       onVolunteered();
     } catch (err) {
-      setActionError(friendlyErrorMessage(err, 'action'));
+      setVolError(friendlyErrorMessage(err, 'action'));
     } finally {
       setLoading(false);
     }
@@ -199,7 +274,7 @@ function IncidentVolunteerButton({
       >
         {loading ? 'Notifying…' : 'Available'}
       </button>
-      {actionError && <ErrorAlert error={actionError} inline />}
+      {volError && <ErrorAlert error={volError} inline />}
     </div>
   );
 }

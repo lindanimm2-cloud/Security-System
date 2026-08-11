@@ -12,6 +12,9 @@ import { HomeAlarmControl } from '@/components/portal/HomeAlarmControl';
 import { clientApi, type ApiResponse } from '@/lib/api-client';
 import { useSubscriptionAccess } from '@/hooks/useSubscriptionAccess';
 import { activityHref } from '@/lib/portal-routes';
+import { OpsMyShiftHeader } from '@/components/ops/OpsMyShiftHeader';
+import { OpsNeedsYou, OpsQuickWork } from '@/components/ops/OpsQuickWork';
+import { OpsUndoToast, useUndoToast } from '@/components/ops/OpsUndoToast';
 
 type Overview = {
   user: { firstName: string; trackingEnabled: boolean; address: string | null };
@@ -58,6 +61,9 @@ function OverviewDashboard() {
   const [medicalLoading, setMedicalLoading] = useState(false);
   const [fireLoading, setFireLoading] = useState(false);
   const [alertMsg, setAlertMsg] = useState('');
+  const [filter, setFilter] = useState('all');
+  const [armLoading, setArmLoading] = useState(false);
+  const undo = useUndoToast();
   const { data, loading, error, reload } = useApi(
     () => clientApi.get<ApiResponse<Overview>>('/client/overview'),
     [],
@@ -88,6 +94,9 @@ function OverviewDashboard() {
     try {
       await clientApi.post('/client/panic', { silent });
       setAlertMsg(silent ? 'Silent alert sent discreetly.' : 'Panic alert sent. Dispatch notified.');
+      undo.show(silent ? 'Silent alert sent' : 'Panic alert sent', async () => {
+        /* demo: acknowledge only */
+      });
       reload();
     } finally {
       setPanicLoading(false);
@@ -119,6 +128,29 @@ function OverviewDashboard() {
     }
   }
 
+  async function togglePrimaryAlarm() {
+    const prop = data?.data?.properties[0];
+    if (!prop) {
+      window.location.href = '/portal/home';
+      return;
+    }
+    const prev = prop.alarmStatus;
+    const next = ['ARMED', 'STAY', 'NIGHT'].includes(prev) ? 'DISARMED' : 'ARMED';
+    setArmLoading(true);
+    setAlertMsg('');
+    try {
+      await clientApi.patch(`/client/properties/${prop.id}/alarm`, { status: next });
+      setAlertMsg(next === 'DISARMED' ? 'Alarm disarmed.' : 'Alarm armed (Away).');
+      undo.show(next === 'DISARMED' ? 'Disarmed' : 'Armed', async () => {
+        await clientApi.patch(`/client/properties/${prop.id}/alarm`, { status: prev });
+        void reload();
+      });
+      void reload();
+    } finally {
+      setArmLoading(false);
+    }
+  }
+
   if (loading) return <LoadingSpinner label="Loading overview..." fullScreen />;
   if (error) return <ErrorAlert error={error} onRetry={reload} />;
 
@@ -138,6 +170,92 @@ function OverviewDashboard() {
 
   return (
     <>
+      <OpsMyShiftHeader
+        title="Right now"
+        subtitle={
+          hasAlert
+            ? `${d.stats.activeIncidents} active · action needed`
+            : 'You are covered — panic stays on this screen'
+        }
+        chips={[
+          {
+            id: 'all',
+            label: 'Everything',
+            count:
+              d.stats.activeIncidents +
+              d.stats.unreadNotifications +
+              (primaryAlarm ? 1 : 0),
+          },
+          {
+            id: 'urgent',
+            label: 'Incidents',
+            count: d.stats.activeIncidents,
+            tone: hasAlert ? 'urgent' : 'ok',
+          },
+          {
+            id: 'alarm',
+            label: 'Alarm',
+            count: primaryAlarm ? 1 : 0,
+            tone: primaryAlarm?.alarmStatus === 'ARMED' ? 'ok' : 'warn',
+          },
+          {
+            id: 'messages',
+            label: 'Updates',
+            count: d.stats.unreadNotifications,
+            tone: d.stats.unreadNotifications > 0 ? 'warn' : 'neutral',
+          },
+        ]}
+        activeChip={filter}
+        onChip={(id) => {
+          if (id === 'messages') {
+            window.location.href = '/portal/updates';
+            return;
+          }
+          if (id === 'alarm') {
+            window.location.href = '/portal/home';
+            return;
+          }
+          setFilter(id);
+        }}
+      />
+
+      <OpsQuickWork
+        hint="Protection controls"
+        actions={[
+          {
+            id: 'panic',
+            label: panicLoading ? 'Sending…' : 'Panic',
+            primary: true,
+            loading: panicLoading,
+            disabled: panicLoading || silentLoading || medicalLoading || fireLoading,
+            onClick: () => void handlePanic(false),
+          },
+          {
+            id: 'arm',
+            label: armLoading
+              ? 'Updating…'
+              : primaryAlarm && ['ARMED', 'STAY', 'NIGHT'].includes(primaryAlarm.alarmStatus)
+                ? 'Disarm'
+                : 'Arm',
+            loading: armLoading,
+            disabled: armLoading || !primaryAlarm,
+            onClick: () => void togglePrimaryAlarm(),
+          },
+          {
+            id: 'call',
+            label: 'Call dispatch',
+            href: contactsPayload?.meta?.dispatchLine
+              ? `tel:${contactsPayload.meta.dispatchLine.phone}`
+              : '/portal/emergency',
+          },
+          {
+            id: 'updates',
+            label: 'Updates',
+            href: '/portal/updates',
+          },
+        ]}
+      />
+
       <div className="portal-hero portal-hero--compact">
         <div>
           <h1>Hello, {d.user.firstName}</h1>
@@ -233,10 +351,11 @@ function OverviewDashboard() {
       </section>
 
       {/* Priority: right-now status board */}
+      {(filter === 'all' || filter === 'urgent') && (
       <section className="portal-now" aria-label="Right now">
         <div className="portal-now__head">
-          <h2>Right now</h2>
-          <span className="text-muted">What needs your attention</span>
+          <h2>Status board</h2>
+          <span className="text-muted">Tap to act</span>
         </div>
         <div className="portal-now__grid">
           <Link
@@ -295,6 +414,33 @@ function OverviewDashboard() {
           </Link>
         </div>
       </section>
+      )}
+
+      <OpsNeedsYou
+        items={[
+          ...(hasAlert
+            ? [
+                {
+                  id: 'inc',
+                  title: `${d.stats.activeIncidents} active incident${d.stats.activeIncidents === 1 ? '' : 's'}`,
+                  detail: 'Tap for status and responder updates',
+                  href: '/portal/incidents',
+                },
+              ]
+            : []),
+          ...(d.stats.unreadNotifications > 0
+            ? [
+                {
+                  id: 'upd',
+                  title: `${d.stats.unreadNotifications} updates`,
+                  detail: 'Messages and system notices',
+                  href: '/portal/updates',
+                },
+              ]
+            : []),
+        ]}
+        viewAllHref="/portal/updates"
+      />
 
       {(hasAlert || activeIncidents.length > 0) && (
         <section className="portal-card portal-card--accent">
@@ -582,6 +728,7 @@ function OverviewDashboard() {
           </ul>
         </section>
       </div>
+      <OpsUndoToast toast={undo.toast} onDismiss={undo.clear} />
     </>
   );
 }

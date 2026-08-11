@@ -2,7 +2,7 @@
 
 import { ErrorAlert } from '@/components/ErrorAlert';
 import Link from 'next/link';
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { ControlRoomLayout } from '@/components/control-room/ControlRoomLayout';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { useApi } from '@/hooks/useApi';
@@ -13,6 +13,8 @@ import { sortIncidentsForOps } from '@/lib/alert-priority';
 import { CONTROL_ROOM_ROUTES, dispatchHref, incidentHref, mapHref, officerHref } from '@/lib/control-room-routes';
 import { getSession } from '@/lib/auth';
 import { navForRole } from '@/lib/control-room-nav';
+import { OpsMyShiftHeader } from '@/components/ops/OpsMyShiftHeader';
+import { OpsCompactStats, OpsNeedsYou, OpsQuickWork } from '@/components/ops/OpsQuickWork';
 
 type Dashboard = {
   stats: {
@@ -42,6 +44,7 @@ function OverviewContent() {
     () => adminApi.get<ApiResponse<Dashboard>>('/control-room/dashboard'),
     [],
   );
+  const [filter, setFilter] = useState('all');
 
   useEffect(() => {
     const id = window.setInterval(() => void reload({ silent: true }), 15000);
@@ -75,38 +78,84 @@ function OverviewContent() {
   if (error) return <ErrorAlert error={error} onRetry={reload} />;
   if (!d) return null;
 
-  const shortcuts = [
-    { href: CONTROL_ROOM_ROUTES.map, label: 'Live Map', className: 'btn-primary' },
-    { href: CONTROL_ROOM_ROUTES.incidents, label: 'Incidents', className: 'btn-secondary' },
-    { href: CONTROL_ROOM_ROUTES.dispatch, label: 'Dispatch', className: 'btn-secondary' },
-    { href: CONTROL_ROOM_ROUTES.officers, label: 'Officers', className: 'btn-secondary' },
-    { href: CONTROL_ROOM_ROUTES.customers, label: 'Customers', className: 'btn-secondary' },
-    { href: '/control-room/installs', label: 'Install Jobs', className: 'btn-secondary' },
-  ].filter((s) => canAccess(s.href));
+  const topIncident = prioritizedIncidents[0];
+  const list =
+    filter === 'urgent' ? criticalList : prioritizedIncidents;
 
   return (
     <div className="dash-ops">
-      <div className="dash-ops__head">
-        <div>
-          <p className="dash-ops__eyebrow">
-            <span className="ops-live-chip__dot" aria-hidden />
-            Ops live · auto-refresh 15s
-          </p>
-          <h1 className="dash-ops__title">Command overview</h1>
-        </div>
-        <div className="dash-ops__head-actions">
-          {canAccess(CONTROL_ROOM_ROUTES.map) && (
-            <Link href={CONTROL_ROOM_ROUTES.map} className="btn-primary">
-              Open live map
-            </Link>
-          )}
-          {canAccess(CONTROL_ROOM_ROUTES.incidents) && (
-            <Link href={CONTROL_ROOM_ROUTES.incidents} className="btn-secondary">
-              All incidents
-            </Link>
-          )}
-        </div>
-      </div>
+      <OpsMyShiftHeader
+        title="Ops shift"
+        subtitle={`${d.stats.activeIncidents} open · ${d.stats.criticalIncidents} critical · ${officerCoveragePct}% officers available`}
+        chips={[
+          {
+            id: 'all',
+            label: 'Everything',
+            count: d.stats.activeIncidents,
+          },
+          {
+            id: 'urgent',
+            label: 'Critical',
+            count: d.stats.criticalIncidents,
+            tone: 'urgent',
+          },
+          {
+            id: 'officers',
+            label: 'Available',
+            count: d.stats.availableOfficers,
+            tone: 'ok',
+          },
+          {
+            id: 'map',
+            label: 'Map',
+            count: d.stats.activeUsers,
+            tone: 'neutral',
+          },
+        ]}
+        activeChip={filter}
+        onChip={(id) => {
+          if (id === 'map' && canAccess(CONTROL_ROOM_ROUTES.map)) {
+            window.location.href = CONTROL_ROOM_ROUTES.map;
+            return;
+          }
+          if (id === 'officers' && canAccess(CONTROL_ROOM_ROUTES.officers)) {
+            window.location.href = CONTROL_ROOM_ROUTES.officers;
+            return;
+          }
+          setFilter(id);
+        }}
+      />
+
+      {topIncident && canAccess(CONTROL_ROOM_ROUTES.dispatch) && (
+        <OpsQuickWork
+          hint={`${topIncident.type} — ${topIncident.user}`}
+          actions={[
+            {
+              id: 'dispatch',
+              label: 'Dispatch',
+              primary: true,
+              href: dispatchHref(topIncident.id),
+            },
+            {
+              id: 'open',
+              label: 'Open',
+              href: incidentHref(topIncident.id),
+            },
+            canAccess(CONTROL_ROOM_ROUTES.map)
+              ? {
+                  id: 'map',
+                  label: 'Live map',
+                  href: CONTROL_ROOM_ROUTES.map,
+                }
+              : { id: 'map', label: 'Live map', href: CONTROL_ROOM_ROUTES.map },
+            {
+              id: 'call',
+              label: 'Calls',
+              href: CONTROL_ROOM_ROUTES.communications,
+            },
+          ]}
+        />
+      )}
 
       {canAccess(CONTROL_ROOM_ROUTES.incidents) && d.stats.criticalIncidents > 0 && (
         <Link href={CONTROL_ROOM_ROUTES.incidents} className="ops-critical-banner">
@@ -134,14 +183,14 @@ function OverviewContent() {
                 {d.stats.activeIncidents} open
               </Link>
             </div>
-            {prioritizedIncidents.length === 0 ? (
+            {list.length === 0 ? (
               <div className="dash-clear">
                 <strong>Board clear</strong>
                 <p className="text-muted">No active incidents. Monitor the map for new alerts.</p>
               </div>
             ) : (
               <ul className="incident-list dash-incident-list">
-                {prioritizedIncidents.slice(0, 6).map((i) => (
+                {list.slice(0, 6).map((i) => (
                   <li
                     key={i.id}
                     className={`incident-row incident-row--link incident-row--${i.priority.toLowerCase()}`}
@@ -163,18 +212,15 @@ function OverviewContent() {
               </ul>
             )}
             {criticalList.length > 0 && (
-              <div className="dash-needs-now">
-                <strong>Needs you now</strong>
-                <ul>
-                  {criticalList.slice(0, 3).map((i) => (
-                    <li key={i.id}>
-                      <Link href={dispatchHref(i.id)}>
-                        {i.type} — {i.user}
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
-              </div>
+              <OpsNeedsYou
+                items={criticalList.slice(0, 3).map((i) => ({
+                  id: i.id,
+                  title: `${i.type} — ${i.user}`,
+                  detail: `${i.location} · ${i.time}`,
+                  href: dispatchHref(i.id),
+                }))}
+                viewAllHref={CONTROL_ROOM_ROUTES.incidents}
+              />
             )}
           </section>
         )}
@@ -212,53 +258,39 @@ function OverviewContent() {
         )}
       </div>
 
-      {/* Priority 2: coverage + response metrics */}
-      <div className="stats-grid">
-        {canAccess(CONTROL_ROOM_ROUTES.incidents) && (
-          <StatCard
-            href={CONTROL_ROOM_ROUTES.incidents}
-            label="Active Incidents"
-            value={String(d.stats.activeIncidents)}
-            trend={`${d.stats.criticalIncidents} critical`}
-            highlight
-          />
-        )}
-        {canAccess(officerHref()) && (
-          <StatCard
-            href={officerHref()}
-            label="Officers Available"
-            value={String(d.stats.availableOfficers)}
-            trend={`${officerCoveragePct}% coverage · ${d.stats.totalOfficers} on duty`}
-          />
-        )}
-        {canAccess(CONTROL_ROOM_ROUTES.map) && (
-          <StatCard
-            href={mapHref('users')}
-            label="Active Users"
-            value={d.stats.activeUsers.toLocaleString()}
-            trend="Tracking enabled"
-          />
-        )}
-        {canAccess(CONTROL_ROOM_ROUTES.analytics) && (
-          <StatCard
-            href={CONTROL_ROOM_ROUTES.analytics}
-            label="Avg Response"
-            value={d.stats.avgResponseFormatted}
-            trend="Fleet average"
-            positive
-          />
-        )}
-      </div>
-
-      {shortcuts.length > 0 && (
-        <div className="overview-shortcuts">
-          {shortcuts.map((s) => (
-            <Link key={s.href} href={s.href} className={s.className}>
-              {s.label}
-            </Link>
-          ))}
-        </div>
-      )}
+      {/* Priority 2: coverage metrics */}
+      <OpsCompactStats
+        items={[
+          ...(canAccess(CONTROL_ROOM_ROUTES.incidents)
+            ? [
+                {
+                  label: 'Incidents',
+                  value: String(d.stats.activeIncidents),
+                  href: CONTROL_ROOM_ROUTES.incidents,
+                  warn: d.stats.criticalIncidents > 0,
+                },
+              ]
+            : []),
+          ...(canAccess(officerHref())
+            ? [
+                {
+                  label: 'Available',
+                  value: String(d.stats.availableOfficers),
+                  href: officerHref(),
+                },
+              ]
+            : []),
+          ...(canAccess(CONTROL_ROOM_ROUTES.map)
+            ? [
+                {
+                  label: 'Users',
+                  value: d.stats.activeUsers.toLocaleString(),
+                  href: mapHref('users'),
+                },
+              ]
+            : []),
+        ]}
+      />
 
       <div className="dashboard-grid">
         {canAccess(CONTROL_ROOM_ROUTES.officers) && (

@@ -13,6 +13,7 @@ import { NavIcon } from './nav/NavIcon';
 import { MobileBottomNav } from './nav/MobileBottomNav';
 import { MAP_SCREENSHOT_FROZEN_AT } from '@/lib/map-screenshot';
 import { ThemeToggle } from './ThemeToggle';
+import { adminApi, type ApiResponse } from '@/lib/api-client';
 
 export function ControlRoomShell({
   session,
@@ -26,6 +27,28 @@ export function ControlRoomShell({
   const router = useRouter();
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [criticalCount, setCriticalCount] = useState(0);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function poll() {
+      try {
+        const res = await adminApi.get<
+          ApiResponse<{ stats?: { criticalIncidents?: number } }>
+        >('/control-room/dashboard');
+        if (cancelled) return;
+        setCriticalCount(res.data?.stats?.criticalIncidents ?? 0);
+      } catch {
+        /* keep last */
+      }
+    }
+    void poll();
+    const id = window.setInterval(() => void poll(), 20000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(id);
+    };
+  }, []);
 
   useEffect(() => {
     setMenuOpen(false);
@@ -65,6 +88,10 @@ export function ControlRoomShell({
     label: item.mobileLabel,
     icon: item.icon,
     exact: item.exact,
+    badge:
+      item.href === '/control-room/incidents' && criticalCount > 0
+        ? criticalCount
+        : undefined,
   }));
 
   return (

@@ -13,6 +13,7 @@ import { ThemeToggle } from './ThemeToggle';
 import { OfficerStatusBadge } from './officer/StatusBadges';
 import { useOfficerStatus } from './officer/OfficerStatusProvider';
 import { MobileBottomNav } from './nav/MobileBottomNav';
+import { officerApi, type ApiResponse } from '@/lib/api-client';
 
 export function OfficerShell({
   session,
@@ -26,7 +27,34 @@ export function OfficerShell({
   const router = useRouter();
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [needsYou, setNeedsYou] = useState(0);
   const { status } = useOfficerStatus();
+
+  useEffect(() => {
+    let cancelled = false;
+    async function poll() {
+      try {
+        const res = await officerApi.get<ApiResponse<{ unread?: number }[] | { unreadCount?: number }>>(
+          '/officer/messages',
+        );
+        if (cancelled) return;
+        const data = res.data;
+        if (Array.isArray(data)) {
+          setNeedsYou(data.filter((m) => (m as { unread?: boolean }).unread).length);
+        } else if (data && typeof data === 'object' && 'unreadCount' in data) {
+          setNeedsYou(Number((data as { unreadCount?: number }).unreadCount) || 0);
+        }
+      } catch {
+        /* keep last badge */
+      }
+    }
+    void poll();
+    const id = window.setInterval(() => void poll(), 30000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(id);
+    };
+  }, []);
 
   useEffect(() => {
     setMenuOpen(false);
@@ -131,6 +159,12 @@ export function OfficerShell({
           label: item.mobileLabel,
           icon: item.icon,
           exact: item.exact,
+          badge:
+            item.href === '/officer/messages' && needsYou > 0
+              ? needsYou
+              : item.href === '/officer/queue' && status && !['AVAILABLE', 'OFF_DUTY'].includes(status)
+                ? '!'
+                : undefined,
         }))}
         ariaLabel="Officer"
       />

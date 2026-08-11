@@ -2,15 +2,28 @@
 
 import { ErrorAlert } from '@/components/ErrorAlert';
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { OfficerLayout } from '@/components/officer/OfficerLayout';
 import { OfficerActiveAssignment } from '@/components/officer/OfficerActiveAssignment';
 import { OfficerStatusBadge } from '@/components/officer/StatusBadges';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { useApi } from '@/hooks/useApi';
 import { DispatchStatusBadge } from '@/components/officer/StatusBadges';
-import { officerQueueRowClass } from '@/lib/officer-task-theme';
+import {
+  officerQueueRowClass,
+  officerTaskButtonClass,
+  primaryTaskAction,
+} from '@/lib/officer-task-theme';
 import { officerApi, type ApiResponse } from '@/lib/api-client';
+import { OpsMyShiftHeader } from '@/components/ops/OpsMyShiftHeader';
+import {
+  OpsCompactStats,
+  OpsNeedsYou,
+  OpsQuickWork,
+  OpsSection,
+} from '@/components/ops/OpsQuickWork';
+import { OpsSwipeRow } from '@/components/ops/OpsSwipeRow';
+import { OpsUndoToast, useUndoToast } from '@/components/ops/OpsUndoToast';
 
 type Dashboard = {
   officer: {
@@ -44,6 +57,26 @@ type DispatchItem = {
   };
 };
 
+function nextDispatchAction(status: string): {
+  key: string;
+  label: string;
+  path: string;
+} | null {
+  if (status === 'ASSIGNED') {
+    return { key: 'accept', label: 'Accept', path: 'accept' };
+  }
+  if (status === 'ACCEPTED') {
+    return { key: 'enroute', label: 'En route', path: 'en-route' };
+  }
+  if (status === 'EN_ROUTE') {
+    return { key: 'scene', label: 'On scene', path: 'on-scene' };
+  }
+  if (status === 'ON_SCENE') {
+    return { key: 'complete', label: 'Complete', path: 'complete' };
+  }
+  return null;
+}
+
 export default function OfficerDashboardPage() {
   return (
     <OfficerLayout title="Field Dashboard">
@@ -58,35 +91,195 @@ function DashboardContent() {
     [],
   );
   const [actionLoading, setActionLoading] = useState<string | null>(null);
-  const [msg, setMsg] = useState('');
+  const [filter, setFilter] = useState('all');
+  const [localActive, setLocalActive] = useState<DispatchItem | null | undefined>(
+    undefined,
+  );
+  const [localQueue, setLocalQueue] = useState<DispatchItem[] | null>(null);
+  const undo = useUndoToast();
 
   useEffect(() => {
     const id = window.setInterval(() => void reload({ silent: true }), 20000);
     return () => window.clearInterval(id);
   }, [reload]);
 
+  useEffect(() => {
+    if (!data?.data) return;
+    setLocalActive(data.data.activeDispatch);
+    setLocalQueue(data.data.queue);
+  }, [data]);
+
+  const d = data?.data;
+  const active = localActive === undefined ? d?.activeDispatch ?? null : localActive;
+  const queue = localQueue ?? d?.queue ?? [];
+  const waiting = queue.filter((q) => !active || q.id !== active.id);
+
+  const urgentCount = useMemo(
+    () =>
+      [active, ...waiting].filter(
+        (i) =>
+          i &&
+          ['CRITICAL', 'HIGH'].includes(i.incident.priority.toUpperCase()),
+      ).length,
+    [active, waiting],
+  );
+
+  async function patchDispatch(
+    item: DispatchItem,
+    path: string,
+    key: string,
+    previousStatus: string,
+  ) {
+    setActionLoading(key);
+    try {
+      await officerApi.post(`/officer/dispatch/${item.id}/${path}`);
+      const nextStatus =
+        path === 'accept'
+          ? 'ACCEPTED'
+          : path === 'en-route'
+            ? 'EN_ROUTE'
+            : path === 'on-scene'
+              ? 'ON_SCENE'
+              : path === 'complete'
+                ? 'COMPLETED'
+                : item.status;
+
+      if (path === 'complete') {
+        setLocalActive(null);
+        setLocalQueue((prev) => (prev ?? queue).filter((q) => q.id !== item.id));
+        undo.show('Assignment completed', async () => {
+          await officerApi.post(`/officer/dispatch/${item.id}/undo`, {
+            status: previousStatus,
+          });
+          void reload();
+        });
+      } else {
+        const updated = { ...item, status: nextStatus };
+        setLocalActive(updated);
+        setLocalQueue((prev) =>
+          (prev ?? queue).map((q) => (q.id === item.id ? updated : q)),
+        );
+        undo.show(`Marked ${nextStatus.replace(/_/g, ' ').toLowerCase()}`, async () => {
+          await officerApi.post(`/officer/dispatch/${item.id}/undo`, {
+            status: previousStatus,
+          });
+          void reload();
+        });
+      }
+      void reload({ silent: true });
+    } finally {
+      setActionLoading(null);
+    }
+  }
+
   async function runAction(key: string, fn: () => Promise<unknown>) {
     setActionLoading(key);
-    setMsg('');
     try {
       await fn();
-      setMsg('Status updated.');
-      reload();
+      void reload();
     } finally {
       setActionLoading(null);
     }
   }
 
   if (loading) return <LoadingSpinner label="Loading dashboard..." fullScreen />;
-  if (error) return <ErrorAlert error={error} onRetry={reload} />;
+  if (error || !d) return <ErrorAlert error={error} onRetry={reload} />;
 
-  const d = data!.data;
-  const active = d.activeDispatch;
-  const waiting = d.queue.filter((q) => !active || q.id !== active.id);
+  const primary = active ? nextDispatchAction(active.status) : null;
+  const showQueue = filter === 'all' || filter === 'queue';
+  const showUrgentOnly = filter === 'urgent';
+
+  const filteredWaiting = showUrgentOnly
+    ? waiting.filter((w) =>
+        ['CRITICAL', 'HIGH'].includes(w.incident.priority.toUpperCase()),
+      )
+    : waiting;
+
+  const needsItems = [
+    ...(urgentCount > 0
+      ? [
+          {
+            id: 'urgent',
+            title: `${urgentCount} high-priority`,
+            detail: 'Incidents needing fast response',
+            href: '/officer/queue',
+          },
+        ]
+      : []),
+    {
+      id: 'messages',
+      title: 'Dispatch chat',
+      detail: 'Check for control-room messages',
+      href: '/officer/messages',
+    },
+  ];
 
   return (
     <div className="dash-ops dash-ops--officer">
-      {/* Priority 1: active assignment / empty queue CTA */}
+      <OpsMyShiftHeader
+        title="My shift"
+        subtitle={
+          active
+            ? `1 active · ${waiting.length} waiting`
+            : waiting.length
+              ? `${waiting.length} in queue · standby`
+              : 'No active assignment'
+        }
+        chips={[
+          { id: 'all', label: 'Everything', count: (active ? 1 : 0) + waiting.length },
+          { id: 'urgent', label: 'Urgent', count: urgentCount, tone: 'urgent' },
+          { id: 'queue', label: 'Queue', count: waiting.length, tone: 'warn' },
+          {
+            id: 'messages',
+            label: 'Messages',
+            count: 0,
+            tone: 'neutral',
+          },
+        ]}
+        activeChip={filter}
+        onChip={(id) => {
+          if (id === 'messages') {
+            window.location.href = '/officer/messages';
+            return;
+          }
+          setFilter(id);
+        }}
+      />
+
+      {active && primary && (
+        <OpsQuickWork
+          hint={active.incident.client}
+          actions={[
+            {
+              id: 'primary',
+              label: primary.label,
+              primary: true,
+              loading: actionLoading === primary.key,
+              disabled: !!actionLoading,
+              onClick: () =>
+                void patchDispatch(active, primary.path, primary.key, active.status),
+            },
+            {
+              id: 'call',
+              label: 'Call',
+              href: active.incident.phone
+                ? `tel:${active.incident.phone}`
+                : '/officer/calls',
+            },
+            {
+              id: 'nav',
+              label: 'Navigate',
+              href: `https://www.google.com/maps/dir/?api=1&destination=${active.incident.lat},${active.incident.lng}`,
+            },
+            {
+              id: 'reply',
+              label: 'Reply',
+              href: '/officer/messages',
+            },
+          ]}
+        />
+      )}
+
       {active ? (
         <OfficerActiveAssignment
           dispatch={active}
@@ -115,39 +308,76 @@ function DashboardContent() {
         </section>
       )}
 
-      {msg && <div className="alert alert--success">{msg}</div>}
-
-      {/* Priority 2: rest of queue */}
-      {waiting.length > 0 && (
-        <section className="portal-card">
-          <div className="card-header-row">
-            <h2>Your queue</h2>
+      {showQueue && filteredWaiting.length > 0 && (
+        <OpsSection
+          title="Your queue"
+          action={
             <Link href="/officer/queue" className="link-sm">
               View all
             </Link>
+          }
+        >
+          <div className="ops-queue-list">
+            {filteredWaiting.slice(0, 5).map((item) => {
+              const next = nextDispatchAction(item.status);
+              return (
+                <OpsSwipeRow
+                  key={item.id}
+                  label={next?.label ?? 'Open'}
+                  disabled={!!actionLoading || !next}
+                  onSwipePrimary={() => {
+                    if (!next) return;
+                    void patchDispatch(item, next.path, `${item.id}-${next.key}`, item.status);
+                  }}
+                >
+                  <div
+                    className={`ops-queue-card ${officerQueueRowClass(item.status, item.incident.type)}`}
+                  >
+                    <div className="card-header-row">
+                      <strong>
+                        {item.incident.type} — {item.incident.client}
+                      </strong>
+                      <DispatchStatusBadge status={item.status} />
+                    </div>
+                    {item.incident.address && (
+                      <span className="text-muted">{item.incident.address}</span>
+                    )}
+                    <div className="ops-queue-card__actions">
+                      {next && (
+                        <button
+                          type="button"
+                          className={`btn-sm ${officerTaskButtonClass(primaryTaskAction(item.status) ?? 'accept', item.status)}`}
+                          disabled={!!actionLoading}
+                          onClick={() =>
+                            void patchDispatch(
+                              item,
+                              next.path,
+                              `${item.id}-${next.key}`,
+                              item.status,
+                            )
+                          }
+                        >
+                          {next.label}
+                        </button>
+                      )}
+                      <Link
+                        href={`https://www.google.com/maps/dir/?api=1&destination=${item.incident.lat},${item.incident.lng}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="btn-sm btn-secondary"
+                      >
+                        Navigate
+                      </Link>
+                    </div>
+                  </div>
+                </OpsSwipeRow>
+              );
+            })}
           </div>
-          <ul className="status-list">
-            {waiting.slice(0, 5).map((item) => (
-              <li
-                key={item.id}
-                className={`status-list-item ${officerQueueRowClass(item.status, item.incident.type)}`}
-              >
-                <Link href="/officer/queue" className="status-list-link">
-                  <span>
-                    {item.incident.type} — {item.incident.client}
-                  </span>
-                  {item.incident.address && (
-                    <span className="text-muted" style={{ display: 'block', fontSize: '0.8rem' }}>
-                      {item.incident.address}
-                    </span>
-                  )}
-                </Link>
-                <DispatchStatusBadge status={item.status} />
-              </li>
-            ))}
-          </ul>
-        </section>
+        </OpsSection>
       )}
+
+      <OpsNeedsYou items={needsItems} viewAllHref="/officer/messages" />
 
       <div className="officer-hero portal-card officer-hero--compact">
         <div>
@@ -159,77 +389,24 @@ function DashboardContent() {
         <OfficerStatusBadge status={d.officer.status} linkToProfile />
       </div>
 
-      <div className="stats-grid">
-        <StatCard
-          label="Active jobs"
-          value={String(d.stats.activeAssignments)}
-          href="/officer/queue"
-          highlight={d.stats.activeAssignments > 0}
-        />
-        <StatCard
-          label="Completed today"
-          value={String(d.stats.completedToday)}
-          href="/officer/profile"
-        />
-        <StatCard label="Avg response" value={d.stats.avgResponseFormatted} />
-      </div>
+      <OpsCompactStats
+        items={[
+          {
+            label: 'Active',
+            value: String(d.stats.activeAssignments),
+            href: '/officer/queue',
+            warn: d.stats.activeAssignments > 0,
+          },
+          {
+            label: 'Done today',
+            value: String(d.stats.completedToday),
+            href: '/officer/profile',
+          },
+          { label: 'Avg', value: d.stats.avgResponseFormatted },
+        ]}
+      />
 
-      <div className="action-grid officer-quick-grid">
-        <Link href="/officer/queue" className="action-tile">
-          <span className="action-icon">📋</span>
-          <span className="action-label">Incident queue</span>
-        </Link>
-        <Link href="/officer/map" className="action-tile">
-          <span className="action-icon">🗺️</span>
-          <span className="action-label">Navigation</span>
-        </Link>
-        <Link href="/officer/record?quick=1" className="action-tile action-tile--record">
-          <span className="action-icon">🔴</span>
-          <span className="action-label">Quick record</span>
-        </Link>
-        <Link href="/officer/report" className="action-tile">
-          <span className="action-icon">📝</span>
-          <span className="action-label">Incident report</span>
-        </Link>
-        <Link href="/officer/messages" className="action-tile">
-          <span className="action-icon">💬</span>
-          <span className="action-label">Dispatch chat</span>
-        </Link>
-        <Link href="/officer/calls" className="action-tile">
-          <span className="action-icon">📞</span>
-          <span className="action-label">Calls</span>
-        </Link>
-      </div>
+      <OpsUndoToast toast={undo.toast} onDismiss={undo.clear} />
     </div>
   );
-}
-
-function StatCard({
-  label,
-  value,
-  href,
-  highlight,
-}: {
-  label: string;
-  value: string;
-  href?: string;
-  highlight?: boolean;
-}) {
-  const className = `stat-card ${highlight ? 'stat-card--highlight' : ''} ${href ? 'stat-card--link' : ''}`;
-  const content = (
-    <>
-      <div className="stat-label">{label}</div>
-      <div className="stat-value">{value}</div>
-    </>
-  );
-
-  if (href) {
-    return (
-      <Link href={href} className={className}>
-        {content}
-      </Link>
-    );
-  }
-
-  return <div className={className}>{content}</div>;
 }

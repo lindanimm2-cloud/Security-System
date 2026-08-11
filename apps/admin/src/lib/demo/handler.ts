@@ -48,6 +48,52 @@ const techJobs: TechJob[] = [
   },
 ];
 
+type OfficerDispatch = {
+  id: string;
+  status: string;
+  incident: {
+    id: string;
+    type: string;
+    priority: string;
+    address: string;
+    client: string;
+    phone: string;
+    lat: number;
+    lng: number;
+  };
+};
+
+const officerDispatches: OfficerDispatch[] = [
+  {
+    id: 'demo-dispatch-1',
+    status: 'EN_ROUTE',
+    incident: {
+      id: 'demo-inc-1',
+      type: 'PANIC',
+      priority: 'CRITICAL',
+      address: 'Umhlanga Rocks Dr',
+      client: 'Nomsa Client',
+      phone: '+27821234567',
+      lat: -29.728,
+      lng: 31.085,
+    },
+  },
+  {
+    id: 'demo-dispatch-2',
+    status: 'ASSIGNED',
+    incident: {
+      id: 'demo-inc-2',
+      type: 'INTRUSION',
+      priority: 'HIGH',
+      address: 'Glenwood, Durban',
+      client: 'James Demo',
+      phone: '+27829876543',
+      lat: -29.86,
+      lng: 30.99,
+    },
+  },
+];
+
 let orderSeq = 1001;
 const demoIncidents: {
   id: string;
@@ -94,6 +140,22 @@ const demoIncidents: {
     location: 'N2 northbound',
   },
 ];
+
+const demoProperties: {
+  id: string;
+  name: string;
+  alarmStatus: string;
+  alarmLinked: boolean;
+}[] = [
+  {
+    id: 'demo-prop-1',
+    name: 'Home — Umhlanga',
+    alarmStatus: 'ARMED',
+    alarmLinked: true,
+  },
+];
+
+let demoUnreadNotifications = 2;
 
 function ok<T>(data: T) {
   return { success: true as const, data };
@@ -175,7 +237,7 @@ export async function handleDemoRequest<T>({
         activeIncidents: demoIncidents.filter((i) =>
           ['OPEN', 'DISPATCHED', 'IN_PROGRESS'].includes(i.status),
         ).length,
-        unreadNotifications: 2,
+        unreadNotifications: demoUnreadNotifications,
       },
       services: {
         personal: 'active',
@@ -198,14 +260,7 @@ export async function handleDemoRequest<T>({
           theftRecovery: true,
         },
       ],
-      properties: [
-        {
-          id: 'demo-prop-1',
-          name: 'Home — Umhlanga',
-          alarmStatus: 'ARMED',
-          alarmLinked: true,
-        },
-      ],
+      properties: [...demoProperties],
       family: [
         { id: 'demo-fam-1', name: 'Thandi Client', trackingEnabled: true },
         { id: 'demo-fam-2', name: 'Lerato Client', trackingEnabled: false },
@@ -308,6 +363,37 @@ export async function handleDemoRequest<T>({
       location: 'Umhlanga Rocks Dr',
     });
     return ok({ created: true }) as T;
+  }
+  {
+    const alarmMatch = clean.match(/^\/client\/properties\/([^/]+)\/alarm$/);
+    if (alarmMatch && m === 'PATCH') {
+      const prop = demoProperties.find((p) => p.id === alarmMatch[1]);
+      if (prop && typeof payload.status === 'string') {
+        prop.alarmStatus = payload.status;
+      }
+      return ok(prop ?? { ok: true }) as T;
+    }
+  }
+  if (clean === '/client/notifications' && m === 'GET') {
+    return ok({
+      notifications: Array.from({ length: Math.max(1, demoUnreadNotifications) }, (_, i) => ({
+        id: `demo-cn-${i + 1}`,
+        type: 'SYSTEM',
+        title: i === 0 ? 'Dispatch update' : 'System notice',
+        body: i === 0 ? 'Confirm your protection status when ready.' : 'Tap for details',
+        isRead: i >= demoUnreadNotifications,
+        createdAt: new Date().toISOString(),
+      })),
+      unreadCount: demoUnreadNotifications,
+    }) as T;
+  }
+  if (clean === '/client/notifications/read-all' && m === 'PATCH') {
+    demoUnreadNotifications = 0;
+    return ok({ ok: true }) as T;
+  }
+  if (clean.match(/^\/client\/notifications\/[^/]+\/read$/) && m === 'PATCH') {
+    demoUnreadNotifications = Math.max(0, demoUnreadNotifications - 1);
+    return ok({ ok: true }) as T;
   }
   if (clean.startsWith('/client/') && (m === 'GET' || m === 'POST' || m === 'PATCH')) {
     if (m === 'GET') return ok([]) as T;
@@ -476,21 +562,6 @@ export async function handleDemoRequest<T>({
       unreadCount: 1,
     }) as T;
   }
-  if (clean === '/client/notifications' && m === 'GET') {
-    return ok({
-      notifications: [
-        {
-          id: 'demo-cn-1',
-          type: 'SYSTEM',
-          title: 'Welcome to Nexus demo',
-          body: 'Pitch mode — no live API connected.',
-          isRead: false,
-          createdAt: new Date().toISOString(),
-        },
-      ],
-      unreadCount: 1,
-    }) as T;
-  }
   if (clean === '/calls/active' && m === 'GET') {
     return ok(null) as T;
   }
@@ -538,53 +609,88 @@ export async function handleDemoRequest<T>({
   }
 
   // ——— Officer ———
+  {
+    const dispatchMatch = clean.match(
+      /^\/officer\/dispatch\/([^/]+)\/(accept|en-route|on-scene|complete|undo)$/,
+    );
+    if (dispatchMatch && m === 'POST') {
+      const [, id, action] = dispatchMatch;
+      const d = officerDispatches.find((x) => x.id === id);
+      if (d) {
+        if (action === 'undo' && typeof payload.status === 'string') {
+          d.status = payload.status;
+        } else {
+          const map: Record<string, string> = {
+            accept: 'ACCEPTED',
+            'en-route': 'EN_ROUTE',
+            'on-scene': 'ON_SCENE',
+            complete: 'COMPLETED',
+          };
+          d.status = map[action] ?? d.status;
+        }
+      }
+      return ok(d ?? { ok: true, id, status: payload.status }) as T;
+    }
+  }
+  if (clean === '/officer/queue' && m === 'GET') {
+    const assigned = officerDispatches.filter((d) => d.status !== 'COMPLETED');
+    return ok({
+      assigned,
+      unassigned: demoIncidents
+        .filter((i) => i.status === 'OPEN')
+        .map((i) => ({
+          id: i.id,
+          type: i.type,
+          priority: i.priority,
+          client: i.user,
+          address: i.location,
+          lat: DURBAN.lat,
+          lng: DURBAN.lng,
+          volunteered: false,
+        })),
+    }) as T;
+  }
   if (clean === '/officer/dashboard' && m === 'GET') {
-    const active = {
-      id: 'demo-dispatch-1',
-      status: 'EN_ROUTE',
-      incident: {
-        id: 'demo-inc-1',
-        type: 'PANIC',
-        priority: 'CRITICAL',
-        address: 'Umhlanga Rocks Dr',
-        client: 'Nomsa Client',
-        phone: '+27821234567',
-        lat: -29.728,
-        lng: 31.085,
-      },
-    };
+    const open = officerDispatches.filter((d) => d.status !== 'COMPLETED');
+    const active =
+      open.find((d) =>
+        ['ACCEPTED', 'EN_ROUTE', 'ON_SCENE'].includes(d.status),
+      ) ?? open[0] ?? null;
+    const completedToday = officerDispatches.filter((d) => d.status === 'COMPLETED').length;
     return ok({
       officer: {
         firstName: user?.firstName ?? 'Sipho',
         lastName: user?.lastName ?? 'Ndlovu',
-        status: 'EN_ROUTE',
+        status: active?.status ?? 'AVAILABLE',
         zone: 'Zone A',
         avgResponseSec: 280,
       },
       stats: {
-        activeAssignments: 1,
-        completedToday: 3,
+        activeAssignments: open.filter((d) =>
+          ['ACCEPTED', 'EN_ROUTE', 'ON_SCENE'].includes(d.status),
+        ).length,
+        completedToday: Math.max(3, completedToday),
         avgResponseFormatted: '4m 40s',
       },
       activeDispatch: active,
-      queue: [
-        active,
-        {
-          id: 'demo-dispatch-2',
-          status: 'ASSIGNED',
-          incident: {
-            id: 'demo-inc-2',
-            type: 'INTRUSION',
-            priority: 'HIGH',
-            address: 'Glenwood, Durban',
-            client: 'James Demo',
-            phone: '+27829876543',
-            lat: -29.86,
-            lng: 30.99,
-          },
-        },
-      ],
+      queue: open,
     }) as T;
+  }
+  if (clean.startsWith('/officer/messages') && m === 'GET') {
+    return ok([
+      {
+        id: 'demo-msg-1',
+        unread: true,
+        from: 'Control',
+        preview: 'Confirm ETA to Umhlanga',
+      },
+    ]) as T;
+  }
+  if (clean.match(/^\/officer\/incidents\/[^/]+\/volunteer$/) && m === 'POST') {
+    return ok({ volunteered: true, message: 'Dispatch notified (demo).' }) as T;
+  }
+  if (clean.match(/^\/officer\/messages\/[^/]+\/reply$/) && m === 'POST') {
+    return ok({ ok: true, sent: true }) as T;
   }
   if (clean.startsWith('/officer/') && (m === 'GET' || m === 'POST' || m === 'PATCH')) {
     if (m === 'GET') return ok([]) as T;

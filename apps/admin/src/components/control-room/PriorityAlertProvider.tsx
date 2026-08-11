@@ -19,6 +19,12 @@ import {
 import { adminApi } from '@/lib/api-client';
 import { getSession } from '@/lib/auth';
 import { getSocketUrl } from '@/lib/socket';
+import {
+  acknowledgeAnnouncement,
+  isOpsQuietMode,
+  markAnnounced,
+  shouldAnnounce,
+} from '@/lib/ops-alert-memory';
 
 type PriorityAlertContextValue = {
   criticalAlert: PriorityAlert | null;
@@ -44,7 +50,13 @@ export function PriorityAlertProvider({ children }: { children: React.ReactNode 
   const [highToasts, setHighToasts] = useState<PriorityAlert[]>([]);
 
   const pushAlert = useCallback((alert: PriorityAlert) => {
+    const eventId = alert.incidentId
+      ? `incident:${alert.incidentId}:${alert.tier}`
+      : `alert:${alert.id}`;
+
     if (alert.tier === 'critical') {
+      if (!shouldAnnounce(eventId, 30_000)) return;
+      markAnnounced(eventId);
       setCriticalQueue((prev) => {
         if (alert.incidentId && prev.some((item) => item.incidentId === alert.incidentId)) {
           return prev;
@@ -54,7 +66,12 @@ export function PriorityAlertProvider({ children }: { children: React.ReactNode 
       return;
     }
 
+    // Quiet mode: non-critical stay badge/digest only — no interrupt toasts
+    if (isOpsQuietMode()) return;
+
     if (alert.tier === 'high') {
+      if (!shouldAnnounce(eventId)) return;
+      markAnnounced(eventId);
       setHighToasts((prev) => {
         const next = [alert, ...prev.filter((item) => item.id !== alert.id)];
         return next.slice(0, MAX_HIGH_TOASTS);
@@ -65,6 +82,12 @@ export function PriorityAlertProvider({ children }: { children: React.ReactNode 
   const dismissCritical = useCallback(() => {
     setCriticalQueue((prev) => {
       const current = prev[0];
+      if (current) {
+        const eventId = current.incidentId
+          ? `incident:${current.incidentId}:critical`
+          : `alert:${current.id}`;
+        acknowledgeAnnouncement(eventId);
+      }
       if (current && !current.id.startsWith('incident-') && !current.id.startsWith('socket-')) {
         void adminApi.patch(`/control-room/notifications/${current.id}/read`).catch(() => undefined);
       }

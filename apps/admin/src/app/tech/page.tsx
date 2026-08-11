@@ -6,21 +6,32 @@ import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { useApi } from '@/hooks/useApi';
 import { techApi, type ApiResponse } from '@/lib/api-client';
 import Link from 'next/link';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { OpsMyShiftHeader } from '@/components/ops/OpsMyShiftHeader';
+import {
+  OpsCompactStats,
+  OpsNeedsYou,
+  OpsQuickWork,
+  OpsSection,
+} from '@/components/ops/OpsQuickWork';
+import { OpsSwipeRow } from '@/components/ops/OpsSwipeRow';
+import { OpsUndoToast, useUndoToast } from '@/components/ops/OpsUndoToast';
+
+type TechJob = {
+  id: string;
+  title: string;
+  status: string;
+  scheduledAt: string;
+  address: string;
+  jobType: string;
+};
 
 type TechProfile = {
   firstName: string;
   lastName: string;
   jobTitle: string | null;
   stats: { scheduled: number; active: number; completed: number };
-  jobs: {
-    id: string;
-    title: string;
-    status: string;
-    scheduledAt: string;
-    address: string;
-    jobType: string;
-  }[];
+  jobs: TechJob[];
 };
 
 const STATUS_FLOW = ['SCHEDULED', 'EN_ROUTE', 'IN_PROGRESS', 'COMPLETED'] as const;
@@ -30,6 +41,14 @@ function statusRank(status: string) {
   if (status === 'EN_ROUTE') return 1;
   if (status === 'SCHEDULED') return 2;
   return 9;
+}
+
+function nextStatus(status: string) {
+  const idx = STATUS_FLOW.indexOf(status as (typeof STATUS_FLOW)[number]);
+  if (idx < 0) return null;
+  const next = STATUS_FLOW[Math.min(idx + 1, STATUS_FLOW.length - 1)];
+  if (!next || next === status) return null;
+  return next;
 }
 
 export default function TechDashboardPage() {
@@ -47,12 +66,20 @@ function TechDashboardContent() {
   );
   const [busyId, setBusyId] = useState<string | null>(null);
   const [actionError, setActionError] = useState('');
+  const [filter, setFilter] = useState('all');
+  const [jobs, setJobs] = useState<TechJob[] | null>(null);
+  const undo = useUndoToast();
 
   const profile = data?.data;
 
+  useEffect(() => {
+    if (profile?.jobs) setJobs(profile.jobs);
+  }, [profile]);
+
+  const liveJobs = jobs ?? profile?.jobs ?? [];
+
   const queue = useMemo(() => {
-    if (!profile) return [];
-    return profile.jobs
+    return liveJobs
       .filter((j) => j.status !== 'COMPLETED' && j.status !== 'CANCELLED')
       .slice()
       .sort((a, b) => {
@@ -60,21 +87,38 @@ function TechDashboardContent() {
         if (r !== 0) return r;
         return new Date(a.scheduledAt).getTime() - new Date(b.scheduledAt).getTime();
       });
-  }, [profile]);
+  }, [liveJobs]);
 
   const focusJob = queue[0] ?? null;
   const restQueue = queue.slice(1);
+  const activeCount = queue.filter((j) =>
+    ['EN_ROUTE', 'IN_PROGRESS'].includes(j.status),
+  ).length;
+  const dueSoon = queue.filter((j) => {
+    const t = new Date(j.scheduledAt).getTime() - Date.now();
+    return t < 4 * 3600000 && t > -3600000;
+  }).length;
 
-  async function advance(job: NonNullable<typeof focusJob>) {
-    const idx = STATUS_FLOW.indexOf(job.status as (typeof STATUS_FLOW)[number]);
-    const next = STATUS_FLOW[Math.min(idx + 1, STATUS_FLOW.length - 1)];
-    if (!next || next === job.status) return;
+  async function advance(job: TechJob) {
+    const next = nextStatus(job.status);
+    if (!next) return;
+    const prev = job.status;
     setBusyId(job.id);
     setActionError('');
+    setJobs((list) =>
+      (list ?? liveJobs).map((j) => (j.id === job.id ? { ...j, status: next } : j)),
+    );
     try {
       await techApi.patch(`/store/tech/jobs/${job.id}/status`, { status: next });
-      reload();
+      undo.show(`Marked ${next.replace(/_/g, ' ').toLowerCase()}`, async () => {
+        await techApi.patch(`/store/tech/jobs/${job.id}/status`, { status: prev });
+        void reload();
+      });
+      void reload({ silent: true });
     } catch (e) {
+      setJobs((list) =>
+        (list ?? liveJobs).map((j) => (j.id === job.id ? { ...j, status: prev } : j)),
+      );
       setActionError(e instanceof Error ? e.message : 'Update failed');
     } finally {
       setBusyId(null);
@@ -86,25 +130,66 @@ function TechDashboardContent() {
     return <ErrorAlert message={error ?? 'Failed to load'} onRetry={reload} />;
   }
 
-  const nextLabel =
-    focusJob &&
-    (() => {
-      const idx = STATUS_FLOW.indexOf(focusJob.status as (typeof STATUS_FLOW)[number]);
-      const next = STATUS_FLOW[Math.min(idx + 1, STATUS_FLOW.length - 1)];
-      if (!next || next === focusJob.status) return null;
-      return next.replace(/_/g, ' ');
-    })();
+  const nextLabel = focusJob ? nextStatus(focusJob.status)?.replace(/_/g, ' ') : null;
+  const filteredRest =
+    filter === 'urgent'
+      ? restQueue.filter((j) => ['EN_ROUTE', 'IN_PROGRESS'].includes(j.status))
+      : restQueue;
 
   return (
     <div className="page-content dash-ops dash-ops--tech">
-      {/* Priority 1: active / next job */}
+      <OpsMyShiftHeader
+        title="My shift"
+        subtitle={
+          focusJob
+            ? `${activeCount} active · ${queue.length} open`
+            : 'No open installs'
+        }
+        chips={[
+          { id: 'all', label: 'Everything', count: queue.length },
+          { id: 'urgent', label: 'Due soon', count: dueSoon, tone: 'urgent' },
+          { id: 'queue', label: 'Queue', count: restQueue.length, tone: 'warn' },
+          {
+            id: 'done',
+            label: 'Done',
+            count: profile.stats.completed,
+            tone: 'ok',
+          },
+        ]}
+        activeChip={filter}
+        onChip={setFilter}
+      />
+
+      {focusJob && nextLabel && (
+        <OpsQuickWork
+          hint={focusJob.title}
+          actions={[
+            {
+              id: 'advance',
+              label: `Mark ${nextLabel}`,
+              primary: true,
+              loading: busyId === focusJob.id,
+              disabled: !!busyId,
+              onClick: () => void advance(focusJob),
+            },
+            {
+              id: 'nav',
+              label: 'Navigate',
+              href: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(focusJob.address)}`,
+            },
+            { id: 'board', label: 'Job board', href: '/tech/jobs' },
+            { id: 'chat', label: 'Reply', href: '/tech/chat' },
+          ]}
+        />
+      )}
+
       <section
         className={`tech-focus-job ${focusJob ? `tech-focus-job--${focusJob.status.toLowerCase()}` : 'tech-focus-job--clear'}`}
       >
         <div className="tech-focus-job__head">
           <p className="dash-ops__eyebrow">
             <span className="ops-live-chip__dot" aria-hidden />
-            Your work queue
+            Focus job
           </p>
           <h1>
             {profile.firstName},{' '}
@@ -142,9 +227,6 @@ function TechDashboardContent() {
                   {busyId === focusJob.id ? 'Updating…' : `Mark ${nextLabel}`}
                 </button>
               )}
-              <Link href="/tech/jobs" className="btn-secondary">
-                Open job board
-              </Link>
               <a
                 className="btn-secondary"
                 href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(focusJob.address)}`}
@@ -166,66 +248,96 @@ function TechDashboardContent() {
         )}
       </section>
 
-      {/* Priority 2: rest of queue */}
-      {restQueue.length > 0 && (
-        <section className="card-panel">
-          <div className="card-header-row">
-            <h2>Up next</h2>
+      {filteredRest.length > 0 && (
+        <OpsSection
+          title="Up next"
+          action={
             <Link href="/tech/jobs" className="link-sm">
               Full queue
             </Link>
+          }
+        >
+          <div className="ops-queue-list">
+            {filteredRest.slice(0, 5).map((job) => {
+              const next = nextStatus(job.status);
+              return (
+                <OpsSwipeRow
+                  key={job.id}
+                  label={next ? next.replace(/_/g, ' ') : 'Open'}
+                  disabled={!!busyId || !next}
+                  onSwipePrimary={() => void advance(job)}
+                >
+                  <div className="ops-queue-card">
+                    <div className="card-header-row">
+                      <strong>{job.title}</strong>
+                      <span className="badge">{job.status.replace(/_/g, ' ')}</span>
+                    </div>
+                    <span className="text-muted">{job.address}</span>
+                    <div className="ops-queue-card__actions">
+                      {next && (
+                        <button
+                          type="button"
+                          className="btn-sm btn-primary"
+                          disabled={busyId === job.id}
+                          onClick={() => void advance(job)}
+                        >
+                          Mark {next.replace(/_/g, ' ')}
+                        </button>
+                      )}
+                      <a
+                        className="btn-sm btn-secondary"
+                        href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(job.address)}`}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        Navigate
+                      </a>
+                    </div>
+                  </div>
+                </OpsSwipeRow>
+              );
+            })}
           </div>
-          <ul className="tech-queue-list">
-            {restQueue.slice(0, 5).map((job) => (
-              <li key={job.id} className="tech-queue-item">
-                <div>
-                  <strong>{job.title}</strong>
-                  <div className="text-muted">{job.address}</div>
-                </div>
-                <div className="tech-queue-item__side">
-                  <span className="badge">{job.status.replace(/_/g, ' ')}</span>
-                  <span className="text-muted">
-                    {new Date(job.scheduledAt).toLocaleString()}
-                  </span>
-                </div>
-              </li>
-            ))}
-          </ul>
-        </section>
+        </OpsSection>
       )}
 
-      <div className="stats-grid">
-        <div className="stat-card">
-          <span className="stat-label">Active now</span>
-          <strong className="stat-value">{profile.stats.active}</strong>
-        </div>
-        <div className="stat-card">
-          <span className="stat-label">Scheduled</span>
-          <strong className="stat-value">{profile.stats.scheduled}</strong>
-        </div>
-        <div className="stat-card">
-          <span className="stat-label">Completed</span>
-          <strong className="stat-value">{profile.stats.completed}</strong>
-        </div>
-      </div>
+      <OpsNeedsYou
+        items={
+          dueSoon > 0
+            ? [
+                {
+                  id: 'due',
+                  title: `${dueSoon} jobs due soon`,
+                  detail: 'Advance status or navigate from Quick work',
+                  href: '/tech/jobs',
+                },
+              ]
+            : []
+        }
+        viewAllHref="/tech/jobs"
+      />
 
-      <div className="overview-shortcuts">
-        <Link href="/tech/jobs" className="btn-primary">
-          Job board
-        </Link>
-        <Link href="/tech/inventory" className="btn-secondary">
-          Parts / inventory
-        </Link>
-        <Link href="/tech/cameras" className="btn-secondary">
-          Commission cameras
-        </Link>
-        <Link href="/tech/chat" className="btn-secondary">
-          Team chat
-        </Link>
-        <Link href="/tech/team" className="btn-secondary">
-          My team
-        </Link>
-      </div>
+      <OpsCompactStats
+        items={[
+          {
+            label: 'Active',
+            value: String(profile.stats.active),
+            href: '/tech/jobs',
+            warn: profile.stats.active > 0,
+          },
+          {
+            label: 'Scheduled',
+            value: String(profile.stats.scheduled),
+            href: '/tech/jobs',
+          },
+          {
+            label: 'Done',
+            value: String(profile.stats.completed),
+          },
+        ]}
+      />
+
+      <OpsUndoToast toast={undo.toast} onDismiss={undo.clear} />
     </div>
   );
 }

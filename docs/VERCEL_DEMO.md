@@ -4,13 +4,11 @@ Repo: https://github.com/lindanimm2-cloud/Security-System
 
 ## One-click pitch mode (recommended)
 
-`NEXT_PUBLIC_DEMO_MODE=true` is set in root `vercel.json`.
+Demo mode is **baked into the Next.js build** by default (`next.config.ts`).
+No Nest API, no Postgres, no Render — products + login work on Vercel alone.
 
-That means the Next.js app on Vercel runs **fully offline**:
-- Store catalogue (65 SKUs)
-- Login for admin / client / officer / tech
-- Main dashboards, map seed data, checkout, panic actions
-- No Postgres, no Render, no Nest host required
+If a browser asks to “access other apps/services on this device”, click **Block** —
+that was the old localhost API probe. New deploys do not request it.
 
 ### Deploy
 1. [vercel.com/new](https://vercel.com/new) → import **Security-System**
