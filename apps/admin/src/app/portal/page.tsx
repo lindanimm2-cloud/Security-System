@@ -9,7 +9,9 @@ import { PortalLayout } from '@/components/portal/PortalLayout';
 import { useApi } from '@/hooks/useApi';
 import { EmergencyCallButton, EmergencyDispatchCallCard } from '@/components/portal/EmergencyCallButton';
 import { HomeAlarmControl } from '@/components/portal/HomeAlarmControl';
+import { useCallsOptional } from '@/components/calls/CallProvider';
 import { clientApi, type ApiResponse } from '@/lib/api-client';
+import { friendlyErrorMessage } from '@/lib/friendly-error';
 import { useSubscriptionAccess } from '@/hooks/useSubscriptionAccess';
 import { activityHref } from '@/lib/portal-routes';
 import { OpsMyShiftHeader } from '@/components/ops/OpsMyShiftHeader';
@@ -63,7 +65,9 @@ function OverviewDashboard() {
   const [alertMsg, setAlertMsg] = useState('');
   const [filter, setFilter] = useState('all');
   const [armLoading, setArmLoading] = useState(false);
+  const [callBusy, setCallBusy] = useState(false);
   const undo = useUndoToast();
+  const calls = useCallsOptional();
   const { data, loading, error, reload } = useApi(
     () => clientApi.get<ApiResponse<Overview>>('/client/overview'),
     [],
@@ -88,6 +92,12 @@ function OverviewDashboard() {
   );
 
   async function handlePanic(silent: boolean) {
+    if (!silent) {
+      const ok = window.confirm(
+        'Send a panic alert to 4DS Dispatch now? Only use this in a real emergency.',
+      );
+      if (!ok) return;
+    }
     if (silent) setSilentLoading(true);
     else setPanicLoading(true);
     setAlertMsg('');
@@ -97,7 +107,9 @@ function OverviewDashboard() {
       undo.show(silent ? 'Silent alert sent' : 'Panic alert sent', async () => {
         /* demo: acknowledge only */
       });
-      reload();
+      void reload();
+    } catch (e) {
+      setAlertMsg(friendlyErrorMessage(e, 'action'));
     } finally {
       setPanicLoading(false);
       setSilentLoading(false);
@@ -136,6 +148,12 @@ function OverviewDashboard() {
     }
     const prev = prop.alarmStatus;
     const next = ['ARMED', 'STAY', 'NIGHT'].includes(prev) ? 'DISARMED' : 'ARMED';
+    const ok = window.confirm(
+      next === 'DISARMED'
+        ? `Disarm ${prop.name}?`
+        : `Arm ${prop.name} (Away mode)?`,
+    );
+    if (!ok) return;
     setArmLoading(true);
     setAlertMsg('');
     try {
@@ -146,8 +164,39 @@ function OverviewDashboard() {
         void reload();
       });
       void reload();
+    } catch (e) {
+      setAlertMsg(friendlyErrorMessage(e, 'action'));
     } finally {
       setArmLoading(false);
+    }
+  }
+
+  async function callDispatch() {
+    const phone =
+      contactsPayload?.meta?.dispatchLine?.phone ??
+      data?.data?.contacts?.find((c) =>
+        `${c.name} ${c.relationship ?? ''}`.toLowerCase().includes('dispatch'),
+      )?.phone ??
+      '+27110000000';
+    const name = contactsPayload?.meta?.dispatchLine?.name ?? '4DS Dispatch';
+    setCallBusy(true);
+    setAlertMsg('');
+    try {
+      if (calls) {
+        await calls.startCall('DISPATCH_LINE', {
+          name,
+          phone,
+          role: 'DISPATCH',
+        });
+        setAlertMsg('Connecting to control room…');
+      } else {
+        window.location.href = `tel:${phone}`;
+      }
+    } catch (e) {
+      setAlertMsg(friendlyErrorMessage(e, 'call'));
+      window.location.href = `tel:${phone}`;
+    } finally {
+      setCallBusy(false);
     }
   }
 
@@ -243,10 +292,10 @@ function OverviewDashboard() {
           },
           {
             id: 'call',
-            label: 'Call dispatch',
-            href: contactsPayload?.meta?.dispatchLine
-              ? `tel:${contactsPayload.meta.dispatchLine.phone}`
-              : '/portal/emergency',
+            label: callBusy ? 'Calling…' : 'Call dispatch',
+            loading: callBusy,
+            disabled: callBusy,
+            onClick: () => void callDispatch(),
           },
           {
             id: 'updates',
@@ -255,6 +304,12 @@ function OverviewDashboard() {
           },
         ]}
       />
+
+      {alertMsg ? (
+        <div className="alert alert--success ops-quick-feedback" role="status">
+          {alertMsg}
+        </div>
+      ) : null}
 
       <div className="portal-hero portal-hero--compact">
         <div>

@@ -62,10 +62,13 @@ export function PortalShell({
       }
     }
     void poll();
+    const onChanged = () => void poll();
+    window.addEventListener('4ds-notifications-changed', onChanged);
     const id = window.setInterval(() => void poll(), 30000);
     return () => {
       cancelled = true;
       window.clearInterval(id);
+      window.removeEventListener('4ds-notifications-changed', onChanged);
     };
   }, []);
 

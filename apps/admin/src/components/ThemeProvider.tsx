@@ -3,6 +3,7 @@
 import { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import {
   applyThemePreference,
+  applyThemePreview,
   getStoredPreference,
   resolveTheme,
   type Theme,
@@ -19,20 +20,28 @@ type ThemeContextValue = {
 const ThemeContext = createContext<ThemeContextValue | null>(null);
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [preference, setPreferenceState] = useState<ThemePreference>('light');
-  const [theme, setThemeState] = useState<Theme>('light');
+  const [preference, setPreferenceState] = useState<ThemePreference>('dark');
+  const [theme, setThemeState] = useState<Theme>('dark');
   const [mounted, setMounted] = useState(false);
 
-  const syncResolvedTheme = useCallback((nextPreference: ThemePreference) => {
-    const resolved = resolveTheme(nextPreference);
-    setThemeState(resolved);
-    applyThemePreference(nextPreference);
-  }, []);
+  const syncResolvedTheme = useCallback(
+    (nextPreference: ThemePreference, persist: boolean) => {
+      const resolved = resolveTheme(nextPreference);
+      setThemeState(resolved);
+      if (persist) {
+        applyThemePreference(nextPreference);
+      } else {
+        applyThemePreview(nextPreference);
+      }
+    },
+    [],
+  );
 
   useEffect(() => {
     const initialPreference = getStoredPreference();
     setPreferenceState(initialPreference);
-    syncResolvedTheme(initialPreference);
+    // Preview only — do not lock light/dark until the user toggles or picks settings.
+    syncResolvedTheme(initialPreference, false);
     setMounted(true);
   }, [syncResolvedTheme]);
 
@@ -41,13 +50,13 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 
     if (preference === 'system') {
       const media = window.matchMedia('(prefers-color-scheme: dark)');
-      const onChange = () => syncResolvedTheme('system');
+      const onChange = () => syncResolvedTheme('system', false);
       media.addEventListener('change', onChange);
       return () => media.removeEventListener('change', onChange);
     }
 
     if (preference === 'schedule') {
-      const tick = () => syncResolvedTheme('schedule');
+      const tick = () => syncResolvedTheme('schedule', false);
       tick();
       const id = window.setInterval(tick, 60_000);
       return () => window.clearInterval(id);
@@ -58,7 +67,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 
   function setPreference(next: ThemePreference) {
     setPreferenceState(next);
-    syncResolvedTheme(next);
+    syncResolvedTheme(next, true);
   }
 
   function toggleTheme() {

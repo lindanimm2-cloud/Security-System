@@ -36,8 +36,7 @@ export default function SiteLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <div
-      className={`nx-site nx-site--light nx-site--with-bottom-nav ${display.variable} ${body.variable}`}
-      data-nx-theme="light"
+      className={`nx-site nx-site--with-bottom-nav ${display.variable} ${body.variable}`}
     >
       <SiteClientProvider>
         <CartProvider>

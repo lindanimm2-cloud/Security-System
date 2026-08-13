@@ -155,7 +155,40 @@ const demoProperties: {
   },
 ];
 
-let demoUnreadNotifications = 2;
+type DemoClientNotification = {
+  id: string;
+  type: string;
+  title: string;
+  body: string;
+  isRead: boolean;
+  createdAt: string;
+  href?: string;
+};
+
+const demoClientNotifications: DemoClientNotification[] = [
+  {
+    id: 'demo-cn-1',
+    type: 'DISPATCH_ASSIGNED',
+    title: 'Dispatch update',
+    body: 'Confirm your protection status when ready.',
+    isRead: false,
+    createdAt: new Date().toISOString(),
+    href: '/portal/incidents',
+  },
+  {
+    id: 'demo-cn-2',
+    type: 'SYSTEM',
+    title: 'Account notice',
+    body: 'Pitch demo mode — notifications mark-read works offline.',
+    isRead: false,
+    createdAt: new Date(Date.now() - 120000).toISOString(),
+    href: '/portal/updates',
+  },
+];
+
+function demoUnreadCount() {
+  return demoClientNotifications.filter((n) => !n.isRead).length;
+}
 
 function ok<T>(data: T) {
   return { success: true as const, data };
@@ -237,7 +270,7 @@ export async function handleDemoRequest<T>({
         activeIncidents: demoIncidents.filter((i) =>
           ['OPEN', 'DISPATCHED', 'IN_PROGRESS'].includes(i.status),
         ).length,
-        unreadNotifications: demoUnreadNotifications,
+        unreadNotifications: demoUnreadCount(),
       },
       services: {
         personal: 'active',
@@ -376,24 +409,21 @@ export async function handleDemoRequest<T>({
   }
   if (clean === '/client/notifications' && m === 'GET') {
     return ok({
-      notifications: Array.from({ length: Math.max(1, demoUnreadNotifications) }, (_, i) => ({
-        id: `demo-cn-${i + 1}`,
-        type: 'SYSTEM',
-        title: i === 0 ? 'Dispatch update' : 'System notice',
-        body: i === 0 ? 'Confirm your protection status when ready.' : 'Tap for details',
-        isRead: i >= demoUnreadNotifications,
-        createdAt: new Date().toISOString(),
-      })),
-      unreadCount: demoUnreadNotifications,
+      notifications: demoClientNotifications.map((n) => ({ ...n })),
+      unreadCount: demoUnreadCount(),
     }) as T;
   }
   if (clean === '/client/notifications/read-all' && m === 'PATCH') {
-    demoUnreadNotifications = 0;
-    return ok({ ok: true }) as T;
+    for (const n of demoClientNotifications) n.isRead = true;
+    return ok({ ok: true, unreadCount: 0 }) as T;
   }
-  if (clean.match(/^\/client\/notifications\/[^/]+\/read$/) && m === 'PATCH') {
-    demoUnreadNotifications = Math.max(0, demoUnreadNotifications - 1);
-    return ok({ ok: true }) as T;
+  {
+    const readMatch = clean.match(/^\/client\/notifications\/([^/]+)\/read$/);
+    if (readMatch && m === 'PATCH') {
+      const n = demoClientNotifications.find((item) => item.id === readMatch[1]);
+      if (n) n.isRead = true;
+      return ok({ ok: true, unreadCount: demoUnreadCount() }) as T;
+    }
   }
   if (clean.startsWith('/client/') && (m === 'GET' || m === 'POST' || m === 'PATCH')) {
     if (m === 'GET') return ok([]) as T;
@@ -564,6 +594,30 @@ export async function handleDemoRequest<T>({
   }
   if (clean === '/calls/active' && m === 'GET') {
     return ok(null) as T;
+  }
+  if (clean === '/calls' && m === 'POST') {
+    return ok({
+      id: `demo-call-${Date.now()}`,
+      channel: payload.channel ?? 'DISPATCH_LINE',
+      status: 'RINGING',
+      startedAt: new Date().toISOString(),
+      muted: false,
+      onHold: false,
+      targetName: payload.targetName ?? '4DS Dispatch',
+      targetPhone: payload.targetPhone ?? '+27110000000',
+      targetRole: payload.targetRole ?? 'DISPATCH',
+    }) as T;
+  }
+  if (clean.startsWith('/calls/') && (m === 'GET' || m === 'POST' || m === 'PATCH')) {
+    if (m === 'GET') return ok(null) as T;
+    return ok({
+      id: clean.split('/')[2] ?? 'demo-call',
+      status: clean.endsWith('/end') || clean.endsWith('/decline') ? 'ENDED' : 'ACTIVE',
+      startedAt: new Date().toISOString(),
+      muted: Boolean(payload.muted),
+      onHold: Boolean(payload.onHold),
+      demo: true,
+    }) as T;
   }
   if (clean.startsWith('/control-room/') && (m === 'GET' || m === 'POST' || m === 'PATCH' || m === 'DELETE')) {
     if (m === 'GET') {

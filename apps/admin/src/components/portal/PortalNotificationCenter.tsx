@@ -36,15 +36,25 @@ export function PortalNotificationCenter() {
 
   const markRead = useCallback(
     async (id: string) => {
-      await clientApi.patch(`/client/notifications/${id}/read`);
-      void reload({ silent: true });
+      try {
+        await clientApi.patch(`/client/notifications/${id}/read`);
+        window.dispatchEvent(new Event('4ds-notifications-changed'));
+        void reload({ silent: true });
+      } catch {
+        /* keep panel open so user can retry */
+      }
     },
     [reload],
   );
 
   const markAllRead = useCallback(async () => {
-    await clientApi.patch('/client/notifications/read-all');
-    void reload({ silent: true });
+    try {
+      await clientApi.patch('/client/notifications/read-all');
+      window.dispatchEvent(new Event('4ds-notifications-changed'));
+      void reload({ silent: true });
+    } catch {
+      /* keep panel open so user can retry */
+    }
   }, [reload]);
 
   useEffect(() => {

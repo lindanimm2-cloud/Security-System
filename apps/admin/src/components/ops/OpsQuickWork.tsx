@@ -1,6 +1,6 @@
 'use client';
 
-import type { ReactNode } from 'react';
+import Link from 'next/link';
 
 export type QuickWorkAction = {
   id: string;
@@ -30,27 +30,45 @@ export function OpsQuickWork({
         {actions.map((a) => {
           const className = `ops-quick-work__btn ${a.primary ? 'ops-quick-work__btn--primary' : ''}`;
           const label = a.loading ? '…' : a.label;
-          if (a.href) {
+          if (a.onClick) {
             return (
-              <a
+              <button
                 key={a.id}
+                type="button"
                 className={className}
-                href={a.href}
-                target={a.href.startsWith('http') ? '_blank' : undefined}
-                rel={a.href.startsWith('http') ? 'noopener noreferrer' : undefined}
+                disabled={a.disabled || a.loading}
+                onClick={a.onClick}
               >
                 {label}
-              </a>
+              </button>
+            );
+          }
+          if (a.href) {
+            const external =
+              a.href.startsWith('http') ||
+              a.href.startsWith('tel:') ||
+              a.href.startsWith('mailto:');
+            if (external) {
+              return (
+                <a
+                  key={a.id}
+                  className={className}
+                  href={a.href}
+                  target={a.href.startsWith('http') ? '_blank' : undefined}
+                  rel={a.href.startsWith('http') ? 'noopener noreferrer' : undefined}
+                >
+                  {label}
+                </a>
+              );
+            }
+            return (
+              <Link key={a.id} className={className} href={a.href}>
+                {label}
+              </Link>
             );
           }
           return (
-            <button
-              key={a.id}
-              type="button"
-              className={className}
-              disabled={a.disabled || a.loading}
-              onClick={a.onClick}
-            >
+            <button key={a.id} type="button" className={className} disabled>
               {label}
             </button>
           );
@@ -81,18 +99,18 @@ export function OpsNeedsYou({
         <h2>Needs you</h2>
         <span className="badge badge--alert">{items.length}</span>
         {viewAllHref ? (
-          <a href={viewAllHref} className="link-sm">
+          <Link href={viewAllHref} className="link-sm">
             View all
-          </a>
+          </Link>
         ) : null}
       </div>
       <ul className="ops-needs__list">
         {items.map((item) => (
           <li key={item.id}>
-            <a href={item.href}>
+            <Link href={item.href}>
               <strong>{item.title}</strong>
               <span>{item.detail}</span>
-            </a>
+            </Link>
           </li>
         ))}
       </ul>
@@ -116,9 +134,9 @@ export function OpsCompactStats({
         );
         if (item.href) {
           return (
-            <a key={item.label} href={item.href} className="ops-compact-stats__cell">
+            <Link key={item.label} href={item.href} className="ops-compact-stats__cell">
               {body}
-            </a>
+            </Link>
           );
         }
         return (
@@ -137,8 +155,8 @@ export function OpsSection({
   children,
 }: {
   title: string;
-  action?: ReactNode;
-  children: ReactNode;
+  action?: React.ReactNode;
+  children: React.ReactNode;
 }) {
   return (
     <section className="ops-section">
