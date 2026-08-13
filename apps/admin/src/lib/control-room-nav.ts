@@ -13,7 +13,7 @@ const OWNER_STORE_ROLES = ['OWNER', 'TENANT_ADMIN', 'MANAGER', 'SUPER_ADMIN', 'D
 const SALES_ROLES = [...OWNER_STORE_ROLES, 'SALES'];
 
 export const CONTROL_ROOM_NAV: ControlRoomNavItem[] = [
-  { href: '/control-room', label: 'Overview', icon: 'overview', exact: true },
+  { href: '/control-room', label: 'Ops Board', icon: 'overview', exact: true },
   { href: '/control-room/map', label: 'Live Map', icon: 'live-map' },
   { href: '/control-room/surveillance', label: 'Surveillance', icon: 'surveillance' },
   { href: '/control-room/incidents', label: 'Incidents', icon: 'incidents' },
@@ -99,8 +99,8 @@ const MOBILE_PREFERRED: Record<string, string[]> = {
   DEFAULT: [
     '/control-room',
     '/control-room/map',
-    '/control-room/customers',
     '/control-room/incidents',
+    '/control-room/customers',
     '/control-room/settings',
   ],
 };

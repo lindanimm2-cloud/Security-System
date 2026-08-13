@@ -18,7 +18,7 @@ import { adminApi, type ApiResponse } from '@/lib/api-client';
 export function ControlRoomShell({
   session,
   children,
-  title = 'Control Panel',
+  title = 'Live Ops Board',
 }: {
   session: AuthSession;
   children: React.ReactNode;
@@ -89,7 +89,8 @@ export function ControlRoomShell({
     icon: item.icon,
     exact: item.exact,
     badge:
-      item.href === '/control-room/incidents' && criticalCount > 0
+      (item.href === '/control-room/incidents' || item.href === '/control-room') &&
+      criticalCount > 0
         ? criticalCount
         : undefined,
   }));
