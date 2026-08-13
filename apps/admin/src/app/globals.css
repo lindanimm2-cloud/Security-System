@@ -13012,27 +13012,32 @@ a.btn-primary {
 
 .nx-toc-item {
   display: flex;
-  align-items: baseline;
-  gap: 0.65rem;
-  padding: 0.85rem 1rem;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.95rem 1.05rem;
+  border-radius: 12px;
   border: 1px solid var(--nx-line);
+  background: var(--nx-card, var(--nx-paper));
   text-decoration: none;
-  color: inherit;
+  color: var(--nx-ink);
   font-family: var(--font-nx-display), 'Barlow Condensed', sans-serif;
   font-size: 1.05rem;
   letter-spacing: 0.02em;
-  transition: border-color 0.2s ease, background 0.2s ease;
+  transition: border-color 0.2s ease, background 0.2s ease, transform 0.15s ease;
 }
 
 .nx-toc-item span {
   color: var(--nx-signal);
-  font-size: 0.85rem;
-  letter-spacing: 0.1em;
+  font-size: 1.2rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  min-width: 1.7rem;
 }
 
 .nx-toc-item:hover {
   border-color: var(--nx-signal);
-  background: color-mix(in srgb, var(--nx-signal) 6%, transparent);
+  background: color-mix(in srgb, var(--nx-signal) 8%, var(--nx-card, var(--nx-paper)));
+  transform: translateY(-1px);
 }
 
 .nx-section--tight {
