@@ -365,6 +365,18 @@ export function getSession(portal: AuthPortal): AuthSession | null {
   }
 }
 
+/** Merge profile fields into the stored session (demo + after self-service profile save). */
+export function updateSessionUser(portal: AuthPortal, patch: Partial<AuthUser>) {
+  if (typeof window === 'undefined') return;
+  const session = getSession(portal);
+  if (!session) return;
+  const next: AuthSession = {
+    ...session,
+    user: { ...session.user, ...patch },
+  };
+  localStorage.setItem(sessionKey(portal), JSON.stringify(next));
+}
+
 export function clearSession(portal: AuthPortal) {
   if (typeof window === 'undefined') return;
   const key = sessionKey(portal);

@@ -114,7 +114,7 @@ export function OfficerActiveAssignment({
             aria-current={primary === 'scene' ? 'step' : undefined}
             onClick={() => onAction('scene', () => officerApi.post(`/officer/dispatch/${active.id}/on-scene`))}
           >
-            {actionLoading === 'scene' ? 'Updating…' : 'On scene'}
+            {actionLoading === 'scene' ? 'Updating…' : 'Arrived'}
           </button>
         )}
         <button
@@ -134,7 +134,7 @@ export function OfficerActiveAssignment({
             onAction('backup', () => officerApi.post('/officer/backup', { incidentId: active.incident.id }))
           }
         >
-          {actionLoading === 'backup' ? 'Sending…' : 'Request backup'}
+          {actionLoading === 'backup' ? 'Sending…' : 'Need backup'}
         </button>
         <Link
           href={`https://www.google.com/maps/dir/?api=1&destination=${active.incident.lat},${active.incident.lng}`}

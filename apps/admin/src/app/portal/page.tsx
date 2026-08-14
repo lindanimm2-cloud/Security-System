@@ -7,16 +7,24 @@ import { useState } from 'react';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { PortalLayout } from '@/components/portal/PortalLayout';
 import { useApi } from '@/hooks/useApi';
-import { EmergencyCallButton, EmergencyDispatchCallCard } from '@/components/portal/EmergencyCallButton';
+import { EmergencyCallButton } from '@/components/portal/EmergencyCallButton';
 import { HomeAlarmControl } from '@/components/portal/HomeAlarmControl';
-import { useCallsOptional } from '@/components/calls/CallProvider';
 import { clientApi, type ApiResponse } from '@/lib/api-client';
 import { friendlyErrorMessage } from '@/lib/friendly-error';
 import { useSubscriptionAccess } from '@/hooks/useSubscriptionAccess';
 import { activityHref } from '@/lib/portal-routes';
 import { OpsMyShiftHeader } from '@/components/ops/OpsMyShiftHeader';
-import { OpsNeedsYou, OpsQuickWork } from '@/components/ops/OpsQuickWork';
+import { OpsNeedsYou } from '@/components/ops/OpsQuickWork';
 import { OpsUndoToast, useUndoToast } from '@/components/ops/OpsUndoToast';
+import {
+  EmergencyModeBanner,
+  HoldToActivate,
+  ProtectionStatusCard,
+} from '@/components/ops/EmergencyMode';
+import { DashboardLiveCctv } from '@/components/portal/DashboardLiveCctv';
+import { SlideCarousel, SlideCarouselCard } from '@/components/portal/SlideCarousel';
+import { SlidingSection } from '@/components/portal/SlidingSection';
+import { protectionStatusTone } from '@/lib/portal-priority';
 
 type Overview = {
   user: { firstName: string; trackingEnabled: boolean; address: string | null };
@@ -64,10 +72,7 @@ function OverviewDashboard() {
   const [fireLoading, setFireLoading] = useState(false);
   const [alertMsg, setAlertMsg] = useState('');
   const [filter, setFilter] = useState('all');
-  const [armLoading, setArmLoading] = useState(false);
-  const [callBusy, setCallBusy] = useState(false);
   const undo = useUndoToast();
-  const calls = useCallsOptional();
   const { data, loading, error, reload } = useApi(
     () => clientApi.get<ApiResponse<Overview>>('/client/overview'),
     [],
@@ -92,12 +97,6 @@ function OverviewDashboard() {
   );
 
   async function handlePanic(silent: boolean) {
-    if (!silent) {
-      const ok = window.confirm(
-        'Send a panic alert to 4DS Dispatch now? Only use this in a real emergency.',
-      );
-      if (!ok) return;
-    }
     if (silent) setSilentLoading(true);
     else setPanicLoading(true);
     setAlertMsg('');
@@ -140,37 +139,6 @@ function OverviewDashboard() {
     }
   }
 
-  async function togglePrimaryAlarm() {
-    const prop = data?.data?.properties[0];
-    if (!prop) {
-      window.location.href = '/portal/home';
-      return;
-    }
-    const prev = prop.alarmStatus;
-    const next = ['ARMED', 'STAY', 'NIGHT'].includes(prev) ? 'DISARMED' : 'ARMED';
-    const ok = window.confirm(
-      next === 'DISARMED'
-        ? `Disarm ${prop.name}?`
-        : `Arm ${prop.name} (Away mode)?`,
-    );
-    if (!ok) return;
-    setArmLoading(true);
-    setAlertMsg('');
-    try {
-      await clientApi.patch(`/client/properties/${prop.id}/alarm`, { status: next });
-      setAlertMsg(next === 'DISARMED' ? 'Alarm disarmed.' : 'Alarm armed (Away).');
-      undo.show(next === 'DISARMED' ? 'Disarmed' : 'Armed', async () => {
-        await clientApi.patch(`/client/properties/${prop.id}/alarm`, { status: prev });
-        void reload();
-      });
-      void reload();
-    } catch (e) {
-      setAlertMsg(friendlyErrorMessage(e, 'action'));
-    } finally {
-      setArmLoading(false);
-    }
-  }
-
   async function callDispatch() {
     const phone =
       contactsPayload?.meta?.dispatchLine?.phone ??
@@ -178,26 +146,7 @@ function OverviewDashboard() {
         `${c.name} ${c.relationship ?? ''}`.toLowerCase().includes('dispatch'),
       )?.phone ??
       '+27110000000';
-    const name = contactsPayload?.meta?.dispatchLine?.name ?? '4DS Dispatch';
-    setCallBusy(true);
-    setAlertMsg('');
-    try {
-      if (calls) {
-        await calls.startCall('DISPATCH_LINE', {
-          name,
-          phone,
-          role: 'DISPATCH',
-        });
-        setAlertMsg('Connecting to control room…');
-      } else {
-        window.location.href = `tel:${phone}`;
-      }
-    } catch (e) {
-      setAlertMsg(friendlyErrorMessage(e, 'call'));
-      window.location.href = `tel:${phone}`;
-    } finally {
-      setCallBusy(false);
-    }
+    window.location.href = `tel:${phone}`;
   }
 
   if (loading) return <LoadingSpinner label="Loading overview..." fullScreen />;
@@ -216,20 +165,134 @@ function OverviewDashboard() {
   );
   const hasAlert = d.stats.activeIncidents > 0 || activeIncidents.length > 0;
   const primaryAlarm = d.properties[0];
+  const tone = protectionStatusTone({
+    activeIncidents: d.stats.activeIncidents,
+    criticalIncidents: hasAlert ? d.stats.activeIncidents : 0,
+    alarmFault: primaryAlarm ? !['ARMED', 'STAY', 'NIGHT', 'DISARMED'].includes(primaryAlarm.alarmStatus) : false,
+  });
 
   return (
     <>
+      {(hasAlert || alertMsg.includes('Panic') || alertMsg.includes('Medical') || alertMsg.includes('Fire')) && (
+        <EmergencyModeBanner
+          title={activeIncidents[0]?.title ?? 'Emergency active'}
+          detail="Control room notified. Stay available if safe."
+          statusLine={d.user.address ? `Location · ${d.user.address}` : 'Location sharing on'}
+          actions={
+            <>
+              <Link href="/portal/protect" className="btn-sm btn-primary">
+                Protect controls
+              </Link>
+              <Link href="/portal/incidents" className="btn-sm btn-sm--link">
+                View response
+              </Link>
+              <button type="button" className="btn-sm" onClick={() => void callDispatch()}>
+                Call control room
+              </button>
+            </>
+          }
+        />
+      )}
+
+      {access?.emergency !== false && (
+        <section className="panic-section" aria-label="Emergency controls">
+          <HoldToActivate
+            label="Panic"
+            holdLabel="Sending panic…"
+            loading={panicLoading}
+            disabled={silentLoading || medicalLoading || fireLoading}
+            className="hold-activate--circle"
+            onActivate={() => handlePanic(false)}
+          />
+          <p className="panic-note">Hold to confirm · Dispatch notified instantly</p>
+
+          <div className="panic-orbit">
+            <button
+              type="button"
+              className="panic-orbit-btn panic-orbit-btn--silent"
+              onClick={() => handlePanic(true)}
+              disabled={panicLoading || silentLoading || medicalLoading || fireLoading}
+            >
+              {silentLoading ? '…' : (
+                <>
+                  <span className="panic-orbit-btn__glyph">S</span>
+                  <span className="panic-orbit-btn__label">Silent Panic</span>
+                </>
+              )}
+            </button>
+            {access?.medical !== false && (
+              <button
+                type="button"
+                className="panic-orbit-btn panic-orbit-btn--medical"
+                onClick={handleMedicalEmergency}
+                disabled={panicLoading || silentLoading || medicalLoading || fireLoading}
+              >
+                {medicalLoading ? '…' : (
+                  <>
+                    <span className="panic-orbit-btn__glyph">+</span>
+                    <span className="panic-orbit-btn__label">Medical Emergency</span>
+                  </>
+                )}
+              </button>
+            )}
+            <button
+              type="button"
+              className="panic-orbit-btn panic-orbit-btn--fire"
+              onClick={handleFireEmergency}
+              disabled={panicLoading || silentLoading || medicalLoading || fireLoading}
+            >
+              {fireLoading ? '…' : (
+                <>
+                  <span className="panic-orbit-btn__glyph">F</span>
+                  <span className="panic-orbit-btn__label">Fire Emergency</span>
+                </>
+              )}
+            </button>
+            <Link href="/portal/emergency" className="panic-orbit-btn panic-orbit-btn--hub">
+              <span className="panic-orbit-btn__glyph">◎</span>
+              <span className="panic-orbit-btn__label">Emergency Hub</span>
+            </Link>
+          </div>
+        </section>
+      )}
+
+      <DashboardLiveCctv />
+
+      {alertMsg ? (
+        <div className="alert alert--success ops-quick-feedback" role="status">
+          {alertMsg}
+        </div>
+      ) : null}
+
+      <ProtectionStatusCard
+        tone={tone}
+        title={
+          tone === 'emergency'
+            ? 'Emergency active'
+            : tone === 'attention'
+              ? 'Attention required'
+              : 'You are protected'
+        }
+        lines={[
+          primaryAlarm
+            ? `Home security · ${primaryAlarm.alarmStatus}`
+            : 'Home security ready',
+          `${d.stats.familyCount} family connected`,
+          `Last check · just now`,
+        ]}
+      />
+
       <OpsMyShiftHeader
-        title="Right now"
+        title={`Hello, ${d.user.firstName}`}
         subtitle={
           hasAlert
             ? `${d.stats.activeIncidents} active · action needed`
-            : 'You are covered — panic stays on this screen'
+            : 'You are covered — protect stays one hold away'
         }
         chips={[
           {
             id: 'all',
-            label: 'Everything',
+            label: 'Board',
             count:
               d.stats.activeIncidents +
               d.stats.unreadNotifications +
@@ -268,208 +331,107 @@ function OverviewDashboard() {
         }}
       />
 
-      <OpsQuickWork
-        hint="Protection controls"
-        actions={[
-          {
-            id: 'panic',
-            label: panicLoading ? 'Sending…' : 'Panic',
-            primary: true,
-            loading: panicLoading,
-            disabled: panicLoading || silentLoading || medicalLoading || fireLoading,
-            onClick: () => void handlePanic(false),
-          },
-          {
-            id: 'arm',
-            label: armLoading
-              ? 'Updating…'
-              : primaryAlarm && ['ARMED', 'STAY', 'NIGHT'].includes(primaryAlarm.alarmStatus)
-                ? 'Disarm'
-                : 'Arm',
-            loading: armLoading,
-            disabled: armLoading || !primaryAlarm,
-            onClick: () => void togglePrimaryAlarm(),
-          },
-          {
-            id: 'call',
-            label: callBusy ? 'Calling…' : 'Call dispatch',
-            loading: callBusy,
-            disabled: callBusy,
-            onClick: () => void callDispatch(),
-          },
-          {
-            id: 'updates',
-            label: 'Updates',
-            href: '/portal/updates',
-          },
-        ]}
-      />
-
-      {alertMsg ? (
-        <div className="alert alert--success ops-quick-feedback" role="status">
-          {alertMsg}
-        </div>
-      ) : null}
-
-      <div className="portal-hero portal-hero--compact">
-        <div>
-          <h1>Hello, {d.user.firstName}</h1>
-          <p>
-            {hasAlert
-              ? 'Action needed — review active protection events below.'
-              : 'You are covered. Panic and live status stay on this screen.'}
-          </p>
-        </div>
-        {d.stats.unreadNotifications > 0 && (
-          <Link href="/portal/updates" className="badge badge--alert badge--link">
-            {d.stats.unreadNotifications} updates
-          </Link>
-        )}
-      </div>
-
-      {contactsPayload?.meta?.dispatchLine && (
-        <EmergencyDispatchCallCard
-          name={contactsPayload.meta.dispatchLine.name}
-          phone={contactsPayload.meta.dispatchLine.phone}
-        />
-      )}
-
-      <section className="panic-section portal-card" aria-label="Emergency controls">
-        <button
-          type="button"
-          className={`panic-button ${panicLoading ? 'panic-button--loading' : ''}`}
-          onClick={() => handlePanic(false)}
-          disabled={panicLoading || silentLoading || medicalLoading || fireLoading}
-        >
-          {panicLoading ? (
-            <LoadingSpinner label="" size="sm" />
-          ) : (
-            <span className="panic-button-inner">
-              <span className="panic-icon">!</span>
-              <span className="panic-label">PANIC</span>
-            </span>
-          )}
-        </button>
-        <p className="panic-note">Hold to confirm · Dispatch notified instantly</p>
-
-        {alertMsg && (
-          <div className="alert alert--success panic-section__alert" role="status">
-            {alertMsg}
-          </div>
-        )}
-
-        <div className="panic-orbit">
-          <button
-            type="button"
-            className="panic-orbit-btn panic-orbit-btn--silent"
-            onClick={() => handlePanic(true)}
-            disabled={panicLoading || silentLoading || medicalLoading || fireLoading}
-          >
-            {silentLoading ? '…' : (
-              <>
-                <span className="panic-orbit-btn__glyph">S</span>
-                <span className="panic-orbit-btn__label">Silent Panic</span>
-              </>
-            )}
-          </button>
-          <button
-            type="button"
-            className="panic-orbit-btn panic-orbit-btn--medical"
-            onClick={handleMedicalEmergency}
-            disabled={panicLoading || silentLoading || medicalLoading || fireLoading}
-          >
-            {medicalLoading ? '…' : (
-              <>
-                <span className="panic-orbit-btn__glyph">+</span>
-                <span className="panic-orbit-btn__label">Medical Emergency</span>
-              </>
-            )}
-          </button>
-          <button
-            type="button"
-            className="panic-orbit-btn panic-orbit-btn--fire"
-            onClick={handleFireEmergency}
-            disabled={panicLoading || silentLoading || medicalLoading || fireLoading}
-          >
-            {fireLoading ? '…' : (
-              <>
-                <span className="panic-orbit-btn__glyph">F</span>
-                <span className="panic-orbit-btn__label">Fire Emergency</span>
-              </>
-            )}
-          </button>
-          <Link href="/portal/emergency" className="panic-orbit-btn panic-orbit-btn--hub">
-            <span className="panic-orbit-btn__glyph">◎</span>
-            <span className="panic-orbit-btn__label">Emergency Hub</span>
-          </Link>
-        </div>
-      </section>
-
-      {/* Priority: right-now status board */}
       {(filter === 'all' || filter === 'urgent') && (
-      <section className="portal-now" aria-label="Right now">
-        <div className="portal-now__head">
-          <h2>Status board</h2>
-          <span className="text-muted">Tap to act</span>
-        </div>
-        <div className="portal-now__grid">
-          <Link
-            href="/portal/incidents"
-            className={`portal-now__card ${hasAlert ? 'portal-now__card--alert' : 'portal-now__card--ok'}`}
+      <SlideCarousel
+        title="Status board"
+        subtitle="Swipe · tap a card to act"
+        seeAllHref="/portal/incidents"
+        seeAllLabel="Incidents"
+      >
+        <SlideCarouselCard
+          title="Incidents"
+          href="/portal/incidents"
+          tone={hasAlert ? 'alert' : 'ok'}
+        >
+          <strong className="slide-carousel__stat">{d.stats.activeIncidents}</strong>
+          <p className="text-muted">
+            {hasAlert ? 'Open events — tap for updates' : 'No open incidents · you are clear'}
+          </p>
+        </SlideCarouselCard>
+        <SlideCarouselCard
+          title="Live tracking"
+          href="/portal/location"
+          tone={d.user.trackingEnabled ? 'ok' : 'warn'}
+        >
+          <strong className="slide-carousel__stat">{d.user.trackingEnabled ? 'ON' : 'OFF'}</strong>
+          <p className="text-muted">
+            {d.user.trackingEnabled
+              ? 'GPS sharing active for response'
+              : 'Enable tracking so responders can find you'}
+          </p>
+        </SlideCarouselCard>
+        <SlideCarouselCard
+          title="Home alarm"
+          href="/portal/home"
+          tone={
+            primaryAlarm && ['ARMED', 'STAY', 'NIGHT', 'TRIGGERED'].includes(primaryAlarm.alarmStatus)
+              ? primaryAlarm.alarmStatus === 'TRIGGERED'
+                ? 'alert'
+                : 'ok'
+              : 'muted'
+          }
+        >
+          <strong className="slide-carousel__stat">
+            {primaryAlarm ? primaryAlarm.alarmStatus.replace(/_/g, ' ') : '—'}
+          </strong>
+          <p className="text-muted">
+            {primaryAlarm
+              ? primaryAlarm.name
+              : access?.home
+                ? 'Add a property to arm'
+                : 'Upgrade for home security'}
+          </p>
+        </SlideCarouselCard>
+        <SlideCarouselCard title="Family" href="/portal/family" tone="muted">
+          <strong className="slide-carousel__stat">{d.stats.familyCount}</strong>
+          <p className="text-muted">
+            {d.family.filter((m) => m.trackingEnabled).length} tracking · {d.safeZoneCount} safe zones
+          </p>
+        </SlideCarouselCard>
+        {d.vehicles[0] ? (
+          <SlideCarouselCard
+            title="Vehicle"
+            href={`/portal/vehicles/${d.vehicles[0].id}`}
+            tone={d.vehicles[0].theftRecovery ? 'alert' : 'ok'}
           >
-            <span className="portal-now__label">Active incidents</span>
-            <strong>{d.stats.activeIncidents}</strong>
-            <span>
-              {hasAlert
-                ? 'Open events — tap for status & updates'
-                : 'No open incidents · you are clear'}
-            </span>
-          </Link>
-          <Link
-            href="/portal/location"
-            className={`portal-now__card ${d.user.trackingEnabled ? 'portal-now__card--ok' : 'portal-now__card--warn'}`}
-          >
-            <span className="portal-now__label">Live tracking</span>
-            <strong>{d.user.trackingEnabled ? 'ON' : 'OFF'}</strong>
-            <span>
-              {d.user.trackingEnabled
-                ? 'GPS sharing active for response'
-                : 'Enable tracking so responders can find you'}
-            </span>
-          </Link>
-          <Link
-            href="/portal/home"
-            className={`portal-now__card ${
-              primaryAlarm && ['ARMED', 'STAY', 'NIGHT', 'TRIGGERED'].includes(primaryAlarm.alarmStatus)
-                ? primaryAlarm.alarmStatus === 'TRIGGERED'
-                  ? 'portal-now__card--alert'
-                  : 'portal-now__card--ok'
-                : 'portal-now__card--muted'
-            }`}
-          >
-            <span className="portal-now__label">Home alarm</span>
-            <strong>
-              {primaryAlarm ? primaryAlarm.alarmStatus.replace(/_/g, ' ') : '—'}
+            <strong className="slide-carousel__stat slide-carousel__stat--sm">
+              {d.vehicles[0].registration}
             </strong>
-            <span>
-              {primaryAlarm
-                ? primaryAlarm.name
-                : access?.home
-                  ? 'Add a property to arm'
-                  : 'Upgrade for home security'}
-            </span>
-          </Link>
-          <Link href="/portal/family" className="portal-now__card portal-now__card--muted">
-            <span className="portal-now__label">Family</span>
-            <strong>{d.stats.familyCount}</strong>
-            <span>
-              {d.family.filter((m) => m.trackingEnabled).length} tracking ·{' '}
-              {d.safeZoneCount} safe zones
-            </span>
-          </Link>
-        </div>
-      </section>
+            <p className="text-muted">
+              {d.vehicles[0].make} {d.vehicles[0].model} ·{' '}
+              {d.vehicles[0].theftRecovery ? 'Recovery mode' : 'Secure'}
+            </p>
+          </SlideCarouselCard>
+        ) : null}
+      </SlideCarousel>
       )}
+
+      <SlideCarousel
+        title="Your services"
+        subtitle="Swipe through active modules"
+        seeAllHref="/portal/subscription"
+        seeAllLabel="Manage plan"
+      >
+        {Object.entries(d.services)
+          .filter(([key]) => key !== 'communications')
+          .map(([key, status]) => (
+            <SlideCarouselCard
+              key={key}
+              title={SERVICE_LABELS[key] ?? key}
+              href={
+                status === 'upgrade'
+                  ? `/portal/subscription/upgrade?addon=${key === 'home' ? 'HOME_SECURITY' : key === 'vehicle' ? 'VEHICLE_RESPONSE' : key === 'family' ? 'FAMILY' : ''}`
+                  : (SERVICE_HREFS[key] ?? '/portal')
+              }
+              tone={status === 'active' || status === 'monitoring' ? 'ok' : status === 'upgrade' ? 'warn' : 'muted'}
+            >
+              <span className={`service-status-badge service-status-badge--${status}`}>
+                {status === 'upgrade' ? 'Upgrade' : status}
+              </span>
+              <p className="text-muted">Tap to open module</p>
+            </SlideCarouselCard>
+          ))}
+      </SlideCarousel>
 
       <OpsNeedsYou
         items={[
@@ -495,6 +457,13 @@ function OverviewDashboard() {
             : []),
         ]}
         viewAllHref="/portal/updates"
+      />
+
+      <HomeAlarmControl
+        variant="dashboard"
+        properties={d.properties}
+        hasAccess={!!access?.home}
+        onUpdated={reload}
       />
 
       {(hasAlert || activeIncidents.length > 0) && (
@@ -526,12 +495,12 @@ function OverviewDashboard() {
         </section>
       )}
 
-      <HomeAlarmControl
-        properties={d.properties}
-        hasAccess={!!access?.home}
-        onUpdated={reload}
-      />
-
+      <SlidingSection
+        title="Contacts & services"
+        subtitle="Family, vehicles, subscription & activity"
+        defaultOpen={false}
+        storageKey="portal-dashboard-details"
+      >
       <div className="overview-grid">
         <section className="portal-card portal-card--accent">
           <div className="card-header-row">
@@ -783,6 +752,7 @@ function OverviewDashboard() {
           </ul>
         </section>
       </div>
+      </SlidingSection>
       <OpsUndoToast toast={undo.toast} onDismiss={undo.clear} />
     </>
   );

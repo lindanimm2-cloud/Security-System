@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { ControlRoomLayout } from '@/components/control-room/ControlRoomLayout';
+import { ClientChatHub } from '@/components/control-room/ClientChatHub';
 import { CallActions, DispatchLineButton } from '@/components/calls/CallActions';
 import { channelLabel, formatCallHistoryMeta } from '@/lib/call-utils';
 import { useApi } from '@/hooks/useApi';
@@ -9,7 +10,7 @@ import { adminApi, type ApiResponse } from '@/lib/api-client';
 import type { CallDirectory, CallSession } from '@/types/calls';
 
 export default function CommunicationsPage() {
-  const [tab, setTab] = useState<'directory' | 'history'>('directory');
+  const [tab, setTab] = useState<'client-chat' | 'directory' | 'history'>('client-chat');
   const { data: directory, loading: dirLoading } = useApi(
     () => adminApi.get<ApiResponse<CallDirectory>>('/calls/directory'),
     [],
@@ -29,14 +30,21 @@ export default function CommunicationsPage() {
           <div>
             <h2>Communications hub</h2>
             <p>
-              Internal app calls, WhatsApp, dispatch line, and phone — with live notes via the call
-              lens while you work anywhere in the control panel.
+              Client chat, internal calls, WhatsApp, dispatch line, and phone — with live notes via
+              the call lens while you work anywhere in the control panel.
             </p>
           </div>
           {dir && <DispatchLineButton phone={dir.dispatchLine.phone} name={dir.dispatchLine.name} />}
         </header>
 
         <div className="call-hub-tabs">
+          <button
+            type="button"
+            className={`call-hub-tab ${tab === 'client-chat' ? 'call-hub-tab--active' : ''}`}
+            onClick={() => setTab('client-chat')}
+          >
+            Client chat
+          </button>
           <button
             type="button"
             className={`call-hub-tab ${tab === 'directory' ? 'call-hub-tab--active' : ''}`}
@@ -55,6 +63,12 @@ export default function CommunicationsPage() {
             Call history
           </button>
         </div>
+
+        {tab === 'client-chat' && (
+          <section className="panel client-chat-hub-panel">
+            <ClientChatHub />
+          </section>
+        )}
 
         {tab === 'directory' && (
           <div className="call-hub-grid">

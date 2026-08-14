@@ -78,16 +78,27 @@ function FamilyContent() {
       </section>
       <div className="member-grid">
         {family.members.map((m) => (
-          <Link key={m.id} href="/portal/location" className="member-card member-card--link">
+          <article key={m.id} className="member-card member-card--safety">
             <div className="avatar avatar--admin">{m.name.split(' ').map((n) => n[0]).join('')}</div>
             <div>
               <strong>{m.nickname ?? m.name}</strong>
               <span className={`status-dot ${m.trackingEnabled ? 'status-dot--on' : ''}`}>
-                {m.trackingEnabled ? 'Tracking active' : 'Tracking off'}
+                {m.trackingEnabled ? 'Protected · tracking on' : 'Tracking off'}
               </span>
               {m.lastLocationAt && <span className="text-muted">Last seen: recently</span>}
+              <div className="queue-card__actions" style={{ marginTop: '0.55rem' }}>
+                <a className="btn-sm btn-primary" href="tel:+27820000000">
+                  Call
+                </a>
+                <Link href="/portal/family/chat" className="btn-sm">
+                  Message
+                </Link>
+                <Link href="/portal/location" className="btn-sm">
+                  Location
+                </Link>
+              </div>
             </div>
-          </Link>
+          </article>
         ))}
       </div>
       <section id="add-member" className="portal-card profile-section page-section">

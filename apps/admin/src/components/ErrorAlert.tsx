@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useState } from 'react';
 import { isSignInRequiredMessage } from '@/lib/friendly-error';
+import { reportErrorToDeveloper } from '@/lib/error-report';
 import {
   resolveStaffSession,
   submitDeveloperErrorReport,
@@ -56,7 +57,7 @@ export function ErrorAlert({
   const needsSignIn = isSignInRequiredMessage(text);
   const canRetry = !needsSignIn && (Boolean(onRetry) || isRetryableMessage(text));
   const staff = resolveStaffSession(pathname);
-  const canNotify = !needsSignIn && Boolean(staff);
+  const canNotify = !needsSignIn;
 
   const classes = [
     'alert',
@@ -83,16 +84,23 @@ export function ErrorAlert({
   }
 
   async function handleNotify() {
-    if (!staff || notifying) return;
+    if (notifying) return;
     setNotifying(true);
     setNotifyMsg('');
     try {
-      await submitDeveloperErrorReport({
-        message: text!,
-        path: pathname ?? undefined,
-        portal: staff.portal,
-        accessToken: staff.session.accessToken,
-      });
+      if (staff) {
+        await submitDeveloperErrorReport({
+          message: text!,
+          path: pathname ?? undefined,
+          portal: staff.portal,
+          accessToken: staff.session.accessToken,
+        });
+      } else {
+        await reportErrorToDeveloper({
+          message: text!,
+          path: pathname ?? undefined,
+        });
+      }
       setNotifyMsg('Developer notified');
     } catch (err) {
       setNotifyMsg(err instanceof Error ? err.message : 'Notify failed');
@@ -121,7 +129,7 @@ export function ErrorAlert({
               ? 'Notifying…'
               : notifyMsg === 'Developer notified'
                 ? 'Notified'
-                : 'Notify developer'}
+                : 'Send details to developer'}
           </button>
         )}
         {canRetry && (

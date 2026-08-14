@@ -158,8 +158,12 @@ export function FamilyChat() {
           linked family members who also have the app and have turned messaging on.
         </p>
         <p className="text-muted">
-          <strong>Control room contact is always available</strong> through the Emergency Hub — panic,
-          medical, fire, and theft alerts reach dispatch directly. No outside communication is permitted.
+          <strong>Control room chat is always available</strong> on{' '}
+          <Link href="/portal/chat" className="interactive-text">
+            Control Room Chat
+          </Link>
+          . For emergencies use the Emergency Hub — panic, medical, fire, and theft alerts reach
+          dispatch directly.
         </p>
         <button
           type="button"

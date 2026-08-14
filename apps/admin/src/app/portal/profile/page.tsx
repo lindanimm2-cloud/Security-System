@@ -9,6 +9,7 @@ import {
   type LoyaltySummary,
 } from '@/components/loyalty/LoyaltySummaryCard';
 import { ThemeSettings } from '@/components/ThemeSettings';
+import { PortalPermissionsSection } from '@/components/portal/PortalPermissions';
 import { PortalLayout } from '@/components/portal/PortalLayout';
 import { useApi } from '@/hooks/useApi';
 import { clientApi, type ApiResponse } from '@/lib/api-client';
@@ -343,6 +344,8 @@ function ProfileContent() {
             Manage family safety →
           </Link>
         </section>
+
+        <PortalPermissionsSection />
 
         <section className="portal-card profile-section">
           <ThemeSettings />

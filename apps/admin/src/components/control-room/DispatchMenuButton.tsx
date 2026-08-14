@@ -12,7 +12,7 @@ type DispatchMenuButtonProps = {
 
 export function DispatchMenuButton({
   incidentId,
-  className = 'btn-sm btn-sm--link',
+  className = 'btn-sm btn-primary',
   label = 'Dispatch',
   onAssigned,
 }: DispatchMenuButtonProps) {

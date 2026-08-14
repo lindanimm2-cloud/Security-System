@@ -68,6 +68,7 @@ export default function IncidentsPage() {
 function IncidentsContent() {
   const searchParams = useSearchParams();
   const selectedId = searchParams.get('id');
+  const priorityFilter = searchParams.get('priority');
 
   const { data, loading, error, reload } = useApi(
     () => adminApi.get<ApiResponse<Incident[]>>('/control-room/incidents'),
@@ -113,7 +114,13 @@ function IncidentsContent() {
 
   const detail = detailData?.data;
   const incidents = data!.data;
-  const activeIncidents = incidents.filter((i) => isActiveIncident(i.status));
+  const activeIncidents = incidents.filter((i) => {
+    if (!isActiveIncident(i.status)) return false;
+    if (!priorityFilter) return true;
+    const p = i.priority.toUpperCase();
+    if (priorityFilter.toUpperCase() === 'CRITICAL') return ['CRITICAL', 'HIGH'].includes(p);
+    return p === priorityFilter.toUpperCase();
+  });
   const resolvedIncidents = incidents.filter((i) => !isActiveIncident(i.status));
 
   return (

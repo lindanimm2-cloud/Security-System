@@ -25,7 +25,7 @@ function CheckoutContent() {
   const params = useSearchParams();
   const ref = params.get('ref') ?? '';
   const [paying, setPaying] = useState(false);
-  const [method, setMethod] = useState<'card' | 'eft'>('card');
+  const [method, setMethod] = useState<'card' | 'eft' | 'debit_order'>('card');
   const { data, loading, error , reload } = useApi(
     () => (ref ? clientApi.get<ApiResponse<Payment>>(`/client/subscription/payment/${ref}`) : Promise.reject(new Error('Missing payment reference'))),
     [ref],
@@ -46,7 +46,11 @@ function CheckoutContent() {
   async function pay() {
     setPaying(true);
     try {
-      await clientApi.post('/client/subscription/confirm', { reference: ref });
+      await clientApi.post('/client/subscription/confirm', { reference: ref, method });
+      if (method === 'debit_order') {
+        router.push('/portal/billing?debitPending=1');
+        return;
+      }
       router.push(isMonthly ? '/portal/subscription?renewed=1' : '/portal/subscription?upgraded=1');
     } finally {
       setPaying(false);
@@ -79,6 +83,7 @@ function CheckoutContent() {
         <div className="checkout-methods">
           <button type="button" className={`checkout-method ${method === 'card' ? 'checkout-method--active' : ''}`} onClick={() => setMethod('card')}>Card</button>
           <button type="button" className={`checkout-method ${method === 'eft' ? 'checkout-method--active' : ''}`} onClick={() => setMethod('eft')}>EFT</button>
+          <button type="button" className={`checkout-method ${method === 'debit_order' ? 'checkout-method--active' : ''}`} onClick={() => setMethod('debit_order')}>Debit order</button>
         </div>
 
         {method === 'card' && (
@@ -94,8 +99,25 @@ function CheckoutContent() {
           <p className="text-muted checkout-eft-note">You will be redirected to your bank to authorise an instant EFT payment via PayFast.</p>
         )}
 
+        {method === 'debit_order' && (
+          <div className="checkout-debit-note">
+            <p className="text-muted">
+              Pay via monthly debit order. Submit your bank details on the{' '}
+              <Link href="/portal/billing" className="interactive-text">billing page</Link>{' '}
+              if you have not already. Control room verifies before the first collection.
+            </p>
+            <p className="text-muted">This checkout will mark the payment as pending verification.</p>
+          </div>
+        )}
+
         <button type="button" className="btn-primary btn-payfast" onClick={() => void pay()} disabled={paying}>
-          {paying ? <LoadingSpinner label="" size="sm" /> : `Pay ${payment.amountFormatted} securely`}
+          {paying ? (
+            <LoadingSpinner label="" size="sm" />
+          ) : method === 'debit_order' ? (
+            'Submit debit order payment'
+          ) : (
+            `Pay ${payment.amountFormatted} securely`
+          )}
         </button>
 
         <p className="text-muted checkout-footer">

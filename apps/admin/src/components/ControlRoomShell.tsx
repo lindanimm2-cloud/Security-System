@@ -14,6 +14,8 @@ import { MobileBottomNav } from './nav/MobileBottomNav';
 import { MAP_SCREENSHOT_FROZEN_AT } from '@/lib/map-screenshot';
 import { ThemeToggle } from './ThemeToggle';
 import { adminApi, type ApiResponse } from '@/lib/api-client';
+import { useSidebarCollapsed } from '@/hooks/useSidebarCollapsed';
+import { SidebarCollapseButton, SignOutIcon } from './nav/SidebarCollapseButton';
 
 export function ControlRoomShell({
   session,
@@ -28,6 +30,7 @@ export function ControlRoomShell({
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
   const [criticalCount, setCriticalCount] = useState(0);
+  const { collapsed, toggle } = useSidebarCollapsed();
 
   useEffect(() => {
     let cancelled = false;
@@ -89,8 +92,7 @@ export function ControlRoomShell({
     icon: item.icon,
     exact: item.exact,
     badge:
-      (item.href === '/control-room/incidents' || item.href === '/control-room') &&
-      criticalCount > 0
+      item.href === '/control-room/incidents' && criticalCount > 0
         ? criticalCount
         : undefined,
   }));
@@ -127,36 +129,55 @@ export function ControlRoomShell({
         />
       )}
 
-      <aside className={`sidebar ${menuOpen ? 'sidebar--open' : ''}`}>
+      <aside
+        className={`sidebar ${menuOpen ? 'sidebar--open' : ''} ${collapsed ? 'sidebar--collapsed' : ''}`}
+      >
         <div className="sidebar-brand">
-          <BrandMark variant="control" />
+          <BrandMark variant="control" compact={collapsed} showProduct={!collapsed} />
+          <SidebarCollapseButton collapsed={collapsed} onClick={toggle} />
         </div>
         <nav className="sidebar-nav">
           {navItems.map((item) => (
             <Link
               key={item.href}
               href={item.href}
+              title={item.label}
+              aria-label={item.label}
               className={`sidebar-link ${isActive(item.href, item.exact) ? 'sidebar-link--active' : ''}`}
             >
-              <NavIcon name={item.icon} />
-              <span>{item.label}</span>
+              <span className="sidebar-link__icon">
+                <NavIcon name={item.icon} size={collapsed ? 20 : 18} />
+              </span>
+              <span className="sidebar-link__label">{item.label}</span>
             </Link>
           ))}
         </nav>
         <div className="sidebar-footer">
-          <div className="sidebar-user">
+          <Link
+            href="/control-room/profile"
+            className="sidebar-user sidebar-user--link"
+            title={`${session.user.firstName} ${session.user.lastName}`}
+          >
             <div className="avatar avatar--admin">
               {session.user.firstName[0]}{session.user.lastName[0]}
             </div>
-            <div>
+            <div className="sidebar-user-copy">
               <div className="sidebar-user-name">
                 {session.user.firstName} {session.user.lastName}
               </div>
               <div className="sidebar-user-role">{roleDisplayLabel(session.user.role)}</div>
             </div>
-          </div>
-          <button type="button" className="btn-ghost btn-ghost--full" onClick={logout}>
-            Sign out
+          </Link>
+          <ThemeToggle className="theme-toggle--sidebar" />
+          <button
+            type="button"
+            className="btn-ghost btn-ghost--full sidebar-signout"
+            onClick={logout}
+            title="Sign out"
+            aria-label="Sign out"
+          >
+            <SignOutIcon />
+            <span>Sign out</span>
           </button>
         </div>
       </aside>

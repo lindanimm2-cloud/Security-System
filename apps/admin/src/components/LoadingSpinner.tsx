@@ -1,6 +1,5 @@
 'use client';
 
-import Image from 'next/image';
 import { ButtonSpinner } from './ButtonSpinner';
 
 type LoadingSpinnerProps = {
@@ -29,29 +28,13 @@ export function LoadingSpinner({
       >
         <div className="loading-screen__glow" aria-hidden />
         <div className="loading-screen__scan" aria-hidden />
-        <div className="loading-screen__card">
-          <div className="loading-screen__mark">
-            <Image
-              src="/brand/4ds-logo.png"
-              alt=""
-              width={120}
-              height={32}
-              className="loading-screen__logo"
-              priority
-            />
-            <span className="loading-screen__word">
-              4DS <em>Nexus</em>
-            </span>
-          </div>
-          <div className={`loader-wrap loader-wrap--${size === 'sm' ? 'md' : 'lg'}`}>
-            <div
-              className="loader-spinner loader-spinner--ring"
-              aria-label={label || 'Loading'}
-            >
-              <span className="loader-ring" />
-              <span className="loader-ring loader-ring--delay" />
-              <span className="loader-core" aria-hidden />
-            </div>
+        <div className="loading-screen__content">
+          <div className="loader-orbit" aria-label={label || 'Loading'}>
+            <span className="loader-orbit__track" aria-hidden />
+            <span className="loader-orbit__ring loader-orbit__ring--a" aria-hidden />
+            <span className="loader-orbit__ring loader-orbit__ring--b" aria-hidden />
+            <span className="loader-orbit__ring loader-orbit__ring--c" aria-hidden />
+            <span className="loader-orbit__core" aria-hidden />
           </div>
           <p className="loading-screen__label">{label}</p>
           <p className="loading-screen__hint">
@@ -62,11 +45,6 @@ export function LoadingSpinner({
           </p>
           <div className="loading-screen__bar" aria-hidden>
             <span />
-          </div>
-          <div className="loading-screen__dots" aria-hidden>
-            <i />
-            <i />
-            <i />
           </div>
         </div>
       </div>

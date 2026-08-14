@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 export default function CommunicationsPage() {
   const router = useRouter();
   useEffect(() => {
-    router.replace('/portal/emergency');
+    router.replace('/portal/chat');
   }, [router]);
   return null;
 }

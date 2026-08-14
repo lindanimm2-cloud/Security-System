@@ -7,6 +7,12 @@ import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { FeatureHub } from '@/components/portal/FeatureHub';
 import { PortalLayout } from '@/components/portal/PortalLayout';
 import { UpgradeBanner } from '@/components/portal/UpgradeBanner';
+import { MiniCctvViewer } from '@/components/portal/MiniCctvViewer';
+import { SlideCarousel, SlideCarouselCard } from '@/components/portal/SlideCarousel';
+import { SlidingSection } from '@/components/portal/SlidingSection';
+import { CctvLiveFeed } from '@/components/portal/CctvLiveFeed';
+import { PropertyRegisterForm } from '@/components/portal/PropertyRegisterForm';
+import { HoldToActivate } from '@/components/ops/EmergencyMode';
 import { useSubscriptionAccess } from '@/hooks/useSubscriptionAccess';
 import { useApi } from '@/hooks/useApi';
 import { clientApi, type ApiResponse } from '@/lib/api-client';
@@ -66,6 +72,7 @@ export default function HomePage() {
 
 function HomeContent() {
   const [loadingId, setLoadingId] = useState<string | null>(null);
+  const [showRegister, setShowRegister] = useState(false);
   const { access, loading: accessLoading } = useSubscriptionAccess();
   const { data, loading, error, reload } = useApi(
     () => clientApi.get<ApiResponse<Site[]>>('/client/surveillance/sites'),
@@ -98,6 +105,7 @@ function HomeContent() {
 
   const sites = data!.data;
   const hasHome = access?.home ?? false;
+  const primaryCamSite = sites.find((s) => s.cameraCount > 0);
 
   return (
     <FeatureHub
@@ -111,52 +119,141 @@ function HomeContent() {
       accessKey="home"
     >
       {!hasHome && (
-        <UpgradeBanner addon="HOME_SECURITY" title="Home Security" price="R 300" />
+        <>
+          <UpgradeBanner addon="HOME_SECURITY" title="Home Security" price="R 300" />
+          <section className="portal-card" style={{ marginBottom: '1rem' }}>
+            <div className="card-header-row">
+              <h2 style={{ margin: 0 }}>Subscribe &amp; register</h2>
+              <Link href="/portal/subscription" className="btn-primary btn-sm">
+                Add subscription
+              </Link>
+            </div>
+            <p className="text-muted">
+              Add Home Security to your plan, then register your property for monitoring.
+            </p>
+            <Link href="/portal/subscription/upgrade" className="link-sm">
+              View plans &amp; add-ons →
+            </Link>
+          </section>
+        </>
       )}
       {hasHome && (
         <>
-          <div id="properties-list" className="entity-grid">
-            {sites.length === 0 ? (
-              <div className="empty-state">No properties registered yet. Add a property from your profile or contact dispatch.</div>
-            ) : (
-              sites.map((p) => (
-                <div key={p.id} className="entity-card">
-                  <div className="entity-card-header">
-                    <Link href={`/portal/home/${p.id}`} className="status-list-link">{p.name}</Link>
-                    <span className={`status-pill status-pill--${p.alarmStatus.toLowerCase()}`}>{alarmStatusLabel(p.alarmStatus)}</span>
-                  </div>
-                  <p>{p.address}</p>
-                  <p className="text-muted">
-                    {p.panel?.panelVendor ? `${p.panel.panelVendor} · ` : ''}
-                    {p.propertyType} · Cams {p.onlineCameras}/{p.cameraCount}
-                    {typeof p.sensorCount === 'number' ? ` · ${p.sensorCount} zones` : ''}
-                    {p.alertSensors ? ` · ${p.alertSensors} sensor alert${p.alertSensors === 1 ? '' : 's'}` : ''}
-                    {p.openEvents > 0 ? ` · ${p.openEvents} open event${p.openEvents === 1 ? '' : 's'}` : ''}
-                  </p>
-                  {p.accessNotes && <p className="text-muted">{p.accessNotes}</p>}
-                  <div className="entity-card-actions">
-                    <Link href={`/portal/home/${p.id}`} className="btn-secondary btn-sm">
-                      Zones &amp; cams
-                    </Link>
-                    <button type="button" className="btn-secondary btn-sm" onClick={() => toggleAlarm(p.id, isArmedStatus(p.alarmStatus) ? 'DISARMED' : 'ARMED')} disabled={!!loadingId}>
-                      {loadingId === `${p.id}-${isArmedStatus(p.alarmStatus) ? 'DISARMED' : 'ARMED'}` ? <LoadingSpinner label="" size="sm" /> : isArmedStatus(p.alarmStatus) ? 'Disarm' : 'Away arm'}
-                    </button>
-                    <button type="button" className="btn-danger btn-sm" onClick={() => homePanic(p.id)} disabled={!!loadingId}>
-                      {loadingId === `${p.id}-panic` ? <LoadingSpinner label="" size="sm" /> : 'Home Panic'}
-                    </button>
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-
-          <section id="surveillance" className="portal-card" style={{ marginTop: '1.25rem' }}>
+          <SlidingSection
+            title="Home arm state"
+            subtitle={sites[0] ? alarmStatusLabel(sites[0].alarmStatus) : 'Register your property'}
+            defaultOpen
+            storageKey="portal-home-arm"
+            headerAction={
+              <Link href="/portal/protect" className="link-sm">
+                Protect
+              </Link>
+            }
+          >
+          <section className="portal-card portal-card--flat" aria-label="Arm state">
             <div className="card-header-row">
-              <h2>Surveillance</h2>
-              <span className="text-muted">Live site cameras</span>
+              <button
+                type="button"
+                className="btn-secondary btn-sm"
+                onClick={() => setShowRegister((v) => !v)}
+              >
+                {showRegister ? 'Close' : 'Register property'}
+              </button>
             </div>
+            {showRegister && (
+              <div style={{ marginTop: '0.75rem' }}>
+                <PropertyRegisterForm
+                  compact
+                  onRegistered={() => {
+                    setShowRegister(false);
+                    reload();
+                  }}
+                />
+              </div>
+            )}
+            {sites[0] ? (
+              <div className="queue-card__actions" style={{ marginTop: '0.65rem' }}>
+                <span className={`status-pill status-pill--${sites[0].alarmStatus.toLowerCase()}`}>
+                  {alarmStatusLabel(sites[0].alarmStatus)}
+                </span>
+                <button
+                  type="button"
+                  className="btn-primary btn-sm"
+                  disabled={!!loadingId}
+                  onClick={() =>
+                    void toggleAlarm(
+                      sites[0].id,
+                      isArmedStatus(sites[0].alarmStatus) ? 'DISARMED' : 'ARMED',
+                    )
+                  }
+                >
+                  {isArmedStatus(sites[0].alarmStatus) ? 'Disarm' : 'Away arm'}
+                </button>
+                <div style={{ flex: '1 1 12rem', minWidth: '10rem' }}>
+                  <HoldToActivate
+                    label="Home panic"
+                    holdLabel="Hold to panic…"
+                    loading={loadingId === `${sites[0].id}-panic`}
+                    disabled={!!loadingId}
+                    onActivate={() => homePanic(sites[0].id)}
+                  />
+                </div>
+              </div>
+            ) : (
+              <p className="text-muted">
+                No property linked yet.{' '}
+                <button type="button" className="btn-sm btn-sm--link" onClick={() => setShowRegister(true)}>
+                  Register now
+                </button>
+              </p>
+            )}
+          </section>
+          </SlidingSection>
+
+          {sites.filter((s) => s.cameraCount > 0).length > 0 && (
+            <SlideCarousel
+              title="Live CCTV"
+              subtitle="Swipe between sites"
+              seeAllHref={primaryCamSite ? `/portal/home/${primaryCamSite.id}` : '/portal/home'}
+              seeAllLabel="All cameras"
+              className="slide-carousel--feeds"
+            >
+              {sites
+                .filter((s) => s.cameraCount > 0)
+                .map((s) => (
+                  <SlideCarouselCard
+                    key={s.id}
+                    title={s.name}
+                    href={`/portal/home/${s.id}`}
+                    wide
+                  >
+                    <p className="text-muted slide-carousel__feed-meta">
+                      {s.onlineCameras}/{s.cameraCount} online · {alarmStatusLabel(s.alarmStatus)}
+                    </p>
+                    <MiniCctvViewer
+                      siteId={s.id}
+                      siteName={s.name}
+                      cameras={s.cameras}
+                      onlineCount={s.onlineCameras}
+                      className="mini-cctv--in-slide"
+                    />
+                  </SlideCarouselCard>
+                ))}
+            </SlideCarousel>
+          )}
+
+          <SlidingSection
+            title="All camera channels"
+            subtitle="Every site · full grid"
+            defaultOpen={false}
+            storageKey="portal-home-all-cams"
+          >
+          <section id="surveillance" className="portal-card portal-card--flat">
             {sites.every((s) => s.cameraCount === 0) ? (
-              <p className="text-muted">No cameras commissioned yet. Contact 4DS after install to enable viewing.</p>
+              <p className="text-muted">
+                No cameras commissioned yet. Register your property — control room enables viewing after
+                install verification.
+              </p>
             ) : (
               <div className="surveillance-site-list">
                 {sites.filter((s) => s.cameraCount > 0).map((s) => (
@@ -167,13 +264,11 @@ function HomeContent() {
                     </div>
                     <div className="camera-grid">
                       {s.cameras.slice(0, 4).map((c) => (
-                        <Link key={c.id} href={`/portal/home/${s.id}`} className="camera-tile">
-                          <div className={`camera-tile__feed camera-tile__feed--${c.status.toLowerCase()}`}>
-                            <span className="camera-tile__live">CH {c.channel}</span>
-                            <span className="camera-tile__name">{c.name}</span>
-                          </div>
-                          <span className="camera-tile__meta">{c.locationLabel} · {c.status}</span>
-                        </Link>
+                        <CctvLiveFeed
+                          key={c.id}
+                          camera={c}
+                          href={`/portal/home/${s.id}`}
+                        />
                       ))}
                     </div>
                   </div>
@@ -181,6 +276,99 @@ function HomeContent() {
               </div>
             )}
           </section>
+          </SlidingSection>
+
+          {sites.length > 0 && (
+            <SlideCarousel title="Your properties" subtitle="Swipe to browse sites">
+              {sites.map((p) => (
+                <SlideCarouselCard
+                  key={p.id}
+                  title={p.name}
+                  href={`/portal/home/${p.id}`}
+                  tone={
+                    p.alarmStatus === 'TRIGGERED'
+                      ? 'alert'
+                      : ['ARMED', 'STAY', 'NIGHT'].includes(p.alarmStatus)
+                        ? 'ok'
+                        : 'muted'
+                  }
+                >
+                  <strong className="slide-carousel__stat slide-carousel__stat--sm">
+                    {alarmStatusLabel(p.alarmStatus)}
+                  </strong>
+                  <p className="text-muted">{p.address}</p>
+                  <p className="text-muted">
+                    Cams {p.onlineCameras}/{p.cameraCount}
+                    {typeof p.sensorCount === 'number' ? ` · ${p.sensorCount} zones` : ''}
+                  </p>
+                </SlideCarouselCard>
+              ))}
+            </SlideCarousel>
+          )}
+
+          <SlidingSection
+            title="Property controls"
+            subtitle={sites.length ? `${sites.length} sites · arm & zones` : 'Register a site'}
+            defaultOpen={false}
+            storageKey="portal-home-properties"
+          >
+          <div id="properties-list" className="entity-grid">
+            {sites.length === 0 ? (
+              <div className="empty-state">
+                <p>No properties registered yet.</p>
+                <PropertyRegisterForm onRegistered={() => reload()} />
+              </div>
+            ) : (
+              sites.map((p) => (
+                <div key={p.id} className="entity-card">
+                  <div className="entity-card-header">
+                    <Link href={`/portal/home/${p.id}`} className="status-list-link">
+                      {p.name}
+                    </Link>
+                    <span className={`status-pill status-pill--${p.alarmStatus.toLowerCase()}`}>
+                      {alarmStatusLabel(p.alarmStatus)}
+                    </span>
+                  </div>
+                  <p>{p.address}</p>
+                  <p className="text-muted">
+                    {p.panel?.panelVendor ? `${p.panel.panelVendor} · ` : ''}
+                    {p.propertyType} · Cams {p.onlineCameras}/{p.cameraCount}
+                    {typeof p.sensorCount === 'number' ? ` · ${p.sensorCount} zones` : ''}
+                    {p.alertSensors
+                      ? ` · ${p.alertSensors} sensor alert${p.alertSensors === 1 ? '' : 's'}`
+                      : ''}
+                    {p.openEvents > 0
+                      ? ` · ${p.openEvents} open event${p.openEvents === 1 ? '' : 's'}`
+                      : ''}
+                  </p>
+                  {p.accessNotes && <p className="text-muted">{p.accessNotes}</p>}
+                  <div className="entity-card-actions">
+                    <Link href={`/portal/home/${p.id}`} className="btn-secondary btn-sm">
+                      Zones &amp; cams
+                    </Link>
+                    <button
+                      type="button"
+                      className="btn-secondary btn-sm"
+                      onClick={() =>
+                        toggleAlarm(p.id, isArmedStatus(p.alarmStatus) ? 'DISARMED' : 'ARMED')
+                      }
+                      disabled={!!loadingId}
+                    >
+                      {loadingId ===
+                      `${p.id}-${isArmedStatus(p.alarmStatus) ? 'DISARMED' : 'ARMED'}` ? (
+                        <LoadingSpinner label="" size="sm" />
+                      ) : isArmedStatus(p.alarmStatus) ? (
+                        'Disarm'
+                      ) : (
+                        'Away arm'
+                      )}
+                    </button>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+          </SlidingSection>
         </>
       )}
     </FeatureHub>

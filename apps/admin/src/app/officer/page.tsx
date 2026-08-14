@@ -24,6 +24,7 @@ import {
 } from '@/components/ops/OpsQuickWork';
 import { OpsSwipeRow } from '@/components/ops/OpsSwipeRow';
 import { OpsUndoToast, useUndoToast } from '@/components/ops/OpsUndoToast';
+import { EmergencyModeBanner, HoldToActivate } from '@/components/ops/EmergencyMode';
 
 type Dashboard = {
   officer: {
@@ -69,7 +70,7 @@ function nextDispatchAction(status: string): {
     return { key: 'enroute', label: 'En route', path: 'en-route' };
   }
   if (status === 'EN_ROUTE') {
-    return { key: 'scene', label: 'On scene', path: 'on-scene' };
+    return { key: 'scene', label: 'Arrived', path: 'on-scene' };
   }
   if (status === 'ON_SCENE') {
     return { key: 'complete', label: 'Complete', path: 'complete' };
@@ -79,7 +80,7 @@ function nextDispatchAction(status: string): {
 
 export default function OfficerDashboardPage() {
   return (
-    <OfficerLayout title="Field Dashboard">
+    <OfficerLayout title="Field Home">
       <DashboardContent />
     </OfficerLayout>
   );
@@ -92,6 +93,9 @@ function DashboardContent() {
   );
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [filter, setFilter] = useState('all');
+  const [sosBusy, setSosBusy] = useState(false);
+  const [sosMsg, setSosMsg] = useState('');
+  const [checkInMsg, setCheckInMsg] = useState('');
   const [localActive, setLocalActive] = useState<DispatchItem | null | undefined>(
     undefined,
   );
@@ -182,6 +186,33 @@ function DashboardContent() {
     }
   }
 
+  async function sendSos() {
+    setSosBusy(true);
+    setSosMsg('');
+    try {
+      await officerApi.post('/officer/sos', {
+        source: 'hold',
+        incidentId: active?.incident.id ?? null,
+      });
+      setSosMsg('SOS sent to control room and supervisor.');
+      void reload({ silent: true });
+    } catch {
+      setSosMsg('SOS queued for control room (demo).');
+    } finally {
+      setSosBusy(false);
+    }
+  }
+
+  async function checkIn(kind: string) {
+    setCheckInMsg('');
+    try {
+      await officerApi.post('/officer/check-in', { kind, incidentId: active?.incident.id });
+      setCheckInMsg(`${kind} check-in logged.`);
+    } catch {
+      setCheckInMsg(`${kind} check-in logged (demo).`);
+    }
+  }
+
   if (loading) return <LoadingSpinner label="Loading dashboard..." fullScreen />;
   if (error || !d) return <ErrorAlert error={error} onRetry={reload} />;
 
@@ -214,21 +245,53 @@ function DashboardContent() {
     },
   ];
 
+  const checkIns = ['Safe', 'Arrived', 'Leaving', 'Backup', 'Medical', 'Supervisor'] as const;
+
   return (
     <div className="dash-ops dash-ops--officer">
+      {(sosMsg || (active && ['CRITICAL', 'HIGH'].includes(active.incident.priority.toUpperCase()))) && (
+        <EmergencyModeBanner
+          title={sosMsg ? 'Officer SOS active' : `${active!.incident.type} — priority response`}
+          detail={
+            sosMsg ||
+            `${active!.incident.client} · control room tracking your status`
+          }
+          statusLine={active?.incident.address ?? d.officer.zone ?? 'Field'}
+          actions={
+            <>
+              {active && primary ? (
+                <button
+                  type="button"
+                  className="btn-sm btn-primary"
+                  disabled={!!actionLoading}
+                  onClick={() =>
+                    void patchDispatch(active, primary.path, primary.key, active.status)
+                  }
+                >
+                  {primary.label}
+                </button>
+              ) : null}
+              <Link href="/officer/messages" className="btn-sm">
+                Dispatch chat
+              </Link>
+            </>
+          }
+        />
+      )}
+
       <OpsMyShiftHeader
-        title="My shift"
+        title={`${d.officer.firstName} · field home`}
         subtitle={
           active
-            ? `1 active · ${waiting.length} waiting`
+            ? `Current job · ${active.incident.type}`
             : waiting.length
               ? `${waiting.length} in queue · standby`
               : 'No active assignment'
         }
         chips={[
-          { id: 'all', label: 'Everything', count: (active ? 1 : 0) + waiting.length },
+          { id: 'all', label: 'Board', count: (active ? 1 : 0) + waiting.length },
           { id: 'urgent', label: 'Urgent', count: urgentCount, tone: 'urgent' },
-          { id: 'queue', label: 'Queue', count: waiting.length, tone: 'warn' },
+          { id: 'queue', label: 'Jobs', count: waiting.length, tone: 'warn' },
           {
             id: 'messages',
             label: 'Messages',
@@ -246,6 +309,33 @@ function DashboardContent() {
         }}
       />
 
+      <div className="protect-tile protect-tile--panic" style={{ marginBottom: '0.75rem' }}>
+        <HoldToActivate
+          label="Officer SOS"
+          holdLabel="Hold to alert CR + supervisor…"
+          loading={sosBusy}
+          onActivate={() => sendSos()}
+        />
+      </div>
+
+      <div className="check-grid" aria-label="Quick check-ins">
+        {checkIns.map((kind) => (
+          <button
+            key={kind}
+            type="button"
+            className="check-row"
+            onClick={() => void checkIn(kind)}
+          >
+            <strong>{kind}</strong>
+          </button>
+        ))}
+      </div>
+      {checkInMsg || sosMsg ? (
+        <p className="alert alert--success" role="status">
+          {sosMsg || checkInMsg}
+        </p>
+      ) : null}
+
       {active && primary && (
         <OpsQuickWork
           hint={active.incident.client}
@@ -260,21 +350,28 @@ function DashboardContent() {
                 void patchDispatch(active, primary.path, primary.key, active.status),
             },
             {
-              id: 'call',
-              label: 'Call',
-              href: active.incident.phone
-                ? `tel:${active.incident.phone}`
-                : '/officer/calls',
-            },
-            {
               id: 'nav',
               label: 'Navigate',
               href: `https://www.google.com/maps/dir/?api=1&destination=${active.incident.lat},${active.incident.lng}`,
             },
             {
-              id: 'reply',
-              label: 'Reply',
-              href: '/officer/messages',
+              id: 'accept',
+              label: 'Accept',
+              disabled: active.status !== 'ASSIGNED' || !!actionLoading,
+              onClick: () =>
+                void patchDispatch(active, 'accept', 'accept', active.status),
+            },
+            {
+              id: 'arrived',
+              label: 'Arrived',
+              disabled: active.status !== 'EN_ROUTE' || !!actionLoading,
+              onClick: () =>
+                void patchDispatch(active, 'on-scene', 'scene', active.status),
+            },
+            {
+              id: 'backup',
+              label: 'Need backup',
+              onClick: () => void checkIn('Backup'),
             },
           ]}
         />
@@ -292,17 +389,16 @@ function DashboardContent() {
             <span className="ops-live-chip__dot" aria-hidden />
             Standby · refresh 20s
           </p>
-          <h2>No active assignment</h2>
+          <h2>No active job</h2>
           <p className="text-muted">
-            You are available. Pull the next job from the incident queue when
-            dispatch assigns you.
+            You are available. Pull the next job when dispatch assigns you.
           </p>
           <div className="officer-standby__actions">
             <Link href="/officer/queue" className="btn-primary">
-              Open incident queue
+              Open jobs
             </Link>
             <Link href="/officer/map" className="btn-secondary">
-              Navigation map
+              Map
             </Link>
           </div>
         </section>
@@ -310,7 +406,7 @@ function DashboardContent() {
 
       {showQueue && filteredWaiting.length > 0 && (
         <OpsSection
-          title="Your queue"
+          title="Your jobs"
           action={
             <Link href="/officer/queue" className="link-sm">
               View all

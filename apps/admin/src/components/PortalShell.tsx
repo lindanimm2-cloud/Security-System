@@ -8,12 +8,16 @@ import { NavIcon } from '@/components/nav/NavIcon';
 import { filterPortalNav, portalMobileNav, portalPathRequiresAccess } from '@/lib/portal-nav';
 import { useSubscriptionAccess } from '@/hooks/useSubscriptionAccess';
 import { PortalNotificationCenter } from './portal/PortalNotificationCenter';
+import { MiniCallSafetyBar } from './portal/MiniCallSafetyBar';
+import { PortalPermissionsBanner } from './portal/PortalPermissions';
 import { PortalNavClock } from './portal/PortalNavClock';
 import { PortalProtectionBadge } from './portal/PortalProtectionBadge';
 import { BrandMark } from './BrandMark';
 import { ThemeToggle } from './ThemeToggle';
 import { MobileBottomNav } from './nav/MobileBottomNav';
 import { clientApi, type ApiResponse } from '@/lib/api-client';
+import { useSidebarCollapsed } from '@/hooks/useSidebarCollapsed';
+import { SidebarCollapseButton, SignOutIcon } from '@/components/nav/SidebarCollapseButton';
 
 export function PortalShell({
   session,
@@ -26,6 +30,7 @@ export function PortalShell({
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
   const [unread, setUnread] = useState(0);
+  const { collapsed, toggle } = useSidebarCollapsed();
   const { access, loading: accessLoading, tierCode } = useSubscriptionAccess();
   const navSections = useMemo(() => {
     const sections = filterPortalNav(access, accessLoading);
@@ -122,10 +127,10 @@ export function PortalShell({
         </button>
         <BrandMark variant="portal" compact />
         <div className="mobile-topbar-actions">
-          <PortalNavClock compact />
+          <PortalProtectionBadge compact />
           <PortalNotificationCenter />
           <ThemeToggle className="theme-toggle--compact" />
-          <PortalProtectionBadge compact />
+          <PortalNavClock compact />
         </div>
       </header>
 
@@ -138,9 +143,12 @@ export function PortalShell({
         />
       )}
 
-      <aside className={`portal-sidebar ${menuOpen ? 'portal-sidebar--open' : ''}`}>
+      <aside
+        className={`portal-sidebar ${menuOpen ? 'portal-sidebar--open' : ''} ${collapsed ? 'sidebar--collapsed' : ''}`}
+      >
         <div className="portal-sidebar-brand">
-          <BrandMark variant="portal" />
+          <BrandMark variant="portal" compact={collapsed} showProduct={!collapsed} />
+          <SidebarCollapseButton collapsed={collapsed} onClick={toggle} />
         </div>
         <nav className="portal-sidebar-nav">
           {navSections.map((section) => (
@@ -153,21 +161,32 @@ export function PortalShell({
                 <Link
                   key={item.href}
                   href={item.href}
+                  title={item.label}
+                  aria-label={item.label}
                   className={`portal-sidebar-link ${isActive(item.href, item.exact) ? 'portal-sidebar-link--active' : ''}`}
                 >
-                  <NavIcon name={item.icon} />
-                  <span>{item.label}</span>
+                  <span className="sidebar-link__icon">
+                    <NavIcon name={item.icon} size={collapsed ? 20 : 18} />
+                  </span>
+                  <span className="sidebar-link__label">{item.label}</span>
                 </Link>
               ))}
             </div>
           ))}
         </nav>
         <div className="portal-sidebar-footer">
-          <div className="portal-sidebar-user">
+          <div className="portal-sidebar-user sidebar-user-copy">
             {session.user.firstName} {session.user.lastName}
           </div>
-          <button type="button" className="btn-ghost btn-ghost--full" onClick={logout}>
-            Sign out
+          <button
+            type="button"
+            className="btn-ghost btn-ghost--full sidebar-signout"
+            onClick={logout}
+            title="Sign out"
+            aria-label="Sign out"
+          >
+            <SignOutIcon />
+            <span>Sign out</span>
           </button>
         </div>
       </aside>
@@ -191,9 +210,13 @@ export function PortalShell({
             <PortalProtectionBadge />
           </div>
         </header>
-        <main className="portal-main portal-main--with-sidebar">{children}</main>
+        <main className="portal-main portal-main--with-sidebar portal-main--with-call-bar">
+          <PortalPermissionsBanner />
+          {children}
+        </main>
       </div>
 
+      <MiniCallSafetyBar />
       <MobileBottomNav items={mobileNavItems} ariaLabel="Client Portal" />
     </div>
   );

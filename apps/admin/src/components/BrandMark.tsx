@@ -1,18 +1,20 @@
 import Image from 'next/image';
 import Link from 'next/link';
 
-export type BrandVariant = 'portal' | 'control' | 'officer';
+export type BrandVariant = 'portal' | 'control' | 'officer' | 'medical';
 
 const PRODUCT_LABELS: Record<BrandVariant, string> = {
   portal: 'Client Portal',
   control: 'Control Panel',
   officer: 'Officer App',
+  medical: 'Medical Portal',
 };
 
 const HOME_HREFS: Record<BrandVariant, string> = {
   portal: '/portal',
   control: '/control-room',
   officer: '/officer',
+  medical: '/medical',
 };
 
 const LOGO_SRC = '/brand/4ds-logo.png';

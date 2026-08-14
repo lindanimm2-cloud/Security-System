@@ -1,0 +1,60 @@
+import { clientApi } from './api-client';
+import { getSession, type AuthPortal } from './auth';
+import { resolveStaffSession, submitDeveloperErrorReport } from './developer-notify';
+
+export type ErrorReportPayload = {
+  message: string;
+  path?: string;
+  stack?: string;
+  digest?: string;
+  name?: string;
+  componentStack?: string;
+};
+
+function buildContext(input: ErrorReportPayload): string {
+  return JSON.stringify({
+    name: input.name,
+    stack: input.stack?.slice(0, 1200),
+    digest: input.digest,
+    componentStack: input.componentStack?.slice(0, 800),
+    reportedAt: new Date().toISOString(),
+  }).slice(0, 2000);
+}
+
+/** Send technical error details to the developer desk (client portal or staff CRM). */
+export async function reportErrorToDeveloper(
+  input: ErrorReportPayload,
+): Promise<{ channel: AuthPortal | 'client' }> {
+  const context = buildContext(input);
+  const userAgent = typeof navigator !== 'undefined' ? navigator.userAgent : undefined;
+
+  const client = getSession('client');
+  if (client) {
+    await clientApi.post('/client/support/error-report', {
+      message: input.message.slice(0, 2000),
+      path: input.path,
+      userAgent,
+      context,
+    });
+    return { channel: 'client' };
+  }
+
+  const staff = resolveStaffSession(input.path ?? null);
+  if (staff) {
+    await submitDeveloperErrorReport({
+      message: input.message.slice(0, 2000),
+      path: input.path,
+      context,
+      portal: staff.portal,
+      accessToken: staff.session.accessToken,
+    });
+    return { channel: staff.portal };
+  }
+
+  throw new Error('Sign in so we can attach your report to your account.');
+}
+
+export function errorReference(error: Error & { digest?: string }): string {
+  if (error.digest) return error.digest.slice(0, 12).toUpperCase();
+  return `ERR-${Date.now().toString(36).toUpperCase()}`;
+}

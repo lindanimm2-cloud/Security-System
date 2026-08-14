@@ -445,6 +445,41 @@ export class AuthService {
     return { success: true, data: this.sanitizeUser(user) };
   }
 
+  async updateProfile(
+    userId: string,
+    body: {
+      firstName?: string;
+      lastName?: string;
+      phone?: string | null;
+      jobTitle?: string | null;
+    },
+  ) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+    });
+
+    if (!user || user.status !== UserStatus.ACTIVE) {
+      throw new UnauthorizedException();
+    }
+
+    const updated = await this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        ...(body.firstName !== undefined && { firstName: body.firstName.trim() }),
+        ...(body.lastName !== undefined && { lastName: body.lastName.trim() }),
+        ...(body.phone !== undefined && { phone: body.phone }),
+        ...(body.jobTitle !== undefined && { jobTitle: body.jobTitle }),
+      },
+      include: {
+        tenant: {
+          select: { id: true, name: true, slug: true, primaryColor: true },
+        },
+      },
+    });
+
+    return { success: true, data: this.sanitizeUser(updated) };
+  }
+
   private normalizeInviteToken(token: string): string {
     const trimmed = token.trim();
     if (/^nx-/i.test(trimmed)) {

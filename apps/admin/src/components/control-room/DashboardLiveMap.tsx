@@ -122,14 +122,14 @@ export function DashboardLiveMap({ focusIncidentId, className = '' }: DashboardL
           <span className="dash-live-map__pulse" aria-hidden />
           Live field picture
         </div>
+        <Link href={CONTROL_ROOM_ROUTES.map} className="btn-sm btn-sm--link dash-live-map__full">
+          Full map
+        </Link>
         <div className="dash-live-map__counts">
           <span>{incidents.length} incidents</span>
           <span>{officers.length} officers</span>
           <span>{users.length} users</span>
         </div>
-        <Link href={CONTROL_ROOM_ROUTES.map} className="btn-sm btn-sm--link">
-          Full screen
-        </Link>
       </div>
       <div className="dash-live-map__canvas">
         <LiveMap

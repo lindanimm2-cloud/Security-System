@@ -1,6 +1,8 @@
 'use client';
 
 import Link from 'next/link';
+import type { ReactNode } from 'react';
+import { OpsMenuDropdown, type OpsMenuItem } from '@/components/ops/OpsMenuDropdown';
 
 export type QuickWorkAction = {
   id: string;
@@ -12,14 +14,85 @@ export type QuickWorkAction = {
   loading?: boolean;
 };
 
+function ActionControl({
+  action,
+  className,
+}: {
+  action: QuickWorkAction;
+  className: string;
+}) {
+  const label = action.loading ? '…' : action.label;
+  if (action.onClick) {
+    return (
+      <button
+        type="button"
+        className={className}
+        disabled={action.disabled || action.loading}
+        onClick={action.onClick}
+      >
+        {label}
+      </button>
+    );
+  }
+  if (action.href) {
+    const external =
+      action.href.startsWith('http') ||
+      action.href.startsWith('tel:') ||
+      action.href.startsWith('mailto:');
+    if (external) {
+      return (
+        <a
+          className={className}
+          href={action.href}
+          target={action.href.startsWith('http') ? '_blank' : undefined}
+          rel={action.href.startsWith('http') ? 'noopener noreferrer' : undefined}
+        >
+          {label}
+        </a>
+      );
+    }
+    return (
+      <Link className={className} href={action.href}>
+        {label}
+      </Link>
+    );
+  }
+  return (
+    <button type="button" className={className} disabled>
+      {label}
+    </button>
+  );
+}
+
 export function OpsQuickWork({
   actions,
   hint,
+  lead,
 }: {
   actions: QuickWorkAction[];
   hint?: string;
+  lead?: ReactNode;
 }) {
-  if (!actions.length) return null;
+  if (!actions.length && !lead) return null;
+
+  const designatedPrimary = actions.filter((a) => a.primary && !a.disabled);
+  const primary =
+    designatedPrimary.length > 0
+      ? designatedPrimary
+      : lead
+        ? []
+        : actions.filter((a) => !a.disabled).slice(0, 2);
+  const primaryIds = new Set(primary.map((a) => a.id));
+  const secondary = actions.filter((a) => !primaryIds.has(a.id));
+
+  const moreItems: OpsMenuItem[] = secondary.map((a) => ({
+    id: a.id,
+    label: a.loading ? '…' : a.label,
+    href: a.href,
+    onClick: a.onClick,
+    tone: a.primary ? 'danger' : 'default',
+  }));
+
   return (
     <section className="ops-quick-work" aria-label="Quick work">
       <div className="ops-quick-work__head">
@@ -27,52 +100,30 @@ export function OpsQuickWork({
         {hint ? <span className="text-muted">{hint}</span> : null}
       </div>
       <div className="ops-quick-work__row">
-        {actions.map((a) => {
-          const className = `ops-quick-work__btn ${a.primary ? 'ops-quick-work__btn--primary' : ''}`;
-          const label = a.loading ? '…' : a.label;
-          if (a.onClick) {
-            return (
-              <button
-                key={a.id}
-                type="button"
-                className={className}
-                disabled={a.disabled || a.loading}
-                onClick={a.onClick}
-              >
-                {label}
-              </button>
-            );
-          }
-          if (a.href) {
-            const external =
-              a.href.startsWith('http') ||
-              a.href.startsWith('tel:') ||
-              a.href.startsWith('mailto:');
-            if (external) {
-              return (
-                <a
+        {lead}
+        {primary.map((a) => (
+          <ActionControl
+            key={a.id}
+            action={a}
+            className={`ops-quick-work__btn ${a.primary ? 'ops-quick-work__btn--primary' : ''}`}
+          />
+        ))}
+        {secondary.length > 0 ? (
+          <>
+            <div className="ops-quick-work__secondary">
+              {secondary.map((a) => (
+                <ActionControl
                   key={a.id}
-                  className={className}
-                  href={a.href}
-                  target={a.href.startsWith('http') ? '_blank' : undefined}
-                  rel={a.href.startsWith('http') ? 'noopener noreferrer' : undefined}
-                >
-                  {label}
-                </a>
-              );
-            }
-            return (
-              <Link key={a.id} className={className} href={a.href}>
-                {label}
-              </Link>
-            );
-          }
-          return (
-            <button key={a.id} type="button" className={className} disabled>
-              {label}
-            </button>
-          );
-        })}
+                  action={a}
+                  className={`ops-quick-work__btn ${a.primary ? 'ops-quick-work__btn--primary' : ''}`}
+                />
+              ))}
+            </div>
+            <div className="ops-quick-work__more">
+              <OpsMenuDropdown label="More" align="right" items={moreItems} />
+            </div>
+          </>
+        ) : null}
       </div>
     </section>
   );
@@ -104,16 +155,14 @@ export function OpsNeedsYou({
           </Link>
         ) : null}
       </div>
-      <ul className="ops-needs__list">
+      <div className="ops-needs__track">
         {items.map((item) => (
-          <li key={item.id}>
-            <Link href={item.href}>
-              <strong>{item.title}</strong>
-              <span>{item.detail}</span>
-            </Link>
-          </li>
+          <Link key={item.id} href={item.href} className="ops-needs__slide" data-slide>
+            <strong>{item.title}</strong>
+            <span>{item.detail}</span>
+          </Link>
         ))}
-      </ul>
+      </div>
     </section>
   );
 }

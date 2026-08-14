@@ -102,9 +102,15 @@ export function QuickDispatchPanel({
     return <div className="quick-dispatch quick-dispatch--error">{error}</div>;
   }
 
-  if (!options) return null;
+  if (!options || typeof options !== 'object' || Array.isArray(options) || !options.incident) {
+    return (
+      <div className="quick-dispatch quick-dispatch--error">
+        Dispatch options unavailable for this incident.
+      </div>
+    );
+  }
 
-  const noUnits = options.availableCount === 0;
+  const noUnits = (options.availableCount ?? 0) === 0;
   const label = incidentLabel ?? `${options.incident.type} · ${options.incident.client}`;
 
   return (
@@ -120,7 +126,7 @@ export function QuickDispatchPanel({
         <p className="quick-dispatch__status text-muted">
           {options.assignedOfficer
             ? `Assigned to ${options.assignedOfficer}`
-            : `Status: ${options.incident.status.replace('_', ' ')}`}
+            : `Status: ${(options.incident.status ?? 'UNKNOWN').replace(/_/g, ' ')}`}
         </p>
       )}
 

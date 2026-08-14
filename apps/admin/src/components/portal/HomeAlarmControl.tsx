@@ -18,11 +18,19 @@ type Props = {
   properties: Property[];
   hasAccess: boolean;
   onUpdated?: () => void;
+  /** Compact card for portal dashboard (below Needs you). */
+  variant?: 'default' | 'dashboard';
 };
 
-export function HomeAlarmControl({ properties, hasAccess, onUpdated }: Props) {
+export function HomeAlarmControl({
+  properties,
+  hasAccess,
+  onUpdated,
+  variant = 'default',
+}: Props) {
   const [loadingId, setLoadingId] = useState<string | null>(null);
   const [msg, setMsg] = useState('');
+  const isDashboard = variant === 'dashboard';
 
   async function setMode(property: Property, mode: ArmMode) {
     if (!hasAccess) return;
@@ -39,7 +47,12 @@ export function HomeAlarmControl({ properties, hasAccess, onUpdated }: Props) {
 
   if (!hasAccess) {
     return (
-      <section className="portal-card home-alarm-card home-alarm-card--locked">
+      <section
+        className={`portal-card home-alarm-card home-alarm-card--locked ${isDashboard ? 'home-alarm-card--dashboard' : ''}`}
+      >
+        {isDashboard ? (
+          <p className="home-alarm-card__eyebrow">Home alarm</p>
+        ) : null}
         <div className="home-alarm-card__head">
           <SketchIcon name="shield" size={22} />
           <div>
@@ -56,7 +69,12 @@ export function HomeAlarmControl({ properties, hasAccess, onUpdated }: Props) {
 
   if (properties.length === 0) {
     return (
-      <section className="portal-card home-alarm-card">
+      <section
+        className={`portal-card home-alarm-card ${isDashboard ? 'home-alarm-card--dashboard' : ''}`}
+      >
+        {isDashboard ? (
+          <p className="home-alarm-card__eyebrow">Home alarm</p>
+        ) : null}
         <div className="home-alarm-card__head">
           <SketchIcon name="shield" size={22} />
           <div>
@@ -74,25 +92,41 @@ export function HomeAlarmControl({ properties, hasAccess, onUpdated }: Props) {
   const primary = properties[0];
   const armed = isArmedStatus(primary.alarmStatus);
   const isTriggered = primary.alarmStatus === 'TRIGGERED';
+  const statusClass = primary.alarmStatus.toLowerCase().replace(/_/g, '-');
 
   return (
     <section
-      className={`portal-card home-alarm-card ${armed ? 'home-alarm-card--armed' : ''} ${isTriggered ? 'home-alarm-card--triggered' : ''}`}
+      className={`portal-card home-alarm-card ${isDashboard ? 'home-alarm-card--dashboard' : ''} ${armed ? 'home-alarm-card--armed' : ''} ${isTriggered ? 'home-alarm-card--triggered' : ''}`}
       aria-label="Home security alarm control"
     >
+      {isDashboard ? (
+        <div className="home-alarm-card__dashboard-head">
+          <div>
+            <p className="home-alarm-card__eyebrow">Home alarm</p>
+            <p className="home-alarm-card__site-name">{primary.name}</p>
+          </div>
+          <Link href={`/portal/home/${primary.id}`} className="link-sm home-alarm-card__open">
+            Open site
+          </Link>
+        </div>
+      ) : null}
+
       <div className="home-alarm-card__head">
-        <div className={`home-alarm-card__shield ${armed ? 'home-alarm-card__shield--armed' : ''} ${isTriggered ? 'home-alarm-card__shield--triggered' : ''}`}>
-          <SketchIcon name="shield" size={26} />
+        <div
+          className={`home-alarm-card__shield ${armed ? 'home-alarm-card__shield--armed' : ''} ${isTriggered ? 'home-alarm-card__shield--triggered' : ''}`}
+        >
+          <SketchIcon name="shield" size={isDashboard ? 24 : 26} />
         </div>
         <div className="home-alarm-card__meta">
           <div className="card-header-row home-alarm-card__title-row">
-            <h2>{primary.name}</h2>
-            <span className={`status-pill status-pill--${primary.alarmStatus.toLowerCase()}`}>
+            <h2>{isDashboard ? primary.name : primary.name}</h2>
+            <span className={`home-alarm-card__status status-pill status-pill--${statusClass}`}>
               {alarmStatusLabel(primary.alarmStatus)}
             </span>
           </div>
-          <p className="text-muted">
-            SA panel modes: Away (full), Stay (perimeter), Night. Compatible with Paradox / DSC / IDS / Ajax / Nemtek fence zones via Contact ID.
+          <p className="text-muted home-alarm-card__desc">
+            SA panel modes: Away (full), Stay (perimeter), Night. Compatible with Paradox / DSC / IDS /
+            Ajax / Nemtek fence zones via Contact ID.
           </p>
           {properties.length > 1 && (
             <Link href="/portal/home" className="link-sm">
@@ -102,9 +136,9 @@ export function HomeAlarmControl({ properties, hasAccess, onUpdated }: Props) {
         </div>
       </div>
 
-      {msg && <div className="alert alert--success">{msg}</div>}
+      {msg ? <div className="alert alert--success home-alarm-card__feedback">{msg}</div> : null}
 
-      <div className="arm-mode-row">
+      <div className={`arm-mode-row ${isDashboard ? 'arm-mode-row--dashboard' : ''}`}>
         {ARM_MODE_OPTIONS.map((opt) => {
           const active = primary.alarmStatus === opt.value;
           const key = `${primary.id}-${opt.value}`;
@@ -113,23 +147,35 @@ export function HomeAlarmControl({ properties, hasAccess, onUpdated }: Props) {
               key={opt.value}
               type="button"
               title={opt.hint}
-              className={`arm-mode-btn ${active ? 'arm-mode-btn--active' : ''} ${opt.value === 'DISARMED' ? 'arm-mode-btn--disarm' : ''}`}
+              className={`arm-mode-btn ${active ? 'arm-mode-btn--active' : ''} ${opt.value === 'DISARMED' ? 'arm-mode-btn--disarm' : ''} ${active && opt.value !== 'DISARMED' ? 'arm-mode-btn--armed-active' : ''}`}
               disabled={!!loadingId}
               onClick={() => void setMode(primary, opt.value)}
             >
-              {loadingId === key ? <LoadingSpinner label="" size="sm" /> : opt.label}
+              {loadingId === key ? (
+                <LoadingSpinner label="" size="sm" />
+              ) : (
+                <>
+                  <span className="arm-mode-btn__label">{opt.label}</span>
+                  {active ? <span className="arm-mode-btn__dot" aria-hidden /> : null}
+                </>
+              )}
             </button>
           );
         })}
       </div>
 
       <div className="home-alarm-card__actions">
-        <Link href="/portal/home" className="home-alarm-card__manage">
+        <Link href={`/portal/home/${primary.id}`} className="home-alarm-card__manage">
           Zones &amp; sensors
         </Link>
+        {primary.alarmLinked === false ? (
+          <span className="text-muted home-alarm-card__linked">Panel not linked</span>
+        ) : (
+          <span className="home-alarm-card__linked home-alarm-card__linked--ok">Monitoring on</span>
+        )}
       </div>
 
-      {properties.length > 1 && (
+      {properties.length > 1 ? (
         <ul className="home-alarm-card__list">
           {properties.slice(1).map((p) => (
             <li key={p.id} className="home-alarm-card__list-item">
@@ -150,7 +196,7 @@ export function HomeAlarmControl({ properties, hasAccess, onUpdated }: Props) {
             </li>
           ))}
         </ul>
-      )}
+      ) : null}
     </section>
   );
 }

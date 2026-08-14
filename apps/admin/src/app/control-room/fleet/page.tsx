@@ -8,6 +8,7 @@ import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { useApi } from '@/hooks/useApi';
 import { adminApi, type ApiResponse } from '@/lib/api-client';
 import { officerStatusLabel } from '@/lib/officer-status';
+import { OpsKpi } from '@/components/ops/OpsKpi';
 import { friendlyErrorMessage } from '@/lib/friendly-error';
 
 type CrewMember = {
@@ -60,10 +61,17 @@ function FleetContent() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [selectedCrew, setSelectedCrew] = useState<{ officerId: string; role: string }[]>([]);
   const [saving, setSaving] = useState(false);
+  const [filter, setFilter] = useState<'all' | 'active' | 'ready' | 'maintenance'>('all');
   const [msg, setMsg] = useState('');
 
   const fleet = fleetData?.data ?? [];
   const officers = officersData?.data ?? [];
+  const visibleFleet = fleet.filter((v) => {
+    if (filter === 'active') return v.status === 'ON_DUTY';
+    if (filter === 'ready') return ['AVAILABLE', 'ON_DUTY'].includes(v.status);
+    if (filter === 'maintenance') return v.status === 'MAINTENANCE';
+    return true;
+  });
 
   function startEdit(vehicle: FleetVehicle) {
     setEditingId(vehicle.id);
@@ -107,15 +115,37 @@ function FleetContent() {
         <div>
           <h2>Company fleet</h2>
           <p className="text-muted">
-            Assign 1–4 officers per vehicle — driver plus passengers or supervisor. Officers can ride solo or as a pair.
+            Vehicle-first board — active, dispatch, and maintenance.
           </p>
         </div>
       </header>
 
       {msg && <div className="alert alert--success">{msg}</div>}
 
+      <div className="ops-board__kpi" style={{ marginBottom: '1rem' }}>
+        <OpsKpi
+          label="Active"
+          value={fleet.filter((v) => v.status === 'ON_DUTY').length}
+          active={filter === 'active'}
+          onClick={() => setFilter(filter === 'active' ? 'all' : 'active')}
+        />
+        <OpsKpi
+          label="Dispatch ready"
+          value={fleet.filter((v) => ['AVAILABLE', 'ON_DUTY'].includes(v.status)).length}
+          active={filter === 'ready'}
+          onClick={() => setFilter(filter === 'ready' ? 'all' : 'ready')}
+        />
+        <OpsKpi
+          label="Maintenance"
+          value={fleet.filter((v) => v.status === 'MAINTENANCE').length}
+          hot={fleet.some((v) => v.status === 'MAINTENANCE')}
+          active={filter === 'maintenance'}
+          onClick={() => setFilter(filter === 'maintenance' ? 'all' : 'maintenance')}
+        />
+      </div>
+
       <div className="fleet-grid">
-        {fleet.map((v) => (
+        {visibleFleet.map((v) => (
           <article key={v.id} className={`fleet-card fleet-card--${v.vehicleType.toLowerCase().replace(/_/g, '-')}`}>
             <div className="fleet-card__header">
               <div>

@@ -51,6 +51,7 @@ export const CONTROL_ROOM_NAV: ControlRoomNavItem[] = [
   { href: '/control-room/teams', label: 'Teams & Users', icon: 'teams' },
   { href: '/control-room/analytics', label: 'Analytics', icon: 'analytics' },
   { href: '/control-room/settings', label: 'Settings', icon: 'profile' },
+  { href: '/control-room/profile', label: 'My profile', icon: 'profile' },
 ];
 
 export function navForRole(role: string): ControlRoomNavItem[] {
@@ -61,15 +62,67 @@ export function navForRole(role: string): ControlRoomNavItem[] {
       '/control-room/sales',
       '/control-room/installs',
       '/control-room/chat',
+      '/control-room/profile',
       '/control-room/settings',
     ]);
     return CONTROL_ROOM_NAV.filter((item) => salesHrefs.has(item.href));
   }
 
-  if (role === 'DEVELOPER') {
-    return CONTROL_ROOM_NAV.filter(
-      (item) => !item.roles || item.roles.includes(role),
+  if (role === 'DISPATCHER') {
+    const hrefs = new Set([
+      '/control-room',
+      '/control-room/map',
+      '/control-room/incidents',
+      '/control-room/dispatch',
+      '/control-room/communications',
+      '/control-room/chat',
+      '/control-room/profile',
+      '/control-room/settings',
+    ]);
+    return CONTROL_ROOM_NAV.filter((item) => hrefs.has(item.href));
+  }
+
+  if (role === 'TENANT_ADMIN') {
+    const order = [
+      '/control-room',
+      '/control-room/officers',
+      '/control-room/customers',
+      '/control-room/store',
+      '/control-room/sales',
+      '/control-room/analytics',
+      '/control-room/profile',
+      '/control-room/settings',
+    ];
+    return order
+      .map((href) => CONTROL_ROOM_NAV.find((item) => item.href === href))
+      .filter((item): item is ControlRoomNavItem => Boolean(item));
+  }
+
+  if (role === 'OWNER') {
+    const first = [
+      '/control-room',
+      '/control-room/incidents',
+      '/control-room/analytics',
+      '/control-room/customers',
+      '/control-room/officers',
+    ];
+    const rest = CONTROL_ROOM_NAV.filter((item) => !first.includes(item.href));
+    return [
+      ...first
+        .map((href) => CONTROL_ROOM_NAV.find((item) => item.href === href))
+        .filter((item): item is ControlRoomNavItem => Boolean(item)),
+      ...rest,
+    ];
+  }
+
+  if (role === 'DEVELOPER' || role === 'SUPER_ADMIN') {
+    const first = CONTROL_ROOM_NAV.filter((item) => item.href === '/control-room/developer');
+    const rest = CONTROL_ROOM_NAV.filter(
+      (item) =>
+        item.href !== '/control-room/developer' &&
+        (!item.roles || item.roles.includes(role)),
     );
+    return [...first, ...rest];
   }
 
   return CONTROL_ROOM_NAV.filter(
@@ -85,7 +138,8 @@ const MOBILE_LABELS: Record<string, string> = {
   '/control-room/incidents': 'Ops',
   '/control-room/sales': 'Sales',
   '/control-room/installs': 'Jobs',
-  '/control-room/settings': 'Account',
+  '/control-room/settings': 'Settings',
+  '/control-room/profile': 'Account',
 };
 
 const MOBILE_PREFERRED: Record<string, string[]> = {
@@ -94,14 +148,21 @@ const MOBILE_PREFERRED: Record<string, string[]> = {
     '/control-room/customers',
     '/control-room/sales',
     '/control-room/installs',
-    '/control-room/settings',
+    '/control-room/profile',
   ],
   DEFAULT: [
     '/control-room',
     '/control-room/map',
     '/control-room/incidents',
     '/control-room/customers',
-    '/control-room/settings',
+    '/control-room/profile',
+  ],
+  DEVELOPER: [
+    '/control-room/developer',
+    '/control-room/map',
+    '/control-room/incidents',
+    '/control-room/profile',
+    '/control-room/chat',
   ],
 };
 
@@ -122,9 +183,11 @@ export function mobileNavForRole(role: string): ControlRoomMobileNavItem[] {
         icon:
           href === '/control-room'
             ? ('home' as const)
-            : href === '/control-room/settings'
+            : href === '/control-room/profile'
               ? ('profile' as const)
-              : item.icon,
+              : href === '/control-room/settings'
+                ? ('profile' as const)
+                : item.icon,
       };
     })
     .filter((item): item is ControlRoomMobileNavItem => item != null)

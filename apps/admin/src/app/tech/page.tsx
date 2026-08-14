@@ -16,6 +16,13 @@ import {
 } from '@/components/ops/OpsQuickWork';
 import { OpsSwipeRow } from '@/components/ops/OpsSwipeRow';
 import { OpsUndoToast, useUndoToast } from '@/components/ops/OpsUndoToast';
+import {
+  DEFAULT_TECH_TESTS,
+  nextWorkflowStatus,
+  TECH_WORKFLOW,
+  workflowIndex,
+  workflowLabel,
+} from '@/lib/tech-workflow';
 
 type TechJob = {
   id: string;
@@ -24,6 +31,9 @@ type TechJob = {
   scheduledAt: string;
   address: string;
   jobType: string;
+  serial?: string;
+  tests?: { id: string; label: string; done: boolean }[];
+  overrideReason?: string;
 };
 
 type TechProfile = {
@@ -34,26 +44,18 @@ type TechProfile = {
   jobs: TechJob[];
 };
 
-const STATUS_FLOW = ['SCHEDULED', 'EN_ROUTE', 'IN_PROGRESS', 'COMPLETED'] as const;
-
 function statusRank(status: string) {
-  if (status === 'IN_PROGRESS') return 0;
-  if (status === 'EN_ROUTE') return 1;
-  if (status === 'SCHEDULED') return 2;
-  return 9;
+  const idx = workflowIndex(status);
+  return idx < 0 ? 9 : idx;
 }
 
 function nextStatus(status: string) {
-  const idx = STATUS_FLOW.indexOf(status as (typeof STATUS_FLOW)[number]);
-  if (idx < 0) return null;
-  const next = STATUS_FLOW[Math.min(idx + 1, STATUS_FLOW.length - 1)];
-  if (!next || next === status) return null;
-  return next;
+  return nextWorkflowStatus(status);
 }
 
 export default function TechDashboardPage() {
   return (
-    <TechLayout title="Technician Dashboard">
+    <TechLayout title="Today’s jobs">
       <TechDashboardContent />
     </TechLayout>
   );
@@ -68,6 +70,8 @@ function TechDashboardContent() {
   const [actionError, setActionError] = useState('');
   const [filter, setFilter] = useState('all');
   const [jobs, setJobs] = useState<TechJob[] | null>(null);
+  const [overrideReason, setOverrideReason] = useState('');
+  const [serialDraft, setSerialDraft] = useState('');
   const undo = useUndoToast();
 
   const profile = data?.data;
@@ -92,7 +96,7 @@ function TechDashboardContent() {
   const focusJob = queue[0] ?? null;
   const restQueue = queue.slice(1);
   const activeCount = queue.filter((j) =>
-    ['EN_ROUTE', 'IN_PROGRESS'].includes(j.status),
+    !['SCHEDULED', 'COMPLETED', 'CANCELLED'].includes(j.status),
   ).length;
   const dueSoon = queue.filter((j) => {
     const t = new Date(j.scheduledAt).getTime() - Date.now();
@@ -102,6 +106,14 @@ function TechDashboardContent() {
   async function advance(job: TechJob) {
     const next = nextStatus(job.status);
     if (!next) return;
+    if (next === 'COMPLETED') {
+      const tests = job.tests ?? DEFAULT_TECH_TESTS.map((t) => ({ ...t, done: false }));
+      const allDone = tests.every((t) => t.done);
+      if (!allDone && !overrideReason.trim()) {
+        setActionError('Complete the test checklist, or enter an override reason.');
+        return;
+      }
+    }
     const prev = job.status;
     setBusyId(job.id);
     setActionError('');
@@ -109,8 +121,11 @@ function TechDashboardContent() {
       (list ?? liveJobs).map((j) => (j.id === job.id ? { ...j, status: next } : j)),
     );
     try {
-      await techApi.patch(`/store/tech/jobs/${job.id}/status`, { status: next });
-      undo.show(`Marked ${next.replace(/_/g, ' ').toLowerCase()}`, async () => {
+      await techApi.patch(`/store/tech/jobs/${job.id}/status`, {
+        status: next,
+        overrideReason: overrideReason || undefined,
+      });
+      undo.show(`Marked ${workflowLabel(next)}`, async () => {
         await techApi.patch(`/store/tech/jobs/${job.id}/status`, { status: prev });
         void reload();
       });
@@ -125,6 +140,23 @@ function TechDashboardContent() {
     }
   }
 
+  async function toggleTest(job: TechJob, testId: string) {
+    const tests = (job.tests ?? DEFAULT_TECH_TESTS.map((t) => ({ ...t, done: false }))).map((t) =>
+      t.id === testId ? { ...t, done: !t.done } : t,
+    );
+    setJobs((list) => (list ?? liveJobs).map((j) => (j.id === job.id ? { ...j, tests } : j)));
+    await techApi.patch(`/store/tech/jobs/${job.id}/tests`, { tests });
+  }
+
+  async function saveSerial(job: TechJob) {
+    await techApi.patch(`/store/tech/jobs/${job.id}/serial`, { serial: serialDraft || job.serial });
+    setJobs((list) =>
+      (list ?? liveJobs).map((j) =>
+        j.id === job.id ? { ...j, serial: serialDraft || j.serial } : j,
+      ),
+    );
+  }
+
   if (loading) return <LoadingSpinner label="Loading jobs..." />;
   if (error || !profile) {
     return <ErrorAlert message={error ?? 'Failed to load'} onRetry={reload} />;
@@ -133,13 +165,13 @@ function TechDashboardContent() {
   const nextLabel = focusJob ? nextStatus(focusJob.status)?.replace(/_/g, ' ') : null;
   const filteredRest =
     filter === 'urgent'
-      ? restQueue.filter((j) => ['EN_ROUTE', 'IN_PROGRESS'].includes(j.status))
+      ? restQueue.filter((j) => !['SCHEDULED', 'COMPLETED', 'CANCELLED'].includes(j.status))
       : restQueue;
 
   return (
     <div className="page-content dash-ops dash-ops--tech">
       <OpsMyShiftHeader
-        title="My shift"
+        title="Today’s jobs"
         subtitle={
           focusJob
             ? `${activeCount} active · ${queue.length} open`
@@ -207,8 +239,24 @@ function TechDashboardContent() {
 
         {focusJob ? (
           <div className="tech-focus-job__card">
+            <div className="workflow-steps" aria-label="Install workflow">
+              {TECH_WORKFLOW.map((step, idx) => (
+                <span
+                  key={step.id}
+                  className={`workflow-step ${
+                    idx < workflowIndex(focusJob.status)
+                      ? 'workflow-step--done'
+                      : idx === workflowIndex(focusJob.status)
+                        ? 'workflow-step--current'
+                        : ''
+                  }`}
+                >
+                  {step.label}
+                </span>
+              ))}
+            </div>
             <div className="tech-focus-job__meta">
-              <span className="badge">{focusJob.status.replace(/_/g, ' ')}</span>
+              <span className="badge">{workflowLabel(focusJob.status)}</span>
               <span className="text-muted">{focusJob.jobType}</span>
             </div>
             <h2>{focusJob.title}</h2>
@@ -216,6 +264,43 @@ function TechDashboardContent() {
             <p className="text-muted">
               Scheduled {new Date(focusJob.scheduledAt).toLocaleString()}
             </p>
+            <label className="text-muted" style={{ display: 'block', margin: '0.65rem 0 0.35rem' }}>
+              Equipment serial
+            </label>
+            <input
+              className="input"
+              defaultValue={focusJob.serial ?? ''}
+              onChange={(e) => setSerialDraft(e.target.value)}
+              placeholder="Scan or type serial"
+            />
+            <button
+              type="button"
+              className="btn-sm"
+              style={{ marginTop: '0.35rem' }}
+              onClick={() => void saveSerial(focusJob)}
+            >
+              Save serial
+            </button>
+            <div className="check-grid">
+              {(focusJob.tests ?? DEFAULT_TECH_TESTS.map((t) => ({ ...t, done: false }))).map((t) => (
+                <label key={t.id} className="check-row">
+                  <input
+                    type="checkbox"
+                    checked={t.done}
+                    onChange={() => void toggleTest(focusJob, t.id)}
+                  />
+                  {t.label}
+                </label>
+              ))}
+            </div>
+            {nextWorkflowStatus(focusJob.status) === 'COMPLETED' && (
+              <input
+                className="input"
+                value={overrideReason}
+                onChange={(e) => setOverrideReason(e.target.value)}
+                placeholder="Override reason if tests incomplete"
+              />
+            )}
             <div className="tech-focus-job__actions">
               {nextLabel && (
                 <button

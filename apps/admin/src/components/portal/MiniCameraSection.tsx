@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useApi } from '@/hooks/useApi';
 import { clientApi, type ApiResponse } from '@/lib/api-client';
+import { CctvLiveFeed } from './CctvLiveFeed';
 
 type Camera = {
   id: string;
@@ -10,7 +11,10 @@ type Camera = {
   locationLabel: string;
   channel: number;
   status: string;
+  isLiveCapable?: boolean;
 };
+
+type CameraWithSite = Camera & { siteId: string; siteName: string };
 
 type Site = {
   id: string;
@@ -60,7 +64,7 @@ export function MiniCameraSection({ hasAccess }: Props) {
   }
 
   const sites = data?.data ?? [];
-  const cameras = sites.flatMap((s) =>
+  const cameras: CameraWithSite[] = sites.flatMap((s) =>
     s.cameras.map((c) => ({ ...c, siteId: s.id, siteName: s.name })),
   );
   const openEvents = sites.reduce((n, s) => n + s.openEvents, 0);
@@ -93,15 +97,7 @@ export function MiniCameraSection({ hasAccess }: Props) {
       ) : (
         <div className="camera-grid camera-grid--mini">
           {preview.map((c) => (
-            <Link key={c.id} href={`/portal/home/${c.siteId}`} className="camera-tile">
-              <div className={`camera-tile__feed camera-tile__feed--${c.status.toLowerCase()}`}>
-                <span className="camera-tile__live">CH {c.channel}</span>
-                <span className="camera-tile__name">{c.name}</span>
-              </div>
-              <span className="camera-tile__meta">
-                {c.siteName} · {c.status.replace(/_/g, ' ')}
-              </span>
-            </Link>
+            <CctvLiveFeed key={c.id} camera={c} href={`/portal/home/${c.siteId}`} />
           ))}
         </div>
       )}

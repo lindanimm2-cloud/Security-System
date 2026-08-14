@@ -156,9 +156,26 @@ function VehicleProfileContent() {
     );
   }
 
-  const profile = data!.data;
+  const profile = data?.data;
+  if (!profile?.vehicle) {
+    return (
+      <ErrorAlert
+        error="Vehicle profile could not be loaded."
+        onRetry={reload}
+      />
+    );
+  }
+
   const v = profile.vehicle;
-  const t = profile.tracking;
+  const t = profile.tracking ?? {
+    active: false,
+    mode: 'OFF' as const,
+    hasPosition: false,
+    lat: null,
+    lng: null,
+    lastUpdate: '',
+    trail: [],
+  };
   const showMap = t.active && t.lat != null && t.lng != null;
 
   return (

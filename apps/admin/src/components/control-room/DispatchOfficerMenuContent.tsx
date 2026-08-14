@@ -97,7 +97,13 @@ export function DispatchOfficerMenuContent({
     return <div className="dispatch-mini-menu__error">{error}</div>;
   }
 
-  if (!options) return null;
+  if (!options || typeof options !== 'object' || Array.isArray(options) || !options.incident) {
+    return (
+      <p className="dispatch-mini-menu__status text-muted">
+        Dispatch options unavailable for this incident.
+      </p>
+    );
+  }
 
   const dispatchOptions = options;
 
@@ -106,13 +112,13 @@ export function DispatchOfficerMenuContent({
       <p className="dispatch-mini-menu__status text-muted">
         {dispatchOptions.assignedOfficer
           ? `Assigned to ${dispatchOptions.assignedOfficer}`
-          : `Status: ${dispatchOptions.incident.status.replace(/_/g, ' ')}`}
+          : `Status: ${(dispatchOptions.incident.status ?? 'UNKNOWN').replace(/_/g, ' ')}`}
       </p>
     );
   }
 
-  const { available, nearbyBusy } = splitOfficersByTier(dispatchOptions.officers);
-  const noUnits = dispatchOptions.availableCount === 0;
+  const { available, nearbyBusy } = splitOfficersByTier(dispatchOptions.officers ?? []);
+  const noUnits = (dispatchOptions.availableCount ?? available.length) === 0;
 
   function renderOfficerRow(
     o: (typeof dispatchOptions.officers)[0],
@@ -165,7 +171,7 @@ export function DispatchOfficerMenuContent({
         </button>
       </div>
 
-      {dispatchOptions.volunteers.length > 0 && (
+      {dispatchOptions.volunteers?.length > 0 && (
         <>
           <p className="dispatch-mini-menu__section">Signalled available</p>
           <ul className="dispatch-mini-menu__list">

@@ -39,7 +39,7 @@ export class ClientService {
           orderBy: { createdAt: 'desc' },
           take: 5,
         }),
-        this.getOrCreateConversation(userId, tenantId),
+        this.getOrCreateClientSupportConversation(userId, tenantId),
       ]);
 
     const familyCount = family?.family.members.length ?? 0;
@@ -543,16 +543,186 @@ export class ClientService {
     return { success: true, data: message };
   }
 
-  async getMessages(_userId: string, _tenantId: string) {
-    throw new ForbiddenException(
-      'General messaging is disabled. Use the Emergency Hub to reach control room, or enable family messaging in Family settings.',
-    );
+  async getMessages(userId: string, tenantId: string) {
+    return this.getClientSupportMessages(userId, tenantId);
   }
 
-  async sendMessage(_userId: string, _tenantId: string, _content: string) {
-    throw new ForbiddenException(
-      'General messaging is disabled. Use the Emergency Hub to reach control room, or enable family messaging in Family settings.',
+  async sendMessage(userId: string, tenantId: string, content: string) {
+    return this.sendClientSupportMessage(userId, tenantId, content);
+  }
+
+  async getClientSupportMessages(userId: string, tenantId: string) {
+    const conversation = await this.getOrCreateClientSupportConversation(userId, tenantId);
+    const messages = await this.prisma.message.findMany({
+      where: { conversationId: conversation.id },
+      orderBy: { createdAt: 'asc' },
+      take: 200,
+      include: {
+        sender: {
+          select: { id: true, firstName: true, lastName: true, role: true },
+        },
+      },
+    });
+
+    return {
+      success: true,
+      data: {
+        conversationId: conversation.id,
+        clientUserId: userId,
+        messages: messages.map((m) => this.formatSupportMessage(m)),
+      },
+    };
+  }
+
+  async sendClientSupportMessage(userId: string, tenantId: string, content: string) {
+    const trimmed = content?.trim();
+    if (!trimmed) throw new BadRequestException('Message cannot be empty');
+
+    const conversation = await this.getOrCreateClientSupportConversation(userId, tenantId);
+    const message = await this.prisma.message.create({
+      data: { conversationId: conversation.id, senderUserId: userId, content: trimmed },
+      include: {
+        sender: {
+          select: { id: true, firstName: true, lastName: true, role: true },
+        },
+      },
+    });
+
+    const payload = this.formatSupportMessage(message);
+    this.realtime.emitClientSupportMessage(tenantId, userId, {
+      conversationId: conversation.id,
+      ...payload,
+    });
+
+    return { success: true, data: payload };
+  }
+
+  async listClientSupportThreads(tenantId: string) {
+    const conversations = await this.prisma.conversation.findMany({
+      where: { tenantId, type: ConversationType.SUPPORT, subject: { not: null } },
+      include: {
+        messages: {
+          orderBy: { createdAt: 'desc' },
+          take: 1,
+          include: {
+            sender: {
+              select: { id: true, firstName: true, lastName: true, role: true },
+            },
+          },
+        },
+      },
+    });
+
+    const clientIds = conversations
+      .map((c) => c.subject)
+      .filter((id): id is string => Boolean(id));
+    const clients = clientIds.length
+      ? await this.prisma.user.findMany({
+          where: { id: { in: clientIds }, tenantId },
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            phone: true,
+            email: true,
+          },
+        })
+      : [];
+
+    const threads = conversations
+      .map((conv) => {
+        const client = clients.find((c) => c.id === conv.subject) ?? null;
+        const last = conv.messages[0] ?? null;
+        return {
+          clientUserId: conv.subject,
+          conversationId: conv.id,
+          client,
+          lastMessage: last ? this.formatSupportMessage(last) : null,
+          updatedAt: (last?.createdAt ?? conv.createdAt).toISOString(),
+        };
+      })
+      .filter((t) => t.client)
+      .sort(
+        (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
+      );
+
+    return { success: true, data: threads };
+  }
+
+  async getClientSupportMessagesForStaff(tenantId: string, clientUserId: string) {
+    const client = await this.prisma.user.findFirst({
+      where: { id: clientUserId, tenantId, role: { in: ['USER', 'FAMILY_MEMBER'] } },
+      select: { id: true, firstName: true, lastName: true, phone: true, email: true },
+    });
+    if (!client) throw new NotFoundException('Client not found');
+
+    const conversation = await this.getOrCreateClientSupportConversation(
+      clientUserId,
+      tenantId,
     );
+    const messages = await this.prisma.message.findMany({
+      where: { conversationId: conversation.id },
+      orderBy: { createdAt: 'asc' },
+      take: 200,
+      include: {
+        sender: {
+          select: { id: true, firstName: true, lastName: true, role: true },
+        },
+      },
+    });
+
+    return {
+      success: true,
+      data: {
+        conversationId: conversation.id,
+        client,
+        messages: messages.map((m) => this.formatSupportMessage(m)),
+      },
+    };
+  }
+
+  async sendClientSupportReply(
+    staff: { id: string; tenantId: string; firstName: string; lastName: string; role: string },
+    clientUserId: string,
+    content: string,
+  ) {
+    const trimmed = content?.trim();
+    if (!trimmed) throw new BadRequestException('Message cannot be empty');
+
+    const client = await this.prisma.user.findFirst({
+      where: {
+        id: clientUserId,
+        tenantId: staff.tenantId,
+        role: { in: ['USER', 'FAMILY_MEMBER'] },
+      },
+      select: { id: true },
+    });
+    if (!client) throw new NotFoundException('Client not found');
+
+    const conversation = await this.getOrCreateClientSupportConversation(
+      clientUserId,
+      staff.tenantId,
+    );
+    const message = await this.prisma.message.create({
+      data: {
+        conversationId: conversation.id,
+        senderUserId: staff.id,
+        content: trimmed,
+      },
+      include: {
+        sender: {
+          select: { id: true, firstName: true, lastName: true, role: true },
+        },
+      },
+    });
+
+    const payload = this.formatSupportMessage(message);
+    this.realtime.emitClientSupportMessage(staff.tenantId, clientUserId, {
+      conversationId: conversation.id,
+      ...payload,
+    });
+
+    return { success: true, data: payload };
   }
 
   async aiChat(_userId: string, _message: string) {
@@ -1277,13 +1447,31 @@ export class ClientService {
     };
   }
 
-  private async getOrCreateConversation(userId: string, tenantId: string) {
+  private formatSupportMessage(message: {
+    id: string;
+    content: string;
+    createdAt: Date;
+    sender: { id: string; firstName: string; lastName: string; role: string };
+  }) {
+    return {
+      id: message.id,
+      content: message.content,
+      createdAt: message.createdAt.toISOString(),
+      sender: message.sender,
+    };
+  }
+
+  private async getOrCreateClientSupportConversation(userId: string, tenantId: string) {
     let conversation = await this.prisma.conversation.findFirst({
-      where: { tenantId, messages: { some: { senderUserId: userId } } },
+      where: { tenantId, type: ConversationType.SUPPORT, subject: userId },
     });
     if (!conversation) {
       conversation = await this.prisma.conversation.create({
-        data: { tenantId, subject: 'Support', type: ConversationType.SUPPORT },
+        data: {
+          tenantId,
+          subject: userId,
+          type: ConversationType.SUPPORT,
+        },
       });
     }
     return conversation;

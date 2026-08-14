@@ -6,6 +6,13 @@ import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { useApi } from '@/hooks/useApi';
 import { techApi } from '@/lib/api-client';
 import { useState } from 'react';
+import {
+  DEFAULT_TECH_TESTS,
+  nextWorkflowStatus,
+  TECH_WORKFLOW,
+  workflowIndex,
+  workflowLabel,
+} from '@/lib/tech-workflow';
 
 type Job = {
   id: string;
@@ -18,9 +25,9 @@ type Job = {
   address: string;
   scheduledAt: string;
   equipmentNotes: string | null;
+  serial?: string;
+  tests?: { id: string; label: string; done: boolean }[];
 };
-
-const STATUS_FLOW = ['SCHEDULED', 'EN_ROUTE', 'IN_PROGRESS', 'COMPLETED'] as const;
 
 export default function TechJobsPage() {
   return (
@@ -37,15 +44,26 @@ function TechJobsContent() {
   );
   const [busyId, setBusyId] = useState<string | null>(null);
   const [actionError, setActionError] = useState('');
+  const [overrideReason, setOverrideReason] = useState('');
+  const [serialByJob, setSerialByJob] = useState<Record<string, string>>({});
 
   async function advance(job: Job) {
-    const idx = STATUS_FLOW.indexOf(job.status as (typeof STATUS_FLOW)[number]);
-    const next = STATUS_FLOW[Math.min(idx + 1, STATUS_FLOW.length - 1)];
-    if (!next || next === job.status) return;
+    const next = nextWorkflowStatus(job.status);
+    if (!next) return;
+    if (next === 'COMPLETED') {
+      const tests = job.tests ?? DEFAULT_TECH_TESTS.map((t) => ({ ...t, done: false }));
+      if (!tests.every((t) => t.done) && !overrideReason.trim()) {
+        setActionError('Complete tests or enter an override reason.');
+        return;
+      }
+    }
     setBusyId(job.id);
     setActionError('');
     try {
-      await techApi.patch(`/store/tech/jobs/${job.id}/status`, { status: next });
+      await techApi.patch(`/store/tech/jobs/${job.id}/status`, {
+        status: next,
+        overrideReason: overrideReason || undefined,
+      });
       reload();
     } catch (e) {
       setActionError(e instanceof Error ? e.message : 'Update failed');
@@ -65,7 +83,7 @@ function TechJobsContent() {
         <div>
           <h1>My install jobs</h1>
           <p className="text-muted">
-            Update status as you travel, work on site, and complete camera / alarm installs.
+            Accept → En route → Arrived → Site check → Install → Testing → Client approval → Complete
           </p>
         </div>
       </div>
@@ -97,24 +115,58 @@ function TechJobsContent() {
                   {job.jobType} · {job.clientName}
                 </p>
               </div>
-              <span className="badge">{job.status.replace(/_/g, ' ')}</span>
+              <span className="badge">{workflowLabel(job.status)}</span>
+            </div>
+            <div className="workflow-steps">
+              {TECH_WORKFLOW.map((step, idx) => (
+                <span
+                  key={step.id}
+                  className={`workflow-step ${
+                    idx < workflowIndex(job.status)
+                      ? 'workflow-step--done'
+                      : idx === workflowIndex(job.status)
+                        ? 'workflow-step--current'
+                        : ''
+                  }`}
+                >
+                  {step.label}
+                </span>
+              ))}
             </div>
             <p>{job.description}</p>
             <p>
               <strong>Address:</strong> {job.address}
             </p>
-            <p>
-              <strong>When:</strong> {new Date(job.scheduledAt).toLocaleString()}
-            </p>
-            {job.clientPhone && (
-              <p>
-                <strong>Phone:</strong> {job.clientPhone}
-              </p>
-            )}
             {job.equipmentNotes && (
               <p>
                 <strong>Equipment:</strong> {job.equipmentNotes}
               </p>
+            )}
+            <input
+              className="input"
+              value={serialByJob[job.id] ?? job.serial ?? ''}
+              onChange={(e) => setSerialByJob((s) => ({ ...s, [job.id]: e.target.value }))}
+              placeholder="Serial / scan"
+            />
+            <button
+              type="button"
+              className="btn-sm"
+              style={{ margin: '0.35rem 0 0.65rem' }}
+              onClick={() =>
+                void techApi.patch(`/store/tech/jobs/${job.id}/serial`, {
+                  serial: serialByJob[job.id] ?? job.serial,
+                })
+              }
+            >
+              Save serial
+            </button>
+            {nextWorkflowStatus(job.status) === 'COMPLETED' && (
+              <input
+                className="input"
+                value={overrideReason}
+                onChange={(e) => setOverrideReason(e.target.value)}
+                placeholder="Override reason if tests incomplete"
+              />
             )}
             {job.status !== 'COMPLETED' && job.status !== 'CANCELLED' && (
               <button
@@ -125,11 +177,7 @@ function TechJobsContent() {
               >
                 {busyId === job.id
                   ? 'Updating...'
-                  : job.status === 'SCHEDULED'
-                    ? 'Mark en route'
-                    : job.status === 'EN_ROUTE'
-                      ? 'Start work'
-                      : 'Mark completed'}
+                  : `Mark ${workflowLabel(nextWorkflowStatus(job.status) ?? job.status)}`}
               </button>
             )}
           </article>

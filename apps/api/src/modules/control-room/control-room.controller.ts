@@ -14,6 +14,7 @@ import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { ADMIN_PORTAL_ROLES, OPS_ROLES } from '../../common/developer-access';
 import { SurveillanceService } from '../surveillance/surveillance.service';
+import { ClientService } from '../client/client.service';
 import { ControlRoomService } from './control-room.service';
 
 type AuthUser = {
@@ -31,6 +32,7 @@ export class ControlRoomController {
   constructor(
     private readonly controlRoomService: ControlRoomService,
     private readonly surveillanceService: SurveillanceService,
+    private readonly clientService: ClientService,
   ) {}
 
   @Get('dashboard')
@@ -139,6 +141,28 @@ export class ControlRoomController {
   @Get('clients')
   clients(@CurrentUser() user: AuthUser) {
     return this.controlRoomService.listClients(user.tenantId);
+  }
+
+  @Get('client-chats')
+  @Roles(...OPS_ROLES)
+  clientChats(@CurrentUser() user: AuthUser) {
+    return this.clientService.listClientSupportThreads(user.tenantId);
+  }
+
+  @Get('client-chats/:userId/messages')
+  @Roles(...OPS_ROLES)
+  clientChatMessages(@CurrentUser() user: AuthUser, @Param('userId') userId: string) {
+    return this.clientService.getClientSupportMessagesForStaff(user.tenantId, userId);
+  }
+
+  @Post('client-chats/:userId/messages')
+  @Roles(...OPS_ROLES)
+  sendClientChatMessage(
+    @CurrentUser() user: AuthUser,
+    @Param('userId') userId: string,
+    @Body() body: { content: string },
+  ) {
+    return this.clientService.sendClientSupportReply(user, userId, body.content ?? '');
   }
 
   @Get('customers')

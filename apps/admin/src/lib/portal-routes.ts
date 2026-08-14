@@ -11,7 +11,7 @@ export function activityHref(title: string, detail: string): string {
   if (text.includes('vehicle') || text.includes('geofence')) return '/portal/vehicles';
   if (text.includes('alarm') || text.includes('home') || text.includes('property')) return '/portal/home';
   if (text.includes('medical')) return '/portal/medical';
-  if (text.includes('message')) return '/portal/family/chat';
+  if (text.includes('message')) return '/portal/chat';
   return '/portal/updates';
 }
 

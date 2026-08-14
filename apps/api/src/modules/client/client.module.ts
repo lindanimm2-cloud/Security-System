@@ -9,6 +9,6 @@ import { SubscriptionService } from './subscription.service';
   imports: [SurveillanceModule],
   controllers: [ClientController],
   providers: [ClientService, SubscriptionService, LoyaltyService],
-  exports: [SubscriptionService, LoyaltyService],
+  exports: [ClientService, SubscriptionService, LoyaltyService],
 })
 export class ClientModule {}

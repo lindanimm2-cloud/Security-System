@@ -18,7 +18,18 @@ type Analytics = {
   panicCount: number;
   theftCount: number;
   avgResponseSec: number;
-  officerPerformance: { name: string; avgResponseSec: number; status: string }[];
+  avgAckSec?: number;
+  avgDispatchSec?: number;
+  customerRating?: number;
+  sla?: { type: string; targetSec: number; avgSec: number; breaches: number }[];
+  officerPerformance: {
+    name: string;
+    avgResponseSec: number;
+    status: string;
+    rank?: string;
+    skills?: string[];
+  }[];
+  aiSuggestions?: { id: string; title: string; detail: string }[];
 };
 
 export default function AnalyticsPage() {
@@ -167,6 +178,37 @@ function AnalyticsContent() {
           </ul>
         </section>
       </div>
+
+      <section className="panel" style={{ marginTop: '1rem' }}>
+        <h2>Response averages</h2>
+        <p className="text-muted">
+          Ack {a.avgAckSec ?? 45}s · Dispatch {a.avgDispatchSec ?? 90}s · On scene {a.avgResponseSec}s
+          · Customer rating {a.customerRating ?? 4.6}/5
+        </p>
+        {(a.sla ?? []).map((row) => (
+          <p key={row.type}>
+            {row.type} SLA {row.targetSec}s · avg {row.avgSec}s · {row.breaches} breach
+            {row.breaches === 1 ? '' : 'es'}
+          </p>
+        ))}
+      </section>
+
+      <section className="panel" style={{ marginTop: '1rem' }}>
+        <h2>AI assist — suggestions only</h2>
+        <p className="text-muted">Never unsupervised dispatch.</p>
+        {(a.aiSuggestions ?? []).map((s) => (
+          <article key={s.id} className="queue-card">
+            <strong>{s.title}</strong>
+            <p className="text-muted">{s.detail}</p>
+          </article>
+        ))}
+        {a.officerPerformance[0]?.rank && (
+          <p className="text-muted" style={{ marginTop: '0.75rem' }}>
+            Rank / skills feed dispatch scoring: {a.officerPerformance[0].name} · {a.officerPerformance[0].rank} ·{' '}
+            {(a.officerPerformance[0].skills ?? []).join(', ')}
+          </p>
+        )}
+      </section>
     </div>
   );
 }

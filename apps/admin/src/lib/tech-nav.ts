@@ -8,7 +8,7 @@ export type TechNavItem = {
 };
 
 export const TECH_NAV: TechNavItem[] = [
-  { href: '/tech', label: 'Dashboard', icon: 'dashboard', exact: true },
+  { href: '/tech', label: 'Today’s jobs', icon: 'dashboard', exact: true },
   { href: '/tech/jobs', label: 'Install Jobs', icon: 'install' },
   { href: '/tech/team', label: 'My Team', icon: 'teams' },
   { href: '/tech/chat', label: 'Team Chat', icon: 'team-chat' },

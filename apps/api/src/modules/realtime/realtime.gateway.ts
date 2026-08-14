@@ -94,6 +94,16 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
     this.server.to(`tenant:${tenantId}`).emit('chat:family', { familyId, ...message });
   }
 
+  emitClientSupportMessage(
+    tenantId: string,
+    clientUserId: string,
+    message: Record<string, unknown>,
+  ) {
+    this.server
+      .to(`tenant:${tenantId}`)
+      .emit('chat:client', { clientUserId, ...message });
+  }
+
   emitCallEvent(tenantId: string, event: string, payload: Record<string, unknown>) {
     this.server.to(`tenant:${tenantId}`).emit(event, payload);
   }

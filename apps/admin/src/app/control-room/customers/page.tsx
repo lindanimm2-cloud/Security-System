@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { ControlRoomLayout } from '@/components/control-room/ControlRoomLayout';
+import { PendingVerificationsPanel } from '@/components/control-room/PendingVerificationsPanel';
 import { CoverageBadges, SubscriptionBadge } from '@/components/control-room/SubscriptionBadge';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { useApi } from '@/hooks/useApi';
@@ -274,6 +275,7 @@ function CustomersContent() {
 
   return (
     <div className="page-content">
+      <PendingVerificationsPanel />
       <div className="page-header">
         <div>
           <h1>Customers & Subscriptions</h1>
@@ -607,6 +609,9 @@ function CustomersContent() {
                         <button type="button" className="btn-sm" onClick={() => setSelectedId(c.id)}>
                           Manage
                         </button>
+                        <Link href={`/control-room/sites/${c.id}`} className="btn-sm">
+                          Site
+                        </Link>
                       </td>
                     </tr>
                   );

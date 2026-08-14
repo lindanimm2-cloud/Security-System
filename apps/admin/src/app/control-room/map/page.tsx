@@ -10,6 +10,7 @@ import { io, Socket } from 'socket.io-client';
 import { CallActions, DispatchLineButton } from '@/components/calls/CallActions';
 import { ControlRoomLayout } from '@/components/control-room/ControlRoomLayout';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
+import { OpsMenuDropdown } from '@/components/ops/OpsMenuDropdown';
 import {
   DEFAULT_VISIBILITY,
   type IncidentCategory,
@@ -314,6 +315,56 @@ function MapContent() {
   if (error) return <ErrorAlert error={error} onRetry={reload} />;
   if (!mapData) return null;
 
+  const layerItems = (
+    [
+      ['clients', 'Clients'],
+      ['officers', 'Officers'],
+      ['fleet', 'Fleet'],
+      ['vehicles', 'Client vehicles'],
+      ['incidents', 'Incidents'],
+      ['properties', 'Properties'],
+      ['trails', 'Trails'],
+    ] as const
+  ).map(([key, label]) => ({
+    id: key,
+    label,
+    active: visibility[key],
+    onClick: () => toggleVisibility(key),
+  }));
+
+  const actionItems = [
+    {
+      id: 'theft',
+      label: 'Theft Recovery',
+      active: theftRecoveryMode,
+      tone: 'danger' as const,
+      onClick: () => setTheftRecoveryMode((v) => !v),
+    },
+    {
+      id: 'replay',
+      label: 'Replay Trail',
+      active: replayActive,
+      onClick: () => setReplayActive((v) => !v),
+    },
+    {
+      id: 'overview',
+      label: 'Return to Overview',
+      onClick: returnToOverview,
+    },
+    {
+      id: 'fullscreen',
+      label: fullscreen ? 'Exit Fullscreen' : 'Fullscreen',
+      onClick: toggleFullscreen,
+    },
+    {
+      id: 'refresh',
+      label: 'Refresh map data',
+      onClick: () => void reload({ silent: true }),
+    },
+  ];
+
+  const layersOn = layerItems.filter((i) => i.active).length;
+
   return (
     <div className={`command-centre ${fullscreen ? 'command-centre--fullscreen' : ''}`}>
       <div className="command-centre__toolbar">
@@ -321,61 +372,64 @@ function MapContent() {
           <input
             type="search"
             className="command-search"
-            placeholder="Search clients, officers, vehicles, incidents..."
+            placeholder="Search map…"
+            aria-label="Search clients, officers, vehicles, incidents"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
-          <div className="command-filters">
-            {(
-              [
-                ['clients', 'Clients'],
-                ['officers', 'Officers'],
-                ['fleet', 'Fleet'],
-                ['vehicles', 'Client vehicles'],
-                ['incidents', 'Incidents'],
-                ['properties', 'Properties'],
-                ['trails', 'Trails'],
-              ] as const
-            ).map(([key, label]) => (
+          <div className="command-filters command-filters--desktop">
+            {layerItems.map((item) => (
               <button
-                key={key}
+                key={item.id}
                 type="button"
-                className={`command-filter ${visibility[key] ? 'command-filter--on' : ''}`}
-                onClick={() => toggleVisibility(key)}
+                className={`command-filter ${item.active ? 'command-filter--on' : ''}`}
+                onClick={item.onClick}
               >
-                {label}
+                {item.label}
               </button>
             ))}
+          </div>
+          <div className="command-filters-mobile">
+            <OpsMenuDropdown
+              label="Layers"
+              summary={`${layersOn}/${layerItems.length}`}
+              items={layerItems}
+            />
           </div>
         </div>
         <div className="command-centre__toolbar-right">
           <DispatchLineButton phone="+27860000000" name="4DS Dispatch" />
-          <button
-            type="button"
-            className={`command-btn ${theftRecoveryMode ? 'command-btn--active' : ''}`}
-            onClick={() => setTheftRecoveryMode((v) => !v)}
-          >
-            Theft Recovery
-          </button>
-          <button
-            type="button"
-            className={`command-btn ${replayActive ? 'command-btn--active' : ''}`}
-            onClick={() => setReplayActive((v) => !v)}
-          >
-            Replay Trail
-          </button>
-          <button type="button" className="command-btn" onClick={returnToOverview}>
-            Return to Overview
-          </button>
-          <button type="button" className="command-btn" onClick={toggleFullscreen}>
-            {fullscreen ? 'Exit Fullscreen' : 'Fullscreen'}
-          </button>
+          <div className="command-actions--desktop">
+            <button
+              type="button"
+              className={`command-btn ${theftRecoveryMode ? 'command-btn--active' : ''}`}
+              onClick={() => setTheftRecoveryMode((v) => !v)}
+            >
+              Theft Recovery
+            </button>
+            <button
+              type="button"
+              className={`command-btn ${replayActive ? 'command-btn--active' : ''}`}
+              onClick={() => setReplayActive((v) => !v)}
+            >
+              Replay Trail
+            </button>
+            <button type="button" className="command-btn" onClick={returnToOverview}>
+              Return to Overview
+            </button>
+            <button type="button" className="command-btn" onClick={toggleFullscreen}>
+              {fullscreen ? 'Exit Fullscreen' : 'Fullscreen'}
+            </button>
+            <button type="button" className="btn-ghost" onClick={() => void reload({ silent: true })}>
+              Refresh
+            </button>
+          </div>
+          <div className="command-actions-mobile">
+            <OpsMenuDropdown label="Actions" align="right" items={actionItems} />
+          </div>
           <span className={`badge ${liveConnected ? 'badge--live' : ''}`}>
             {liveConnected ? 'LIVE' : 'Connecting'}
           </span>
-          <button type="button" className="btn-ghost" onClick={() => void reload({ silent: true })}>
-            Refresh
-          </button>
         </div>
       </div>
 

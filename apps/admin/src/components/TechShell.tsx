@@ -12,6 +12,8 @@ import { ThemeToggle } from './ThemeToggle';
 import { roleDisplayLabel } from '@/lib/role-labels';
 import { MobileBottomNav } from './nav/MobileBottomNav';
 import { techApi, type ApiResponse } from '@/lib/api-client';
+import { useSidebarCollapsed } from '@/hooks/useSidebarCollapsed';
+import { SidebarCollapseButton, SignOutIcon } from './nav/SidebarCollapseButton';
 
 export function TechShell({
   session,
@@ -26,6 +28,7 @@ export function TechShell({
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
   const [activeJobs, setActiveJobs] = useState(0);
+  const { collapsed, toggle } = useSidebarCollapsed();
 
   useEffect(() => {
     let cancelled = false;
@@ -105,31 +108,45 @@ export function TechShell({
         />
       )}
 
-      <aside className={`officer-sidebar ${menuOpen ? 'officer-sidebar--open' : ''}`}>
+      <aside
+        className={`officer-sidebar ${menuOpen ? 'officer-sidebar--open' : ''} ${collapsed ? 'sidebar--collapsed' : ''}`}
+      >
         <div className="officer-sidebar-brand">
-          <BrandMark variant="officer" />
+          <BrandMark variant="officer" compact={collapsed} showProduct={!collapsed} />
+          <SidebarCollapseButton collapsed={collapsed} onClick={toggle} />
         </div>
         <nav className="officer-sidebar-nav">
           {TECH_NAV.map((item) => (
             <Link
               key={item.href}
               href={item.href}
+              title={item.label}
+              aria-label={item.label}
               className={`officer-sidebar-link ${isActive(item.href, item.exact) ? 'officer-sidebar-link--active' : ''}`}
             >
-              <NavIcon name={item.icon} />
-              <span>{item.label}</span>
+              <span className="sidebar-link__icon">
+                <NavIcon name={item.icon} size={collapsed ? 20 : 18} />
+              </span>
+              <span className="sidebar-link__label">{item.label}</span>
             </Link>
           ))}
         </nav>
         <div className="officer-sidebar-footer">
-          <div className="officer-sidebar-user">
+          <div className="officer-sidebar-user sidebar-user-copy">
             {session.user.firstName} {session.user.lastName}
           </div>
-          <span className="officer-sidebar-role">
+          <span className="officer-sidebar-role sidebar-user-copy">
             {session.user.jobTitle || roleDisplayLabel(session.user.role)}
           </span>
-          <button type="button" className="btn-ghost btn-ghost--full" onClick={logout}>
-            Sign out
+          <button
+            type="button"
+            className="btn-ghost btn-ghost--full sidebar-signout"
+            onClick={logout}
+            title="Sign out"
+            aria-label="Sign out"
+          >
+            <SignOutIcon />
+            <span>Sign out</span>
           </button>
         </div>
       </aside>

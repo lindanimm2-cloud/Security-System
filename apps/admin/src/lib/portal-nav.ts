@@ -20,12 +20,16 @@ export const PORTAL_NAV: PortalNavSection[] = [
   {
     title: 'Overview',
     icon: 'overview',
-    items: [{ href: '/portal', label: 'Dashboard', icon: 'dashboard', exact: true }],
+    items: [
+      { href: '/portal', label: 'Dashboard', icon: 'dashboard', exact: true },
+      { href: '/portal/chat', label: 'Control Room Chat', icon: 'dispatch-chat' },
+    ],
   },
   {
     title: 'Emergency',
     icon: 'emergency',
     items: [
+      { href: '/portal/protect', label: 'Protect', icon: 'emergency', requiresAccess: 'emergency' },
       { href: '/portal/emergency', label: 'Emergency Hub', icon: 'emergency', requiresAccess: 'emergency' },
       { href: '/portal/contacts', label: 'Emergency Contacts', icon: 'contacts', requiresAccess: 'emergency' },
       { href: '/portal/medical', label: 'Medical', icon: 'medical', requiresAccess: 'medical' },
@@ -65,6 +69,7 @@ export const PORTAL_NAV: PortalNavSection[] = [
     icon: 'account',
     items: [
       { href: '/portal/subscription', label: 'Subscription', icon: 'subscription' },
+      { href: '/portal/billing', label: 'Billing & Documents', icon: 'subscription' },
       { href: '/portal/subscription/upgrade', label: 'Upgrade Plan', icon: 'upgrade' },
       { href: '/portal/updates', label: 'Security Updates', icon: 'updates' },
       { href: '/portal/profile', label: 'Profile', icon: 'profile' },
@@ -107,6 +112,7 @@ export function filterPortalNav(
 export function portalPathRequiresAccess(pathname: string): keyof AccessMap | null {
   const segment = pathname.replace(/^\/portal\/?/, '').split('/')[0] || '';
   const rules: Record<string, keyof AccessMap> = {
+    protect: 'emergency',
     emergency: 'emergency',
     contacts: 'emergency',
     incidents: 'emergency',
@@ -133,9 +139,9 @@ const PORTAL_MOBILE_PREFERRED: Array<{
   requiresAccess?: keyof AccessMap;
 }> = [
   { href: '/portal', mobileLabel: 'Home', icon: 'home', exact: true },
-  { href: '/portal/emergency', mobileLabel: 'SOS', icon: 'emergency', requiresAccess: 'emergency' },
+  { href: '/portal/protect', mobileLabel: 'Protect', icon: 'emergency', requiresAccess: 'emergency' },
   { href: '/portal/family', mobileLabel: 'Family', icon: 'family', requiresAccess: 'family' },
-  { href: '/portal/home', mobileLabel: 'Home Sec', icon: 'safe-zones', requiresAccess: 'home' },
+  { href: '/portal/home', mobileLabel: 'Security', icon: 'safe-zones', requiresAccess: 'home' },
   { href: '/portal/profile', mobileLabel: 'Account', icon: 'profile' },
 ];
 

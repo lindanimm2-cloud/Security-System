@@ -6,6 +6,7 @@ import { useState } from 'react';
 import { ErrorAlert } from '@/components/ErrorAlert';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { PortalLayout } from '@/components/portal/PortalLayout';
+import { CctvLiveFeed } from '@/components/portal/CctvLiveFeed';
 import { SensorZonePanel, type SensorRow } from '@/components/portal/SensorZonePanel';
 import { useSubscriptionAccess } from '@/hooks/useSubscriptionAccess';
 import { useApi } from '@/hooks/useApi';
@@ -246,7 +247,7 @@ function SiteContent() {
 
       <section className="portal-card">
         <div className="card-header-row">
-          <h2>Cameras</h2>
+          <h2>Live cameras</h2>
           <span className="text-muted">{site.cameras.length} channel{site.cameras.length === 1 ? '' : 's'}</span>
         </div>
         {site.cameras.length === 0 ? (
@@ -254,27 +255,42 @@ function SiteContent() {
         ) : (
           <div className="camera-grid camera-grid--detail">
             {site.cameras.map((c) => (
-              <div key={c.id} className="camera-tile">
-                <div className={`camera-tile__feed camera-tile__feed--${c.status.toLowerCase()}`}>
-                  {c.snapshotUrl ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={c.snapshotUrl} alt={c.name} className="camera-tile__img" />
-                  ) : null}
-                  <span className="camera-tile__live">
-                    {c.isLiveCapable ? 'LIVE' : 'CH'} {c.channel}
-                  </span>
-                  {c.isInterior && (
-                    <span className="camera-tile__badge">Interior</span>
-                  )}
-                  <span className="camera-tile__name">{c.name}</span>
-                </div>
-                <span className="camera-tile__meta">
-                  {c.locationLabel} · {c.status.replace(/_/g, ' ')}
-                  {c.isInterior && !site.shareInteriorCameras ? ' · private to staff' : ''}
-                </span>
-              </div>
+              <CctvLiveFeed
+                key={c.id}
+                camera={{
+                  ...c,
+                  isInterior: c.isInterior,
+                }}
+                featured={c.channel === 1}
+              />
             ))}
           </div>
+        )}
+      </section>
+
+      <section className="portal-card">
+        <div className="card-header-row">
+          <h2>Camera details</h2>
+        </div>
+        {site.cameras.length === 0 ? (
+          <p className="text-muted">No cameras linked to this property yet.</p>
+        ) : (
+          <ul className="status-list">
+            {site.cameras.map((c) => (
+              <li key={c.id} className="status-list-item">
+                <div>
+                  <strong>{c.name}</strong>
+                  <p className="text-muted" style={{ margin: '0.15rem 0 0' }}>
+                    CH {c.channel} · {c.locationLabel} · {c.status.replace(/_/g, ' ')}
+                    {c.isInterior && !site.shareInteriorCameras ? ' · private to staff' : ''}
+                  </p>
+                </div>
+                <span className={`status-pill status-pill--${c.status.toLowerCase()}`}>
+                  {c.isLiveCapable ? 'Live' : 'Snapshot'}
+                </span>
+              </li>
+            ))}
+          </ul>
         )}
       </section>
 

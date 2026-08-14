@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { FormEvent, useEffect, useState } from 'react';
 import {
   AuthPortal,
@@ -9,6 +9,7 @@ import {
   oauthClientSignIn,
 } from '@/lib/auth';
 import { friendlyErrorMessage } from '@/lib/friendly-error';
+import { adminHomeForRole } from '@/lib/admin-home';
 import { BrandMark } from './BrandMark';
 import { ButtonSpinner } from './ButtonSpinner';
 import { LoadingSpinner } from './LoadingSpinner';
@@ -47,16 +48,21 @@ export function LoginForm({
   demoEmail,
 }: LoginFormProps) {
   const router = useRouter();
-  const [email, setEmail] = useState(
+  const searchParams = useSearchParams();
+  const asDeveloper = portal === 'admin' && searchParams.get('as') === 'developer';
+  const presetEmail =
+    demoEmail ??
     defaultEmail ??
-      (portal === 'admin'
+    (asDeveloper
+      ? 'developer@4ds.local'
+      : portal === 'admin'
         ? 'admin@demo.local'
         : portal === 'officer'
           ? 'ndlovu@4ds.local'
           : portal === 'technician'
             ? 'tech.cameras@4ds.local'
-            : 'client@demo.local'),
-  );
+            : 'client@demo.local');
+  const [email, setEmail] = useState(presetEmail);
   const [password, setPassword] = useState('Demo123!');
   const [tenantSlug, setTenantSlug] = useState('demo');
   const [remember, setRemember] = useState(false);
@@ -90,7 +96,7 @@ export function LoginForm({
     setError('');
     setLoading(true);
     try {
-      await login(portal, email, password, tenantSlug, {
+      const session = await login(portal, email, password, tenantSlug, {
         authSource: portal === 'client' ? 'portal' : undefined,
       });
       if (remember) {
@@ -99,7 +105,7 @@ export function LoginForm({
         localStorage.removeItem(REMEMBER_KEY);
       }
       setRedirecting(true);
-      router.push(redirectTo);
+      router.push(portal === 'admin' ? adminHomeForRole(session.user.role) : redirectTo);
       router.refresh();
     } catch (err) {
       setError(friendlyErrorMessage(err, 'login'));
@@ -169,8 +175,12 @@ export function LoginForm({
             <SketchIcon name="shield" size={28} />
           </div>
           <div className="login-brand login-brand--v2">
-            <h1>{title}</h1>
-            <p>{subtitle}</p>
+            <h1>{asDeveloper ? 'Developer sign-in' : title}</h1>
+            <p>
+              {asDeveloper
+                ? 'Platform developer access — error desk, ops visibility, and support chat.'
+                : subtitle}
+            </p>
           </div>
 
           {portal === 'client' && (
@@ -387,9 +397,29 @@ export function LoginForm({
           </div>
 
           <div className="login-demo-hint login-demo-hint--v2">
-            Demo: <code>{demoEmail ?? (portal === 'admin' ? 'admin@demo.local' : portal === 'officer' ? 'ndlovu@4ds.local' : 'client@demo.local')}</code>
+            Demo:{' '}
+            <code>
+              {demoEmail ??
+                (asDeveloper
+                  ? 'developer@4ds.local'
+                  : portal === 'admin'
+                    ? 'admin@demo.local'
+                    : portal === 'officer'
+                      ? 'ndlovu@4ds.local'
+                      : 'client@demo.local')}
+            </code>
             {' / '}<code>Demo123!</code>
-            {portal === 'client' && <> · org <code>demo</code></>}
+            {portal !== 'client' && (
+              <>
+                {' · '}org <code>demo</code>
+              </>
+            )}
+            {asDeveloper && (
+              <>
+                {' · '}
+                <Link href="/control-room/profile">Developer profile</Link>
+              </>
+            )}
           </div>
           </>
           )}

@@ -32,9 +32,14 @@ export function DispatchMiniMenu({
 
     function place() {
       const rect = anchorRef.current!.getBoundingClientRect();
-      const width = 360;
+      const width = Math.min(360, window.innerWidth - 24);
       const left = Math.max(12, Math.min(rect.left, window.innerWidth - width - 12));
-      const top = rect.bottom + 8;
+      const maxHeight = Math.min(window.innerHeight * 0.7, 520);
+      const below = rect.bottom + 8;
+      const top =
+        below + Math.min(280, maxHeight) > window.innerHeight - 16
+          ? Math.max(12, window.innerHeight - maxHeight - 16)
+          : below;
       setPosition({ top, left });
     }
 
@@ -50,7 +55,7 @@ export function DispatchMiniMenu({
   useEffect(() => {
     if (!open) return;
 
-    function onPointerDown(event: MouseEvent) {
+    function onPointerDown(event: Event) {
       const target = event.target as Node;
       if (
         panelRef.current?.contains(target) ||
@@ -66,9 +71,11 @@ export function DispatchMiniMenu({
     }
 
     document.addEventListener('mousedown', onPointerDown);
+    document.addEventListener('touchstart', onPointerDown, { passive: true });
     document.addEventListener('keydown', onKeyDown);
     return () => {
       document.removeEventListener('mousedown', onPointerDown);
+      document.removeEventListener('touchstart', onPointerDown);
       document.removeEventListener('keydown', onKeyDown);
     };
   }, [open, onClose, anchorRef]);
@@ -76,20 +83,28 @@ export function DispatchMiniMenu({
   if (!mounted || !open) return null;
 
   return createPortal(
-    <div
-      ref={panelRef}
-      className="dispatch-mini-menu"
-      style={{ top: position.top, left: position.left }}
-      role="dialog"
-      aria-label="Dispatch officer menu"
-    >
-      <DispatchOfficerMenuContent
-        incidentId={incidentId}
-        compact
-        onAssigned={onAssigned}
-        onClose={onClose}
+    <>
+      <button
+        type="button"
+        className="ops-menu__scrim"
+        aria-label="Close dispatch menu"
+        onClick={onClose}
       />
-    </div>,
+      <div
+        ref={panelRef}
+        className="dispatch-mini-menu"
+        style={{ top: position.top, left: position.left }}
+        role="dialog"
+        aria-label="Dispatch officer menu"
+      >
+        <DispatchOfficerMenuContent
+          incidentId={incidentId}
+          compact
+          onAssigned={onAssigned}
+          onClose={onClose}
+        />
+      </div>
+    </>,
     document.body,
   );
 }

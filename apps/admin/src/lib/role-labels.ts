@@ -12,6 +12,8 @@ export const ROLE_DISPLAY_LABELS: Record<string, string> = {
   SALES: 'Sales',
   TECHNICIAN: 'Technician',
   DEVELOPER: 'Developer',
+  MEDICAL_DISPATCHER: 'Medical Dispatcher',
+  MEDICAL_CREW: 'Medical Crew',
 };
 
 export function roleDisplayLabel(role: string | null | undefined): string {

@@ -11,6 +11,8 @@ import {
   LoyaltySummaryCard,
   type LoyaltySummary,
 } from '@/components/loyalty/LoyaltySummaryCard';
+import { BillingDocuments } from '@/components/portal/BillingDocuments';
+import { DebitOrderSetup } from '@/components/portal/DebitOrderSetup';
 import { PortalLayout } from '@/components/portal/PortalLayout';
 import { useApi } from '@/hooks/useApi';
 import { clientApi, type ApiResponse } from '@/lib/api-client';
@@ -102,9 +104,18 @@ function SubscriptionContent() {
   if (loading) return <LoadingSpinner label="Loading subscription..." fullScreen />;
   if (error) return <ErrorAlert error={error} onRetry={reload} />;
 
-  const p = data!.data;
-  const c = p.current;
+  const p = data?.data;
+  const c = p?.current;
   const payments = paymentsRes?.data ?? [];
+
+  if (!p || !c) {
+    return (
+      <ErrorAlert
+        error="Subscription details are unavailable right now."
+        onRetry={reload}
+      />
+    );
+  }
 
   return (
     <div className="page-content page-content--wide">
@@ -113,7 +124,10 @@ function SubscriptionContent() {
           <h1>Subscription & Billing</h1>
           <p className="text-muted">Manage your plan, add-ons, and payments via PayFast.</p>
         </div>
-        <Link href="/portal/subscription/upgrade" className="btn-primary">View upgrades</Link>
+        <div className="btn-row">
+          <Link href="/portal/subscription/upgrade" className="btn-primary">View upgrades</Link>
+          <Link href="/portal/billing" className="btn-secondary">Billing &amp; documents</Link>
+        </div>
       </div>
 
       {c.isOverdue && (
@@ -151,6 +165,9 @@ function SubscriptionContent() {
       {c.loyalty && (
         <LoyaltySummaryCard loyalty={c.loyalty} onUpdated={() => reload()} />
       )}
+
+      <DebitOrderSetup />
+      <BillingDocuments />
 
       <div className="portal-card">
         <div className="card-header-row">

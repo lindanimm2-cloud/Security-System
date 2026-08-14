@@ -12,6 +12,8 @@ const DEVELOPER_CONTACT_ROLES = new Set([
   'SALES',
   'TECHNICIAN',
   'DEVELOPER',
+  'MEDICAL_DISPATCHER',
+  'MEDICAL_CREW',
 ]);
 
 export function canNotifyDeveloper(role: string | null | undefined): boolean {

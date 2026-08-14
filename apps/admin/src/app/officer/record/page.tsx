@@ -121,11 +121,25 @@ function RecordContent() {
       if (previewType === 'photo' && previewFile.size < 4_000_000) {
         dataUrl = await fileToDataUrl(previewFile);
       }
+      let gps: { lat: number; lng: number } | null = null;
+      if (typeof navigator !== 'undefined' && navigator.geolocation) {
+        gps = await new Promise((resolve) => {
+          navigator.geolocation.getCurrentPosition(
+            (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+            () => resolve(null),
+            { timeout: 4000 },
+          );
+        });
+      }
+      const capturedAt = new Date().toISOString();
       await officerApi.post('/officer/evidence', {
         fileName: previewFile.name,
         fileType: previewFile.type,
-        title: `Field ${previewType} — ${new Date().toLocaleString('en-ZA')}`,
+        title: `Field ${previewType} — ${new Date(capturedAt).toLocaleString('en-ZA')}`,
         incidentId: assignment?.incidentId,
+        capturedAt,
+        lat: gps?.lat ?? null,
+        lng: gps?.lng ?? null,
         dataUrl,
         fileSizeKb: Math.round(previewFile.size / 1024),
       });
@@ -247,6 +261,11 @@ function RecordContent() {
       {mode === 'preview' && previewUrl && (
         <section className="officer-record__preview portal-card">
           <h2>Review capture</h2>
+          <p className="text-muted" style={{ fontSize: '0.8rem' }}>
+            Metadata · {new Date().toLocaleString('en-ZA')}
+            {assignment?.incidentId ? ` · incident ${assignment.incidentId}` : ' · no incident linked'}
+            {' · GPS attached if permitted'}
+          </p>
           {previewType === 'photo' ? (
             <img src={previewUrl} alt="Captured evidence" className="officer-record__preview-media" />
           ) : (

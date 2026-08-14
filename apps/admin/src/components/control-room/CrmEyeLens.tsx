@@ -92,6 +92,7 @@ type Insight = {
 
 const HIDDEN_KEY = 'crm-eye-lens-hidden';
 const POS_KEY = 'crm-eye-lens-pos';
+const MODE_KEY = 'crm-eye-lens-mode';
 
 function startOfDay(d = new Date()) {
   return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
@@ -209,6 +210,14 @@ function IconDrag() {
   );
 }
 
+function IconExpand() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden>
+      <path d="M8 3H3v5M16 3h5v5M8 21H3v-5M16 21h5v-5" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
 function Badge({ count }: { count: number }) {
   if (count <= 0) return null;
   return <span className="eye-lens__badge">{count > 99 ? '99+' : count}</span>;
@@ -217,15 +226,19 @@ function Badge({ count }: { count: number }) {
 export function CrmEyeLens() {
   const router = useRouter();
   const barRef = useRef<HTMLDivElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef<{ ox: number; oy: number; px: number; py: number } | null>(null);
 
   const [hidden, setHidden] = useState(false);
   const [ready, setReady] = useState(false);
   const [open, setOpen] = useState(false);
+  const [mini, setMini] = useState(true);
   const [tab, setTab] = useState<PanelTab>('intel');
   const [query, setQuery] = useState('');
   const [pos, setPos] = useState<{ x: number; y: number } | null>(null);
+  const [barMetrics, setBarMetrics] = useState({ height: 56, bottom: 20 });
   const autoOpenedRef = useRef(false);
+  const firstName = getSession('admin')?.user.firstName ?? 'Operator';
 
   const { data: dashRes, reload: reloadDash } = useApi(
     () => softGet<ApiResponse<DashboardLite>>('/control-room/dashboard'),
@@ -258,6 +271,12 @@ export function CrmEyeLens() {
   useEffect(() => {
     try {
       setHidden(sessionStorage.getItem(HIDDEN_KEY) === '1');
+      const savedMode = localStorage.getItem(MODE_KEY);
+      if (savedMode === 'bar' || savedMode === 'mini') {
+        setMini(savedMode === 'mini');
+      } else {
+        setMini(window.matchMedia('(max-width: 900px)').matches);
+      }
       const raw = localStorage.getItem(POS_KEY);
       if (raw) {
         const parsed = JSON.parse(raw) as { x: number; y: number };
@@ -295,18 +314,70 @@ export function CrmEyeLens() {
     [dash],
   );
 
-  /** Auto-open critical quick-action menu once when life-safety appears. */
+  /** Auto-open critical menu once on desktop; mobile stays badge-first to reduce clutter. */
   useEffect(() => {
     if (hidden || !ready) return;
     if (criticals > 0 && !autoOpenedRef.current) {
       autoOpenedRef.current = true;
       setTab('intel');
-      setOpen(true);
+      const isMobile = window.matchMedia('(max-width: 900px)').matches;
+      if (!isMobile) setOpen(true);
     }
     if (criticals === 0) {
       autoOpenedRef.current = false;
     }
   }, [criticals, hidden, ready]);
+
+  /** Keep the intel panel above the floating bar so hot incidents are not covered. */
+  useEffect(() => {
+    const el = barRef.current;
+    if (!el) return;
+
+    function measure() {
+      const node = barRef.current;
+      if (!node) return;
+      const rect = node.getBoundingClientRect();
+      setBarMetrics({
+        height: rect.height,
+        bottom: Math.max(0, window.innerHeight - rect.bottom),
+      });
+    }
+
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    window.addEventListener('resize', measure);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener('resize', measure);
+    };
+  }, [ready, hidden, mini, open, criticals]);
+
+  /** Close panel when pressing outside it (scrim + pointer outside toolbar/panel). */
+  useEffect(() => {
+    if (!open) return;
+
+    function onPointerDown(event: MouseEvent | TouchEvent) {
+      const target = event.target as Node | null;
+      if (!target) return;
+      if (panelRef.current?.contains(target)) return;
+      if (barRef.current?.contains(target)) return;
+      setOpen(false);
+    }
+
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') setOpen(false);
+    }
+
+    document.addEventListener('mousedown', onPointerDown);
+    document.addEventListener('touchstart', onPointerDown, { passive: true });
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', onPointerDown);
+      document.removeEventListener('touchstart', onPointerDown);
+      document.removeEventListener('keydown', onKeyDown);
+    };
+  }, [open]);
 
   const stats = salesRes?.data?.stats;
   const leads = salesRes?.data?.leads ?? [];
@@ -482,6 +553,15 @@ export function CrmEyeLens() {
     return { leads: leadHits, customers: customerHits };
   }, [query, leads, customers]);
 
+  const persistMode = useCallback((nextMini: boolean) => {
+    setMini(nextMini);
+    try {
+      localStorage.setItem(MODE_KEY, nextMini ? 'mini' : 'bar');
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
   const hide = useCallback(() => {
     setHidden(true);
     setOpen(false);
@@ -494,14 +574,14 @@ export function CrmEyeLens() {
 
   const restore = useCallback(() => {
     setHidden(false);
-    setOpen(true);
+    persistMode(true);
     setTab('intel');
     try {
       sessionStorage.removeItem(HIDDEN_KEY);
     } catch {
       /* ignore */
     }
-  }, []);
+  }, [persistMode]);
 
   function onDragStart(e: ReactPointerEvent<HTMLButtonElement>) {
     if (!barRef.current) return;
@@ -564,11 +644,20 @@ export function CrmEyeLens() {
       ? { left: pos.x, top: pos.y, right: 'auto', bottom: 'auto', transform: 'none' }
       : undefined;
 
+  const panelGap = 12;
+  const panelBottom =
+    pos != null
+      ? Math.max(
+          barMetrics.bottom + barMetrics.height + panelGap,
+          window.innerHeight - pos.y + panelGap,
+        )
+      : barMetrics.bottom + barMetrics.height + panelGap;
+
   return (
     <>
       <div
         ref={barRef}
-        className={`eye-lens ${open ? 'eye-lens--open' : ''} ${criticals > 0 ? 'eye-lens--hot' : ''}`}
+        className={`eye-lens ${mini ? 'eye-lens--mini' : ''} ${open ? 'eye-lens--open' : ''} ${criticals > 0 ? 'eye-lens--hot' : ''}`}
         style={barStyle}
         role="toolbar"
         aria-label="4DS Ops Lens"
@@ -588,7 +677,7 @@ export function CrmEyeLens() {
 
         <button
           type="button"
-          className={`eye-lens__tool eye-lens__tool--eye ${open && tab === 'intel' ? 'eye-lens__tool--active' : ''}`}
+          className={`eye-lens__tool eye-lens__tool--eye ${open && tab === 'intel' ? 'eye-lens__tool--active' : ''} ${criticals > 0 ? 'eye-lens__tool--critical' : ''}`}
           aria-pressed={open && tab === 'intel'}
           aria-label="Ops intel"
           title="Ops Eye"
@@ -600,10 +689,40 @@ export function CrmEyeLens() {
             }
           }}
         >
-          <IconEye active={open && tab === 'intel'} />
+          <IconEye active={(open && tab === 'intel') || criticals > 0} />
           <Badge count={criticals} />
         </button>
 
+        {mini ? (
+          <button
+            type="button"
+            className="eye-lens__copy"
+            aria-label={
+              criticals > 0
+                ? `${criticals} critical — expand tools`
+                : `Expand ops tools for ${firstName}`
+            }
+            title="Show ops tools"
+            onClick={() => {
+              persistMode(false);
+              if (criticals > 0) {
+                setTab('intel');
+                setOpen(true);
+              }
+            }}
+          >
+            <strong>{criticals > 0 ? `${criticals} critical` : firstName}</strong>
+            <span>
+              {criticals > 0
+                ? 'Needs action now'
+                : unread > 0
+                  ? `${unread} update${unread === 1 ? '' : 's'} waiting`
+                  : `Here are your updates, ${firstName}.`}
+            </span>
+          </button>
+        ) : null}
+
+        <div className="eye-lens__tools">
         <button
           type="button"
           className={`eye-lens__tool ${open && tab === 'notify' ? 'eye-lens__tool--active-soft' : ''}`}
@@ -697,33 +816,58 @@ export function CrmEyeLens() {
         >
           <IconGear />
         </button>
+        </div>
 
-        <button
-          type="button"
-          className="eye-lens__close"
-          aria-label="Hide ops lens"
-          title="Hide"
-          onClick={hide}
-        >
-          ×
-        </button>
+        {mini ? (
+          <button
+            type="button"
+            className="eye-lens__expand"
+            aria-label="Expand ops tools"
+            title="Expand"
+            onClick={() => persistMode(false)}
+          >
+            <IconExpand />
+          </button>
+        ) : (
+          <button
+            type="button"
+            className="eye-lens__close"
+            aria-label="Collapse to mini view"
+            title="Mini view"
+            onClick={() => {
+              setOpen(false);
+              persistMode(true);
+            }}
+          >
+            ×
+          </button>
+        )}
       </div>
 
       {open && (
+        <>
+        <button
+          type="button"
+          className="eye-lens-scrim"
+          aria-label="Close quick actions"
+          onClick={() => setOpen(false)}
+        />
         <div
+          ref={panelRef}
           className={`eye-lens-panel ${criticals > 0 ? 'eye-lens-panel--critical' : ''}`}
-          style={
-            pos
+          style={{
+            bottom: panelBottom,
+            ...(pos
               ? {
                   left: Math.min(Math.max(12, pos.x), window.innerWidth - 360),
-                  bottom: Math.max(72, window.innerHeight - pos.y + 10),
                   top: 'auto',
                   right: 'auto',
                   transform: 'none',
                 }
-              : undefined
-          }
+              : undefined),
+          }}
           role="dialog"
+          aria-modal="true"
           aria-label="4DS Ops Lens"
         >
           <div className="eye-lens-panel__header">
@@ -918,6 +1062,7 @@ export function CrmEyeLens() {
             </div>
           )}
         </div>
+        </>
       )}
     </>
   );
