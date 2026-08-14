@@ -8,6 +8,7 @@ import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { PortalLayout } from '@/components/portal/PortalLayout';
 import { useApi } from '@/hooks/useApi';
 import { EmergencyCallButton } from '@/components/portal/EmergencyCallButton';
+import { useCallsOptional } from '@/components/calls/CallProvider';
 import { HomeAlarmControl } from '@/components/portal/HomeAlarmControl';
 import { clientApi, type ApiResponse } from '@/lib/api-client';
 import { friendlyErrorMessage } from '@/lib/friendly-error';
@@ -66,6 +67,7 @@ export default function ClientPortalPage() {
 }
 
 function OverviewDashboard() {
+  const calls = useCallsOptional();
   const [panicLoading, setPanicLoading] = useState(false);
   const [silentLoading, setSilentLoading] = useState(false);
   const [medicalLoading, setMedicalLoading] = useState(false);
@@ -146,6 +148,20 @@ function OverviewDashboard() {
         `${c.name} ${c.relationship ?? ''}`.toLowerCase().includes('dispatch'),
       )?.phone ??
       '+27110000000';
+    const name = contactsPayload?.meta?.dispatchLine?.name ?? '4DS Control Room';
+    if (calls?.portal) {
+      try {
+        await calls.startCall('DISPATCH_LINE', {
+          name,
+          phone,
+          role: 'DISPATCH',
+        });
+        return;
+      } catch (e) {
+        setAlertMsg(friendlyErrorMessage(e, 'call'));
+        return;
+      }
+    }
     window.location.href = `tel:${phone}`;
   }
 
@@ -180,14 +196,18 @@ function OverviewDashboard() {
           statusLine={d.user.address ? `Location · ${d.user.address}` : 'Location sharing on'}
           actions={
             <>
-              <Link href="/portal/protect" className="btn-sm btn-primary">
-                Protect controls
+              <Link href="/portal/protect" className="emergency-mode__btn">
+                Protect
               </Link>
-              <Link href="/portal/incidents" className="btn-sm btn-sm--link">
-                View response
+              <Link href="/portal/incidents" className="emergency-mode__btn">
+                Response
               </Link>
-              <button type="button" className="btn-sm" onClick={() => void callDispatch()}>
-                Call control room
+              <button
+                type="button"
+                className="emergency-mode__btn emergency-mode__btn--call"
+                onClick={() => void callDispatch()}
+              >
+                Call dispatch
               </button>
             </>
           }

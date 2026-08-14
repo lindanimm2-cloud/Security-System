@@ -22,7 +22,6 @@ export function MiniCallSafetyBar({
 }) {
   const calls = useCallsOptional();
   const [callBusy, setCallBusy] = useState(false);
-  const [tipsOpen, setTipsOpen] = useState(false);
 
   const { data } = useApi(
     () =>
@@ -32,92 +31,60 @@ export function MiniCallSafetyBar({
 
   const dispatch = data?.meta?.dispatchLine ?? DEFAULT_DISPATCH;
 
-  const startCall = useCallback(
-    async (silent: boolean) => {
-      setCallBusy(true);
-      try {
-        if (silent) {
-          await clientApi.post('/client/panic', { silent: true });
-          await clientApi.post('/client/support/silent-call', {
-            phone: dispatch.phone,
-          });
-          onStatus?.('Silent safety call — dispatch notified discreetly.');
-        }
+  const startSilentCall = useCallback(async () => {
+    setCallBusy(true);
+    try {
+      await clientApi.post('/client/panic', { silent: true });
+      await clientApi.post('/client/support/silent-call', {
+        phone: dispatch.phone,
+      });
+      onStatus?.('Silent safety call — dispatch notified discreetly.');
 
-        if (calls) {
-          await calls.startCall('DISPATCH_LINE', {
-            name: dispatch.name,
-            phone: dispatch.phone,
-            role: 'DISPATCH',
-          });
-          if (!silent) onStatus?.('Connecting to control room…');
-        } else {
-          window.location.href = `tel:${dispatch.phone}`;
-        }
-      } catch (err) {
-        onStatus?.(friendlyErrorMessage(err, 'call'));
-        if (!calls) window.location.href = `tel:${dispatch.phone}`;
-      } finally {
-        setCallBusy(false);
+      if (calls?.portal) {
+        await calls.startCall('DISPATCH_LINE', {
+          name: dispatch.name,
+          phone: dispatch.phone,
+          role: 'DISPATCH',
+        });
+      } else {
+        window.location.href = `tel:${dispatch.phone}`;
       }
-    },
-    [calls, dispatch.name, dispatch.phone, onStatus],
-  );
+    } catch (err) {
+      onStatus?.(friendlyErrorMessage(err, 'call'));
+      if (!calls?.portal) window.location.href = `tel:${dispatch.phone}`;
+    } finally {
+      setCallBusy(false);
+    }
+  }, [calls, dispatch.name, dispatch.phone, onStatus]);
 
   return (
     <div
-      className={`mini-call-safety ${variant === 'floating' ? 'mini-call-safety--floating' : 'mini-call-safety--inline'}`.trim()}
-      aria-label="Dispatch call and silent safety"
+      className={`silent-call-fab ${variant === 'inline' ? 'silent-call-fab--inline' : 'silent-call-fab--floating'}`}
     >
-      <div className="mini-call-safety__actions">
-        <button
-          type="button"
-          className="mini-call-safety__btn mini-call-safety__btn--call"
-          disabled={callBusy}
-          onClick={() => void startCall(false)}
-          title={`Call ${dispatch.name}`}
-        >
-          <PhoneIcon />
-          <span>{callBusy ? '…' : 'Call'}</span>
-        </button>
-
-        <HoldToActivate
-          label="Silent call"
-          holdLabel="Connecting…"
-          holdMs={1200}
-          tone="warn"
-          className="mini-call-safety__silent-hold"
-          disabled={callBusy}
-          loading={callBusy}
-          onActivate={() => startCall(true)}
-        />
-      </div>
-
-      <button
-        type="button"
-        className="mini-call-safety__tips-toggle"
-        aria-expanded={tipsOpen}
-        onClick={() => setTipsOpen((v) => !v)}
+      <HoldToActivate
+        label="Silent call"
+        holdLabel="Hold"
+        holdMs={1200}
+        tone="warn"
+        className="silent-call-fab__btn"
+        disabled={callBusy}
+        loading={callBusy}
+        onActivate={() => startSilentCall()}
       >
-        {tipsOpen ? 'Hide silent safety' : 'Silent call safety'}
-      </button>
-
-      {tipsOpen ? (
-        <ul className="mini-call-safety__tips">
-          <li>Hold <strong>Silent call</strong> — dispatch is alerted quietly before your line opens.</li>
-          <li>Your phone shows a normal call — no alarm sounds or panic screen.</li>
-          <li>GPS and your profile are shared with control room automatically.</li>
-          <li>Use earpiece and speak quietly if someone is nearby.</li>
-        </ul>
-      ) : null}
+        <span className="silent-call-fab__icon" aria-hidden>
+          <MutePhoneIcon />
+        </span>
+        <span className="silent-call-fab__text">{callBusy ? '…' : 'Silent'}</span>
+      </HoldToActivate>
     </div>
   );
 }
 
-function PhoneIcon() {
+function MutePhoneIcon() {
   return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
-      <path d="M6.62 10.79a15.05 15.05 0 006.59 6.59l2.2-2.2a1 1 0 011.01-.24 11.36 11.36 0 003.56.57 1 1 0 011 1V20a1 1 0 01-1 1A17 17 0 013 4a1 1 0 011-1h3.5a1 1 0 011 1 11.36 11.36 0 00.57 3.56 1 1 0 01-.25 1.01l-2.2 2.22z" />
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden>
+      <path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6A19.79 19.79 0 012.12 4.18 2 2 0 014.11 2h3a2 2 0 012 1.72c.13.96.36 1.9.7 2.81a2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.91.34 1.85.57 2.81.7A2 2 0 0122 16.92z" />
+      <path d="M3 3l18 18" />
     </svg>
   );
 }

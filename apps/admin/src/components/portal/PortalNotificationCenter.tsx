@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { io, Socket } from 'socket.io-client';
 import { useApi } from '@/hooks/useApi';
 import {
@@ -28,7 +29,13 @@ export function PortalNotificationCenter() {
   );
   const [open, setOpen] = useState(false);
   const [filter, setFilter] = useState<ClientNotificationFilter>('ALL');
+  const rootRef = useRef<HTMLDivElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const notifications = (data?.data?.notifications ?? []).map(enrichClientNotification);
   const unreadCount = data?.data?.unreadCount ?? 0;
@@ -77,37 +84,30 @@ export function PortalNotificationCenter() {
   }, [reload]);
 
   useEffect(() => {
+    if (!open) return;
     function onClickOutside(e: MouseEvent) {
-      if (panelRef.current && !panelRef.current.contains(e.target as Node)) {
-        setOpen(false);
-      }
+      const target = e.target as Node;
+      if (rootRef.current?.contains(target) || panelRef.current?.contains(target)) return;
+      setOpen(false);
     }
-    if (open) document.addEventListener('mousedown', onClickOutside);
-    return () => document.removeEventListener('mousedown', onClickOutside);
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape') setOpen(false);
+    }
+    document.addEventListener('mousedown', onClickOutside);
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', onClickOutside);
+      document.removeEventListener('keydown', onKeyDown);
+    };
   }, [open]);
 
-  return (
-    <div className="notification-center notification-center--portal" ref={panelRef}>
-      <button
-        type="button"
-        className="notification-bell notification-bell--portal"
-        onClick={() => setOpen((v) => !v)}
-        aria-label="Your notifications"
-        aria-expanded={open}
-      >
-        <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden>
-          <path
-            fill="currentColor"
-            d="M12 22a2.5 2.5 0 0 0 2.45-2h-4.9A2.5 2.5 0 0 0 12 22Zm7-6V11a7 7 0 0 0-5-6.71V4a2 2 0 1 0-4 0v.29A7 7 0 0 0 5 11v5l-2 2v1h18v-1l-2-2Z"
-          />
-        </svg>
-        {unreadCount > 0 && (
-          <span className="notification-badge">{unreadCount > 99 ? '99+' : unreadCount}</span>
-        )}
-      </button>
-
-      {open && (
-        <div className="notification-panel notification-panel--portal">
+  const panel = open ? (
+        <div
+          ref={panelRef}
+          className="notification-panel notification-panel--portal"
+          role="dialog"
+          aria-label="Your updates"
+        >
           <div className="notification-panel__header notification-panel__header--portal">
             <div className="notification-panel__header-text">
               <h3>Your updates</h3>
@@ -190,7 +190,41 @@ export function PortalNotificationCenter() {
             </Link>
           </div>
         </div>
-      )}
+  ) : null;
+
+  return (
+    <div className="notification-center notification-center--portal" ref={rootRef}>
+      <button
+        type="button"
+        className="notification-bell notification-bell--portal"
+        onClick={() => setOpen((v) => !v)}
+        aria-label="Your notifications"
+        aria-expanded={open}
+      >
+        <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden>
+          <path
+            fill="currentColor"
+            d="M12 22a2.5 2.5 0 0 0 2.45-2h-4.9A2.5 2.5 0 0 0 12 22Zm7-6V11a7 7 0 0 0-5-6.71V4a2 2 0 1 0-4 0v.29A7 7 0 0 0 5 11v5l-2 2v1h18v-1l-2-2Z"
+          />
+        </svg>
+        {unreadCount > 0 && (
+          <span className="notification-badge">{unreadCount > 99 ? '99+' : unreadCount}</span>
+        )}
+      </button>
+      {mounted && open
+        ? createPortal(
+            <>
+              <button
+                type="button"
+                className="notification-scrim"
+                aria-label="Close notifications"
+                onClick={() => setOpen(false)}
+              />
+              {panel}
+            </>,
+            document.body,
+          )
+        : null}
     </div>
   );
 }

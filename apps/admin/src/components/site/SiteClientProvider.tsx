@@ -77,12 +77,6 @@ export function SiteClientProvider({ children }: { children: ReactNode }) {
       await refresh();
       setReady(true);
     })();
-
-    function onStorage(e: StorageEvent) {
-      if (e.key === '4ds_client_session') void refresh();
-    }
-    window.addEventListener('storage', onStorage);
-    return () => window.removeEventListener('storage', onStorage);
   }, [refresh]);
 
   const signIn = useCallback(

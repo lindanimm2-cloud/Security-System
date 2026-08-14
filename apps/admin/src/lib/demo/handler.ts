@@ -629,6 +629,62 @@ function ok<T>(data: T) {
   return { success: true as const, data };
 }
 
+const DEMO_CALL_KEY = '4ds-demo-active-call';
+const DEMO_DISPATCHER = {
+  id: 'demo-user-dispatch-demo-local',
+  firstName: 'Lerato',
+  lastName: 'Dispatch',
+  role: 'DISPATCHER',
+};
+
+type DemoCallSession = {
+  id: string;
+  channel: string;
+  status: string;
+  targetName: string;
+  targetPhone: string | null;
+  targetRole: string | null;
+  targetUserId: string | null;
+  incidentId: string | null;
+  isMuted: boolean;
+  startedAt: string | null;
+  endedAt: string | null;
+  durationSec: number | null;
+  createdAt: string;
+  initiator: { id: string; firstName: string; lastName: string; role: string };
+  target: { id: string; firstName: string; lastName: string; role: string } | null;
+  notes: { id: string; content: string; noteType: string; authorName: string; createdAt: string }[];
+};
+
+function readDemoCall(): DemoCallSession | null {
+  try {
+    const raw = localStorage.getItem(DEMO_CALL_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw) as DemoCallSession;
+  } catch {
+    return null;
+  }
+}
+
+function writeDemoCall(call: DemoCallSession | null) {
+  try {
+    if (call) localStorage.setItem(DEMO_CALL_KEY, JSON.stringify(call));
+    else localStorage.removeItem(DEMO_CALL_KEY);
+    window.dispatchEvent(new Event('4ds-demo-call'));
+  } catch {
+    /* ignore */
+  }
+}
+
+function participantFromUser(user?: AuthSession['user'] | null) {
+  return {
+    id: user?.id ?? 'demo-user',
+    firstName: user?.firstName ?? 'Demo',
+    lastName: user?.lastName ?? 'User',
+    role: user?.role ?? 'USER',
+  };
+}
+
 function parsePath(path: string) {
   const [pathname, query = ''] = path.split('?');
   const clean = pathname.replace(/\/+$/, '') || '/';
@@ -654,6 +710,7 @@ export async function handleDemoRequest<T>({
   method,
   body,
   session,
+  portal,
 }: DemoRequest): Promise<T> {
   // Simulate slight network latency for realism
   await new Promise((r) => setTimeout(r, 120));
@@ -1602,32 +1659,152 @@ export async function handleDemoRequest<T>({
       unreadCount: 1,
     }) as T;
   }
+  if (clean === '/calls/directory' && m === 'GET') {
+    return ok({
+      dispatchLine: { name: '4DS Dispatch', phone: '+27110000000' },
+      officers: [
+        {
+          officerId: 'demo-off-1',
+          userId: 'demo-user-ndlovu-4ds-local',
+          name: 'Sipho Ndlovu',
+          status: 'AVAILABLE',
+          phone: '+27831110001',
+        },
+      ],
+      dispatchers: [
+        {
+          id: DEMO_DISPATCHER.id,
+          firstName: DEMO_DISPATCHER.firstName,
+          lastName: DEMO_DISPATCHER.lastName,
+          role: DEMO_DISPATCHER.role,
+          phone: '+27860000000',
+        },
+      ],
+      clients: [
+        {
+          id: 'demo-user-client-demo-local',
+          firstName: 'Nomsa',
+          lastName: 'Client',
+          phone: '+27821234567',
+          role: 'USER',
+        },
+      ],
+    }) as T;
+  }
   if (clean === '/calls/active' && m === 'GET') {
-    return ok(null) as T;
+    const call = readDemoCall();
+    if (!call || ['ENDED', 'DECLINED', 'MISSED'].includes(call.status)) {
+      return ok(null) as T;
+    }
+    const me = user?.id;
+    const isOps =
+      portal === 'admin' &&
+      call.channel === 'DISPATCH_LINE' &&
+      call.initiator.id !== me;
+    if (isOps) {
+      return ok({
+        ...call,
+        targetUserId: me ?? call.targetUserId,
+        target: participantFromUser(user),
+      }) as T;
+    }
+    if (me && call.initiator.id !== me && call.target?.id !== me) {
+      return ok(null) as T;
+    }
+    return ok(call) as T;
   }
   if (clean === '/calls' && m === 'POST') {
-    return ok({
+    const channel = String(payload.channel ?? 'DISPATCH_LINE');
+    const isClient =
+      (user?.role ?? '').toUpperCase() === 'USER' ||
+      (user?.role ?? '').toUpperCase() === 'CLIENT' ||
+      (user?.role ?? '').toUpperCase() === 'FAMILY_MEMBER' ||
+      portal === 'client';
+    const targetUserId =
+      typeof payload.targetUserId === 'string' && payload.targetUserId
+        ? payload.targetUserId
+        : channel === 'DISPATCH_LINE' && isClient
+          ? DEMO_DISPATCHER.id
+          : null;
+    const rings =
+      channel === 'INTERNAL' || (channel === 'DISPATCH_LINE' && Boolean(targetUserId));
+    const target =
+      targetUserId === DEMO_DISPATCHER.id
+        ? { ...DEMO_DISPATCHER }
+        : targetUserId
+          ? {
+              id: targetUserId,
+              firstName: String(payload.targetName ?? 'Contact').split(' ')[0] ?? 'Contact',
+              lastName: String(payload.targetName ?? '').split(' ').slice(1).join(' ') || 'Line',
+              role: String(payload.targetRole ?? 'CLIENT'),
+            }
+          : channel === 'DISPATCH_LINE'
+            ? { ...DEMO_DISPATCHER }
+            : null;
+    const call: DemoCallSession = {
       id: `demo-call-${Date.now()}`,
-      channel: payload.channel ?? 'DISPATCH_LINE',
-      status: 'RINGING',
-      startedAt: new Date().toISOString(),
-      muted: false,
-      onHold: false,
-      targetName: payload.targetName ?? '4DS Dispatch',
-      targetPhone: payload.targetPhone ?? '+27110000000',
-      targetRole: payload.targetRole ?? 'DISPATCH',
-    }) as T;
+      channel,
+      status: rings ? 'RINGING' : 'CONNECTED',
+      targetName:
+        String(payload.targetName ?? '') ||
+        (channel === 'DISPATCH_LINE' ? '4DS Control Room' : 'Contact'),
+      targetPhone: typeof payload.targetPhone === 'string' ? payload.targetPhone : '+27110000000',
+      targetRole: typeof payload.targetRole === 'string' ? payload.targetRole : 'DISPATCH',
+      targetUserId,
+      incidentId: typeof payload.incidentId === 'string' ? payload.incidentId : null,
+      isMuted: false,
+      startedAt: rings ? null : new Date().toISOString(),
+      endedAt: null,
+      durationSec: null,
+      createdAt: new Date().toISOString(),
+      initiator: participantFromUser(user),
+      target,
+      notes: [],
+    };
+    if (channel === 'DISPATCH_LINE' && isClient) {
+      call.targetName = '4DS Control Room';
+      call.targetRole = 'DISPATCH';
+      call.targetUserId = DEMO_DISPATCHER.id;
+      call.target = { ...DEMO_DISPATCHER };
+    }
+    writeDemoCall(call);
+    return ok(call) as T;
   }
-  if (clean.startsWith('/calls/') && (m === 'GET' || m === 'POST' || m === 'PATCH')) {
-    if (m === 'GET') return ok(null) as T;
-    return ok({
-      id: clean.split('/')[2] ?? 'demo-call',
-      status: clean.endsWith('/end') || clean.endsWith('/decline') ? 'ENDED' : 'ACTIVE',
-      startedAt: new Date().toISOString(),
-      muted: Boolean(payload.muted),
-      onHold: Boolean(payload.onHold),
-      demo: true,
-    }) as T;
+  {
+    const callMatch = clean.match(/^\/calls\/([^/]+)(?:\/(accept|decline|end|mute|hold|notes))?$/);
+    if (callMatch && (m === 'GET' || m === 'POST' || m === 'PATCH')) {
+      const action = callMatch[2];
+      const current = readDemoCall();
+      if (!current || current.id !== callMatch[1]) {
+        if (m === 'GET') return ok(null) as T;
+        return ok({ ok: true, demo: true }) as T;
+      }
+      if (action === 'accept') {
+        current.status = 'CONNECTED';
+        current.startedAt = new Date().toISOString();
+      } else if (action === 'decline' || action === 'end') {
+        current.status = action === 'decline' ? 'DECLINED' : 'ENDED';
+        current.endedAt = new Date().toISOString();
+      } else if (action === 'mute') {
+        current.isMuted = !current.isMuted;
+      } else if (action === 'hold') {
+        current.status = current.status === 'ON_HOLD' ? 'CONNECTED' : 'ON_HOLD';
+      } else if (action === 'notes' && m === 'POST') {
+        current.notes.push({
+          id: `note-${Date.now()}`,
+          content: String(payload.content ?? ''),
+          noteType: String(payload.noteType ?? 'NOTE'),
+          authorName: user ? `${user.firstName} ${user.lastName}`.trim() : 'Operator',
+          createdAt: new Date().toISOString(),
+        });
+      }
+      if (current.status === 'ENDED' || current.status === 'DECLINED') {
+        writeDemoCall(null);
+      } else {
+        writeDemoCall(current);
+      }
+      return ok(current) as T;
+    }
   }
 
   // Map / incident Dispatch menu — must not fall through to generic [] payload
@@ -1926,6 +2103,24 @@ export async function handleDemoRequest<T>({
   }
 
   if (clean.startsWith('/control-room/') && (m === 'GET' || m === 'POST' || m === 'PATCH' || m === 'DELETE')) {
+    if (clean === '/control-room/customers' && m === 'GET') {
+      return ok([
+        {
+          id: 'demo-user-client-demo-local',
+          firstName: 'Nomsa',
+          lastName: 'Client',
+          email: 'client@demo.local',
+          phone: '+27821234567',
+        },
+        {
+          id: 'demo-user-james-demo-local',
+          firstName: 'James',
+          lastName: 'Demo',
+          email: 'james@demo.local',
+          phone: '+27829876543',
+        },
+      ]) as T;
+    }
     if (clean === '/control-room/client-chats' && m === 'GET') {
       return ok(demoClientChatThreads()) as T;
     }

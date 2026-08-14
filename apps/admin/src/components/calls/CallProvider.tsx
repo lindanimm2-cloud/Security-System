@@ -51,6 +51,13 @@ function detectPortal(): AuthPortal | null {
   return null;
 }
 
+function isControlRoomIncoming(portal: AuthPortal | null, session: CallSession, me?: string) {
+  if (!me || session.initiator.id === me) return false;
+  if (session.status !== 'RINGING') return false;
+  if (session.target?.id === me) return true;
+  return portal === 'admin' && session.channel === 'DISPATCH_LINE';
+}
+
 export function CallProvider({ children }: { children: React.ReactNode }) {
   const [portal, setPortal] = useState<AuthPortal | null>(null);
   const [activeCall, setActiveCall] = useState<CallSession | null>(null);
@@ -65,8 +72,16 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
   const loadActive = useCallback(async (p: AuthPortal) => {
     try {
       const res = await apiForPortal(p).get<ApiResponse<CallSession | null>>('/calls/active');
-      if (res.data && ['RINGING', 'CONNECTED', 'ON_HOLD'].includes(res.data.status)) {
-        setActiveCall(res.data);
+      const session = res.data;
+      const me = getSession(p)?.user.id;
+      if (session && isControlRoomIncoming(p, session, me)) {
+        setIncomingCall(session);
+        setActiveCall(null);
+        return;
+      }
+      if (session && ['RINGING', 'CONNECTED', 'ON_HOLD'].includes(session.status)) {
+        setActiveCall(session);
+        if (session.status !== 'RINGING') setIncomingCall(null);
       } else {
         setActiveCall(null);
       }
@@ -82,6 +97,21 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
   }, [loadActive]);
 
   useEffect(() => {
+    if (!portal) return;
+    const id = window.setInterval(() => void loadActive(portal), 4000);
+    function onDemoCall() {
+      void loadActive(portal);
+    }
+    window.addEventListener('4ds-demo-call', onDemoCall);
+    window.addEventListener('storage', onDemoCall);
+    return () => {
+      window.clearInterval(id);
+      window.removeEventListener('4ds-demo-call', onDemoCall);
+      window.removeEventListener('storage', onDemoCall);
+    };
+  }, [portal, loadActive]);
+
+  useEffect(() => {
     if (!portal || !session) return;
     const base = getSocketUrl();
     if (!base) return;
@@ -92,7 +122,10 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
     socketRef.current = socket;
 
     socket.on('call:incoming', (payload: IncomingCall) => {
-      if (payload.recipientUserId === userId) {
+      if (
+        payload.recipientUserId === userId ||
+        isControlRoomIncoming(portal, payload, userId)
+      ) {
         setIncomingCall(payload);
       }
     });
@@ -170,8 +203,6 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
 
       if (channel === 'WHATSAPP' && target.phone) {
         window.open(whatsappCallHref(target.phone), '_blank', 'noopener,noreferrer');
-      } else if (channel === 'DISPATCH_LINE' && target.phone) {
-        window.location.href = telHref(target.phone);
       } else if (channel === 'EXTERNAL' && target.phone) {
         window.location.href = telHref(target.phone);
       }

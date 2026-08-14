@@ -8,6 +8,7 @@ import {
   login,
   oauthClientSignIn,
 } from '@/lib/auth';
+import { applyTabTitle, bootTabSession } from '@/lib/tab-session';
 import { friendlyErrorMessage } from '@/lib/friendly-error';
 import { adminHomeForRole } from '@/lib/admin-home';
 import { BrandMark } from './BrandMark';
@@ -77,6 +78,8 @@ export function LoginForm({
   const [oauthAccept, setOauthAccept] = useState(false);
 
   useEffect(() => {
+    bootTabSession();
+    applyTabTitle(null, portal);
     try {
       const raw = localStorage.getItem(REMEMBER_KEY);
       if (!raw) return;
@@ -99,6 +102,7 @@ export function LoginForm({
       const session = await login(portal, email, password, tenantSlug, {
         authSource: portal === 'client' ? 'portal' : undefined,
       });
+      applyTabTitle(session, portal);
       if (remember) {
         localStorage.setItem(REMEMBER_KEY, JSON.stringify({ email, tenantSlug, portal }));
       } else {

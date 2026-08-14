@@ -52,27 +52,57 @@ function getApiUrl() {
   return process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4010/v1';
 }
 
+function sessionStore(): Storage | null {
+  if (typeof window === 'undefined') return null;
+  return window.sessionStorage;
+}
+
+/** This tab's session first. A leftover shared localStorage session is claimed once, then other tabs stay independent. */
+function readSessionRaw(key: string): string | null {
+  const ss = sessionStore();
+  if (!ss) return null;
+  const owned = ss.getItem(key);
+  if (owned) return owned;
+  try {
+    const shared = localStorage.getItem(key);
+    if (!shared) return null;
+    ss.setItem(key, shared);
+    localStorage.removeItem(key);
+    return shared;
+  } catch {
+    return null;
+  }
+}
+
+function writeSessionRaw(key: string, value: string) {
+  sessionStore()?.setItem(key, value);
+}
+
+function removeSessionRaw(key: string) {
+  sessionStore()?.removeItem(key);
+}
+
 export function getClientAuthSource(): ClientAuthSource | null {
   if (typeof window === 'undefined') return null;
-  const v = localStorage.getItem(CLIENT_AUTH_SOURCE_KEY);
+  const v = readSessionRaw(CLIENT_AUTH_SOURCE_KEY);
   return v === 'site' || v === 'portal' ? v : null;
 }
 
 export function setClientAuthSource(source: ClientAuthSource) {
   if (typeof window === 'undefined') return;
-  localStorage.setItem(CLIENT_AUTH_SOURCE_KEY, source);
+  writeSessionRaw(CLIENT_AUTH_SOURCE_KEY, source);
 }
 
 export function clearClientAuthSource() {
   if (typeof window === 'undefined') return;
-  localStorage.removeItem(CLIENT_AUTH_SOURCE_KEY);
+  removeSessionRaw(CLIENT_AUTH_SOURCE_KEY);
 }
 
 /** Persist a client session and mark whether it came from portal or site auth. */
 export function persistClientSession(session: AuthSession, source: ClientAuthSource) {
   if (typeof window === 'undefined') return;
   const next: AuthSession = { ...session, authSource: source };
-  localStorage.setItem(CLIENT_KEY, JSON.stringify(next));
+  writeSessionRaw(CLIENT_KEY, JSON.stringify(next));
   setClientAuthSource(source);
 }
 
@@ -103,7 +133,7 @@ export async function login(
       if (portal === 'client' && authSource) {
         persistClientSession(session, authSource);
       } else {
-        localStorage.setItem(sessionKey(portal), JSON.stringify(session));
+        writeSessionRaw(sessionKey(portal), JSON.stringify(session));
       }
     }
     return session;
@@ -136,7 +166,7 @@ export async function login(
     if (portal === 'client' && authSource) {
       persistClientSession(session, authSource);
     } else {
-      localStorage.setItem(sessionKey(portal), JSON.stringify(session));
+      writeSessionRaw(sessionKey(portal), JSON.stringify(session));
     }
   }
 
@@ -351,7 +381,7 @@ export async function completeClientRegistration(
 export function getSession(portal: AuthPortal): AuthSession | null {
   if (typeof window === 'undefined') return null;
   const key = sessionKey(portal);
-  const raw = localStorage.getItem(key);
+  const raw = readSessionRaw(key);
   if (!raw) return null;
   try {
     const session = JSON.parse(raw) as AuthSession;
@@ -374,13 +404,13 @@ export function updateSessionUser(portal: AuthPortal, patch: Partial<AuthUser>) 
     ...session,
     user: { ...session.user, ...patch },
   };
-  localStorage.setItem(sessionKey(portal), JSON.stringify(next));
+  writeSessionRaw(sessionKey(portal), JSON.stringify(next));
 }
 
 export function clearSession(portal: AuthPortal) {
   if (typeof window === 'undefined') return;
   const key = sessionKey(portal);
-  localStorage.removeItem(key);
+  removeSessionRaw(key);
   if (portal === 'client') clearClientAuthSource();
 }
 

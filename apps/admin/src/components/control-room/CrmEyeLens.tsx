@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -15,6 +16,8 @@ import { adminApi, type ApiResponse } from '@/lib/api-client';
 import { getSession } from '@/lib/auth';
 import { CONTROL_ROOM_ROUTES, customerHref } from '@/lib/control-room-routes';
 import { fetchInternalChat } from '@/lib/internal-chat-api';
+import { useCallsOptional } from '@/components/calls/CallProvider';
+import { friendlyErrorMessage } from '@/lib/friendly-error';
 
 type Lead = {
   id: string;
@@ -225,6 +228,7 @@ function Badge({ count }: { count: number }) {
 
 export function CrmEyeLens() {
   const router = useRouter();
+  const dockRef = useRef<HTMLDivElement>(null);
   const barRef = useRef<HTMLDivElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef<{ ox: number; oy: number; px: number; py: number } | null>(null);
@@ -236,9 +240,16 @@ export function CrmEyeLens() {
   const [tab, setTab] = useState<PanelTab>('intel');
   const [query, setQuery] = useState('');
   const [pos, setPos] = useState<{ x: number; y: number } | null>(null);
-  const [barMetrics, setBarMetrics] = useState({ height: 56, bottom: 20 });
+  const [panelFit, setPanelFit] = useState({
+    placement: 'above' as 'above' | 'below',
+    left: 0,
+    width: 360,
+    maxHeight: 360,
+  });
   const autoOpenedRef = useRef(false);
   const firstName = getSession('admin')?.user.firstName ?? 'Operator';
+  const calls = useCallsOptional();
+  const [callBusy, setCallBusy] = useState(false);
 
   const { data: dashRes, reload: reloadDash } = useApi(
     () => softGet<ApiResponse<DashboardLite>>('/control-room/dashboard'),
@@ -328,30 +339,48 @@ export function CrmEyeLens() {
     }
   }, [criticals, hidden, ready]);
 
-  /** Keep the intel panel above the floating bar so hot incidents are not covered. */
-  useEffect(() => {
-    const el = barRef.current;
-    if (!el) return;
+  const layoutPanel = useCallback(() => {
+    const dock = dockRef.current;
+    if (!dock) return;
+    const rect = dock.getBoundingClientRect();
+    const pad = 8;
+    const gap = 10;
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    const width = Math.min(360, vw - pad * 2);
+    const spaceAbove = Math.max(0, rect.top - pad);
+    const spaceBelow = Math.max(0, vh - rect.bottom - pad);
+    const comfortable = 220;
+    const placement: 'above' | 'below' =
+      spaceAbove >= comfortable && spaceAbove >= spaceBelow * 0.85
+        ? 'above'
+        : spaceBelow > spaceAbove
+          ? 'below'
+          : 'above';
+    const available = (placement === 'below' ? spaceBelow : spaceAbove) - gap;
+    const maxHeight = Math.max(140, Math.min(vh * 0.56, available));
+    const center = rect.left + rect.width / 2;
+    const viewLeft = Math.min(Math.max(pad, center - width / 2), vw - width - pad);
+    setPanelFit({
+      placement,
+      left: viewLeft - rect.left,
+      width,
+      maxHeight,
+    });
+  }, []);
 
-    function measure() {
-      const node = barRef.current;
-      if (!node) return;
-      const rect = node.getBoundingClientRect();
-      setBarMetrics({
-        height: rect.height,
-        bottom: Math.max(0, window.innerHeight - rect.bottom),
-      });
-    }
-
-    measure();
-    const ro = new ResizeObserver(measure);
-    ro.observe(el);
-    window.addEventListener('resize', measure);
+  useLayoutEffect(() => {
+    if (!ready || hidden) return;
+    layoutPanel();
+    const dock = dockRef.current;
+    const ro = dock ? new ResizeObserver(layoutPanel) : null;
+    if (dock) ro?.observe(dock);
+    window.addEventListener('resize', layoutPanel);
     return () => {
-      ro.disconnect();
-      window.removeEventListener('resize', measure);
+      ro?.disconnect();
+      window.removeEventListener('resize', layoutPanel);
     };
-  }, [ready, hidden, mini, open, criticals]);
+  }, [ready, hidden, open, pos, mini, layoutPanel]);
 
   /** Close panel when pressing outside it (scrim + pointer outside toolbar/panel). */
   useEffect(() => {
@@ -360,8 +389,7 @@ export function CrmEyeLens() {
     function onPointerDown(event: MouseEvent | TouchEvent) {
       const target = event.target as Node | null;
       if (!target) return;
-      if (panelRef.current?.contains(target)) return;
-      if (barRef.current?.contains(target)) return;
+      if (dockRef.current?.contains(target)) return;
       setOpen(false);
     }
 
@@ -553,6 +581,64 @@ export function CrmEyeLens() {
     return { leads: leadHits, customers: customerHits };
   }, [query, leads, customers]);
 
+  const callTarget = useCallback(
+    async (target: {
+      userId?: string;
+      name: string;
+      phone?: string | null;
+      incidentId?: string;
+    }) => {
+      if (!calls?.portal) {
+        router.push(CONTROL_ROOM_ROUTES.communications);
+        return;
+      }
+      setCallBusy(true);
+      try {
+        await calls.startCall('INTERNAL', {
+          userId: target.userId,
+          name: target.name,
+          phone: target.phone ?? undefined,
+          role: 'CLIENT',
+          incidentId: target.incidentId,
+        });
+      } catch (err) {
+        alert(friendlyErrorMessage(err, 'call'));
+      } finally {
+        setCallBusy(false);
+      }
+    },
+    [calls, router],
+  );
+
+  async function handleLensCall() {
+    const hot = hotIncidents[0] ?? dash?.incidents?.[0];
+    const match =
+      (hot
+        ? customers.find((c) => `${c.firstName} ${c.lastName}` === hot.user)
+        : null) ??
+      searchHits.customers[0] ??
+      customers[0];
+    if (match) {
+      await callTarget({
+        userId: match.id,
+        name: `${match.firstName} ${match.lastName}`,
+        phone: match.phone,
+        incidentId: hot?.id,
+      });
+      return;
+    }
+    if (hot) {
+      await callTarget({ name: hot.user, incidentId: hot.id });
+      return;
+    }
+    if (!calls?.portal) {
+      router.push(CONTROL_ROOM_ROUTES.communications);
+      return;
+    }
+    setTab('search');
+    setOpen(true);
+  }
+
   const persistMode = useCallback((nextMini: boolean) => {
     setMini(nextMini);
     try {
@@ -584,9 +670,10 @@ export function CrmEyeLens() {
   }, [persistMode]);
 
   function onDragStart(e: ReactPointerEvent<HTMLButtonElement>) {
-    if (!barRef.current) return;
+    const dock = dockRef.current;
+    if (!dock) return;
     e.preventDefault();
-    const rect = barRef.current.getBoundingClientRect();
+    const rect = dock.getBoundingClientRect();
     dragRef.current = {
       ox: e.clientX,
       oy: e.clientY,
@@ -597,11 +684,12 @@ export function CrmEyeLens() {
   }
 
   function onDragMove(e: ReactPointerEvent<HTMLButtonElement>) {
-    if (!dragRef.current || !barRef.current) return;
+    const dock = dockRef.current;
+    if (!dragRef.current || !dock) return;
     const dx = e.clientX - dragRef.current.ox;
     const dy = e.clientY - dragRef.current.oy;
-    const w = barRef.current.offsetWidth;
-    const h = barRef.current.offsetHeight;
+    const w = dock.offsetWidth;
+    const h = dock.offsetHeight;
     const next = {
       x: Math.min(Math.max(8, dragRef.current.px + dx), window.innerWidth - w - 8),
       y: Math.min(Math.max(8, dragRef.current.py + dy), window.innerHeight - h - 8),
@@ -641,24 +729,27 @@ export function CrmEyeLens() {
 
   const barStyle =
     pos != null
-      ? { left: pos.x, top: pos.y, right: 'auto', bottom: 'auto', transform: 'none' }
+      ? { left: pos.x, top: pos.y, right: 'auto' as const, bottom: 'auto' as const, transform: 'none' }
       : undefined;
-
-  const panelGap = 12;
-  const panelBottom =
-    pos != null
-      ? Math.max(
-          barMetrics.bottom + barMetrics.height + panelGap,
-          window.innerHeight - pos.y + panelGap,
-        )
-      : barMetrics.bottom + barMetrics.height + panelGap;
 
   return (
     <>
+      {open ? (
+        <button
+          type="button"
+          className="eye-lens-scrim"
+          aria-label="Close quick actions"
+          onClick={() => setOpen(false)}
+        />
+      ) : null}
+      <div
+        ref={dockRef}
+        className={`eye-lens-dock ${mini ? 'eye-lens-dock--mini' : ''} ${pos != null ? 'eye-lens-dock--placed' : ''} ${open ? 'eye-lens-dock--open' : ''}`}
+        style={barStyle}
+      >
       <div
         ref={barRef}
         className={`eye-lens ${mini ? 'eye-lens--mini' : ''} ${open ? 'eye-lens--open' : ''} ${criticals > 0 ? 'eye-lens--hot' : ''}`}
-        style={barStyle}
         role="toolbar"
         aria-label="4DS Ops Lens"
       >
@@ -762,9 +853,10 @@ export function CrmEyeLens() {
         <button
           type="button"
           className="eye-lens__tool"
-          aria-label="Dispatch / calls"
-          title="Dispatch"
-          onClick={() => router.push(CONTROL_ROOM_ROUTES.dispatch)}
+          aria-label="Call client / dispatch"
+          title={callBusy ? 'Connecting…' : 'Call'}
+          disabled={callBusy}
+          onClick={() => void handleLensCall()}
         >
           <IconPhone />
         </button>
@@ -845,26 +937,13 @@ export function CrmEyeLens() {
       </div>
 
       {open && (
-        <>
-        <button
-          type="button"
-          className="eye-lens-scrim"
-          aria-label="Close quick actions"
-          onClick={() => setOpen(false)}
-        />
         <div
           ref={panelRef}
-          className={`eye-lens-panel ${criticals > 0 ? 'eye-lens-panel--critical' : ''}`}
+          className={`eye-lens-panel ${panelFit.placement === 'below' ? 'eye-lens-panel--below' : 'eye-lens-panel--above'} ${criticals > 0 ? 'eye-lens-panel--critical' : ''}`}
           style={{
-            bottom: panelBottom,
-            ...(pos
-              ? {
-                  left: Math.min(Math.max(12, pos.x), window.innerWidth - 360),
-                  top: 'auto',
-                  right: 'auto',
-                  transform: 'none',
-                }
-              : undefined),
+            left: panelFit.left,
+            width: panelFit.width,
+            maxHeight: panelFit.maxHeight,
           }}
           role="dialog"
           aria-modal="true"
@@ -938,7 +1017,11 @@ export function CrmEyeLens() {
                           <strong>{i.type}</strong>
                           <span>{i.user}</span>
                         </div>
-                        <Link href={CONTROL_ROOM_ROUTES.dispatch} onClick={() => setOpen(false)}>
+                        <Link
+                          href={CONTROL_ROOM_ROUTES.dispatch}
+                          className="eye-lens-call-btn"
+                          onClick={() => setOpen(false)}
+                        >
                           Dispatch
                         </Link>
                       </li>
@@ -1021,9 +1104,25 @@ export function CrmEyeLens() {
                               </strong>
                               <span>{c.email}</span>
                             </div>
-                            <Link href={customerHref(c.id)} onClick={() => setOpen(false)}>
-                              Open
-                            </Link>
+                            <div className="eye-lens-list__actions">
+                              <button
+                                type="button"
+                                className="eye-lens-call-btn"
+                                disabled={callBusy}
+                                onClick={() =>
+                                  void callTarget({
+                                    userId: c.id,
+                                    name: `${c.firstName} ${c.lastName}`,
+                                    phone: c.phone,
+                                  })
+                                }
+                              >
+                                Call
+                              </button>
+                              <Link href={customerHref(c.id)} onClick={() => setOpen(false)}>
+                                Open
+                              </Link>
+                            </div>
                           </li>
                         ))}
                       </ul>
@@ -1062,8 +1161,8 @@ export function CrmEyeLens() {
             </div>
           )}
         </div>
-        </>
       )}
+      </div>
     </>
   );
 }

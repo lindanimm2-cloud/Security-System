@@ -11,6 +11,7 @@ type HoldToActivateProps = {
   loading?: boolean;
   className?: string;
   tone?: 'danger' | 'warn' | 'medical';
+  children?: ReactNode;
 };
 
 /** Hold-to-fire control — never activates on a single tap. */
@@ -23,6 +24,7 @@ export function HoldToActivate({
   loading,
   className = '',
   tone = 'danger',
+  children,
 }: HoldToActivateProps) {
   const [progress, setProgress] = useState(0);
   const [holding, setHolding] = useState(false);
@@ -96,7 +98,7 @@ export function HoldToActivate({
         aria-hidden
       />
       <span className="hold-activate__label">
-        {loading ? 'Sending…' : holding ? holdLabel : label}
+        {loading ? 'Sending…' : holding ? holdLabel : (children ?? label)}
       </span>
       {holding ? (
         <span className="hold-activate__pct" aria-hidden>

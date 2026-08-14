@@ -12,6 +12,19 @@ type CallUser = {
   role: UserRole;
 };
 
+const CONTROL_ROOM_ROLES: UserRole[] = [
+  UserRole.DISPATCHER,
+  UserRole.SUPERVISOR,
+  UserRole.MANAGER,
+  UserRole.TENANT_ADMIN,
+  UserRole.OWNER,
+  UserRole.SUPER_ADMIN,
+];
+
+function isControlRoomRole(role: UserRole) {
+  return CONTROL_ROOM_ROLES.includes(role);
+}
+
 type StartCallInput = {
   channel: CallChannel;
   targetUserId?: string;
@@ -158,21 +171,41 @@ export class CallsService {
   }
 
   async getActiveCall(user: CallUser) {
-    const session = await this.prisma.callSession.findFirst({
+    const include = {
+      initiator: { select: { id: true, firstName: true, lastName: true, role: true } },
+      target: { select: { id: true, firstName: true, lastName: true, role: true } },
+      notes: { orderBy: { createdAt: 'asc' as const } },
+    };
+
+    const own = await this.prisma.callSession.findFirst({
       where: {
         tenantId: user.tenantId,
         status: { in: [CallStatus.RINGING, CallStatus.CONNECTED, CallStatus.ON_HOLD] },
         OR: [{ initiatorUserId: user.id }, { targetUserId: user.id }],
       },
-      include: {
-        initiator: { select: { id: true, firstName: true, lastName: true, role: true } },
-        target: { select: { id: true, firstName: true, lastName: true, role: true } },
-        notes: { orderBy: { createdAt: 'asc' } },
-      },
+      include,
       orderBy: { createdAt: 'desc' },
     });
+    if (own) {
+      return { success: true, data: this.formatCall(own) };
+    }
 
-    return { success: true, data: session ? this.formatCall(session) : null };
+    if (isControlRoomRole(user.role)) {
+      const incoming = await this.prisma.callSession.findFirst({
+        where: {
+          tenantId: user.tenantId,
+          channel: CallChannel.DISPATCH_LINE,
+          status: CallStatus.RINGING,
+        },
+        include,
+        orderBy: { createdAt: 'desc' },
+      });
+      if (incoming) {
+        return { success: true, data: this.formatCall(incoming) };
+      }
+    }
+
+    return { success: true, data: null };
   }
 
   async getHistory(tenantId: string, limit = 30) {
@@ -220,8 +253,48 @@ export class CallsService {
     }
 
     const isInternal = input.channel === CallChannel.INTERNAL;
+    const isDispatchLine = input.channel === CallChannel.DISPATCH_LINE;
+    const isClientCaller =
+      user.role === UserRole.USER || user.role === UserRole.FAMILY_MEMBER;
+
+    let targetUserId = input.targetUserId ?? null;
+    let targetName = input.targetName;
+    let targetRole = input.targetRole ?? null;
+    let targetPhone = input.targetPhone ?? null;
+
+    if (isDispatchLine && isClientCaller && !targetUserId) {
+      const dispatcher = await this.prisma.user.findFirst({
+        where: {
+          tenantId: user.tenantId,
+          status: 'ACTIVE',
+          role: {
+            in: [
+              UserRole.DISPATCHER,
+              UserRole.SUPERVISOR,
+              UserRole.MANAGER,
+              UserRole.TENANT_ADMIN,
+              UserRole.OWNER,
+            ],
+          },
+        },
+        select: { id: true, firstName: true, lastName: true, role: true, phone: true },
+        orderBy: { role: 'asc' },
+      });
+      if (dispatcher) {
+        targetUserId = dispatcher.id;
+        targetName = `${dispatcher.firstName} ${dispatcher.lastName}`;
+        targetRole = dispatcher.role;
+        targetPhone = dispatcher.phone ?? targetPhone;
+      } else {
+        targetName = targetName || 'Control room';
+        targetRole = targetRole || 'DISPATCH';
+      }
+    }
+
+    const ringsControlRoom =
+      isInternal || (isDispatchLine && (Boolean(targetUserId) || isClientCaller));
     const isExternalApp = input.channel === CallChannel.WHATSAPP;
-    const status = isInternal ? CallStatus.RINGING : CallStatus.CONNECTED;
+    const status = ringsControlRoom ? CallStatus.RINGING : CallStatus.CONNECTED;
 
     const session = await this.prisma.callSession.create({
       data: {
@@ -229,12 +302,12 @@ export class CallsService {
         channel: input.channel,
         status,
         initiatorUserId: user.id,
-        targetUserId: input.targetUserId ?? null,
-        targetPhone: input.targetPhone ?? null,
-        targetName: input.targetName,
-        targetRole: input.targetRole ?? null,
+        targetUserId,
+        targetPhone,
+        targetName,
+        targetRole,
         incidentId: input.incidentId ?? null,
-        startedAt: isInternal || isExternalApp ? null : new Date(),
+        startedAt: ringsControlRoom || isExternalApp ? null : new Date(),
       },
       include: {
         initiator: { select: { id: true, firstName: true, lastName: true, role: true } },
@@ -246,10 +319,10 @@ export class CallsService {
     const formatted = this.formatCall(session);
     this.emitCallEvent(user.tenantId, 'call:started', formatted);
 
-    if (isInternal && input.targetUserId) {
+    if (ringsControlRoom && (targetUserId || isDispatchLine)) {
       this.emitCallEvent(user.tenantId, 'call:incoming', {
         ...formatted,
-        recipientUserId: input.targetUserId,
+        recipientUserId: targetUserId,
       });
     }
 
@@ -258,7 +331,9 @@ export class CallsService {
 
   async acceptCall(user: CallUser, callId: string) {
     const session = await this.loadCall(callId, user.tenantId);
-    if (session.targetUserId !== user.id) {
+    const opsPickup =
+      session.channel === CallChannel.DISPATCH_LINE && isControlRoomRole(user.role);
+    if (session.targetUserId !== user.id && !opsPickup) {
       throw new BadRequestException('Only the callee can accept this call');
     }
     if (session.status !== CallStatus.RINGING) {
@@ -267,7 +342,17 @@ export class CallsService {
 
     const updated = await this.prisma.callSession.update({
       where: { id: callId },
-      data: { status: CallStatus.CONNECTED, startedAt: new Date() },
+      data: {
+        status: CallStatus.CONNECTED,
+        startedAt: new Date(),
+        ...(opsPickup && session.targetUserId !== user.id
+          ? {
+              targetUserId: user.id,
+              targetName: `${user.firstName} ${user.lastName}`,
+              targetRole: user.role,
+            }
+          : {}),
+      },
       include: {
         initiator: { select: { id: true, firstName: true, lastName: true, role: true } },
         target: { select: { id: true, firstName: true, lastName: true, role: true } },

@@ -8,6 +8,7 @@ import {
   canUseClientSessionForPortal,
   getSession,
 } from '@/lib/auth';
+import { applyTabTitle, bootTabSession } from '@/lib/tab-session';
 import { LoadingSpinner } from './LoadingSpinner';
 
 export function AuthGuard({
@@ -24,11 +25,14 @@ export function AuthGuard({
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
+    bootTabSession();
+
     function syncSession() {
       const s = getSession(portal);
       if (!s) {
         setSession(null);
         setReady(false);
+        applyTabTitle(null, portal);
         router.replace(loginPath);
         return;
       }
@@ -41,6 +45,7 @@ export function AuthGuard({
       }
       setSession(s);
       setReady(true);
+      applyTabTitle(s, portal);
     }
 
     syncSession();
@@ -48,17 +53,10 @@ export function AuthGuard({
     function onFocus() {
       syncSession();
     }
-    function onStorage(e: StorageEvent) {
-      if (!e.key || e.key.includes('4ds_') || e.key.includes('session')) {
-        syncSession();
-      }
-    }
 
     window.addEventListener('focus', onFocus);
-    window.addEventListener('storage', onStorage);
     return () => {
       window.removeEventListener('focus', onFocus);
-      window.removeEventListener('storage', onStorage);
     };
   }, [portal, loginPath, router]);
 

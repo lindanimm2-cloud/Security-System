@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { ThemeProvider } from '@/components/ThemeProvider';
 import { CallShell } from '@/components/calls/CallShell';
+import { TabSessionBoot } from '@/components/TabSessionBoot';
 import './globals.css';
 
 export const metadata: Metadata = {
@@ -58,6 +59,7 @@ export default function RootLayout({
       </head>
       <body>
         <ThemeProvider>
+          <TabSessionBoot />
           <CallShell>{children}</CallShell>
         </ThemeProvider>
       </body>

@@ -22,7 +22,7 @@ export function channelLabel(channel: CallChannel): string {
 }
 
 export function isExternalCallChannel(channel: CallChannel): boolean {
-  return channel === 'WHATSAPP' || channel === 'EXTERNAL' || channel === 'DISPATCH_LINE';
+  return channel === 'WHATSAPP' || channel === 'EXTERNAL';
 }
 
 export function channelLiveSubtitle(
