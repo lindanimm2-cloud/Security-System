@@ -13,6 +13,7 @@ import { type AuthPortal, getSession } from '@/lib/auth';
 import { getSocketUrl } from '@/lib/socket';
 import { resolveMediaUrl } from '@/lib/media-url';
 import { friendlyErrorMessage } from '@/lib/friendly-error';
+import { UiSelect } from '@/components/ui/UiSelect';
 
 export type ChatAttachment = {
   id: string;
@@ -205,9 +206,11 @@ type Thread = {
 export function InternalChat({
   portal,
   channel = 'internal',
+  embedded = false,
 }: {
   portal: AuthPortal;
   channel?: ChatChannel;
+  embedded?: boolean;
 }) {
   const session = getSession(portal);
   const currentUserId = session?.user.id ?? '';
@@ -481,39 +484,40 @@ export function InternalChat({
       }
     : null;
 
-  if (loading) return <LoadingSpinner label="Loading chat..." fullScreen />;
+  if (loading) return <LoadingSpinner label="Loading chat..." fullScreen={!embedded} />;
   if (error) return <ErrorAlert error={error} onRetry={reload} />;
 
   return (
-    <div className="page-content page-content--chat team-chat">
-      <header className="team-chat__top">
-        <div className="team-chat__intro">
-          <h1 className="team-chat__title">{meta.title}</h1>
-          <p className="team-chat__greeting">
-            Hi {firstName}
-            {totalUnread > 0 ? ` · ${totalUnread} unread` : ' · All caught up'}
-          </p>
-        </div>
-        <div className="team-chat__top-actions">
-          <button
-            type="button"
-            className="team-chat__pill"
-            title="Open ops desk channel"
-            onClick={() => openThread(TEAM_ID)}
-          >
-            <VideoIcon />
-            <span>Briefing</span>
-          </button>
-          <a href={incidentsHref} className="team-chat__pill" title={incidentsLabel}>
-            <TasksIcon />
-            <span>{incidentsLabel}</span>
-          </a>
-          <a href={dispatchHref} className="team-chat__pill team-chat__pill--accent" title={dispatchLabel}>
-            <CalendarIcon />
-            <span>{dispatchLabel}</span>
-          </a>
-        </div>
-      </header>
+    <div className={`page-content page-content--chat team-chat${embedded ? ' team-chat--embedded' : ''}`}>
+      {!embedded && (
+        <header className="team-chat__top">
+          <div className="team-chat__intro">
+            <p className="team-chat__greeting">
+              Hi {firstName}
+              {totalUnread > 0 ? ` · ${totalUnread} unread` : ' · All caught up'}
+            </p>
+          </div>
+          <div className="team-chat__top-actions">
+            <button
+              type="button"
+              className="team-chat__pill"
+              title="Open ops desk channel"
+              onClick={() => openThread(TEAM_ID)}
+            >
+              <VideoIcon />
+              <span>Briefing</span>
+            </button>
+            <a href={incidentsHref} className="team-chat__pill" title={incidentsLabel}>
+              <TasksIcon />
+              <span>{incidentsLabel}</span>
+            </a>
+            <a href={dispatchHref} className="team-chat__pill team-chat__pill--accent" title={dispatchLabel}>
+              <CalendarIcon />
+              <span>{dispatchLabel}</span>
+            </a>
+          </div>
+        </header>
+      )}
 
       <div
         className={`team-chat__shell ${mobileShowThread ? 'team-chat__shell--thread' : 'team-chat__shell--list'}`}
@@ -610,19 +614,21 @@ export function InternalChat({
 
           <div className="team-chat__new">
             <span className="team-chat__new-label">New chat</span>
-            <select
-              id="team-chat-new-select"
-              className="team-chat__select"
+            <UiSelect
+              ariaLabel="New chat teammate"
+              className="team-chat__select-ui"
+              compact={false}
               value={newChatUserId}
-              onChange={(e) => setNewChatUserId(e.target.value)}
-            >
-              <option value="">Select teammate…</option>
-              {others.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {fullName(p)} · {ROLE_LABELS[p.role] ?? p.role}
-                </option>
-              ))}
-            </select>
+              onChange={setNewChatUserId}
+              options={[
+                { value: '', label: 'Select teammate…' },
+                ...others.map((p) => ({
+                  value: p.id,
+                  label: fullName(p),
+                  meta: ROLE_LABELS[p.role] ?? p.role,
+                })),
+              ]}
+            />
             <button
               type="button"
               className="team-chat__start-btn"

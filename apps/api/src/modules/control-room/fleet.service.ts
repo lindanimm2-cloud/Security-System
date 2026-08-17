@@ -7,6 +7,43 @@ type CrewInput = {
   role?: VehicleCrewRole;
 }[];
 
+function dashCamsForVehicle(v: { id: string; callSign: string; status: string }) {
+  const live = v.status !== 'MAINTENANCE' && v.status !== 'OFFLINE';
+  const frontStatus = !live ? 'OFFLINE' : v.status === 'EN_ROUTE' || v.status === 'DEPLOYED' || v.status === 'ON_DUTY' ? 'RECORDING' : 'ONLINE';
+  return [
+    {
+      id: `${v.id}-cam-front`,
+      name: 'Dash forward',
+      locationLabel: `${v.callSign} · windscreen`,
+      channel: 1,
+      status: frontStatus,
+      snapshotUrl: null as string | null,
+      isLiveCapable: live,
+      isInterior: false,
+    },
+    {
+      id: `${v.id}-cam-cabin`,
+      name: 'Cabin',
+      locationLabel: `${v.callSign} · cabin`,
+      channel: 2,
+      status: live ? 'ONLINE' : 'OFFLINE',
+      snapshotUrl: null as string | null,
+      isLiveCapable: live,
+      isInterior: true,
+    },
+    {
+      id: `${v.id}-cam-rear`,
+      name: 'Rear view',
+      locationLabel: `${v.callSign} · rear`,
+      channel: 3,
+      status: live ? 'ONLINE' : 'OFFLINE',
+      snapshotUrl: null as string | null,
+      isLiveCapable: live,
+      isInterior: false,
+    },
+  ];
+}
+
 @Injectable()
 export class FleetService {
   constructor(private readonly prisma: PrismaService) {}
@@ -48,6 +85,7 @@ export class FleetService {
       isActive: v.isActive,
       crew: this.formatCrew(v.crew),
       crewCount: v.crew.length,
+      cameras: dashCamsForVehicle(v),
     };
   }
 

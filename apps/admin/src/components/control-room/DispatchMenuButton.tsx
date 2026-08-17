@@ -1,12 +1,12 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useRef, useState, type ReactNode } from 'react';
 import { DispatchMiniMenu } from './DispatchMiniMenu';
 
 type DispatchMenuButtonProps = {
   incidentId: string;
   className?: string;
-  label?: string;
+  label?: ReactNode;
   onAssigned?: () => void;
 };
 

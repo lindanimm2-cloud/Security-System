@@ -18,6 +18,11 @@ import {
 } from '@/lib/alert-priority';
 import { adminApi } from '@/lib/api-client';
 import { getSession } from '@/lib/auth';
+import {
+  DEMO_DEV_TICKET_EVENT,
+  DEMO_ERROR_REPORTS_KEY,
+  developerTicketCode,
+} from '@/lib/developer-tickets';
 import { getSocketUrl } from '@/lib/socket';
 import {
   acknowledgeAnnouncement,
@@ -118,10 +123,25 @@ export function PriorityAlertProvider({ children }: { children: React.ReactNode 
     });
 
     socket.on('notification:new', (payload: Record<string, unknown> | ControlRoomNotification) => {
+      const forRoles = (payload as Record<string, unknown>).forRoles;
+      if (Array.isArray(forRoles) && forRoles.length) {
+        const role = getSession('admin')?.user.role;
+        if (role && !forRoles.includes(role)) return;
+      }
       const alert =
         'category' in payload && payload.title
           ? notificationToAlert(payload as ControlRoomNotification)
           : looseNotificationToAlert(payload as Record<string, unknown>);
+      if (alert) pushAlert(alert);
+    });
+
+    socket.on('developer:error-report', (payload: Record<string, unknown>) => {
+      const role = getSession('admin')?.user.role;
+      if (role && !['DEVELOPER', 'OWNER', 'SUPER_ADMIN'].includes(role)) return;
+      const alert = looseNotificationToAlert({
+        ...payload,
+        type: 'ERROR_REPORT',
+      });
       if (alert) pushAlert(alert);
     });
 
@@ -132,6 +152,61 @@ export function PriorityAlertProvider({ children }: { children: React.ReactNode 
 
     return () => {
       socket.disconnect();
+    };
+  }, [pushAlert]);
+
+  useEffect(() => {
+    function toastFromReport(report: {
+      id: string;
+      message: string;
+      status?: string;
+      createdAt?: string;
+      reporter?: { name?: string };
+    }) {
+      const role = getSession('admin')?.user.role;
+      if (role && !['DEVELOPER', 'OWNER', 'SUPER_ADMIN'].includes(role)) return;
+      if (report.status && report.status !== 'OPEN') return;
+      if (report.createdAt && Date.now() - new Date(report.createdAt).getTime() > 12_000) return;
+      pushAlert({
+        id: `ticket-${report.id}`,
+        tier: 'high',
+        kind: 'high',
+        category: 'DEVELOPER',
+        title: `Issue ticket ${developerTicketCode(report.id)}`,
+        subtitle: `${report.reporter?.name ?? 'Reporter'} · ${report.message}`,
+        link: `/control-room/developer?ticket=${encodeURIComponent(report.id)}`,
+        createdAt: report.createdAt ?? new Date().toISOString(),
+      });
+    }
+
+    function onTicket(e: Event) {
+      const detail = (e as CustomEvent<{ action?: string; report?: { id: string; message: string; reporter?: { name?: string } } }>).detail;
+      if (detail?.action !== 'created' || !detail.report) return;
+      toastFromReport(detail.report);
+    }
+
+    function onStorage(e: StorageEvent) {
+      if (e.key !== DEMO_ERROR_REPORTS_KEY || !e.newValue) return;
+      try {
+        const reports = JSON.parse(e.newValue) as Array<{
+          id: string;
+          message: string;
+          status?: string;
+          createdAt?: string;
+          reporter?: { name?: string };
+        }>;
+        const newest = reports[0];
+        if (newest) toastFromReport(newest);
+      } catch {
+        /* ignore */
+      }
+    }
+
+    window.addEventListener(DEMO_DEV_TICKET_EVENT, onTicket);
+    window.addEventListener('storage', onStorage);
+    return () => {
+      window.removeEventListener(DEMO_DEV_TICKET_EVENT, onTicket);
+      window.removeEventListener('storage', onStorage);
     };
   }, [pushAlert]);
 

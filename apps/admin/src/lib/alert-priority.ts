@@ -25,7 +25,14 @@ export type PriorityAlert = {
   createdAt: string;
 };
 
-const HIGH_CATEGORIES: NotificationCategory[] = ['MEDICAL', 'THEFT_RECOVERY', 'ALARM', 'VEHICLE', 'FAMILY'];
+const HIGH_CATEGORIES: NotificationCategory[] = [
+  'MEDICAL',
+  'THEFT_RECOVERY',
+  'ALARM',
+  'VEHICLE',
+  'FAMILY',
+  'DEVELOPER',
+];
 
 export function classifyNotificationTier(
   category: NotificationCategory,
@@ -47,6 +54,7 @@ export function kindFromCategory(category: NotificationCategory): PriorityAlertK
   if (category === 'THEFT_RECOVERY') return 'theft';
   if (category === 'ALARM') return 'alarm';
   if (category === 'OFFICER') return 'call';
+  if (category === 'DEVELOPER') return 'high';
   return 'high';
 }
 
@@ -134,6 +142,22 @@ export function looseNotificationToAlert(raw: Record<string, unknown>): Priority
   const body = String(raw.body ?? '');
   const incidentId = typeof raw.incidentId === 'string' ? raw.incidentId : undefined;
   const type = String(raw.type ?? '').toLowerCase();
+
+  if (type.includes('error_report') || type.includes('error-report') || raw.reportId) {
+    const reportId = typeof raw.reportId === 'string' ? raw.reportId : undefined;
+    return {
+      id: `dev-ticket-${reportId ?? title}-${Date.now()}`,
+      tier: 'high',
+      kind: 'high',
+      category: 'DEVELOPER',
+      title,
+      subtitle: body,
+      link: reportId
+        ? `/control-room/developer?ticket=${encodeURIComponent(reportId)}`
+        : '/control-room/developer',
+      createdAt: new Date().toISOString(),
+    };
+  }
 
   let tier: AlertTier = 'high';
   let kind: PriorityAlertKind = 'high';

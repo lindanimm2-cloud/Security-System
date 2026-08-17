@@ -70,19 +70,17 @@ export function SiteFooter() {
               <Link href="/portals">Employee login</Link>
             </li>
             <li>
-              <a href="mailto:hello@4dsnexus.example">hello@4dsnexus.example</a>
+              <a href="mailto:hello@4dsnexus.co.za">hello@4dsnexus.co.za</a>
             </li>
             <li>
-              <span>+27 (0) 11 000 0000</span>
+              <span>+27 11 100 4400</span>
             </li>
           </ul>
         </div>
       </div>
       <div className="nx-footer-bottom">
         <p>© {new Date().getFullYear()} 4DS Nexus. All rights reserved.</p>
-        <p className="nx-muted">
-          Placeholder company site for client review — demo content only.
-        </p>
+        <p className="nx-muted">Johannesburg · Pretoria · 24/7 control room</p>
       </div>
     </footer>
   );

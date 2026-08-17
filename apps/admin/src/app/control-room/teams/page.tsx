@@ -8,6 +8,7 @@ import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { useApi } from '@/hooks/useApi';
 import { adminApi, type ApiResponse } from '@/lib/api-client';
 import { friendlyErrorMessage } from '@/lib/friendly-error';
+import { UiSelect } from '@/components/ui/UiSelect';
 
 type TeamMember = {
   user: { id: string; firstName: string; lastName: string; role: string };
@@ -323,7 +324,6 @@ function TeamsContent() {
     <div className="page-content">
       <div className="page-header">
         <div>
-          <h1>Branches, Teams & Users</h1>
           <p className="text-muted">
             Create users, upload profile photos, and assign roles, positions, branches, and teams
           </p>
@@ -386,18 +386,21 @@ function TeamsContent() {
           <form className="stack-form" onSubmit={createTeam}>
             <label>
               Branch
-              <select
+              <UiSelect
+                compact={false}
+                ariaLabel="Team branch"
                 value={teamBranchId}
-                onChange={(e) => setTeamBranchId(e.target.value)}
+                onChange={setTeamBranchId}
                 disabled={saving}
-              >
-                <option value="">Select branch</option>
-                {branches.map((b) => (
-                  <option key={b.id} value={b.id}>
-                    {b.name} ({b.code})
-                  </option>
-                ))}
-              </select>
+                options={[
+                  { value: '', label: 'Select branch' },
+                  ...branches.map((b) => ({
+                    value: b.id,
+                    label: b.name,
+                    meta: b.code,
+                  })),
+                ]}
+              />
             </label>
             <label>
               Team name
@@ -726,52 +729,52 @@ function UserFormModal({
           <div className="form-row-2">
             <label>
               Role
-              <select
+              <UiSelect
+                compact={false}
+                ariaLabel="Staff role"
                 value={form.role}
-                onChange={(e) => onChange({ ...form, role: e.target.value })}
-              >
-                {ROLES.map((r) => (
-                  <option key={r} value={r}>{ROLE_LABELS[r]}</option>
-                ))}
-              </select>
+                onChange={(role) => onChange({ ...form, role })}
+                options={ROLES.map((r) => ({ value: r, label: ROLE_LABELS[r] }))}
+              />
             </label>
             <label>
               Status
-              <select
+              <UiSelect
+                compact={false}
+                ariaLabel="Staff status"
                 value={form.status}
-                onChange={(e) => onChange({ ...form, status: e.target.value })}
-              >
-                {STATUSES.map((s) => (
-                  <option key={s} value={s}>{s}</option>
-                ))}
-              </select>
+                onChange={(status) => onChange({ ...form, status })}
+                options={STATUSES.map((s) => ({ value: s, label: s }))}
+              />
             </label>
           </div>
 
           <label>
             Branch
-            <select
+            <UiSelect
+              compact={false}
+              ariaLabel="Staff branch"
               value={form.branch?.id ?? ''}
-              onChange={(e) => {
-                const branch = branches.find((b) => b.id === e.target.value);
+              onChange={(id) => {
+                const branch = branches.find((b) => b.id === id);
                 onChange({
                   ...form,
                   branch: branch
                     ? { id: branch.id, name: branch.name, code: branch.code }
                     : null,
                   teams: form.teams.filter(
-                    (t) => !e.target.value || t.branchId === e.target.value,
+                    (t) => !id || t.branchId === id,
                   ),
                 });
               }}
-            >
-              <option value="">No branch</option>
-              {branches.map((b) => (
-                <option key={b.id} value={b.id}>
-                  {b.name} ({b.code})
-                </option>
-              ))}
-            </select>
+              options={[
+                { value: '', label: 'No branch' },
+                ...branches.map((b) => ({
+                  value: b.id,
+                  label: `${b.name} (${b.code})`,
+                })),
+              ]}
+            />
           </label>
 
           <fieldset className="team-checkboxes">

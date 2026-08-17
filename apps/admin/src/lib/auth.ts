@@ -78,6 +78,11 @@ function writeSessionRaw(key: string, value: string) {
   sessionStore()?.setItem(key, value);
 }
 
+function notifyAuthChanged() {
+  if (typeof window === 'undefined') return;
+  window.dispatchEvent(new Event('4ds-auth-changed'));
+}
+
 function removeSessionRaw(key: string) {
   sessionStore()?.removeItem(key);
 }
@@ -104,6 +109,7 @@ export function persistClientSession(session: AuthSession, source: ClientAuthSou
   const next: AuthSession = { ...session, authSource: source };
   writeSessionRaw(CLIENT_KEY, JSON.stringify(next));
   setClientAuthSource(source);
+  notifyAuthChanged();
 }
 
 /** Portal may reuse session only if it was created via portal login (or CRM staff is unrelated). */
@@ -134,6 +140,7 @@ export async function login(
         persistClientSession(session, authSource);
       } else {
         writeSessionRaw(sessionKey(portal), JSON.stringify(session));
+        notifyAuthChanged();
       }
     }
     return session;
@@ -167,6 +174,7 @@ export async function login(
       persistClientSession(session, authSource);
     } else {
       writeSessionRaw(sessionKey(portal), JSON.stringify(session));
+      notifyAuthChanged();
     }
   }
 
@@ -412,6 +420,15 @@ export function clearSession(portal: AuthPortal) {
   const key = sessionKey(portal);
   removeSessionRaw(key);
   if (portal === 'client') clearClientAuthSource();
+  notifyAuthChanged();
+}
+
+/** Live API 401 only. Demo tokens must never wipe a working local session. */
+export function logoutIfUnauthorized(portal: AuthPortal, status: number) {
+  if (status !== 401) return false;
+  if (isDemoMode()) return false;
+  clearSession(portal);
+  return true;
 }
 
 export async function fetchWithAuth<T>(
@@ -441,8 +458,7 @@ export async function fetchWithAuth<T>(
     throw new Error('Request failed');
   }
 
-  if (res.status === 401) {
-    clearSession(portal);
+  if (logoutIfUnauthorized(portal, res.status)) {
     throw new Error('Session expired');
   }
 

@@ -39,19 +39,21 @@ export default function ContactPage() {
             <div>
               <dt>Email</dt>
               <dd>
-                <a href="mailto:hello@4dsnexus.example">hello@4dsnexus.example</a>
+                <a href="mailto:hello@4dsnexus.co.za">hello@4dsnexus.co.za</a>
               </dd>
             </div>
             <div>
               <dt>Phone</dt>
-              <dd>+27 (0) 11 000 0000</dd>
+              <dd>+27 11 100 4400</dd>
             </div>
             <div>
               <dt>HQ</dt>
               <dd>
-                [Street address placeholder]
+                4DS Nexus House
                 <br />
-                Johannesburg, South Africa
+                115 West Street, Sandton
+                <br />
+                Johannesburg, 2196
               </dd>
             </div>
             <div>
@@ -67,8 +69,7 @@ export default function ContactPage() {
         <form className="nx-contact-form" onSubmit={onSubmit}>
           {sent ? (
             <div className="nx-success">
-              Thanks — your message is recorded for this demo session. Connect
-              your email or lead inbox when you go live.
+              Thanks — we have your inquiry and a Nexus advisor will get back to you.
             </div>
           ) : (
             <>

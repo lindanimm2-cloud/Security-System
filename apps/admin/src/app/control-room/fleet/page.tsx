@@ -9,6 +9,8 @@ import { useApi } from '@/hooks/useApi';
 import { adminApi, type ApiResponse } from '@/lib/api-client';
 import { officerStatusLabel } from '@/lib/officer-status';
 import { OpsKpi } from '@/components/ops/OpsKpi';
+import { UiSelect } from '@/components/ui/UiSelect';
+import { CctvLiveFeed, type CctvCamera } from '@/components/portal/CctvLiveFeed';
 import { friendlyErrorMessage } from '@/lib/friendly-error';
 
 type CrewMember = {
@@ -30,6 +32,7 @@ type FleetVehicle = {
   status: string;
   crew: CrewMember[];
   crewCount: number;
+  cameras?: CctvCamera[];
 };
 
 type Officer = {
@@ -113,7 +116,6 @@ function FleetContent() {
     <div className="page-content">
       <header className="page-header">
         <div>
-          <h2>Company fleet</h2>
           <p className="text-muted">
             Vehicle-first board — active, dispatch, and maintenance.
           </p>
@@ -161,6 +163,14 @@ function FleetContent() {
             </p>
             <p className="fleet-card__type">{v.vehicleType.replace(/_/g, ' ')}</p>
 
+            {v.cameras && v.cameras.length > 0 ? (
+              <div className="fleet-card__cams" aria-label={`${v.callSign} dash cams`}>
+                {v.cameras.slice(0, 3).map((c) => (
+                  <CctvLiveFeed key={c.id} camera={c} />
+                ))}
+              </div>
+            ) : null}
+
             <div className="fleet-card__crew">
               <h4>Crew ({v.crewCount})</h4>
               {v.crew.length === 0 ? (
@@ -182,34 +192,33 @@ function FleetContent() {
               <div className="fleet-card__edit">
                 {selectedCrew.map((slot, idx) => (
                   <div key={idx} className="fleet-crew-row">
-                    <select
+                    <UiSelect
+                      ariaLabel="Crew officer"
                       value={slot.officerId}
-                      onChange={(e) => {
-                        const id = e.target.value;
+                      onChange={(id) => {
                         setSelectedCrew((prev) =>
                           prev.map((s, i) => (i === idx ? { ...s, officerId: id } : s)),
                         );
                       }}
-                    >
-                      {officers.map((o) => (
-                        <option key={o.id} value={o.id}>
-                          {o.firstName} {o.lastName}
-                        </option>
-                      ))}
-                    </select>
-                    <select
+                      options={officers.map((o) => ({
+                        value: o.id,
+                        label: `${o.firstName} ${o.lastName}`,
+                      }))}
+                    />
+                    <UiSelect
+                      ariaLabel="Crew role"
                       value={slot.role}
-                      onChange={(e) => {
-                        const role = e.target.value;
+                      onChange={(role) => {
                         setSelectedCrew((prev) =>
                           prev.map((s, i) => (i === idx ? { ...s, role } : s)),
                         );
                       }}
-                    >
-                      <option value="DRIVER">Driver</option>
-                      <option value="PASSENGER">Passenger</option>
-                      <option value="SUPERVISOR">Supervisor</option>
-                    </select>
+                      options={[
+                        { value: 'DRIVER', label: 'Driver' },
+                        { value: 'PASSENGER', label: 'Passenger' },
+                        { value: 'SUPERVISOR', label: 'Supervisor' },
+                      ]}
+                    />
                     <button
                       type="button"
                       className="btn-ghost btn-sm"

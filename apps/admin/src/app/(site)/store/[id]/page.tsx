@@ -83,9 +83,9 @@ export default function ProductDetailPage() {
           ← Back to shop
         </Link>
         <div className="nx-pdp-grid">
-          <div className="nx-pdp-media" aria-hidden>
+          <div className={`nx-pdp-media nx-pdp-media--${product.category.toLowerCase()}`} aria-hidden>
             <span className="nx-pdp-emoji">{product.imageEmoji}</span>
-            <p className="nx-muted">Product image placeholder</p>
+            <span className="nx-pdp-sku">{product.sku}</span>
           </div>
           <div className="nx-pdp-info">
             <p className="nx-cat">

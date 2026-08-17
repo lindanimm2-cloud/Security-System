@@ -2,7 +2,7 @@
 export function adminHomeForRole(role: string): string {
   if (role === 'SUPERVISOR') return '/supervisor';
   if (role === 'MEDICAL_DISPATCHER' || role === 'MEDICAL_CREW') return '/medical';
-  if (role === 'DEVELOPER') return '/control-room/profile';
+  if (role === 'DEVELOPER') return '/control-room/developer';
   return '/control-room';
 }
 

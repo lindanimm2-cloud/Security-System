@@ -55,7 +55,6 @@ function AnalyticsContent() {
     <div className="page-content">
       <div className="page-header">
         <div>
-          <h1>Analytics</h1>
           <p className="text-muted">
             <Link href={CONTROL_ROOM_ROUTES.overview} className="interactive-text">Overview</Link>
             {' · '}

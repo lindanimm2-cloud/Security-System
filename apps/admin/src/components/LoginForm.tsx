@@ -110,7 +110,6 @@ export function LoginForm({
       }
       setRedirecting(true);
       router.push(portal === 'admin' ? adminHomeForRole(session.user.role) : redirectTo);
-      router.refresh();
     } catch (err) {
       setError(friendlyErrorMessage(err, 'login'));
       setLoading(false);
@@ -139,7 +138,6 @@ export function LoginForm({
       );
       setRedirecting(true);
       router.push(redirectTo);
-      router.refresh();
     } catch (err) {
       setError(friendlyErrorMessage(err, 'login'));
       setLoading(false);
@@ -219,8 +217,7 @@ export function LoginForm({
           {portal === 'client' && oauthProvider && (
             <form onSubmit={handleOAuth} className="login-form login-form--v2 login-oauth-panel">
               <p className="text-muted">
-                Demo {oauthProvider === 'google' ? 'Google' : 'Apple'} sign-in —
-                confirm your email (production verifies the provider token).
+                Confirm your {oauthProvider === 'google' ? 'Google' : 'Apple'} email to continue.
               </p>
               <label className="login-field">
                 <span>Email</span>

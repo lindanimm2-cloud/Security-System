@@ -5,6 +5,7 @@ import { Roles } from '../../common/decorators/roles.decorator';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { SurveillanceService } from '../surveillance/surveillance.service';
+import { DeveloperService } from '../developer/developer.service';
 import { AddonCode, TierCode } from './plans.catalog';
 import { ClientService } from './client.service';
 import { LoyaltyService } from './loyalty.service';
@@ -21,6 +22,7 @@ export class ClientController {
     private readonly subscriptionService: SubscriptionService,
     private readonly loyaltyService: LoyaltyService,
     private readonly surveillanceService: SurveillanceService,
+    private readonly developerService: DeveloperService,
   ) {}
 
   @Get('dashboard')
@@ -380,6 +382,15 @@ export class ClientController {
     @Body() body: { name: string; lat: number; lng: number; radiusM?: number },
   ) {
     return this.clientService.createSafeZone(user.id, user.tenantId, body);
+  }
+
+  @Post('support/error-report')
+  submitErrorReport(
+    @CurrentUser() user: AuthUser,
+    @Body()
+    body: { message: string; path?: string; userAgent?: string; context?: string },
+  ) {
+    return this.developerService.submitErrorReportByUserId(user.id, user.tenantId, body);
   }
 
   @Get('notifications')

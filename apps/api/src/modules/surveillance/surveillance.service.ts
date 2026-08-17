@@ -616,7 +616,7 @@ export class SurveillanceService {
       where: { tenantId, OR: [{ camerasLinked: true }, { alarmLinked: true }, { monitoringEnabled: true }] },
       include: {
         user: { select: { id: true, firstName: true, lastName: true, email: true, phone: true } },
-        cameras: true,
+        cameras: { orderBy: { channel: 'asc' } },
         sensors: true,
         alarmEvents: {
           where: { status: { in: ['NEW', 'ACKNOWLEDGED', 'DISPATCHED'] } },
@@ -678,6 +678,9 @@ export class SurveillanceService {
             email: p.user.email,
             phone: p.user.phone,
           },
+          cameras: p.cameras.slice(0, 6).map((c) =>
+            this.formatCamera(c, { viewer: 'STAFF', interiorUnlocked: p.alarmStatus === AlarmStatus.TRIGGERED }),
+          ),
           openEvents: p.alarmEvents.map((e) => this.formatEvent(e)),
         })),
       },

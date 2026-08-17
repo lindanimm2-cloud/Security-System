@@ -48,7 +48,6 @@ function OfficersContent() {
     <div className="page-content">
       <div className="page-header">
         <div>
-          <h1>Officers</h1>
           <p className="text-muted">
             Override officer availability when they are too busy, en route, or returning.
             Dispatch only auto-assigns officers marked <strong>Available</strong>.

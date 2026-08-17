@@ -28,8 +28,7 @@ export default function CommunicationsPage() {
       <div className="page-content">
         <header className="page-header">
           <div>
-            <h2>Communications hub</h2>
-            <p>
+            <p className="text-muted">
               Client chat, internal calls, WhatsApp, dispatch line, and phone — with live notes via
               the call lens while you work anywhere in the control panel.
             </p>

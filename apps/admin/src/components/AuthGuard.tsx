@@ -55,8 +55,10 @@ export function AuthGuard({
     }
 
     window.addEventListener('focus', onFocus);
+    window.addEventListener('4ds-auth-changed', syncSession);
     return () => {
       window.removeEventListener('focus', onFocus);
+      window.removeEventListener('4ds-auth-changed', syncSession);
     };
   }, [portal, loginPath, router]);
 

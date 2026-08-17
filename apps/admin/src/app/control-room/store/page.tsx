@@ -8,6 +8,7 @@ import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { useApi } from '@/hooks/useApi';
 import { adminApi, type ApiResponse } from '@/lib/api-client';
 import { exportCsv } from '@/lib/export-csv';
+import { UiSelect } from '@/components/ui/UiSelect';
 
 type Overview = {
   stats: {
@@ -228,7 +229,6 @@ function StoreCrmContent() {
     <div className="page-content">
       <div className="page-header">
         <div>
-          <h1>Gear Store</h1>
           <p className="text-muted">
             Owner CRM for catalog, stock, and gear orders — linked to sales and install teams.
           </p>
@@ -345,18 +345,13 @@ function StoreCrmContent() {
               </label>
               <label>
                 Category
-                <select
+                <UiSelect
+                  compact={false}
+                  ariaLabel="Product category"
                   value={form.category}
-                  onChange={(e) =>
-                    setForm({ ...form, category: e.target.value })
-                  }
-                >
-                  {CATEGORIES.map((c) => (
-                    <option key={c} value={c}>
-                      {c}
-                    </option>
-                  ))}
-                </select>
+                  onChange={(category) => setForm({ ...form, category })}
+                  options={CATEGORIES.map((c) => ({ value: c, label: c }))}
+                />
               </label>
               <label>
                 Price (cents)
@@ -528,18 +523,12 @@ function StoreCrmContent() {
                     <td>{o.customerName}</td>
                     <td>{o.totalFormatted}</td>
                     <td>
-                      <select
+                      <UiSelect
+                        ariaLabel={`Order ${o.orderNumber} status`}
                         value={o.status}
-                        onChange={(e) =>
-                          updateOrderStatus(o.id, e.target.value)
-                        }
-                      >
-                        {ORDER_STATUSES.map((s) => (
-                          <option key={s} value={s}>
-                            {s}
-                          </option>
-                        ))}
-                      </select>
+                        onChange={(status) => updateOrderStatus(o.id, status)}
+                        options={ORDER_STATUSES.map((s) => ({ value: s, label: s }))}
+                      />
                     </td>
                   </tr>
                 ))}

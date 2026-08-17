@@ -9,6 +9,7 @@ import { useApi } from '@/hooks/useApi';
 import { adminApi, type ApiResponse } from '@/lib/api-client';
 import { getSession } from '@/lib/auth';
 import { CONTROL_ROOM_ROUTES } from '@/lib/control-room-routes';
+import { UiSelect } from '@/components/ui/UiSelect';
 
 type Lead = {
   id: string;
@@ -177,7 +178,6 @@ function SalesCrmContent() {
     <div className="page-content">
       <div className="page-header">
         <div>
-          <h1>Sales desk</h1>
           <p className="text-muted">
             {isSales
               ? 'Your pipeline, gear store leads, and follow-ups.'
@@ -296,31 +296,27 @@ function SalesCrmContent() {
             </label>
             <label>
               Status
-              <select
+              <UiSelect
+                compact={false}
+                ariaLabel="Lead status"
                 value={form.status}
-                onChange={(e) => setForm({ ...form, status: e.target.value })}
-              >
-                {LEAD_STATUSES.map((s) => (
-                  <option key={s} value={s}>
-                    {s}
-                  </option>
-                ))}
-              </select>
+                onChange={(status) => setForm({ ...form, status })}
+                options={LEAD_STATUSES.map((s) => ({ value: s, label: s }))}
+              />
             </label>
             <label>
               Owner
-              <select
+              <UiSelect
+                compact={false}
+                ariaLabel="Lead owner"
                 value={form.ownerUserId}
-                onChange={(e) =>
-                  setForm({ ...form, ownerUserId: e.target.value })
-                }
-              >
-                {(usersRes?.data ?? []).map((u) => (
-                  <option key={u.id} value={u.id}>
-                    {u.firstName} {u.lastName} ({u.role})
-                  </option>
-                ))}
-              </select>
+                onChange={(ownerUserId) => setForm({ ...form, ownerUserId })}
+                options={(usersRes?.data ?? []).map((u) => ({
+                  value: u.id,
+                  label: `${u.firstName} ${u.lastName}`,
+                  meta: u.role,
+                }))}
+              />
             </label>
             <label>
               Next follow-up

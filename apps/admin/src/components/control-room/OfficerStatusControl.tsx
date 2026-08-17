@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
+import { OpsMenuDropdown } from '@/components/ops/OpsMenuDropdown';
 import { adminApi } from '@/lib/api-client';
 import { friendlyErrorMessage } from '@/lib/friendly-error';
 import { OFFICER_STATUSES, officerStatusLabel, officerStatusSlug } from '@/lib/officer-status';
@@ -39,19 +40,25 @@ export function OfficerStatusControl({
   if (variant === 'select') {
     return (
       <div className="officer-status-select-wrap">
-        <select
-          className="officer-status-select"
-          value={status}
+        <OpsMenuDropdown
+          className="officer-status-menu"
+          compact
+          align="right"
+          ariaLabel="Officer status"
           disabled={updating}
-          onChange={(e) => void setStatus(e.target.value)}
-          aria-label="Officer status"
-        >
-          {OFFICER_STATUSES.map((s) => (
-            <option key={s.value} value={s.value}>
-              {s.label}
-            </option>
-          ))}
-        </select>
+          label={officerStatusLabel(status)}
+          leading={<OfficerStatusDot status={status} />}
+          items={OFFICER_STATUSES.map((s) => ({
+            id: s.value,
+            label: s.label,
+            description: s.hint,
+            active: status === s.value,
+            tone: s.value === 'OFF_DUTY' ? 'danger' : s.value === 'AVAILABLE' ? 'ok' : 'default',
+            className: `officer-status-item officer-status-item--${officerStatusSlug(s.value)}`,
+            leading: <OfficerStatusDot status={s.value} />,
+            onClick: () => void setStatus(s.value),
+          }))}
+        />
         {updating && <LoadingSpinner label="" size="sm" />}
         {error && <span className="officer-status-error">{error}</span>}
       </div>

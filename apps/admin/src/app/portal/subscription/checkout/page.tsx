@@ -121,7 +121,7 @@ function CheckoutContent() {
         </button>
 
         <p className="text-muted checkout-footer">
-          Demo mode — no real charge. Production uses PayFast ITN webhooks.
+          Secure checkout — no real charge in this environment.
           {' '}
           <Link href="/portal/subscription" className="interactive-text">Cancel</Link>
         </p>

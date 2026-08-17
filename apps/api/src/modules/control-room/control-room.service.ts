@@ -1,5 +1,6 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import {
+  ErrorReportStatus,
   IncidentPriority,
   IncidentStatus,
   IncidentType,
@@ -21,6 +22,7 @@ import {
   parseOfficerIdFromVolunteerNote,
   volunteerNoteCutoff,
 } from '../../common/officer-volunteer.util';
+import { canSeeDeveloperTickets } from '../../common/developer-access';
 
 /** Short premium-client invite codes shown to customers (e.g. NX-A7K2M9). */
 export function generateClientInviteCode(): string {
@@ -373,8 +375,9 @@ export class ControlRoomService {
     };
   }
 
-  async getNotifications(tenantId: string) {
-    const [notifications, incidents] = await Promise.all([
+  async getNotifications(tenantId: string, user?: { id: string; role: UserRole }) {
+    const showTickets = user ? canSeeDeveloperTickets(user.role) : false;
+    const [notifications, incidents, errorReports] = await Promise.all([
       this.prisma.notification.findMany({
         where: { tenantId },
         orderBy: { createdAt: 'desc' },
@@ -387,6 +390,19 @@ export class ControlRoomService {
         take: 20,
         select: { id: true, type: true, isSilent: true, priority: true, createdAt: true, user: true },
       }),
+      showTickets
+        ? this.prisma.errorReport.findMany({
+            where: {
+              tenantId,
+              status: { in: [ErrorReportStatus.OPEN, ErrorReportStatus.ACKNOWLEDGED] },
+            },
+            orderBy: { createdAt: 'desc' },
+            take: 40,
+            include: {
+              reporter: { select: { firstName: true, lastName: true, role: true } },
+            },
+          })
+        : Promise.resolve([]),
     ]);
 
     const incidentFeed = incidents.map((i) => ({
@@ -402,7 +418,9 @@ export class ControlRoomService {
       entityId: i.id,
     }));
 
-    const stored = notifications.map((n) => ({
+    const stored = notifications
+      .filter((n) => n.type !== NotificationType.ERROR_REPORT)
+      .map((n) => ({
       id: n.id,
       category: this.notificationCategoryFromType(n.type, n.title, n.body),
       title: n.title,
@@ -415,6 +433,27 @@ export class ControlRoomService {
       entityId: null as string | null,
     }));
 
+    const ticketFeed = errorReports.map((r) => {
+      const code = this.developerTicketCode(r.id);
+      const reporter = `${r.reporter.firstName} ${r.reporter.lastName}`.trim();
+      return {
+        id: `ticket-${r.id}`,
+        category: 'DEVELOPER' as const,
+        title: `Issue ticket ${code}`,
+        body: `${reporter} · ${r.message}`,
+        priority: (r.status === ErrorReportStatus.OPEN ? 'high' : 'medium') as
+          | 'low'
+          | 'medium'
+          | 'high'
+          | 'critical',
+        isRead: r.status !== ErrorReportStatus.OPEN,
+        createdAt: r.createdAt.toISOString(),
+        link: `/control-room/developer?ticket=${r.id}`,
+        entityType: null as 'incident' | 'vehicle' | 'client' | 'property' | null,
+        entityId: r.id,
+      };
+    });
+
     const priorityRank: Record<string, number> = {
       critical: 0,
       high: 1,
@@ -422,7 +461,7 @@ export class ControlRoomService {
       low: 3,
     };
 
-    const merged = [...incidentFeed, ...stored].sort((a, b) => {
+    const merged = [...incidentFeed, ...ticketFeed, ...stored].sort((a, b) => {
       const unreadDelta = Number(a.isRead) - Number(b.isRead);
       if (unreadDelta !== 0) return unreadDelta;
       const pa = priorityRank[a.priority] ?? 9;
@@ -441,7 +480,7 @@ export class ControlRoomService {
   }
 
   async markNotificationRead(tenantId: string, id: string) {
-    if (id.startsWith('incident-')) {
+    if (id.startsWith('incident-') || id.startsWith('ticket-')) {
       return { success: true, data: { id, isRead: true } };
     }
     const notification = await this.prisma.notification.findFirst({
@@ -1896,6 +1935,12 @@ export class ControlRoomService {
     return 'ALARM';
   }
 
+  private developerTicketCode(id: string) {
+    const compact = id.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+    const tail = (compact.slice(-4) || '0000').padStart(4, '0');
+    return `DEV-${tail}`;
+  }
+
   private notificationCategoryFromType(type: string, title: string, body: string) {
     const text = `${title} ${body}`.toLowerCase();
     if (type === 'PANIC_ALERT') return 'PANIC';
@@ -1904,6 +1949,9 @@ export class ControlRoomService {
     if (type === 'DISPATCH_ASSIGNED' || type === 'INCIDENT_UPDATE') return 'OFFICER';
     if (type === 'BILLING' || text.includes('billing') || text.includes('subscription') || text.includes('payment') || text.includes('past-due') || text.includes('overdue')) {
       return 'BILLING';
+    }
+    if (type === 'ERROR_REPORT' || text.includes('issue ticket') || text.includes('error reported')) {
+      return 'DEVELOPER';
     }
     if (text.includes('medical')) return 'MEDICAL';
     if (text.includes('alarm')) return 'ALARM';
@@ -1915,6 +1963,7 @@ export class ControlRoomService {
     if (type === 'PANIC_ALERT' || t.includes('panic')) return 'critical';
     if (type === 'THEFT_ALERT') return 'high';
     if (type === 'BILLING' || t.includes('past-due') || t.includes('overdue')) return 'high';
+    if (type === 'ERROR_REPORT' || t.includes('issue ticket')) return 'high';
     if (type === 'FAMILY_ALERT') return 'medium';
     return 'low';
   }
@@ -1970,6 +2019,9 @@ export class ControlRoomService {
       text.includes('overdue')
     ) {
       return '/control-room/customers?filter=PAST_DUE';
+    }
+    if (type === 'ERROR_REPORT' || text.includes('issue ticket') || text.includes('error reported')) {
+      return '/control-room/developer';
     }
     if (text.includes('alarm') || text.includes('property')) return '/control-room/map?focus=properties';
     return '/control-room';

@@ -10,6 +10,7 @@ import { useApi } from '@/hooks/useApi';
 import { adminApi, type ApiResponse } from '@/lib/api-client';
 import { dispatchIncidentHref } from '@/lib/control-room-routes';
 import { SensorZonePanel, type SensorRow } from '@/components/portal/SensorZonePanel';
+import { CctvLiveFeed } from '@/components/portal/CctvLiveFeed';
 import { alarmStatusLabel } from '@/lib/sa-alarm';
 
 type SiteDetail = {
@@ -194,28 +195,21 @@ function SiteContent() {
             or an active panic / emergency is on the account.
           </p>
         )}
-        <div className="camera-grid camera-grid--detail">
+        <div className="camera-grid camera-grid--detail cam-viewer__mosaic cam-viewer__mosaic--3">
           {site.cameras.map((c) => (
-            <div key={c.id} className={`camera-tile ${c.privacyLocked ? 'camera-tile--locked' : ''}`}>
-              <div
-                className={`camera-tile__feed camera-tile__feed--${c.status.toLowerCase()} ${
-                  c.privacyLocked ? 'camera-tile__feed--privacy' : ''
-                }`}
-              >
-                <span className="camera-tile__live">
-                  {c.privacyLocked ? 'PRIVATE' : c.isLiveCapable ? 'LIVE' : 'CH'}{' '}
-                  {!c.privacyLocked && c.channel}
-                </span>
-                {c.isInterior && !c.privacyLocked && (
-                  <span className="camera-tile__badge">Interior</span>
-                )}
-                <span className="camera-tile__name">{c.name}</span>
-              </div>
-              <span className="camera-tile__meta">
-                {c.locationLabel}
-                {c.privacyLocked ? '' : ` · ${c.status}`}
-              </span>
-            </div>
+            <CctvLiveFeed
+              key={c.id}
+              camera={{
+                id: c.id,
+                name: c.privacyLocked ? 'Interior camera' : c.name,
+                locationLabel: c.privacyLocked ? 'Inside · private' : c.locationLabel,
+                channel: c.channel,
+                status: c.privacyLocked ? 'OFFLINE' : c.status,
+                snapshotUrl: c.privacyLocked ? null : c.snapshotUrl,
+                isLiveCapable: c.privacyLocked ? false : c.isLiveCapable,
+                isInterior: c.isInterior,
+              }}
+            />
           ))}
         </div>
       </section>

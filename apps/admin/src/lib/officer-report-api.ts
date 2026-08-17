@@ -1,5 +1,7 @@
-import { clearSession, getSession } from './auth';
+import { getSession, logoutIfUnauthorized } from './auth';
 import type { ApiResponse } from './api-client';
+import { isDemoMode } from './demo/is-demo-mode';
+import { handleDemoRequest } from './demo/handler';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4010/v1';
 
@@ -16,6 +18,15 @@ async function postMultipart<T>(path: string, form: FormData): Promise<T> {
   const session = getSession('officer');
   if (!session) throw new Error('Not authenticated');
 
+  if (isDemoMode()) {
+    return handleDemoRequest<T>({
+      portal: 'officer',
+      path,
+      method: 'POST',
+      session,
+    });
+  }
+
   let res: Response;
   try {
     res = await fetch(`${API_URL}${path}`, {
@@ -27,8 +38,7 @@ async function postMultipart<T>(path: string, form: FormData): Promise<T> {
     throw new Error('Request failed');
   }
 
-  if (res.status === 401) {
-    clearSession('officer');
+  if (logoutIfUnauthorized('officer', res.status)) {
     throw new Error('Session expired');
   }
 

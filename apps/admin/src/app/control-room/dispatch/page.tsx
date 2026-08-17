@@ -16,6 +16,7 @@ import { OfficerStatusControl, OfficerStatusDot } from '@/components/control-roo
 import { setActiveIncidentId } from '@/lib/dispatch-context';
 import { officerStatusLabel } from '@/lib/officer-status';
 import { CONTROL_ROOM_ROUTES, incidentHref, mapHref, officerHref } from '@/lib/control-room-routes';
+import { isAwaitingDispatch } from '@/lib/incident-status';
 
 type Officer = {
   id: string;
@@ -129,8 +130,8 @@ function DispatchContent() {
   if (loading) return <LoadingSpinner label="Loading dispatch..." fullScreen />;
   if (error) return <ErrorAlert error={error} onRetry={reload} />;
 
-  const unassigned = data!.data.incidents.filter(
-    (i) => i.status === 'ACTIVE' && !i.officer,
+  const unassigned = data!.data.incidents.filter((i) =>
+    isAwaitingDispatch(i.status, i.officer),
   );
   const dispatches = dispatchesData?.data ?? [];
 
@@ -138,7 +139,6 @@ function DispatchContent() {
     <div className="page-content">
       <div className="page-header">
         <div>
-          <h1>Dispatch</h1>
           <p className="text-muted">
             <Link href={CONTROL_ROOM_ROUTES.incidents} className="interactive-text">Incidents</Link>
             {' · '}

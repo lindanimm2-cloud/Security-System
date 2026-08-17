@@ -11,6 +11,9 @@ export type OpsMenuItem = {
   active?: boolean;
   tone?: 'default' | 'danger' | 'ok';
   meta?: string;
+  description?: string;
+  leading?: ReactNode;
+  className?: string;
 };
 
 type OpsMenuDropdownProps = {
@@ -19,6 +22,11 @@ type OpsMenuDropdownProps = {
   className?: string;
   align?: 'left' | 'right';
   summary?: string;
+  compact?: boolean;
+  ariaLabel?: string;
+  disabled?: boolean;
+  leading?: ReactNode;
+  showCount?: boolean;
 };
 
 /** Compact enterprise dropdown — panel is portaled so mobile cards cannot clip it. */
@@ -28,6 +36,11 @@ export function OpsMenuDropdown({
   className = '',
   align = 'left',
   summary,
+  compact = false,
+  ariaLabel,
+  disabled = false,
+  leading,
+  showCount = false,
 }: OpsMenuDropdownProps) {
   const [open, setOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
@@ -46,15 +59,17 @@ export function OpsMenuDropdown({
 
     function place() {
       const rect = triggerRef.current!.getBoundingClientRect();
-      const width = Math.min(280, window.innerWidth - 24);
-      let left =
-        align === 'right' ? rect.right - width : rect.left;
+      const width = Math.min(
+        Math.max(rect.width, 240),
+        window.innerWidth - 24,
+      );
+      let left = align === 'right' ? rect.right - width : rect.left;
       left = Math.max(12, Math.min(left, window.innerWidth - width - 12));
-      const estimatedHeight = Math.min(window.innerHeight * 0.5, 320);
-      const below = rect.bottom + 8;
+      const estimatedHeight = Math.min(window.innerHeight * 0.5, 380);
+      const below = rect.bottom + 6;
       const top =
         below + estimatedHeight > window.innerHeight - 12
-          ? Math.max(12, rect.top - estimatedHeight - 8)
+          ? Math.max(12, rect.top - estimatedHeight - 6)
           : below;
       setPos({ top, left, width });
     }
@@ -101,15 +116,22 @@ export function OpsMenuDropdown({
       item.active ? 'ops-menu__item--active' : '',
       item.tone === 'danger' ? 'ops-menu__item--danger' : '',
       item.tone === 'ok' ? 'ops-menu__item--ok' : '',
+      item.className ?? '',
     ]
       .filter(Boolean)
       .join(' ');
 
     const body: ReactNode = (
       <>
-        <span className="ops-menu__item-label">{item.label}</span>
+        {item.leading ? <span className="ops-menu__leading">{item.leading}</span> : null}
+        <span className="ops-menu__item-text">
+          <span className="ops-menu__item-label">{item.label}</span>
+          {item.description ? (
+            <span className="ops-menu__item-desc">{item.description}</span>
+          ) : null}
+        </span>
         {item.meta ? <span className="ops-menu__item-meta">{item.meta}</span> : null}
-        {item.active ? <span className="ops-menu__check">On</span> : null}
+        {item.active ? <span className="ops-menu__check" aria-hidden>✓</span> : null}
       </>
     );
 
@@ -146,7 +168,7 @@ export function OpsMenuDropdown({
   return (
     <div
       ref={rootRef}
-      className={`ops-menu ${open ? 'ops-menu--open' : ''} ${className}`.trim()}
+      className={`ops-menu ${open ? 'ops-menu--open' : ''} ${compact ? 'ops-menu--compact' : ''} ${className}`.trim()}
     >
       <button
         ref={triggerRef}
@@ -155,14 +177,17 @@ export function OpsMenuDropdown({
         aria-haspopup="menu"
         aria-expanded={open}
         aria-controls={menuId}
+        aria-label={ariaLabel}
+        disabled={disabled}
         onClick={() => setOpen((v) => !v)}
       >
+        {leading ? <span className="ops-menu__leading">{leading}</span> : null}
         <span className="ops-menu__label">{label}</span>
         {summary ? <span className="ops-menu__summary">{summary}</span> : null}
-        {activeCount > 0 ? <span className="ops-menu__count">{activeCount}</span> : null}
-        <span className="ops-menu__caret" aria-hidden>
-          ▾
-        </span>
+        {showCount && activeCount > 0 ? (
+          <span className="ops-menu__count">{activeCount}</span>
+        ) : null}
+        <span className="ops-menu__caret" aria-hidden />
       </button>
       {mounted && open
         ? createPortal(

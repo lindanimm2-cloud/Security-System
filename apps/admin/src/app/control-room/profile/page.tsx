@@ -30,7 +30,7 @@ type DeveloperDesk = {
 };
 
 const DEVELOPER_LINKS = [
-  { label: 'Developer desk', href: '/control-room/developer', desc: 'Error reports & support chat' },
+  { label: 'Developer desk', href: '/control-room/developer', desc: 'Issue tickets & support chat' },
   { label: 'Live map', href: '/control-room/map', desc: 'Fleet & incident positions' },
   { label: 'Incidents', href: '/control-room/incidents', desc: 'Panic, medical, and dispatch queue' },
   { label: 'Customers', href: '/control-room/customers', desc: 'CRM, subscriptions, billing checks' },
@@ -157,7 +157,6 @@ function ProfileContent() {
     <div className="page-content page-content--profile">
       <div className="page-header">
         <div>
-          <h1>My profile</h1>
           <p className="text-muted">
             {isDeveloper
               ? 'Your developer account, toolkit, and sign-in details.'
@@ -205,7 +204,7 @@ function ProfileContent() {
               )}
               {isDeveloper && deskData && deskData.openErrorReports > 0 && (
                 <span className="status-pill status-pill--new">
-                  {deskData.openErrorReports} open report{deskData.openErrorReports === 1 ? '' : 's'}
+                  {deskData.openErrorReports} open ticket{deskData.openErrorReports === 1 ? '' : 's'}
                 </span>
               )}
             </div>

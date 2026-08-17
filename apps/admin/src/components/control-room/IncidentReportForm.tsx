@@ -5,6 +5,7 @@ import { ErrorAlert } from '@/components/ErrorAlert';
 import { useState } from 'react';
 import { SubscriptionBadge } from '@/components/control-room/SubscriptionBadge';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
+import { UiSelect } from '@/components/ui/UiSelect';
 import { adminApi } from '@/lib/api-client';
 import { friendlyErrorMessage } from '@/lib/friendly-error';
 
@@ -87,31 +88,41 @@ export function IncidentReportForm({
       <div className="incident-report-form__grid">
         <label>
           Type
-          <select value={type} onChange={(e) => setType(e.target.value)}>
-            {INCIDENT_TYPES.map((t) => (
-              <option key={t} value={t}>{t.replace('_', ' ')}</option>
-            ))}
-          </select>
+          <UiSelect
+            compact={false}
+            ariaLabel="Incident type"
+            value={type}
+            onChange={setType}
+            options={INCIDENT_TYPES.map((t) => ({
+              value: t,
+              label: t.replace('_', ' '),
+            }))}
+          />
         </label>
         <label>
           Priority
-          <select value={priority} onChange={(e) => setPriority(e.target.value)}>
-            {PRIORITIES.map((p) => (
-              <option key={p} value={p}>{p}</option>
-            ))}
-          </select>
+          <UiSelect
+            compact={false}
+            ariaLabel="Incident priority"
+            value={priority}
+            onChange={setPriority}
+            options={PRIORITIES.map((p) => ({ value: p, label: p }))}
+          />
         </label>
         {clients.length > 0 && (
           <label>
             Client
-            <select value={userId} onChange={(e) => setUserId(e.target.value)}>
-              {clients.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.firstName} {c.lastName}
-                  {c.subscription ? ` · ${c.subscription.tierCode}` : ''}
-                </option>
-              ))}
-            </select>
+            <UiSelect
+              compact={false}
+              ariaLabel="Client"
+              value={userId}
+              onChange={setUserId}
+              options={clients.map((c) => ({
+                value: c.id,
+                label: `${c.firstName} ${c.lastName}`,
+                meta: c.subscription?.tierCode,
+              }))}
+            />
             {(() => {
               const selected = clients.find((c) => c.id === userId);
               if (!selected?.subscription) return null;

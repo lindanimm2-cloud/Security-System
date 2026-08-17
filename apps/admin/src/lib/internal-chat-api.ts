@@ -1,6 +1,8 @@
-import { clearSession, getSession, type AuthPortal } from './auth';
+import { getSession, logoutIfUnauthorized, type AuthPortal } from './auth';
 import type { ApiResponse } from './api-client';
 import type { ChatMessage, ChatParticipant } from '@/components/InternalChat';
+import { isDemoMode } from './demo/is-demo-mode';
+import { handleDemoRequest } from './demo/handler';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4010/v1';
 
@@ -26,6 +28,15 @@ export async function fetchInternalChat(
   const session = getSession(portal);
   if (!session) throw new Error('Not authenticated');
 
+  if (isDemoMode()) {
+    return handleDemoRequest<ApiResponse<InternalChatData>>({
+      portal,
+      path: channelPath(channel),
+      method: 'GET',
+      session,
+    });
+  }
+
   let res: Response;
   try {
     res = await fetch(`${API_URL}${channelPath(channel)}`, {
@@ -36,8 +47,7 @@ export async function fetchInternalChat(
     throw new Error('Request failed');
   }
 
-  if (res.status === 401) {
-    clearSession(portal);
+  if (logoutIfUnauthorized(portal, res.status)) {
     throw new Error('Session expired');
   }
 
@@ -59,6 +69,16 @@ export async function sendInternalChatMessage(
   const session = getSession(portal);
   if (!session) throw new Error('Not authenticated');
 
+  if (isDemoMode()) {
+    return handleDemoRequest<ApiResponse<ChatMessage>>({
+      portal,
+      path: channelPath(channel),
+      method: 'POST',
+      body: JSON.stringify({ content }),
+      session,
+    });
+  }
+
   const form = new FormData();
   form.append('content', content);
   for (const file of files) {
@@ -76,8 +96,7 @@ export async function sendInternalChatMessage(
     throw new Error('Request failed');
   }
 
-  if (res.status === 401) {
-    clearSession(portal);
+  if (logoutIfUnauthorized(portal, res.status)) {
     throw new Error('Session expired');
   }
 

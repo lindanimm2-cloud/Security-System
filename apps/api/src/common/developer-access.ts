@@ -10,6 +10,8 @@ export const ADMIN_PORTAL_ROLES: UserRole[] = [
   UserRole.DISPATCHER,
   UserRole.SALES,
   UserRole.DEVELOPER,
+  UserRole.MEDICAL_DISPATCHER,
+  UserRole.MEDICAL_CREW,
 ];
 
 /** Ops roles that may use control-room surveillance / dispatch tools */
@@ -54,6 +56,15 @@ export function canContactDeveloper(role: UserRole | string): boolean {
 
 export function isDeveloper(role: UserRole | string): boolean {
   return role === UserRole.DEVELOPER;
+}
+
+/** Roles that receive incoming error reports as issue tickets. */
+export function canSeeDeveloperTickets(role: UserRole | string): boolean {
+  return (
+    role === UserRole.DEVELOPER ||
+    role === UserRole.OWNER ||
+    role === UserRole.SUPER_ADMIN
+  );
 }
 
 type TenantSettings = {

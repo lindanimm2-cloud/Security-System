@@ -1,6 +1,5 @@
-import { clearSession, getSession, type AuthPortal, type AuthSession } from './auth';
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4010/v1';
+import { getSession, type AuthPortal, type AuthSession } from './auth';
+import { adminApi, clientApi, officerApi, techApi } from './api-client';
 
 const DEVELOPER_CONTACT_ROLES = new Set([
   'OWNER',
@@ -55,33 +54,19 @@ export async function submitDeveloperErrorReport(input: {
   portal: AuthPortal;
   accessToken: string;
 }): Promise<void> {
-  let res: Response;
-  try {
-    res = await fetch(`${API_URL}/developer/error-reports`, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${input.accessToken}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        message: input.message,
-        path: input.path,
-        userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : undefined,
-        context: input.context,
-      }),
-    });
-  } catch {
-    throw new Error('Could not reach the API to notify the developer');
-  }
+  const api =
+    input.portal === 'officer'
+      ? officerApi
+      : input.portal === 'technician'
+        ? techApi
+        : input.portal === 'client'
+          ? clientApi
+          : adminApi;
 
-  if (res.status === 401) {
-    clearSession(input.portal);
-    throw new Error('Session expired');
-  }
-
-  const json = await res.json().catch(() => ({}));
-  if (!res.ok) {
-    const msg = Array.isArray(json?.message) ? json.message[0] : json?.message;
-    throw new Error(msg ?? 'Could not notify developer');
-  }
+  await api.post('/developer/error-reports', {
+    message: input.message,
+    path: input.path,
+    userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : undefined,
+    context: input.context,
+  });
 }

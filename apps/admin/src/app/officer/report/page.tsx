@@ -11,6 +11,7 @@ import { useApi } from '@/hooks/useApi';
 import { officerApi, type ApiResponse } from '@/lib/api-client';
 import { friendlyErrorMessage } from '@/lib/friendly-error';
 import { submitAssignmentReport, submitFieldIncidentReport } from '@/lib/officer-report-api';
+import { UiSelect } from '@/components/ui/UiSelect';
 
 type Assignment = {
   dispatchId: string;
@@ -159,16 +160,16 @@ function ReportContent() {
             <form className="incident-report-form" onSubmit={handleAssignmentReport}>
               <label>
                 Assignment
-                <select
-                  value={selectedId || assignments[0]?.incidentId}
-                  onChange={(e) => setSelectedId(e.target.value)}
-                >
-                  {assignments.map((a) => (
-                    <option key={a.incidentId} value={a.incidentId}>
-                      {a.type} — {a.title ?? a.address ?? 'Active job'}
-                    </option>
-                  ))}
-                </select>
+                <UiSelect
+                  compact={false}
+                  ariaLabel="Assignment"
+                  value={selectedId}
+                  onChange={setSelectedId}
+                  options={assignments.map((a) => ({
+                    value: a.incidentId,
+                    label: `${a.type} — ${a.title ?? a.address ?? 'Active job'}`,
+                  }))}
+                />
               </label>
               <label>
                 Field report
@@ -204,11 +205,16 @@ function ReportContent() {
             <div className="incident-report-form__grid">
               <label>
                 Type
-                <select value={fieldType} onChange={(e) => setFieldType(e.target.value)}>
-                  {FIELD_TYPES.map((t) => (
-                    <option key={t} value={t}>{t.replace('_', ' ')}</option>
-                  ))}
-                </select>
+                <UiSelect
+                  compact={false}
+                  ariaLabel="Incident type"
+                  value={fieldType}
+                  onChange={setFieldType}
+                  options={FIELD_TYPES.map((t) => ({
+                    value: t,
+                    label: t.replace('_', ' '),
+                  }))}
+                />
               </label>
               <label>
                 Title

@@ -52,8 +52,8 @@ export default function CareersPage() {
           <p className="nx-eyebrow">Open roles</p>
           <h2>Where you can make an impact</h2>
           <p>
-            Sample openings for the client demo — swap in live vacancies,
-            benefits, and application links when you go to market.
+            Current openings in the control room, field response, installs, and
+            sales. Send a brief via Contact and a hiring lead will follow up.
           </p>
         </div>
         <div className="nx-career-list">

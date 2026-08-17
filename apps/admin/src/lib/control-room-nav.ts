@@ -15,7 +15,8 @@ const SALES_ROLES = [...OWNER_STORE_ROLES, 'SALES'];
 export const CONTROL_ROOM_NAV: ControlRoomNavItem[] = [
   { href: '/control-room', label: 'Ops Board', icon: 'overview', exact: true },
   { href: '/control-room/map', label: 'Live Map', icon: 'live-map' },
-  { href: '/control-room/surveillance', label: 'Surveillance', icon: 'surveillance' },
+  { href: '/control-room/surveillance', label: 'CCTV', icon: 'surveillance' },
+  { href: '/control-room/fleet', label: 'Vehicles', icon: 'fleet' },
   { href: '/control-room/incidents', label: 'Incidents', icon: 'incidents' },
   { href: '/control-room/dispatch', label: 'Dispatch', icon: 'dispatch' },
   { href: '/control-room/customers', label: 'Customers', icon: 'customers' },
@@ -38,7 +39,6 @@ export const CONTROL_ROOM_NAV: ControlRoomNavItem[] = [
     roles: [...OWNER_STORE_ROLES, 'SUPERVISOR', 'SALES'],
   },
   { href: '/control-room/officers', label: 'Officers', icon: 'officers' },
-  { href: '/control-room/fleet', label: 'Fleet', icon: 'fleet' },
   { href: '/control-room/documents', label: 'Documents', icon: 'documents' },
   { href: '/control-room/communications', label: 'Communications', icon: 'communications' },
   { href: '/control-room/chat', label: 'Internal Chat', icon: 'chat' },
@@ -72,6 +72,8 @@ export function navForRole(role: string): ControlRoomNavItem[] {
     const hrefs = new Set([
       '/control-room',
       '/control-room/map',
+      '/control-room/surveillance',
+      '/control-room/fleet',
       '/control-room/incidents',
       '/control-room/dispatch',
       '/control-room/communications',
@@ -101,10 +103,10 @@ export function navForRole(role: string): ControlRoomNavItem[] {
   if (role === 'OWNER') {
     const first = [
       '/control-room',
+      '/control-room/map',
+      '/control-room/surveillance',
+      '/control-room/fleet',
       '/control-room/incidents',
-      '/control-room/analytics',
-      '/control-room/customers',
-      '/control-room/officers',
     ];
     const rest = CONTROL_ROOM_NAV.filter((item) => !first.includes(item.href));
     return [
@@ -134,6 +136,8 @@ export function navForRole(role: string): ControlRoomNavItem[] {
 const MOBILE_LABELS: Record<string, string> = {
   '/control-room': 'Home',
   '/control-room/map': 'Map',
+  '/control-room/surveillance': 'CCTV',
+  '/control-room/fleet': 'Fleet',
   '/control-room/customers': 'Clients',
   '/control-room/incidents': 'Ops',
   '/control-room/sales': 'Sales',
@@ -153,16 +157,16 @@ const MOBILE_PREFERRED: Record<string, string[]> = {
   DEFAULT: [
     '/control-room',
     '/control-room/map',
-    '/control-room/incidents',
-    '/control-room/customers',
+    '/control-room/surveillance',
+    '/control-room/fleet',
     '/control-room/profile',
   ],
   DEVELOPER: [
     '/control-room/developer',
     '/control-room/map',
-    '/control-room/incidents',
+    '/control-room/surveillance',
+    '/control-room/fleet',
     '/control-room/profile',
-    '/control-room/chat',
   ],
 };
 

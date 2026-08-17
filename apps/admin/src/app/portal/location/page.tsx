@@ -77,9 +77,14 @@ function LocationContent() {
             <span>Lat: {location.lat.toFixed(4)}, Lng: {location.lng.toFixed(4)}</span>
           </div>
         )}
-        <div className="map-placeholder map-placeholder--small">
+        <div className="map-placeholder map-placeholder--small map-placeholder--location">
           <div className="map-placeholder-grid" />
-          <p>{location ? 'Your position has been updated on the live map.' : 'Tap update to share your location.'}</p>
+          {location ? <span className="location-pin" aria-hidden /> : null}
+          <p>
+            {location
+              ? `Live · ${location.lat.toFixed(4)}, ${location.lng.toFixed(4)}`
+              : 'Share your position with dispatch and family.'}
+          </p>
         </div>
       </div>
     </div>

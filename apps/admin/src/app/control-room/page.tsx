@@ -2,8 +2,10 @@
 
 import { ErrorAlert } from '@/components/ErrorAlert';
 import Link from 'next/link';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { ControlRoomLayout } from '@/components/control-room/ControlRoomLayout';
+import { DashboardCctvWall } from '@/components/control-room/DashboardCctvWall';
+import { DashboardFleetStrip } from '@/components/control-room/DashboardFleetStrip';
 import { DashboardLiveMap } from '@/components/control-room/DashboardLiveMap';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { useApi } from '@/hooks/useApi';
@@ -16,7 +18,6 @@ import { getSession } from '@/lib/auth';
 import { navForRole } from '@/lib/control-room-nav';
 import { DispatchMenuButton } from '@/components/control-room/DispatchMenuButton';
 import { OpsQuickWork, OpsCompactStats } from '@/components/ops/OpsQuickWork';
-import { OpsKpi } from '@/components/ops/OpsKpi';
 import { incidentPriorityBand, PORTAL_HOME_PRIORITIES } from '@/lib/portal-priority';
 
 type Dashboard = {
@@ -80,6 +81,48 @@ function mapStatusToTimeline(status?: string, priority?: string): string {
     return priority && ['CRITICAL', 'HIGH'].includes(priority.toUpperCase()) ? 'ACK' : 'VERIFY';
   }
   return 'ACK';
+}
+
+function QueueActionIcon({ name }: { name: 'dispatch' | 'call' | 'cctv' | 'map' | 'resolve' }) {
+  const paths: Record<typeof name, ReactNode> = {
+    dispatch: (
+      <>
+        <circle cx="12" cy="12" r="2" />
+        <path d="M4.9 19.1C1 15.2 1 8.8 4.9 4.9M19.1 4.9C23 8.8 23 15.2 19.1 19.1M7.8 16.2c-2.3-2.3-2.3-6.1 0-8.5M16.2 7.8c2.3 2.3 2.3 6.1 0 8.5" />
+      </>
+    ),
+    call: (
+      <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.8 19.8 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.8 19.8 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z" />
+    ),
+    cctv: (
+      <>
+        <rect x="2" y="6" width="13" height="11" rx="2" />
+        <path d="m15 10 6-3v9l-6-3" />
+      </>
+    ),
+    map: (
+      <>
+        <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
+        <circle cx="12" cy="10" r="3" />
+      </>
+    ),
+    resolve: <path d="M20 6 9 17l-5-5" />,
+  };
+
+  return (
+    <svg
+      className="queue-action__icon"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.9"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      {paths[name]}
+    </svg>
+  );
 }
 
 export default function ControlRoomPage() {
@@ -172,10 +215,8 @@ function OverviewContent() {
   if (error) return <ErrorAlert error={error} onRetry={reload} />;
   if (!d) return null;
 
-  const vehicles = d.stats.vehiclesAvailable ?? Math.max(1, Math.floor(d.stats.availableOfficers / 2));
-  const ambulances = d.stats.ambulancesAvailable ?? 2;
-  const systemOk =
-    d.system.api === 'up' || d.system.api === 'Demo mode' || Boolean(d.system.realtime);
+  const panicQueue = prioritizedIncidents.filter((i) => /PANIC/i.test(i.type));
+  const panicCount = panicQueue.length;
 
   return (
     <div className="dash-ops dash-ops--ops-board">
@@ -212,40 +253,123 @@ function OverviewContent() {
       )}
 
       <div className="ops-board">
-        <div className="ops-board__kpi" aria-label="Ops KPIs">
-          <OpsKpi
-            label="Active"
-            value={d.stats.activeIncidents}
-            href={canAccess(CONTROL_ROOM_ROUTES.incidents) ? CONTROL_ROOM_ROUTES.incidents : undefined}
-          />
-          <OpsKpi
-            label="Critical"
-            value={d.stats.criticalIncidents}
-            hot={d.stats.criticalIncidents > 0}
-            href={canAccess(CONTROL_ROOM_ROUTES.incidents) ? `${CONTROL_ROOM_ROUTES.incidents}?priority=CRITICAL` : undefined}
-          />
-          <OpsKpi
-            label="Officers"
-            value={`${d.stats.availableOfficers}/${d.stats.totalOfficers}`}
-            href={canAccess(CONTROL_ROOM_ROUTES.officers) ? CONTROL_ROOM_ROUTES.officers : undefined}
-          />
-          <OpsKpi
-            label="Vehicles"
-            value={vehicles}
-            href={canAccess(CONTROL_ROOM_ROUTES.fleet) ? CONTROL_ROOM_ROUTES.fleet : undefined}
-          />
-          <OpsKpi
-            label="Ambulances"
-            value={ambulances}
-            href="/medical"
-          />
-          <OpsKpi
-            label="System"
-            value={systemOk ? 'OK' : 'Check'}
-            hot={!systemOk}
-            href="/control-room/developer"
-          />
+        <div className="ops-mini" aria-label="Live ops">
+          <section className="ops-mini__card">
+            <div className="ops-mini__head">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden>
+                <path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" strokeLinecap="round" />
+              </svg>
+              <span>Queue</span>
+              <strong>{prioritizedIncidents.length}</strong>
+              {canAccess(CONTROL_ROOM_ROUTES.incidents) ? (
+                <Link href={CONTROL_ROOM_ROUTES.incidents} className="link-sm">
+                  All
+                </Link>
+              ) : null}
+            </div>
+            {prioritizedIncidents.length === 0 ? (
+              <p className="ops-mini__empty">Board clear</p>
+            ) : (
+              <ul className="ops-mini__list">
+                {prioritizedIncidents.slice(0, 3).map((i) => {
+                  const band = incidentPriorityBand(i.priority, i.type);
+                  return (
+                    <li key={i.id}>
+                      <button
+                        type="button"
+                        className={`ops-mini__row ${focusIncidentId === i.id ? 'ops-mini__row--on' : ''}`}
+                        onClick={() => setFocusIncidentId(i.id)}
+                      >
+                        <span className={`priority-chip priority-chip--${band}`}>{band}</span>
+                        <b>{i.user}</b>
+                        <em>{i.type}</em>
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </section>
+
+          <section className={`ops-mini__card ${panicCount > 0 ? 'ops-mini__card--hot' : ''}`}>
+            <div className="ops-mini__head">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden>
+                <path d="M12 3 3.5 20h17L12 3z" />
+                <path d="M12 9v5" strokeLinecap="round" />
+                <circle cx="12" cy="16.6" r="0.7" fill="currentColor" stroke="none" />
+              </svg>
+              <span>Panic</span>
+              <strong>{panicCount}</strong>
+              {canAccess(CONTROL_ROOM_ROUTES.incidents) ? (
+                <Link href={`${CONTROL_ROOM_ROUTES.incidents}?priority=CRITICAL`} className="link-sm">
+                  Open
+                </Link>
+              ) : null}
+            </div>
+            {panicQueue.length === 0 ? (
+              <p className="ops-mini__empty">No panic alerts</p>
+            ) : (
+              <ul className="ops-mini__list">
+                {panicQueue.slice(0, 3).map((i) => (
+                  <li key={i.id}>
+                    <button
+                      type="button"
+                      className={`ops-mini__row ${focusIncidentId === i.id ? 'ops-mini__row--on' : ''}`}
+                      onClick={() => setFocusIncidentId(i.id)}
+                    >
+                      <span className="priority-chip priority-chip--P0">P0</span>
+                      <b>{i.user}</b>
+                      <em>{i.location}</em>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+
+          <section className="ops-mini__card">
+            <div className="ops-mini__head">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden>
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                <path d="m9 12 2 2 4-4" />
+              </svg>
+              <span>Available</span>
+              <strong>
+                {d.stats.availableOfficers}/{d.stats.totalOfficers}
+              </strong>
+              {canAccess(CONTROL_ROOM_ROUTES.officers) ? (
+                <Link href={CONTROL_ROOM_ROUTES.officers} className="link-sm">
+                  Manage
+                </Link>
+              ) : null}
+            </div>
+            {d.officers.length === 0 ? (
+              <p className="ops-mini__empty">No officers on duty</p>
+            ) : (
+              <ul className="ops-mini__avail">
+                {d.officers.slice(0, 4).map((o) => (
+                  <li key={o.id}>
+                    <OfficerStatusDot status={o.status} />
+                    <span>{o.name.split(' ')[0]}</span>
+                    <em>{officerStatusLabel(o.status)}</em>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
         </div>
+
+        <section className="ops-board__map" aria-label="Live map">
+          {canAccess(CONTROL_ROOM_ROUTES.map) ? (
+            <DashboardLiveMap focusIncidentId={focusIncidentId} />
+          ) : (
+            <div className="empty-state">Map access not available for this role.</div>
+          )}
+        </section>
+
+        {canAccess(CONTROL_ROOM_ROUTES.surveillance) ? <DashboardCctvWall /> : null}
+
+        {canAccess(CONTROL_ROOM_ROUTES.fleet) ? <DashboardFleetStrip /> : null}
 
         <aside className="ops-board__queue" aria-label="Emergency queue">
           <div className="panel-header" style={{ padding: '0.75rem 0.85rem 0.35rem' }}>
@@ -294,7 +418,11 @@ function OverviewContent() {
                     <div className="queue-card__summary">
                       <strong>{i.user}</strong>
                       <span className="text-muted queue-card__location">
-                        {i.location} · {i.time}
+                        {i.location}
+                        <span className="queue-card__dot" aria-hidden>
+                          ·
+                        </span>
+                        {i.time}
                         {i.slaBreached ? ' · SLA breach' : ''}
                       </span>
                     </div>
@@ -302,47 +430,57 @@ function OverviewContent() {
                   <div className="queue-card__actions">
                     <DispatchMenuButton
                       incidentId={i.id}
-                      className="btn-sm btn-primary"
+                      className="btn-sm btn-primary queue-action"
+                      label={
+                        <>
+                          <QueueActionIcon name="dispatch" />
+                          Dispatch
+                        </>
+                      }
                       onAssigned={() => void reload({ silent: true })}
                     />
                     <a
-                      className="btn-sm"
+                      className="btn-sm queue-action"
                       href={`tel:${clientPhone}`}
                       title={`Call ${i.user}`}
                       onClick={(e) => e.stopPropagation()}
                     >
-                      CALL
+                      <QueueActionIcon name="call" />
+                      Call
                     </a>
                     {canAccess(CONTROL_ROOM_ROUTES.surveillance) && (
                       <Link
                         href={CONTROL_ROOM_ROUTES.surveillance}
-                        className="btn-sm"
+                        className="btn-sm queue-action"
                         onClick={(e) => e.stopPropagation()}
                       >
+                        <QueueActionIcon name="cctv" />
                         CCTV
                       </Link>
                     )}
                     {canAccess(CONTROL_ROOM_ROUTES.map) && (
                       <Link
                         href={`${CONTROL_ROOM_ROUTES.map}?incident=${i.id}`}
-                        className="btn-sm"
+                        className="btn-sm queue-action"
                         onClick={(e) => {
                           e.stopPropagation();
                           setFocusIncidentId(i.id);
                         }}
                       >
-                        MAP
+                        <QueueActionIcon name="map" />
+                        Map
                       </Link>
                     )}
                     <button
                       type="button"
-                      className="btn-sm btn-primary"
+                      className="btn-sm btn-primary queue-action"
                       disabled={resolveBusyId === i.id}
                       onClick={(e) => {
                         e.stopPropagation();
                         void resolveIncident(false, i.id);
                       }}
                     >
+                      <QueueActionIcon name="resolve" />
                       {resolveBusyId === i.id ? '…' : 'Resolve'}
                     </button>
                   </div>
@@ -351,14 +489,6 @@ function OverviewContent() {
             })
           )}
         </aside>
-
-        <section className="ops-board__map" aria-label="Live map">
-          {canAccess(CONTROL_ROOM_ROUTES.map) ? (
-            <DashboardLiveMap focusIncidentId={focusIncidentId} />
-          ) : (
-            <div className="empty-state">Map access not available for this role.</div>
-          )}
-        </section>
 
         <aside className="ops-board__detail" aria-label="Incident detail">
           <div style={{ padding: '0.85rem' }}>

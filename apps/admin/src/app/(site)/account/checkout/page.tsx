@@ -186,7 +186,7 @@ function SiteCheckoutContent() {
           {method === 'eft' && (
             <div style={{ marginTop: '1rem' }}>
               <p className="nx-muted">
-                Demo: instant EFT is simulated — no bank redirect.
+                Instant EFT via PayFast — you will be redirected to authorise payment.
               </p>
               <button
                 type="button"
@@ -202,7 +202,7 @@ function SiteCheckoutContent() {
           )}
 
           <p className="nx-muted nx-checkout-fineprint" style={{ marginTop: '1rem' }}>
-            Demo mode — no real charge.{' '}
+            Secure checkout — no real charge in this environment.{' '}
             <Link href="/account">Cancel and return to account</Link>
           </p>
         </div>

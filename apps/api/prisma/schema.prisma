@@ -20,6 +20,8 @@ enum UserRole {
   SALES
   TECHNICIAN
   DEVELOPER
+  MEDICAL_DISPATCHER
+  MEDICAL_CREW
 }
 
 enum ProductCategory {

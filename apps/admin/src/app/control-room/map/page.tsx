@@ -66,6 +66,7 @@ import { maskMapDataForScreenshot } from '@/lib/map-screenshot';
 import { DispatchMenuButton } from '@/components/control-room/DispatchMenuButton';
 import { CONTROL_ROOM_ROUTES, incidentHref } from '@/lib/control-room-routes';
 import { getSocketUrl } from '@/lib/socket';
+import { isDemoMode } from '@/lib/demo/is-demo-mode';
 
 const CommandCentreMap = dynamic(() => import('@/components/maps/CommandCentreMap'), {
   ssr: false,
@@ -193,6 +194,12 @@ function MapContent() {
   );
 
   useEffect(() => {
+    if (isDemoMode()) {
+      setLiveConnected(true);
+      const poll = setInterval(() => void reload({ silent: true }), 20000);
+      return () => clearInterval(poll);
+    }
+
     const session = getSession('admin');
     if (!session) return;
     const base = getSocketUrl();
@@ -398,7 +405,7 @@ function MapContent() {
           </div>
         </div>
         <div className="command-centre__toolbar-right">
-          <DispatchLineButton phone="+27860000000" name="4DS Dispatch" />
+          <DispatchLineButton phone="+27111004400" name="4DS Dispatch" />
           <div className="command-actions--desktop">
             <button
               type="button"

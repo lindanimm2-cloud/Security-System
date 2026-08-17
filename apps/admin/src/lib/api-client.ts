@@ -1,4 +1,4 @@
-import { clearSession, getSession, type AuthPortal } from './auth';
+import { getSession, logoutIfUnauthorized, type AuthPortal } from './auth';
 import { handleDemoRequest } from './demo/handler';
 import { isDemoMode } from './demo/is-demo-mode';
 
@@ -37,8 +37,7 @@ async function request<T>(
     throw new Error('Request failed');
   }
 
-  if (res.status === 401) {
-    clearSession(portal);
+  if (logoutIfUnauthorized(portal, res.status)) {
     throw new Error('Session expired');
   }
 

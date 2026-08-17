@@ -6,6 +6,7 @@ import { ErrorAlert } from '@/components/ErrorAlert';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { useApi } from '@/hooks/useApi';
 import { techApi } from '@/lib/api-client';
+import { UiSelect } from '@/components/ui/UiSelect';
 
 type PropertyRow = {
   id: string;
@@ -92,14 +93,20 @@ function TechCamerasContent() {
       <form className="portal-card commission-form stack-form" onSubmit={commission}>
         <div className="form-field form-field--full">
           <span>Property</span>
-          <select value={propertyId} onChange={(e) => setPropertyId(e.target.value)} required>
-            <option value="">Select property…</option>
-            {data.data.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name} — {p.clientName} ({p.cameraCount} cams)
-              </option>
-            ))}
-          </select>
+          <UiSelect
+            compact={false}
+            ariaLabel="Property"
+            value={propertyId}
+            onChange={setPropertyId}
+            options={[
+              { value: '', label: 'Select property…' },
+              ...data.data.map((p) => ({
+                value: p.id,
+                label: `${p.name} — ${p.clientName}`,
+                meta: `${p.cameraCount} cams`,
+              })),
+            ]}
+          />
         </div>
 
         <div className="commission-form__grid">
@@ -136,13 +143,16 @@ function TechCamerasContent() {
           </div>
           <div className="form-field">
             <span>Placement</span>
-            <select
+            <UiSelect
+              compact={false}
+              ariaLabel="Camera placement"
               value={placement}
-              onChange={(e) => setPlacement(e.target.value as 'EXTERIOR' | 'INTERIOR')}
-            >
-              <option value="EXTERIOR">Exterior (always visible to staff)</option>
-              <option value="INTERIOR">Interior (client privacy controls)</option>
-            </select>
+              onChange={(value) => setPlacement(value as 'EXTERIOR' | 'INTERIOR')}
+              options={[
+                { value: 'EXTERIOR', label: 'Exterior', meta: 'Always visible to staff' },
+                { value: 'INTERIOR', label: 'Interior', meta: 'Client privacy controls' },
+              ]}
+            />
           </div>
         </div>
 

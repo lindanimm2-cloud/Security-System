@@ -1,4 +1,9 @@
 import type { AuthPortal, AuthSession } from '../auth';
+import {
+  DEMO_DEV_TICKET_EVENT,
+  DEMO_ERROR_REPORTS_KEY,
+  developerTicketCode,
+} from '../developer-tickets';
 import { getDemoCategories, getDemoProducts } from './catalog';
 import { DEMO_TENANT, demoRegisterSession } from './users';
 
@@ -165,6 +170,260 @@ const demoIncidents: {
   },
 ];
 
+const demoIncidentAssignments: Record<string, string> = {
+  'demo-inc-1': 'Sipho Ndlovu',
+};
+
+const demoOfficerRoster = [
+  {
+    id: 'demo-off-1',
+    firstName: 'Sipho',
+    lastName: 'Ndlovu',
+    status: 'EN_ROUTE',
+    zone: 'Zone A',
+    avgResponseSec: 241,
+    vehicle: {
+      id: 'demo-fleet-1',
+      callSign: 'Unit 101',
+      registration: 'ND 4DS-101',
+      role: 'DRIVER',
+      crewMates: [] as { officerId: string; name: string; role: string }[],
+    },
+  },
+  {
+    id: 'demo-off-2',
+    firstName: 'Raj',
+    lastName: 'Patel',
+    status: 'BUSY',
+    zone: 'Zone B',
+    avgResponseSec: 310,
+    vehicle: null as {
+      id: string;
+      callSign: string;
+      registration: string;
+      role: string;
+      crewMates: { officerId: string; name: string; role: string }[];
+    } | null,
+  },
+  {
+    id: 'demo-off-3',
+    firstName: 'John',
+    lastName: 'Smith',
+    status: 'AVAILABLE',
+    zone: 'Zone C',
+    avgResponseSec: 198,
+    vehicle: null as {
+      id: string;
+      callSign: string;
+      registration: string;
+      role: string;
+      crewMates: { officerId: string; name: string; role: string }[];
+    } | null,
+  },
+  {
+    id: 'demo-off-4',
+    firstName: 'Zanele',
+    lastName: 'Khumalo',
+    status: 'AVAILABLE',
+    zone: 'Zone A',
+    avgResponseSec: 165,
+    vehicle: {
+      id: 'demo-fleet-110',
+      callSign: 'Unit 110',
+      registration: 'ND 4DS-110',
+      role: 'DRIVER',
+      crewMates: [] as { officerId: string; name: string; role: string }[],
+    },
+  },
+];
+
+const demoDispatches: {
+  id: string;
+  status: string;
+  officer: { id: string; name: string; status: string };
+  incident: {
+    id: string;
+    type: string;
+    status: string;
+    client: string;
+    address: string | null;
+    latestReport: string | null;
+  };
+}[] = [
+  {
+    id: 'demo-disp-1',
+    status: 'EN_ROUTE',
+    officer: { id: 'demo-off-1', name: 'Sipho Ndlovu', status: 'EN_ROUTE' },
+    incident: {
+      id: 'demo-inc-1',
+      type: 'PANIC',
+      status: 'DISPATCHED',
+      client: 'Nomsa Client',
+      address: 'Umhlanga Rocks Dr',
+      latestReport: 'Unit 101 en route.',
+    },
+  },
+];
+
+function officerFullName(id: string) {
+  const o = demoOfficerRoster.find((x) => x.id === id);
+  return o ? `${o.firstName} ${o.lastName}` : 'Officer';
+}
+
+function mapTrail(lat: number, lng: number) {
+  return Array.from({ length: 8 }, (_, i) => ({
+    lat: lat - (7 - i) * 0.0022,
+    lng: lng - (7 - i) * 0.0014,
+  }));
+}
+
+const REVENUE_KEY = '4ds-demo-dev-revenue';
+
+function readRevenueFlag() {
+  if (typeof window === 'undefined') return false;
+  try {
+    return localStorage.getItem(REVENUE_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+function writeRevenueFlag(enabled: boolean) {
+  try {
+    localStorage.setItem(REVENUE_KEY, enabled ? '1' : '0');
+  } catch {
+    /* ignore */
+  }
+}
+
+let demoClientLocation = { lat: -29.7267, lng: 31.0857 };
+
+let demoFamilyMessagingEnabled = true;
+const demoFamilyMessages: {
+  id: string;
+  content: string;
+  createdAt: string;
+  sender: { id: string; firstName: string; lastName: string };
+}[] = [
+  {
+    id: 'demo-fam-msg-1',
+    content: 'At school pickup — all good.',
+    createdAt: new Date(Date.now() - 600000).toISOString(),
+    sender: { id: 'demo-fam-1', firstName: 'Thandi', lastName: 'Client' },
+  },
+  {
+    id: 'demo-fam-msg-2',
+    content: 'On my way. Share live location if you leave early.',
+    createdAt: new Date(Date.now() - 420000).toISOString(),
+    sender: { id: 'demo-user-client-demo-local', firstName: 'Nomsa', lastName: 'Client' },
+  },
+];
+
+let demoVehicleState = {
+  phoneTrackingEnabled: false,
+  theftRecovery: true,
+  immobiliserOn: false,
+  trackingMode: 'THEFT_RECOVERY' as 'OFF' | 'TRACKER' | 'PHONE' | 'THEFT_RECOVERY',
+  lat: -29.81,
+  lng: 31.04,
+};
+
+const demoClients = [
+  {
+    id: 'demo-user-client-demo-local',
+    firstName: 'Nomsa',
+    lastName: 'Client',
+    email: 'client@demo.local',
+    phone: '+27821234567',
+    subscription: {
+      planName: 'Family Protect',
+      tierCode: 'FAMILY',
+      status: 'ACTIVE',
+      memberId: 'NX-MEM-1001',
+    },
+  },
+  {
+    id: 'demo-user-james-demo-local',
+    firstName: 'James',
+    lastName: 'Demo',
+    email: 'james@demo.local',
+    phone: '+27829876543',
+    subscription: {
+      planName: 'Personal Protect',
+      tierCode: 'PERSONAL',
+      status: 'ACTIVE',
+      memberId: 'NX-MEM-1002',
+    },
+  },
+];
+
+const demoContacts = [
+  {
+    id: 'demo-c-1',
+    name: 'Thandi Client',
+    phone: '+27820001111',
+    relationship: 'Spouse',
+    priority: 1,
+  },
+  {
+    id: 'demo-c-2',
+    name: '4DS Dispatch',
+    phone: '+27111004400',
+    relationship: 'Dispatch',
+    priority: 0,
+    isDispatch: true,
+  },
+];
+
+let demoMedical = {
+  bloodType: 'O+',
+  allergies: 'Penicillin',
+  medications: 'Metformin 500mg daily',
+  chronicConditions: 'Type 2 Diabetes',
+  emergencyNotes: 'Insulin stored in fridge. Contact James if unresponsive.',
+  isComplete: true,
+};
+
+const demoSafeZones = [
+  { id: 'demo-zone-1', name: 'Home — Umhlanga', lat: '-29.7267', lng: '31.0857', radiusM: 400 },
+  { id: 'demo-zone-2', name: 'School drop-off', lat: '-29.8488', lng: '31.0099', radiusM: 250 },
+];
+
+type DemoStoreOrder = {
+  id: string;
+  orderNumber: string;
+  customerName: string;
+  customerEmail: string;
+  customerUserId?: string;
+  status: string;
+  totalCents: number;
+  totalFormatted: string;
+  createdAt: string;
+  itemCount: number;
+  items: { productName: string; quantity: number }[];
+};
+
+const demoStoreOrders: DemoStoreOrder[] = [
+  {
+    id: 'demo-ord-seed',
+    orderNumber: 'NX-DEMO-1000',
+    customerName: 'Nomsa Client',
+    customerEmail: 'client@demo.local',
+    customerUserId: 'demo-user-client-demo-local',
+    status: 'PAID',
+    totalCents: 249900,
+    totalFormatted: 'R 2499.00',
+    createdAt: new Date(Date.now() - 86400000).toISOString(),
+    itemCount: 2,
+    items: [
+      { productName: '4K turret camera', quantity: 1 },
+      { productName: 'Body armour vest', quantity: 1 },
+    ],
+  },
+];
+
+let demoAdminProducts = getDemoProducts().map((p) => ({ ...p, isActive: true }));
+
 const demoProperties: {
   id: string;
   name: string;
@@ -189,19 +448,21 @@ type DemoClientChatMessage = {
 
 const demoClientProfiles: Record<
   string,
-  { firstName: string; lastName: string; phone: string; email: string }
+  { firstName: string; lastName: string; phone: string; email: string; trackingEnabled: boolean }
 > = {
   'demo-user-client-demo-local': {
     firstName: 'Nomsa',
     lastName: 'Client',
     phone: '+27821234567',
     email: 'client@demo.local',
+    trackingEnabled: true,
   },
   'demo-user-james-demo-local': {
     firstName: 'James',
     lastName: 'Demo',
     phone: '+27829876543',
     email: 'james@demo.local',
+    trackingEnabled: true,
   },
 };
 
@@ -409,7 +670,52 @@ type DemoErrorReport = {
   reporter: { id: string; name: string; role: string; email: string };
 };
 
-const demoErrorReports: DemoErrorReport[] = [];
+function readDemoErrorReports(): DemoErrorReport[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = localStorage.getItem(DEMO_ERROR_REPORTS_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as DemoErrorReport[];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeDemoErrorReports(reports: DemoErrorReport[], created?: DemoErrorReport) {
+  try {
+    localStorage.setItem(DEMO_ERROR_REPORTS_KEY, JSON.stringify(reports.slice(0, 80)));
+    window.dispatchEvent(
+      new CustomEvent(DEMO_DEV_TICKET_EVENT, {
+        detail: created ? { action: 'created', report: created } : { action: 'updated' },
+      }),
+    );
+  } catch {
+    /* ignore */
+  }
+}
+
+function pushDemoErrorReport(report: DemoErrorReport) {
+  const next = [report, ...readDemoErrorReports().filter((r) => r.id !== report.id)];
+  writeDemoErrorReports(next, report);
+  return report;
+}
+
+function demoTicketNotifications(role?: string) {
+  if (role !== 'DEVELOPER' && role !== 'OWNER' && role !== 'SUPER_ADMIN') return [];
+  return readDemoErrorReports()
+    .filter((r) => r.status !== 'RESOLVED')
+    .map((r) => ({
+      id: `ticket-${r.id}`,
+      category: 'DEVELOPER' as const,
+      title: `Issue ticket ${developerTicketCode(r.id)}`,
+      body: `${r.reporter.name} · ${r.message}`,
+      priority: r.status === 'OPEN' ? ('high' as const) : ('medium' as const),
+      isRead: r.status !== 'OPEN',
+      createdAt: r.createdAt,
+      link: `/control-room/developer?ticket=${encodeURIComponent(r.id)}`,
+    }));
+}
 
 const demoPendingVerifications: DemoVerification[] = [];
 
@@ -549,7 +855,7 @@ const demoClientNotifications: DemoClientNotification[] = [
     id: 'demo-cn-2',
     type: 'SYSTEM',
     title: 'Account notice',
-    body: 'Pitch demo mode — notifications mark-read works offline.',
+    body: 'Your protection plan is active. Open Updates anytime for dispatch notes.',
     isRead: false,
     createdAt: new Date(Date.now() - 120000).toISOString(),
     href: '/portal/updates',
@@ -558,6 +864,46 @@ const demoClientNotifications: DemoClientNotification[] = [
 
 function demoUnreadCount() {
   return demoClientNotifications.filter((n) => !n.isRead).length;
+}
+
+type DemoCrNotification = {
+  id: string;
+  category: string;
+  title: string;
+  body: string;
+  priority: 'critical' | 'high' | 'medium' | 'low';
+  isRead: boolean;
+  createdAt: string;
+  link: string;
+};
+
+const demoControlRoomNotifications: DemoCrNotification[] = [
+  {
+    id: 'demo-n-1',
+    category: 'PANIC',
+    title: 'Panic alert',
+    body: 'Nomsa Client — Umhlanga',
+    priority: 'critical',
+    isRead: false,
+    createdAt: new Date(Date.now() - 2 * 60 * 1000).toISOString(),
+    link: '/control-room/incidents',
+  },
+];
+
+const demoCrReadIds = new Set<string>();
+
+function markDemoCrRead(id: string) {
+  demoCrReadIds.add(id);
+  const n = demoControlRoomNotifications.find((item) => item.id === id);
+  if (n) n.isRead = true;
+}
+
+let demoDeveloperCanViewRevenue = false;
+
+function developerRevenueVisible() {
+  const stored = readRevenueFlag();
+  if (stored) demoDeveloperCanViewRevenue = true;
+  return demoDeveloperCanViewRevenue;
 }
 
 const medicalTickets: {
@@ -598,6 +944,38 @@ const demoFleet = [
     status: 'ON_DUTY',
     crew: [{ officerId: 'demo-off-1', name: 'Sipho Ndlovu', role: 'DRIVER', status: 'EN_ROUTE', zone: 'Zone A' }],
     crewCount: 1,
+    cameras: [
+      {
+        id: 'demo-fleet-1-cam-front',
+        name: 'Dash forward',
+        locationLabel: 'Unit 101 · windscreen',
+        channel: 1,
+        status: 'RECORDING',
+        snapshotUrl: null as string | null,
+        isLiveCapable: true,
+        isInterior: false,
+      },
+      {
+        id: 'demo-fleet-1-cam-cabin',
+        name: 'Cabin',
+        locationLabel: 'Unit 101 · cabin',
+        channel: 2,
+        status: 'ONLINE',
+        snapshotUrl: null as string | null,
+        isLiveCapable: true,
+        isInterior: true,
+      },
+      {
+        id: 'demo-fleet-1-cam-rear',
+        name: 'Rear view',
+        locationLabel: 'Unit 101 · rear',
+        channel: 3,
+        status: 'ONLINE',
+        snapshotUrl: null as string | null,
+        isLiveCapable: true,
+        isInterior: false,
+      },
+    ],
   },
   {
     id: 'demo-fleet-2',
@@ -610,6 +988,38 @@ const demoFleet = [
     status: 'AVAILABLE',
     crew: [],
     crewCount: 0,
+    cameras: [
+      {
+        id: 'demo-fleet-2-cam-front',
+        name: 'Dash forward',
+        locationLabel: 'Medic 1 · windscreen',
+        channel: 1,
+        status: 'ONLINE',
+        snapshotUrl: null as string | null,
+        isLiveCapable: true,
+        isInterior: false,
+      },
+      {
+        id: 'demo-fleet-2-cam-cabin',
+        name: 'Cabin',
+        locationLabel: 'Medic 1 · cabin',
+        channel: 2,
+        status: 'ONLINE',
+        snapshotUrl: null as string | null,
+        isLiveCapable: true,
+        isInterior: true,
+      },
+      {
+        id: 'demo-fleet-2-cam-rear',
+        name: 'Rear view',
+        locationLabel: 'Medic 1 · rear',
+        channel: 3,
+        status: 'ONLINE',
+        snapshotUrl: null as string | null,
+        isLiveCapable: true,
+        isInterior: false,
+      },
+    ],
   },
   {
     id: 'demo-fleet-3',
@@ -622,6 +1032,28 @@ const demoFleet = [
     status: 'MAINTENANCE',
     crew: [],
     crewCount: 0,
+    cameras: [
+      {
+        id: 'demo-fleet-3-cam-front',
+        name: 'Dash forward',
+        locationLabel: 'Unit 204 · windscreen',
+        channel: 1,
+        status: 'OFFLINE',
+        snapshotUrl: null as string | null,
+        isLiveCapable: false,
+        isInterior: false,
+      },
+      {
+        id: 'demo-fleet-3-cam-cabin',
+        name: 'Cabin',
+        locationLabel: 'Unit 204 · cabin',
+        channel: 2,
+        status: 'OFFLINE',
+        snapshotUrl: null as string | null,
+        isLiveCapable: false,
+        isInterior: true,
+      },
+    ],
   },
 ];
 
@@ -675,6 +1107,28 @@ function writeDemoCall(call: DemoCallSession | null) {
     /* ignore */
   }
 }
+
+const demoChatMessages: {
+  id: string;
+  content: string;
+  createdAt: string;
+  sender: { id: string; firstName: string; lastName: string; role: string; phone: string | null };
+  attachments: { id: string; fileName: string; fileType: string; fileUrl: string; fileSize: number; kind: 'IMAGE' | 'VIDEO' | 'FILE' }[];
+}[] = [
+  {
+    id: 'demo-chat-1',
+    content: 'Unit 101 en route to Umhlanga panic.',
+    createdAt: new Date(Date.now() - 4 * 60 * 1000).toISOString(),
+    sender: {
+      id: DEMO_DISPATCHER.id,
+      firstName: DEMO_DISPATCHER.firstName,
+      lastName: DEMO_DISPATCHER.lastName,
+      role: DEMO_DISPATCHER.role,
+      phone: '+27860000000',
+    },
+    attachments: [],
+  },
+];
 
 function participantFromUser(user?: AuthSession['user'] | null) {
   return {
@@ -731,33 +1185,228 @@ export async function handleDemoRequest<T>({
   }
   if (clean === '/store/checkout' && m === 'POST') {
     const orderNumber = `NX-DEMO-${orderSeq++}`;
+    const items = Array.isArray(payload.items)
+      ? (payload.items as { productId?: string; quantity?: number }[])
+      : [];
+    const named = items.map((item) => {
+      const product = demoAdminProducts.find((p) => p.id === item.productId);
+      return {
+        productName: product?.name ?? 'Store item',
+        quantity: Math.max(1, Number(item.quantity ?? 1)),
+      };
+    });
+    const totalCents = items.reduce((sum, item) => {
+      const product = demoAdminProducts.find((p) => p.id === item.productId);
+      return sum + (product?.priceCents ?? 0) * Math.max(1, Number(item.quantity ?? 1));
+    }, 0);
+    demoStoreOrders.unshift({
+      id: `demo-ord-${Date.now()}`,
+      orderNumber,
+      customerName: String(payload.customerName ?? user?.firstName ?? 'Client'),
+      customerEmail: String(payload.customerEmail ?? user?.email ?? 'client@demo.local'),
+      customerUserId: typeof payload.customerUserId === 'string' ? payload.customerUserId : user?.id,
+      status: 'PAID',
+      totalCents,
+      totalFormatted: `R ${(totalCents / 100).toFixed(2)}`,
+      createdAt: new Date().toISOString(),
+      itemCount: named.reduce((n, i) => n + i.quantity, 0) || 1,
+      items: named.length ? named : [{ productName: 'Nexus gear', quantity: 1 }],
+    });
     return ok({ orderNumber }) as T;
+  }
+  if (clean === '/store/my-orders' && m === 'GET') {
+    const email = (user?.email ?? '').toLowerCase();
+    const uid = user?.id;
+    return ok(
+      demoStoreOrders.filter(
+        (o) =>
+          (email && o.customerEmail.toLowerCase() === email) ||
+          (uid && o.customerUserId === uid),
+      ),
+    ) as T;
+  }
+  if (clean === '/store/admin/overview' && m === 'GET') {
+    const openOrders = demoStoreOrders.filter((o) => !['DELIVERED', 'CANCELLED'].includes(o.status)).length;
+    const revenue = demoStoreOrders.reduce((n, o) => n + o.totalCents, 0);
+    return ok({
+      stats: {
+        catalogSize: demoAdminProducts.length,
+        lowStock: demoAdminProducts.filter((p) => p.stock < 5).length,
+        openOrders,
+        revenueFormatted: `R ${(revenue / 100).toFixed(2)}`,
+        openLeads: 3,
+        technicians: 3,
+        activeInstalls: 2,
+      },
+      lowStock: demoAdminProducts
+        .filter((p) => p.stock < 5)
+        .slice(0, 6)
+        .map((p) => ({ id: p.id, name: p.name, sku: p.sku, stock: p.stock, category: p.category })),
+      recentOrders: demoStoreOrders.slice(0, 8),
+    }) as T;
+  }
+  if (clean === '/store/admin/products' && m === 'GET') {
+    return ok(demoAdminProducts) as T;
+  }
+  if (clean === '/store/admin/products' && m === 'POST') {
+    const id = typeof payload.id === 'string' && payload.id ? payload.id : `demo-product-${Date.now()}`;
+    const existing = demoAdminProducts.find((p) => p.id === id);
+    const next = {
+      id,
+      sku: String(payload.sku ?? existing?.sku ?? 'SKU'),
+      name: String(payload.name ?? existing?.name ?? 'Product'),
+      description: String(payload.description ?? existing?.description ?? ''),
+      category: String(payload.category ?? existing?.category ?? 'GEAR'),
+      priceCents: Number(payload.priceCents ?? existing?.priceCents ?? 0),
+      priceFormatted: `R ${(Number(payload.priceCents ?? existing?.priceCents ?? 0) / 100).toFixed(2)}`,
+      stock: Number(payload.stock ?? existing?.stock ?? 0),
+      imageEmoji: String(payload.imageEmoji ?? existing?.imageEmoji ?? '🛡️'),
+      featured: Boolean(payload.featured ?? existing?.featured),
+      requiresLicense: Boolean(payload.requiresLicense ?? existing?.requiresLicense),
+      isActive: payload.isActive !== false,
+    };
+    if (existing) Object.assign(existing, next);
+    else demoAdminProducts.unshift(next);
+    return ok(next) as T;
+  }
+  if (clean === '/store/admin/orders' && m === 'GET') {
+    const revenue = demoStoreOrders.reduce((n, o) => n + o.totalCents, 0);
+    return {
+      success: true as const,
+      data: demoStoreOrders,
+      stats: {
+        revenueFormatted: `R ${(revenue / 100).toFixed(2)}`,
+        pending: demoStoreOrders.filter((o) => o.status === 'PENDING' || o.status === 'PAID').length,
+        total: demoStoreOrders.length,
+      },
+    } as T;
+  }
+  {
+    const orderMatch = clean.match(/^\/store\/admin\/orders\/([^/]+)\/status$/);
+    if (orderMatch && m === 'PATCH') {
+      const order = demoStoreOrders.find((o) => o.id === orderMatch[1]);
+      if (order && typeof payload.status === 'string') order.status = payload.status;
+      return ok(order ?? { ok: true }) as T;
+    }
   }
 
   // ——— Client ———
   if (clean === '/client/profile' && m === 'GET') {
+    const key = user?.id ?? 'demo-user-client-demo-local';
+    const profile = demoClientProfiles[key];
     return ok({
-      id: user?.id ?? 'demo-user-client',
-      email: user?.email ?? 'client@demo.local',
-      phone: user?.phone ?? '+27821234567',
-      firstName: user?.firstName ?? 'Nomsa',
-      lastName: user?.lastName ?? 'Client',
-      trackingEnabled: true,
+      id: key,
+      email: profile?.email ?? user?.email ?? 'client@demo.local',
+      phone: profile?.phone ?? user?.phone ?? '+27821234567',
+      firstName: profile?.firstName ?? user?.firstName ?? 'Nomsa',
+      lastName: profile?.lastName ?? user?.lastName ?? 'Client',
+      trackingEnabled: profile?.trackingEnabled ?? true,
       tenant: {
         name: user?.tenant?.name ?? DEMO_TENANT.name,
         slug: user?.tenant?.slug ?? DEMO_TENANT.slug,
       },
     }) as T;
   }
+  if (clean === '/client/profile' && m === 'PATCH') {
+    const key = user?.id ?? 'demo-user-client-demo-local';
+    const current = demoClientProfiles[key] ?? {
+      firstName: user?.firstName ?? 'Nomsa',
+      lastName: user?.lastName ?? 'Client',
+      phone: user?.phone ?? '+27821234567',
+      email: user?.email ?? 'client@demo.local',
+      trackingEnabled: true,
+    };
+    if (typeof payload.phone === 'string') current.phone = payload.phone;
+    if (typeof payload.trackingEnabled === 'boolean') current.trackingEnabled = payload.trackingEnabled;
+    demoClientProfiles[key] = current;
+    return ok({
+      id: key,
+      email: current.email,
+      phone: current.phone,
+      firstName: current.firstName,
+      lastName: current.lastName,
+      trackingEnabled: current.trackingEnabled,
+      tenant: {
+        name: user?.tenant?.name ?? DEMO_TENANT.name,
+        slug: user?.tenant?.slug ?? DEMO_TENANT.slug,
+      },
+    }) as T;
+  }
+  if (clean === '/client/tracking' && m === 'POST') {
+    const lat = Number(payload.lat);
+    const lng = Number(payload.lng);
+    demoClientLocation = {
+      lat: Number.isFinite(lat) ? lat : demoClientLocation.lat,
+      lng: Number.isFinite(lng) ? lng : demoClientLocation.lng,
+    };
+    return ok({ ...demoClientLocation }) as T;
+  }
+  if (clean === '/client/medical' && m === 'GET') {
+    return ok({ ...demoMedical }) as T;
+  }
+  if (clean === '/client/medical' && m === 'PATCH') {
+    demoMedical = {
+      bloodType: typeof payload.bloodType === 'string' ? payload.bloodType : demoMedical.bloodType,
+      allergies: typeof payload.allergies === 'string' ? payload.allergies : demoMedical.allergies,
+      medications: typeof payload.medications === 'string' ? payload.medications : demoMedical.medications,
+      chronicConditions:
+        typeof payload.chronicConditions === 'string'
+          ? payload.chronicConditions
+          : demoMedical.chronicConditions,
+      emergencyNotes:
+        typeof payload.emergencyNotes === 'string' ? payload.emergencyNotes : demoMedical.emergencyNotes,
+      isComplete: true,
+    };
+    return ok({ ...demoMedical }) as T;
+  }
+  if (clean === '/client/contacts' && m === 'POST') {
+    const contact = {
+      id: `demo-c-${Date.now()}`,
+      name: String(payload.name ?? 'Contact'),
+      phone: String(payload.phone ?? ''),
+      relationship: typeof payload.relationship === 'string' ? payload.relationship : null,
+      priority: demoContacts.length + 1,
+    };
+    demoContacts.push(contact);
+    return ok(contact) as T;
+  }
+  {
+    const delContact = clean.match(/^\/client\/contacts\/([^/]+)$/);
+    if (delContact && m === 'DELETE') {
+      const idx = demoContacts.findIndex((c) => c.id === delContact[1] && !('isDispatch' in c && c.isDispatch));
+      if (idx >= 0) demoContacts.splice(idx, 1);
+      return ok({ ok: true }) as T;
+    }
+  }
+  if (clean === '/client/safe-zones' && m === 'GET') {
+    return ok(demoSafeZones) as T;
+  }
+  if (clean === '/client/safe-zones' && m === 'POST') {
+    const zone = {
+      id: `demo-zone-${Date.now()}`,
+      name: String(payload.name ?? 'Safe zone'),
+      lat: String(payload.lat ?? demoClientLocation.lat),
+      lng: String(payload.lng ?? demoClientLocation.lng),
+      radiusM: Number(payload.radiusM ?? 500),
+    };
+    demoSafeZones.push(zone);
+    return ok(zone) as T;
+  }
+  if (clean === '/client/panic/cancel' && m === 'POST') {
+    const open = demoIncidents.find((i) => i.status === 'OPEN' && (i.type === 'PANIC' || i.isSilent));
+    if (open) open.status = 'CANCELLED';
+    return ok({ cancelled: Boolean(open) }) as T;
+  }
   if (clean === '/client/overview' && m === 'GET') {
     return ok({
       user: {
         firstName: user?.firstName ?? 'Nomsa',
-        trackingEnabled: true,
+        trackingEnabled:
+          demoClientProfiles[user?.id ?? 'demo-user-client-demo-local']?.trackingEnabled ?? true,
         address: '12 Lagoon Dr, Umhlanga',
       },
       stats: {
-        contactCount: 3,
+      contactCount: demoContacts.length,
         familyCount: 2,
         activeIncidents: demoIncidents.filter((i) =>
           ['OPEN', 'DISPATCHED', 'IN_PROGRESS'].includes(i.status),
@@ -782,7 +1431,7 @@ export async function handleDemoRequest<T>({
           registration: 'ND 123-456',
           make: 'Toyota',
           model: 'Fortuner',
-          theftRecovery: true,
+          theftRecovery: demoVehicleState.theftRecovery,
         },
       ],
       properties: [...demoProperties],
@@ -790,23 +1439,7 @@ export async function handleDemoRequest<T>({
         { id: 'demo-fam-1', name: 'Thandi Client', trackingEnabled: true },
         { id: 'demo-fam-2', name: 'Lerato Client', trackingEnabled: false },
       ],
-      contacts: [
-        {
-          id: 'demo-c-1',
-          name: 'Thandi Client',
-          phone: '+27820001111',
-          relationship: 'Spouse',
-          priority: 1,
-        },
-        {
-          id: 'demo-c-2',
-          name: '4DS Dispatch',
-          phone: '+27110000000',
-          relationship: 'Dispatch',
-          priority: 0,
-          isDispatch: true,
-        },
-      ],
+      contacts: demoContacts,
       recentIncidents: demoIncidents.map((i) => ({
         id: i.id,
         type: i.type,
@@ -820,30 +1453,14 @@ export async function handleDemoRequest<T>({
         { title: 'Vehicle check-in', detail: 'ND 123-456', time: '3h ago' },
       ],
       medicalComplete: true,
-      safeZoneCount: 2,
+      safeZoneCount: demoSafeZones.length,
     }) as T;
   }
   if (clean === '/client/contacts' && m === 'GET') {
     return {
       success: true,
-      data: [
-        {
-          id: 'demo-c-1',
-          name: 'Thandi Client',
-          phone: '+27820001111',
-          relationship: 'Spouse',
-          priority: 1,
-        },
-        {
-          id: 'demo-c-2',
-          name: '4DS Dispatch',
-          phone: '+27110000000',
-          relationship: 'Dispatch',
-          priority: 0,
-          isDispatch: true,
-        },
-      ],
-      meta: { dispatchLine: { name: '4DS Dispatch', phone: '+27110000000' } },
+      data: demoContacts,
+      meta: { dispatchLine: { name: '4DS Dispatch', phone: '+27111004400' } },
     } as T;
   }
   if (clean === '/client/subscription/access' && m === 'GET') {
@@ -1179,7 +1796,7 @@ export async function handleDemoRequest<T>({
       id: `demo-inc-${Date.now()}`,
       type,
       status: 'OPEN',
-      title: `${type} alert (demo)`,
+      title: type === 'PANIC' ? 'Panic alert' : `${type.charAt(0)}${type.slice(1).toLowerCase()} alert`,
       isSilent: Boolean(payload.silent),
       time: 'Just now',
       priority: 'CRITICAL',
@@ -1308,7 +1925,7 @@ export async function handleDemoRequest<T>({
     return ok({ ok: true, discreet: true }) as T;
   }
   if (clean === '/client/support/error-report' && m === 'POST') {
-    const report: DemoErrorReport = {
+    const report = pushDemoErrorReport({
       id: `err-${Date.now()}`,
       message: String(payload.message ?? 'Client error'),
       path: typeof payload.path === 'string' ? payload.path : null,
@@ -1321,9 +1938,14 @@ export async function handleDemoRequest<T>({
         role: user?.role ?? 'USER',
         email: user?.email ?? 'client@demo.local',
       },
-    };
-    demoErrorReports.unshift(report);
-    return ok({ id: report.id, status: report.status, message: report.message, createdAt: report.createdAt }) as T;
+    });
+    return ok({
+      id: report.id,
+      status: report.status,
+      message: report.message,
+      createdAt: report.createdAt,
+      ticketCode: developerTicketCode(report.id),
+    }) as T;
   }
   {
     const vehicleProfileMatch = clean.match(/^\/client\/vehicles\/([^/]+)\/profile$/);
@@ -1340,23 +1962,23 @@ export async function handleDemoRequest<T>({
           color: 'White',
           vin: 'JTMDN123456789012',
           trackerLinked: true,
-          phoneTrackingEnabled: false,
-          theftRecovery: false,
-          immobiliserOn: false,
+          phoneTrackingEnabled: demoVehicleState.phoneTrackingEnabled,
+          theftRecovery: demoVehicleState.theftRecovery,
+          immobiliserOn: demoVehicleState.immobiliserOn,
           insuranceInfo: 'Santam comprehensive',
           updatedAt: new Date().toISOString(),
         },
         tracking: {
-          active: true,
-          mode: 'TRACKER',
+          active: demoVehicleState.trackingMode !== 'OFF',
+          mode: demoVehicleState.trackingMode,
           hasPosition: true,
-          lat: -29.7281,
-          lng: 31.0873,
+          lat: demoVehicleState.lat,
+          lng: demoVehicleState.lng,
           lastUpdate: new Date().toISOString(),
-          trail: [
-            { lat: -29.7281, lng: 31.0873, at: new Date().toISOString() },
-            { lat: -29.7295, lng: 31.085, at: new Date(Date.now() - 120000).toISOString() },
-          ],
+          trail: mapTrail(demoVehicleState.lat, demoVehicleState.lng).map((p, i) => ({
+            ...p,
+            at: new Date(Date.now() - (7 - i) * 45000).toISOString(),
+          })),
         },
         responseTeam: { synced: true },
         alerts: [],
@@ -1393,6 +2015,202 @@ export async function handleDemoRequest<T>({
     const { clientUserId: _c, ...data } = msg;
     return ok(data) as T;
   }
+  if (clean === '/client/family' && m === 'GET') {
+    return ok({
+      id: 'demo-family-1',
+      name: 'Client family',
+      owner: 'Nomsa Client',
+      familyMessagingEnabled: demoFamilyMessagingEnabled,
+      members: [
+        {
+          id: 'demo-fam-1',
+          name: 'Thandi Client',
+          nickname: 'Thandi',
+          trackingEnabled: true,
+          familyMessagingEnabled: true,
+          lastLocationAt: new Date(Date.now() - 180000).toISOString(),
+        },
+        {
+          id: 'demo-fam-2',
+          name: 'Lerato Client',
+          nickname: 'Lerato',
+          trackingEnabled: false,
+          familyMessagingEnabled: false,
+          lastLocationAt: null,
+        },
+      ],
+    }) as T;
+  }
+  if (clean === '/client/communication-settings' && m === 'GET') {
+    return ok({
+      familyMessagingEnabled: demoFamilyMessagingEnabled,
+      familyId: 'demo-family-1',
+      controlRoomAlwaysOn: true,
+      eligibleMembers: [
+        { id: 'demo-fam-1', name: 'Thandi Client' },
+        { id: 'demo-fam-2', name: 'Lerato Client' },
+      ],
+    }) as T;
+  }
+  if (clean === '/client/communication-settings' && m === 'PATCH') {
+    if (typeof payload.familyMessagingEnabled === 'boolean') {
+      demoFamilyMessagingEnabled = payload.familyMessagingEnabled;
+    }
+    return ok({
+      familyMessagingEnabled: demoFamilyMessagingEnabled,
+      familyId: 'demo-family-1',
+      controlRoomAlwaysOn: true,
+      eligibleMembers: [
+        { id: 'demo-fam-1', name: 'Thandi Client' },
+        { id: 'demo-fam-2', name: 'Lerato Client' },
+      ],
+    }) as T;
+  }
+  if (clean === '/client/family/messages' && m === 'GET') {
+    return ok({
+      familyId: 'demo-family-1',
+      familyMessagingEnabled: demoFamilyMessagingEnabled,
+      messages: [...demoFamilyMessages],
+      eligibleMembers: [
+        { id: 'demo-fam-1', name: 'Thandi Client' },
+        { id: 'demo-fam-2', name: 'Lerato Client' },
+      ],
+    }) as T;
+  }
+  if (clean === '/client/family/messages' && m === 'POST') {
+    const content = String(payload.content ?? '').trim();
+    if (!content) return { success: false as const, message: 'Message cannot be empty' } as T;
+    const msg = {
+      id: `demo-fam-msg-${Date.now()}`,
+      content,
+      createdAt: new Date().toISOString(),
+      sender: {
+        id: user?.id ?? 'demo-user-client-demo-local',
+        firstName: user?.firstName ?? 'Nomsa',
+        lastName: user?.lastName ?? 'Client',
+      },
+    };
+    demoFamilyMessages.push(msg);
+    return ok(msg) as T;
+  }
+  if (clean === '/client/vehicles' && m === 'GET') {
+    return ok([
+      {
+        id: 'demo-veh-1',
+        registration: 'ND 123-456',
+        make: 'Toyota',
+        model: 'Fortuner',
+        variant: 'GD-6',
+        year: 2022,
+        color: 'White',
+        vin: 'JTMDN123456789012',
+        trackerLinked: true,
+        theftRecovery: demoVehicleState.theftRecovery,
+        immobiliserOn: demoVehicleState.immobiliserOn,
+        insuranceInfo: 'Santam comprehensive',
+      },
+    ]) as T;
+  }
+  if (clean === '/client/subscription' && m === 'GET') {
+    return ok({
+      planName: 'Family Protect',
+      tierName: 'Family',
+      status: 'ACTIVE',
+      memberId: 'NX-MEM-1001',
+      validUntil: new Date(Date.now() + 20 * 86400000).toISOString(),
+      access: {
+        home: true,
+        vehicle: true,
+        family: true,
+        medical: true,
+        personal: true,
+        emergency: true,
+      },
+      isOverdue: false,
+    }) as T;
+  }
+  if (clean === '/client/incidents' && m === 'GET') {
+    return ok(
+      demoIncidents.map((i) => ({
+        id: i.id,
+        type: i.type,
+        status: i.status,
+        priority: i.priority,
+        title: i.title,
+        isSilent: i.isSilent,
+        address: i.location,
+        createdAt: new Date().toISOString(),
+        media: [],
+        hasResponse: Boolean(demoIncidentAssignments[i.id]),
+      })),
+    ) as T;
+  }
+  if (clean === '/client/incidents/evidence' && m === 'GET') {
+    return ok(
+      demoIncidents.slice(0, 2).map((i) => ({
+        id: i.id,
+        type: i.type,
+        title: i.title,
+        status: i.status,
+        createdAt: new Date().toISOString(),
+        media: [
+          {
+            id: `${i.id}-media`,
+            fileName: 'scene-photo.jpg',
+            fileType: 'image/jpeg',
+            fileUrl: '/demo-evidence.jpg',
+          },
+        ],
+      })),
+    ) as T;
+  }
+  {
+    const vehicleIdMatch = clean.match(/^\/client\/vehicles\/([^/]+)\/(tracking\/phone|location|theft-recovery)$/);
+    if (vehicleIdMatch && (m === 'POST' || m === 'DELETE')) {
+      const action = vehicleIdMatch[2];
+      const lat = Number(payload.lat);
+      const lng = Number(payload.lng);
+      if (Number.isFinite(lat) && Number.isFinite(lng)) {
+        demoVehicleState.lat = lat;
+        demoVehicleState.lng = lng;
+      }
+      if (action === 'tracking/phone') {
+        if (m === 'DELETE') {
+          demoVehicleState.phoneTrackingEnabled = false;
+          if (demoVehicleState.trackingMode === 'PHONE') demoVehicleState.trackingMode = 'TRACKER';
+        } else {
+          demoVehicleState.phoneTrackingEnabled = true;
+          demoVehicleState.trackingMode = 'PHONE';
+        }
+      }
+      if (action === 'theft-recovery' && m === 'POST') {
+        demoVehicleState.theftRecovery = true;
+        demoVehicleState.trackingMode = 'THEFT_RECOVERY';
+        const existing = demoIncidents.find((i) => i.type === 'THEFT' && isActiveDemoIncident(i.status));
+        if (!existing) {
+          demoIncidents.unshift({
+            id: `demo-inc-${Date.now()}`,
+            type: 'THEFT',
+            status: 'OPEN',
+            title: 'Vehicle recovery track',
+            isSilent: false,
+            time: 'Just now',
+            priority: 'HIGH',
+            user: user ? `${user.firstName ?? ''} ${user.lastName ?? ''}`.trim() || user.email : 'Nomsa Client',
+            location: 'Live phone relay',
+          });
+        }
+      }
+      return ok({
+        ok: true,
+        phoneTrackingEnabled: demoVehicleState.phoneTrackingEnabled,
+        theftRecovery: demoVehicleState.theftRecovery,
+        trackingMode: demoVehicleState.trackingMode,
+        lat: demoVehicleState.lat,
+        lng: demoVehicleState.lng,
+      }) as T;
+    }
+  }
   if (clean.startsWith('/client/') && (m === 'GET' || m === 'POST' || m === 'PATCH')) {
     if (m === 'GET') return ok([]) as T;
     return ok({ ok: true }) as T;
@@ -1400,14 +2218,15 @@ export async function handleDemoRequest<T>({
 
   // ——— Developer desk ———
   if (clean === '/developer/error-reports' && m === 'GET') {
-    const openCount = demoErrorReports.filter((r) => r.status === 'OPEN').length;
+    const reports = readDemoErrorReports();
+    const openCount = reports.filter((r) => r.status === 'OPEN').length;
     return ok({
       openCount,
-      reports: demoErrorReports.map((r) => ({ ...r })),
+      reports: reports.map((r) => ({ ...r, ticketCode: developerTicketCode(r.id) })),
     }) as T;
   }
   if (clean === '/developer/error-reports' && m === 'POST') {
-    const report: DemoErrorReport = {
+    const report = pushDemoErrorReport({
       id: `err-${Date.now()}`,
       message: String(payload.message ?? 'Staff error report'),
       path: typeof payload.path === 'string' ? payload.path : null,
@@ -1420,29 +2239,44 @@ export async function handleDemoRequest<T>({
         role: user?.role ?? 'DISPATCHER',
         email: user?.email ?? 'staff@demo.local',
       },
-    };
-    demoErrorReports.unshift(report);
+    });
     return ok({
       id: report.id,
       status: report.status,
       message: report.message,
       createdAt: report.createdAt,
+      ticketCode: developerTicketCode(report.id),
+    }) as T;
+  }
+  if (clean === '/developer/revenue-access' && m === 'PATCH') {
+    demoDeveloperCanViewRevenue = Boolean(payload.enabled);
+    writeRevenueFlag(demoDeveloperCanViewRevenue);
+    return ok({
+      developerCanViewRevenue: demoDeveloperCanViewRevenue,
+      message: demoDeveloperCanViewRevenue
+        ? 'Developers can now see revenue figures.'
+        : 'Developer revenue figures are hidden again.',
     }) as T;
   }
   if (clean === '/developer/desk' && m === 'GET') {
-    const openCount = demoErrorReports.filter((r) => r.status === 'OPEN').length;
+    const reports = readDemoErrorReports();
+    const openCount = reports.filter((r) => r.status === 'OPEN').length;
+    const canViewRevenue = developerRevenueVisible();
     return ok({
       tenantName: DEMO_TENANT.name,
-      canViewRevenue: false,
-      revenueNote: 'Revenue figures are hidden until the owner unlocks developer access.',
+      canViewRevenue,
+      revenueNote: canViewRevenue
+        ? 'Revenue figures are visible for this demo session.'
+        : 'Revenue figures are hidden until the owner unlocks developer access.',
       openErrorReports: openCount,
-      recentReports: demoErrorReports.slice(0, 8).map((r) => ({
+      recentReports: reports.slice(0, 8).map((r) => ({
         id: r.id,
         message: r.message,
         path: r.path,
         status: r.status,
         createdAt: r.createdAt,
         reporter: `${r.reporter.name} · ${r.reporter.role}`,
+        ticketCode: developerTicketCode(r.id),
       })),
       developers: [
         {
@@ -1467,21 +2301,24 @@ export async function handleDemoRequest<T>({
   {
     const devReportMatch = clean.match(/^\/developer\/error-reports\/([^/]+)$/);
     if (devReportMatch && m === 'PATCH') {
-      const id = devReportMatch[1];
-      const idx = demoErrorReports.findIndex((r) => r.id === id);
+      const id = decodeURIComponent(devReportMatch[1]);
+      const reports = readDemoErrorReports();
+      const idx = reports.findIndex((r) => r.id === id);
       if (idx < 0) return { success: false as const, message: 'Report not found' } as T;
       const next = String(payload.status ?? '').toUpperCase();
       if (next === 'ACKNOWLEDGED' || next === 'RESOLVED' || next === 'OPEN') {
-        demoErrorReports[idx] = {
-          ...demoErrorReports[idx],
+        reports[idx] = {
+          ...reports[idx],
           status: next as DemoErrorReport['status'],
         };
+        writeDemoErrorReports(reports);
       }
       return ok({
-        id: demoErrorReports[idx].id,
-        status: demoErrorReports[idx].status,
+        id: reports[idx].id,
+        status: reports[idx].status,
+        ticketCode: developerTicketCode(reports[idx].id),
         resolvedAt:
-          demoErrorReports[idx].status === 'RESOLVED'
+          reports[idx].status === 'RESOLVED'
             ? new Date().toISOString()
             : null,
       }) as T;
@@ -1498,8 +2335,8 @@ export async function handleDemoRequest<T>({
         criticalIncidents: active.filter((i) =>
           ['CRITICAL', 'HIGH'].includes(i.priority),
         ).length,
-        availableOfficers: 2,
-        totalOfficers: 4,
+        availableOfficers: demoOfficerRoster.filter((o) => o.status === 'AVAILABLE').length,
+        totalOfficers: demoOfficerRoster.length,
         avgResponseFormatted: '4m 40s',
         avgResponseSec: 280,
         vehiclesAvailable: 3,
@@ -1513,14 +2350,28 @@ export async function handleDemoRequest<T>({
         time: i.time,
         priority: i.priority,
         status: i.status,
+        officer: demoIncidentAssignments[i.id] ?? null,
         slaBreached: i.type === 'INTRUSION' || i.time.includes('18'),
       })),
-      officers: [
-        { id: 'demo-off-1', name: 'Sipho Ndlovu', status: 'EN_ROUTE', zone: 'Zone A' },
-        { id: 'demo-off-2', name: 'Raj Patel', status: 'BUSY', zone: 'Zone B' },
-        { id: 'demo-off-3', name: 'John Smith', status: 'AVAILABLE', zone: 'Zone C' },
-        { id: 'demo-off-4', name: 'Zanele Khumalo', status: 'AVAILABLE', zone: 'Zone A' },
-      ],
+      officers: demoOfficerRoster.map((o) => ({
+        id: o.id,
+        name: `${o.firstName} ${o.lastName}`,
+        status: o.status,
+        zone: o.zone,
+      })),
+      dispatches: demoDispatches.map((d) => ({
+        id: d.id,
+        status: d.status,
+        officer: {
+          firstName: d.officer.name.split(' ')[0] ?? d.officer.name,
+          lastName: d.officer.name.split(' ').slice(1).join(' ') || '',
+        },
+        incident: {
+          id: d.incident.id,
+          type: d.incident.type,
+          user: { firstName: d.incident.client.split(' ')[0] ?? d.incident.client },
+        },
+      })),
       system: {
         api: 'Demo mode',
         realtime: 'Simulated',
@@ -1529,15 +2380,55 @@ export async function handleDemoRequest<T>({
       },
     }) as T;
   }
+  if (clean === '/control-room/surveillance' && m === 'GET') {
+    const sites = demoSurveillanceSites.map((s) => ({
+      id: s.id,
+      name: s.name,
+      address: s.address,
+      propertyType: s.propertyType,
+      alarmStatus: s.alarmStatus,
+      monitoringEnabled: s.monitoringEnabled,
+      camerasLinked: s.camerasLinked,
+      alarmLinked: s.alarmLinked,
+      panel: s.panel,
+      cameraCount: s.cameraCount,
+      onlineCameras: s.onlineCameras,
+      sensorCount: s.sensorCount,
+      client: {
+        id: 'demo-user-client',
+        name: 'Nomsa Client',
+        email: 'nomsa@demo.4ds',
+        phone: '+27821234567',
+      },
+      cameras: s.cameras,
+      openEvents: [] as { id: string; title: string }[],
+    }));
+    return ok({
+      stats: {
+        sites: sites.length,
+        cameras: sites.reduce((n, s) => n + s.cameraCount, 0),
+        sensors: sites.reduce((n, s) => n + s.sensorCount, 0),
+        openEvents: 0,
+        triggeredSites: 0,
+        offlineCameras: 0,
+      },
+      sites,
+    }) as T;
+  }
   if (clean === '/control-room/map' && m === 'GET') {
+    const incidentCoords: Record<string, { lat: number; lng: number }> = {
+      'demo-inc-1': { lat: -29.728, lng: 31.085 },
+      'demo-inc-2': { lat: DURBAN.lat + 0.01, lng: DURBAN.lng + 0.008 },
+      'demo-inc-3': { lat: demoVehicleState.lat, lng: demoVehicleState.lng },
+    };
     return ok({
       center: DURBAN,
       clients: [
         {
           id: 'demo-user-client',
           name: 'Nomsa Client',
-          lat: -29.728,
-          lng: 31.085,
+          lat: demoClientLocation.lat,
+          lng: demoClientLocation.lng,
           clientType: 'VIP',
           membershipNumber: 'NX-MEM-1001',
           tierCode: 'FAMILY',
@@ -1559,7 +2450,7 @@ export async function handleDemoRequest<T>({
           lng: 31.002,
           officerType: 'ARMED_RESPONSE',
           unitNumber: 'AR-101',
-          status: 'EN_ROUTE',
+          status: demoOfficerRoster.find((o) => o.id === 'demo-off-1')?.status ?? 'EN_ROUTE',
           phone: '+27831110001',
           zone: 'Zone A',
         },
@@ -1568,24 +2459,24 @@ export async function handleDemoRequest<T>({
           name: 'John Smith',
           lat: -29.83,
           lng: 30.93,
-                        officerType: 'ARMED_RESPONSE',
+          officerType: 'ARMED_RESPONSE',
           unitNumber: 'AR-103',
-          status: 'AVAILABLE',
+          status: demoOfficerRoster.find((o) => o.id === 'demo-off-3')?.status ?? 'AVAILABLE',
           zone: 'Zone C',
         },
       ],
       vehicles: [
         {
           id: 'demo-veh-1',
-          lat: -29.81,
-          lng: 31.01,
-          vehicleType: 'CLIENT',
+          lat: demoVehicleState.lat,
+          lng: demoVehicleState.lng,
+          vehicleType: demoVehicleState.theftRecovery ? 'STOLEN' : 'CLIENT',
           registration: 'ND 123-456',
           make: 'Toyota',
           model: 'Fortuner',
           owner: 'Nomsa Client',
           trackerStatus: 'ONLINE',
-          speed: 42,
+          speed: demoVehicleState.theftRecovery ? 68 : 42,
           updatedAt: new Date().toISOString(),
         },
       ],
@@ -1620,48 +2511,66 @@ export async function handleDemoRequest<T>({
           owner: 'Nomsa Client',
         },
       ],
-      incidents: demoIncidents.slice(0, 2).map((i, idx) => ({
-        id: i.id,
-        category: i.type === 'PANIC' ? 'PANIC' : i.type === 'THEFT' ? 'THEFT_RECOVERY' : 'INTRUSION',
-        type: i.type,
-        priority: i.priority,
-        status: i.status,
-        name: i.title,
-        clientUserId: 'demo-user-client',
-        clientPhone: idx === 0 ? '+27821234567' : '+27829876543',
-        lat: DURBAN.lat + idx * 0.01,
-        lng: DURBAN.lng + idx * 0.008,
-        address: i.location,
-        isSilent: i.isSilent,
-        createdAt: new Date().toISOString(),
-        assignedOfficer: idx === 0 ? 'Sipho Ndlovu' : null,
-        nearestUnitKm: 0.8 + idx,
-        nearestUnitEta: `${3 + idx * 2} min`,
-        trail: [],
-      })),
+      incidents: activeDemoIncidents().map((i, idx) => {
+        const coords = incidentCoords[i.id] ?? {
+          lat: DURBAN.lat + idx * 0.01,
+          lng: DURBAN.lng + idx * 0.008,
+        };
+        return {
+          id: i.id,
+          category: i.type === 'PANIC' ? 'PANIC' : i.type === 'THEFT' ? 'THEFT_RECOVERY' : 'INTRUSION',
+          type: i.type,
+          priority: i.priority,
+          status: i.status,
+          name: i.title,
+          clientUserId: 'demo-user-client',
+          clientPhone: idx === 0 ? '+27821234567' : '+27829876543',
+          lat: coords.lat,
+          lng: coords.lng,
+          address: i.location,
+          isSilent: i.isSilent,
+          createdAt: new Date().toISOString(),
+          assignedOfficer: demoIncidentAssignments[i.id] ?? null,
+          nearestUnitKm: 0.8 + idx,
+          nearestUnitEta: `${3 + idx * 2} min`,
+          trail: i.type === 'THEFT' || i.type === 'PANIC' ? mapTrail(coords.lat, coords.lng) : [],
+        };
+      }),
     }) as T;
   }
   // ——— Control room notifications shape ———
   if (clean === '/control-room/notifications' && m === 'GET') {
+    const tickets = demoTicketNotifications(user?.role).map((n) => ({
+      ...n,
+      isRead: n.isRead || demoCrReadIds.has(n.id),
+    }));
+    const notifications = [
+      ...tickets,
+      ...demoControlRoomNotifications.map((n) => ({
+        ...n,
+        isRead: n.isRead || demoCrReadIds.has(n.id),
+      })),
+    ];
     return ok({
-      notifications: [
-        {
-          id: 'demo-n-1',
-          category: 'PANIC',
-          title: 'Panic alert',
-          body: 'Nomsa Client — Umhlanga',
-          priority: 'critical',
-          isRead: false,
-          createdAt: new Date().toISOString(),
-          link: '/control-room/incidents',
-        },
-      ],
-      unreadCount: 1,
+      notifications,
+      unreadCount: notifications.filter((n) => !n.isRead).length,
     }) as T;
+  }
+  if (clean === '/control-room/notifications/read-all' && m === 'PATCH') {
+    for (const n of demoControlRoomNotifications) n.isRead = true;
+    for (const n of demoTicketNotifications(user?.role)) demoCrReadIds.add(n.id);
+    return ok({ ok: true, unreadCount: 0 }) as T;
+  }
+  {
+    const readMatch = clean.match(/^\/control-room\/notifications\/([^/]+)\/read$/);
+    if (readMatch && m === 'PATCH') {
+      markDemoCrRead(readMatch[1]);
+      return ok({ ok: true }) as T;
+    }
   }
   if (clean === '/calls/directory' && m === 'GET') {
     return ok({
-      dispatchLine: { name: '4DS Dispatch', phone: '+27110000000' },
+      dispatchLine: { name: '4DS Dispatch', phone: '+27111004400' },
       officers: [
         {
           officerId: 'demo-off-1',
@@ -1927,19 +2836,30 @@ export async function handleDemoRequest<T>({
         typeof payload.incidentId === 'string' ? payload.incidentId : demoIncidents[0]?.id;
       const officerId =
         typeof payload.officerId === 'string' ? payload.officerId : 'demo-off-4';
-      const officerNames: Record<string, string> = {
-        'demo-off-1': 'Sipho Ndlovu',
-        'demo-off-2': 'Raj Patel',
-        'demo-off-3': 'John Smith',
-        'demo-off-4': 'Zanele Khumalo',
-      };
       const incident = demoIncidents.find((i) => i.id === incidentId);
       if (incident) incident.status = 'DISPATCHED';
+      const officerName = officerFullName(officerId);
+      demoIncidentAssignments[incidentId] = officerName;
+      const officer = demoOfficerRoster.find((o) => o.id === officerId);
+      if (officer) officer.status = 'EN_ROUTE';
+      demoDispatches.unshift({
+        id: `demo-disp-${Date.now()}`,
+        status: 'EN_ROUTE',
+        officer: { id: officerId, name: officerName, status: 'EN_ROUTE' },
+        incident: {
+          id: incidentId,
+          type: incident?.type ?? 'PANIC',
+          status: 'DISPATCHED',
+          client: incident?.user ?? 'Client',
+          address: incident?.location ?? null,
+          latestReport: `${officerName} assigned and en route.`,
+        },
+      });
       return ok({
         ok: true,
         incidentId,
         officerId,
-        officerName: officerNames[officerId] ?? 'Assigned officer',
+        officerName,
       }) as T;
     }
 
@@ -1990,6 +2910,20 @@ export async function handleDemoRequest<T>({
   }
   if (clean === '/control-room/fleet' && m === 'GET') {
     return ok(demoFleet) as T;
+  }
+  {
+    const incMatch = clean.match(/^\/control-room\/incidents\/([^/]+)$/);
+    if (incMatch && m === 'PATCH') {
+      const inc = demoIncidents.find((i) => i.id === incMatch[1]);
+      if (inc) {
+        if (typeof payload.status === 'string') inc.status = payload.status;
+        if (typeof payload.priority === 'string') inc.priority = payload.priority;
+      }
+      return ok(inc ?? { ok: true }) as T;
+    }
+  }
+  if (clean.match(/^\/control-room\/incidents\/[^/]+\/(notes|request-medical)$/) && m === 'POST') {
+    return ok({ ok: true }) as T;
   }
   if (clean.match(/^\/control-room\/sites\/[^/]+$/) && m === 'GET') {
     return ok({
@@ -2102,6 +3036,80 @@ export async function handleDemoRequest<T>({
     return ok(t ?? { ok: true }) as T;
   }
 
+  if (clean === '/control-room/officers' && m === 'GET') {
+    return ok(
+      demoOfficerRoster.map((o) => ({
+        id: o.id,
+        firstName: o.firstName,
+        lastName: o.lastName,
+        status: o.status,
+        zone: o.zone,
+        avgResponseSec: o.avgResponseSec,
+        vehicle: o.vehicle,
+      })),
+    ) as T;
+  }
+  {
+    const officerStatusMatch = clean.match(/^\/control-room\/officers\/([^/]+)\/status$/);
+    if (officerStatusMatch && m === 'PATCH') {
+      const officer = demoOfficerRoster.find((o) => o.id === officerStatusMatch[1]);
+      if (officer && typeof payload.status === 'string') officer.status = payload.status;
+      return ok({
+        id: officer?.id ?? officerStatusMatch[1],
+        status: officer?.status ?? payload.status,
+      }) as T;
+    }
+  }
+  if (clean === '/control-room/dispatches' && m === 'GET') {
+    return ok(demoDispatches) as T;
+  }
+  if (clean === '/control-room/clients' && m === 'GET') {
+    return ok(demoClients) as T;
+  }
+  if (clean === '/control-room/incidents' && m === 'POST') {
+    const client =
+      demoClients.find((c) => c.id === payload.userId) ?? demoClients[0];
+    const type = String(payload.type ?? 'OTHER');
+    const incident = {
+      id: `demo-inc-${Date.now()}`,
+      type,
+      status: 'OPEN',
+      title:
+        typeof payload.title === 'string' && payload.title.trim()
+          ? payload.title.trim()
+          : `${type} — ${client.firstName} ${client.lastName}`,
+      isSilent: Boolean(payload.isSilent),
+      time: 'Just now',
+      priority: String(payload.priority ?? 'HIGH'),
+      user: `${client.firstName} ${client.lastName}`,
+      location: typeof payload.address === 'string' && payload.address ? payload.address : 'Logged from dispatch',
+    };
+    demoIncidents.unshift(incident);
+    return ok(incident) as T;
+  }
+  {
+    const fleetCrewMatch = clean.match(/^\/control-room\/fleet\/([^/]+)\/crew$/);
+    if (fleetCrewMatch && m === 'PATCH') {
+      const vehicle = demoFleet.find((v) => v.id === fleetCrewMatch[1]);
+      const crewPayload = Array.isArray(payload.crew) ? payload.crew : [];
+      if (vehicle) {
+        vehicle.crew = crewPayload.map((slot: { officerId?: string; role?: string }) => {
+          const officer = demoOfficerRoster.find((o) => o.id === slot.officerId);
+          return {
+            officerId: slot.officerId ?? '',
+            name: officer ? `${officer.firstName} ${officer.lastName}` : 'Officer',
+            role: slot.role ?? 'PASSENGER',
+            status: officer?.status ?? 'AVAILABLE',
+            zone: officer?.zone ?? null,
+          };
+        });
+        vehicle.crewCount = vehicle.crew.length;
+        vehicle.status = vehicle.crew.length ? 'ON_DUTY' : vehicle.status;
+      }
+      return ok(vehicle ?? { ok: true }) as T;
+    }
+  }
+
   if (clean.startsWith('/control-room/') && (m === 'GET' || m === 'POST' || m === 'PATCH' || m === 'DELETE')) {
     if (clean === '/control-room/customers' && m === 'GET') {
       return ok([
@@ -2208,12 +3216,19 @@ export async function handleDemoRequest<T>({
         ) as T;
       }
       if (clean.includes('officers')) {
-        return ok([
-          { id: 'demo-off-1', name: 'Sipho Ndlovu', status: 'EN_ROUTE', zone: 'Zone A', email: 'ndlovu@4ds.local' },
-          { id: 'demo-off-2', name: 'Raj Patel', status: 'BUSY', zone: 'Zone B', email: 'patel@4ds.local' },
-          { id: 'demo-off-3', name: 'John Smith', status: 'AVAILABLE', zone: 'Zone C', email: 'smith@4ds.local' },
-          { id: 'demo-off-4', name: 'Zanele Khumalo', status: 'AVAILABLE', zone: 'Zone A', email: 'khumalo@4ds.local' },
-        ]) as T;
+        return ok(
+          demoOfficerRoster.map((o) => ({
+            id: o.id,
+            firstName: o.firstName,
+            lastName: o.lastName,
+            name: `${o.firstName} ${o.lastName}`,
+            status: o.status,
+            zone: o.zone,
+            avgResponseSec: o.avgResponseSec,
+            email: `${o.lastName.toLowerCase()}@4ds.local`,
+            vehicle: o.vehicle,
+          })),
+        ) as T;
       }
       if (clean.includes('customers') || clean.includes('users')) {
         return ok([
@@ -2405,7 +3420,44 @@ export async function handleDemoRequest<T>({
     return ok({ ok: true }) as T;
   }
 
-  // ——— Auth helpers used via publicApi rarely ———
+  if (
+    (clean === '/chat/internal' || clean === '/chat/tech-team' || clean === '/chat/dev-support') &&
+    m === 'GET'
+  ) {
+    const me = participantFromUser(user);
+    return ok({
+      conversationId: `demo-chat-${clean.slice(6)}`,
+      team: { id: 'ops-desk', name: 'Ops desk' },
+      participants: [
+        me,
+        { id: 'demo-off-1', firstName: 'Sipho', lastName: 'Ndlovu', role: 'OFFICER', phone: '+27831110001' },
+        { id: DEMO_DISPATCHER.id, firstName: DEMO_DISPATCHER.firstName, lastName: DEMO_DISPATCHER.lastName, role: 'DISPATCHER', phone: '+27860000000' },
+      ],
+      messages: demoChatMessages,
+    }) as T;
+  }
+  if (
+    (clean === '/chat/internal' || clean === '/chat/tech-team' || clean === '/chat/dev-support') &&
+    m === 'POST'
+  ) {
+    const me = participantFromUser(user);
+    const msg = {
+      id: `demo-chat-${Date.now()}`,
+      content: String(payload.content ?? '').trim() || 'Message sent',
+      createdAt: new Date().toISOString(),
+      sender: {
+        id: me.id,
+        firstName: me.firstName,
+        lastName: me.lastName,
+        role: me.role,
+        phone: null,
+      },
+      attachments: [] as { id: string; fileName: string; fileType: string; fileUrl: string; fileSize: number; kind: 'IMAGE' | 'VIDEO' | 'FILE' }[],
+    };
+    demoChatMessages.push(msg);
+    return ok(msg) as T;
+  }
+
   if (clean === '/auth/me' && m === 'GET') {
     return ok({
       id: user?.id ?? 'demo-user',

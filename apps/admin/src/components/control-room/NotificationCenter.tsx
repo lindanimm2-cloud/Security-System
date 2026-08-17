@@ -12,6 +12,10 @@ import {
   sortNotificationsForOps,
 } from '@/lib/alert-priority';
 import { getSession } from '@/lib/auth';
+import {
+  DEMO_DEV_TICKET_EVENT,
+  DEMO_ERROR_REPORTS_KEY,
+} from '@/lib/developer-tickets';
 import { getSocketUrl } from '@/lib/socket';
 
 type NotificationData = {
@@ -30,6 +34,7 @@ const CATEGORY_LABELS: Record<string, string> = {
   FAMILY: 'Family Safety',
   SYSTEM: 'System',
   BILLING: 'Billing',
+  DEVELOPER: 'Dev tickets',
 };
 
 function formatTime(iso: string) {
@@ -112,9 +117,23 @@ export function NotificationCenter() {
 
     socket.on('incident:created', () => reload());
     socket.on('notification:new', () => reload());
+    socket.on('developer:error-report', () => reload());
 
     return () => {
       socket.disconnect();
+    };
+  }, [reload]);
+
+  useEffect(() => {
+    const refresh = () => void reload({ silent: true });
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === DEMO_ERROR_REPORTS_KEY) refresh();
+    };
+    window.addEventListener(DEMO_DEV_TICKET_EVENT, refresh);
+    window.addEventListener('storage', onStorage);
+    return () => {
+      window.removeEventListener(DEMO_DEV_TICKET_EVENT, refresh);
+      window.removeEventListener('storage', onStorage);
     };
   }, [reload]);
 

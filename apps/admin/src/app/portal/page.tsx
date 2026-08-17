@@ -106,7 +106,8 @@ function OverviewDashboard() {
       await clientApi.post('/client/panic', { silent });
       setAlertMsg(silent ? 'Silent alert sent discreetly.' : 'Panic alert sent. Dispatch notified.');
       undo.show(silent ? 'Silent alert sent' : 'Panic alert sent', async () => {
-        /* demo: acknowledge only */
+        await clientApi.post('/client/panic/cancel');
+        void reload();
       });
       void reload();
     } catch (e) {

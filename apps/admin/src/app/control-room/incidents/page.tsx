@@ -16,6 +16,7 @@ import { QuickDispatchPanel } from '@/components/control-room/QuickDispatchPanel
 import { setActiveIncidentId } from '@/lib/dispatch-context';
 import { CONTROL_ROOM_ROUTES, dispatchHref, documentsHref, mapHref } from '@/lib/control-room-routes';
 import { exportCsv } from '@/lib/export-csv';
+import { isAwaitingDispatch } from '@/lib/incident-status';
 
 type Incident = {
   id: string;
@@ -127,7 +128,6 @@ function IncidentsContent() {
     <div className="page-content">
       <div className="page-header">
         <div>
-          <h1>Incidents</h1>
           <p className="text-muted">
             <Link href={CONTROL_ROOM_ROUTES.overview} className="interactive-text">Overview</Link>
             {' · '}
@@ -299,7 +299,9 @@ function isActiveIncident(status: string) {
 }
 
 function statusBadgeClass(status: string) {
-  if (status === 'ACTIVE') return 'incident-status-badge incident-status-badge--active';
+  if (status === 'ACTIVE' || status === 'OPEN' || status === 'PENDING' || status === 'NEW') {
+    return 'incident-status-badge incident-status-badge--active';
+  }
   if (['DISPATCHED', 'EN_ROUTE', 'ON_SCENE'].includes(status)) {
     return 'incident-status-badge incident-status-badge--dispatched';
   }
@@ -379,7 +381,7 @@ function IncidentRow({
         )}
       </Link>
       <div className="incident-card__actions">
-        {!resolved && i.status === 'ACTIVE' && !i.officer && (
+        {!resolved && isAwaitingDispatch(i.status, i.officer) && (
           <AvailableOfficersButton
             incidentId={i.id}
             active={dispatchOpen}

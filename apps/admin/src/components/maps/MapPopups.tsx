@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { CallActions } from '@/components/calls/CallActions';
 import { QuickDispatchPanel } from '@/components/control-room/QuickDispatchPanel';
+import { isAwaitingDispatch } from '@/lib/incident-status';
 import type { MapClient, MapFleetVehicle, MapIncident, MapOfficer, MapProperty, MapVehicle } from './map-types';
 import { customerHref, incidentHref } from '@/lib/control-room-routes';
 import { SubscriptionBadge } from '@/components/control-room/SubscriptionBadge';
@@ -240,7 +241,7 @@ export function IncidentPopup({
   incident: MapIncident;
   onDispatchAssigned?: () => void;
 }) {
-  const canQuickDispatch = incident.status === 'ACTIVE' && !incident.assignedOfficer;
+  const canQuickDispatch = isAwaitingDispatch(incident.status, incident.assignedOfficer);
 
   return (
     <div className="map-popup-panel map-popup-panel--incident">

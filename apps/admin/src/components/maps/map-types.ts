@@ -202,7 +202,8 @@ export type NotificationCategory =
   | 'MEDICAL'
   | 'FAMILY'
   | 'SYSTEM'
-  | 'BILLING';
+  | 'BILLING'
+  | 'DEVELOPER';
 
 export type ControlRoomNotification = {
   id: string;

@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ControlRoomLayout } from '@/components/control-room/ControlRoomLayout';
 import { ErrorAlert } from '@/components/ErrorAlert';
 import { InternalChat } from '@/components/InternalChat';
@@ -9,6 +9,11 @@ import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { useApi } from '@/hooks/useApi';
 import { adminApi, type ApiResponse } from '@/lib/api-client';
 import { getSession } from '@/lib/auth';
+import {
+  DEMO_DEV_TICKET_EVENT,
+  DEMO_ERROR_REPORTS_KEY,
+  developerTicketCode,
+} from '@/lib/developer-tickets';
 
 type Desk = {
   tenantName: string;
@@ -22,22 +27,28 @@ type Desk = {
     status: string;
     createdAt: string;
     reporter: string;
+    ticketCode?: string;
   }[];
   platformLinks?: { label: string; href: string }[];
 };
 
+type Report = {
+  id: string;
+  message: string;
+  path: string | null;
+  context: string | null;
+  status: string;
+  createdAt: string;
+  ticketCode?: string;
+  reporter: { id: string; name: string; role: string; email: string };
+};
+
 type ReportList = {
   openCount: number;
-  reports: {
-    id: string;
-    message: string;
-    path: string | null;
-    context: string | null;
-    status: string;
-    createdAt: string;
-    reporter: { id: string; name: string; role: string; email: string };
-  }[];
+  reports: Report[];
 };
+
+type TicketFilter = 'OPEN' | 'ACKNOWLEDGED' | 'RESOLVED' | 'ALL';
 
 function formatContext(raw: string | null): string {
   if (!raw) return 'No technical context attached.';
@@ -46,6 +57,11 @@ function formatContext(raw: string | null): string {
   } catch {
     return raw;
   }
+}
+
+function ticketQueryId(): string | null {
+  if (typeof window === 'undefined') return null;
+  return new URLSearchParams(window.location.search).get('ticket');
 }
 
 export default function DeveloperDeskPage() {
@@ -61,6 +77,8 @@ function DeveloperDeskContent() {
   const isDev = session?.user.role === 'DEVELOPER';
   const [busy, setBusy] = useState<string | null>(null);
   const [actionError, setActionError] = useState('');
+  const [filter, setFilter] = useState<TicketFilter>('OPEN');
+  const [focusId, setFocusId] = useState<string | null>(null);
 
   const desk = useApi(
     () =>
@@ -84,6 +102,37 @@ function DeveloperDeskContent() {
     [],
   );
 
+  useEffect(() => {
+    const id = ticketQueryId();
+    setFocusId(id);
+    if (id) setFilter('ALL');
+  }, []);
+
+  useEffect(() => {
+    const refresh = () => {
+      void reports.reload({ silent: true });
+      void desk.reload({ silent: true });
+    };
+    const onTicket = () => refresh();
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === DEMO_ERROR_REPORTS_KEY) refresh();
+    };
+    window.addEventListener(DEMO_DEV_TICKET_EVENT, onTicket);
+    window.addEventListener('storage', onStorage);
+    const poll = window.setInterval(refresh, 4000);
+    return () => {
+      window.removeEventListener(DEMO_DEV_TICKET_EVENT, onTicket);
+      window.removeEventListener('storage', onStorage);
+      window.clearInterval(poll);
+    };
+  }, [reports.reload, desk.reload]);
+
+  useEffect(() => {
+    if (!focusId) return;
+    const el = document.getElementById(`dev-ticket-${focusId}`);
+    el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }, [focusId, reports.data]);
+
   async function setStatus(id: string, status: 'ACKNOWLEDGED' | 'RESOLVED' | 'OPEN') {
     setBusy(id);
     setActionError('');
@@ -104,7 +153,7 @@ function DeveloperDeskContent() {
 
   if (!session || !['DEVELOPER', 'OWNER', 'SUPER_ADMIN'].includes(session.user.role)) {
     return (
-      <div className="empty-state">
+      <div className="empty-state portal-card">
         Developer desk is for the developer profile (owner can also view reports).
       </div>
     );
@@ -112,10 +161,10 @@ function DeveloperDeskContent() {
 
   const list = reports.data?.data;
   const deskData = desk.data?.data;
-  const ackCount =
-    list?.reports.filter((r) => r.status === 'ACKNOWLEDGED').length ?? 0;
-  const resolvedCount =
-    list?.reports.filter((r) => r.status === 'RESOLVED').length ?? 0;
+  const allReports = list?.reports ?? [];
+  const ackCount = allReports.filter((r) => r.status === 'ACKNOWLEDGED').length;
+  const resolvedCount = allReports.filter((r) => r.status === 'RESOLVED').length;
+  const openCount = list?.openCount ?? allReports.filter((r) => r.status === 'OPEN').length;
   const platformLinks = deskData?.platformLinks ?? [
     { label: 'Control room', href: '/control-room' },
     { label: 'Live map', href: '/control-room/map' },
@@ -125,18 +174,19 @@ function DeveloperDeskContent() {
     { label: 'Settings', href: '/control-room/settings' },
   ];
 
+  const filtered = allReports.filter((r) => (filter === 'ALL' ? true : r.status === filter));
+
   return (
     <div className="page-content">
       <div className="page-header">
         <div>
-          <h1>Developer desk</h1>
           <p className="text-muted">
-            Error reports from clients, ops, and field teams — manage platform health from here.
+            Incoming issues become tickets here as soon as someone sends details from an error page.
             {isDev && deskData ? ` · ${deskData.revenueNote}` : ''}
           </p>
         </div>
         {list && (
-          <span className="status-pill status-pill--new">{list.openCount} open</span>
+          <span className="status-pill status-pill--new">{openCount} open tickets</span>
         )}
       </div>
 
@@ -146,20 +196,20 @@ function DeveloperDeskContent() {
 
       <div className="dev-desk-stats">
         <div className="dev-desk-stat">
-          <strong>{list?.openCount ?? 0}</strong>
+          <strong>{openCount}</strong>
           <span>Open</span>
         </div>
         <div className="dev-desk-stat">
           <strong>{ackCount}</strong>
-          <span>Acknowledged</span>
+          <span>In progress</span>
         </div>
         <div className="dev-desk-stat">
           <strong>{resolvedCount}</strong>
           <span>Resolved</span>
         </div>
         <div className="dev-desk-stat">
-          <strong>{list?.reports.length ?? 0}</strong>
-          <span>Total</span>
+          <strong>{allReports.length}</strong>
+          <span>Total tickets</span>
         </div>
       </div>
 
@@ -179,60 +229,39 @@ function DeveloperDeskContent() {
 
       <section className="portal-card" style={{ marginTop: '1rem' }}>
         <div className="card-header-row">
-          <h2>Error reports</h2>
-          <span className="text-muted">Stack traces visible here only — not shown to users</span>
+          <h2>Issue tickets</h2>
+          <span className="text-muted">Live queue · stack traces stay on this desk</span>
         </div>
-        {!list?.reports.length ? (
+        <div className="dev-ticket-filters">
+          {(['OPEN', 'ACKNOWLEDGED', 'RESOLVED', 'ALL'] as TicketFilter[]).map((key) => (
+            <button
+              key={key}
+              type="button"
+              className={`dev-ticket-filter ${filter === key ? 'dev-ticket-filter--on' : ''}`}
+              onClick={() => setFilter(key)}
+            >
+              {key === 'ACKNOWLEDGED' ? 'In progress' : key === 'ALL' ? 'All' : key.charAt(0) + key.slice(1).toLowerCase()}
+            </button>
+          ))}
+        </div>
+        {!filtered.length ? (
           <p className="text-muted">
-            No reports yet. Users can tap “Send details to developer” on any error page.
+            {filter === 'OPEN'
+              ? 'No open tickets. New issues appear here the moment someone taps “Send details to developer”.'
+              : 'No tickets in this view.'}
           </p>
         ) : (
-          <ul className="status-list">
-            {list.reports.map((r) => (
-              <li key={r.id} className="status-list-item" style={{ flexWrap: 'wrap', gap: '0.5rem' }}>
-                <div style={{ flex: 1, minWidth: '14rem' }}>
-                  <strong>{r.message}</strong>
-                  <p className="text-muted" style={{ margin: '0.15rem 0 0' }}>
-                    {r.reporter.name} · {r.reporter.role}
-                    {r.path ? ` · ${r.path}` : ''}
-                    {' · '}
-                    {new Date(r.createdAt).toLocaleString()}
-                  </p>
-                  {r.context ? (
-                    <details className="dev-report-context">
-                      <summary>Technical details</summary>
-                      <pre>{formatContext(r.context)}</pre>
-                    </details>
-                  ) : null}
-                </div>
-                <span className={`status-pill status-pill--${r.status.toLowerCase()}`}>
-                  {r.status.replace(/_/g, ' ')}
-                </span>
-                <div className="entity-card-actions">
-                  {r.status === 'OPEN' && (
-                    <button
-                      type="button"
-                      className="btn-secondary btn-sm"
-                      disabled={busy === r.id}
-                      onClick={() => void setStatus(r.id, 'ACKNOWLEDGED')}
-                    >
-                      Ack
-                    </button>
-                  )}
-                  {r.status !== 'RESOLVED' && (
-                    <button
-                      type="button"
-                      className="btn-primary btn-sm"
-                      disabled={busy === r.id}
-                      onClick={() => void setStatus(r.id, 'RESOLVED')}
-                    >
-                      Resolve
-                    </button>
-                  )}
-                </div>
-              </li>
+          <div className="dev-ticket-list">
+            {filtered.map((r) => (
+              <IssueTicketCard
+                key={r.id}
+                report={r}
+                busy={busy === r.id}
+                focused={focusId === r.id}
+                onStatus={(status) => void setStatus(r.id, status)}
+              />
             ))}
-          </ul>
+          </div>
         )}
       </section>
 
@@ -245,9 +274,9 @@ function DeveloperDeskContent() {
             {deskData.recentReports.map((r) => (
               <li key={r.id} className="status-list-item">
                 <div>
-                  <strong>{r.message}</strong>
+                  <strong>{r.ticketCode ?? developerTicketCode(r.id)}</strong>
                   <p className="text-muted" style={{ margin: '0.15rem 0 0' }}>
-                    {r.reporter}
+                    {r.message} · {r.reporter}
                     {r.path ? ` · ${r.path}` : ''}
                     {' · '}
                     {new Date(r.createdAt).toLocaleString()}
@@ -267,8 +296,94 @@ function DeveloperDeskContent() {
           <h2>Developer support chat</h2>
           <span className="text-muted">Owner · control room · store · techs</span>
         </div>
-        <InternalChat portal="admin" channel="dev-support" />
+        <InternalChat portal="admin" channel="dev-support" embedded />
       </section>
     </div>
+  );
+}
+
+function IssueTicketCard({
+  report,
+  busy,
+  focused,
+  onStatus,
+}: {
+  report: Report;
+  busy: boolean;
+  focused: boolean;
+  onStatus: (status: 'ACKNOWLEDGED' | 'RESOLVED' | 'OPEN') => void;
+}) {
+  const code = report.ticketCode ?? developerTicketCode(report.id);
+  const statusClass = report.status.toLowerCase();
+
+  return (
+    <article
+      id={`dev-ticket-${report.id}`}
+      className={`dev-ticket ${focused ? 'dev-ticket--focus' : ''} ${
+        report.status === 'OPEN' ? 'dev-ticket--open' : ''
+      }`}
+    >
+      <div className="dev-ticket__top">
+        <span className="dev-ticket__code">{code}</span>
+        <span className={`status-pill status-pill--${statusClass}`}>
+          {report.status.replace(/_/g, ' ')}
+        </span>
+      </div>
+      <h3 className="dev-ticket__title">{report.message}</h3>
+      <p className="dev-ticket__meta">
+        {report.reporter.name} · {report.reporter.role}
+        {report.path ? ` · ${report.path}` : ''}
+        {' · '}
+        {new Date(report.createdAt).toLocaleString()}
+      </p>
+      {report.context ? (
+        <details className="dev-report-context">
+          <summary>Technical details</summary>
+          <pre>{formatContext(report.context)}</pre>
+        </details>
+      ) : null}
+      <div className="queue-card__actions">
+        {report.status === 'OPEN' && (
+          <button
+            type="button"
+            className="btn-secondary btn-sm"
+            disabled={busy}
+            onClick={() => onStatus('ACKNOWLEDGED')}
+          >
+            Take ticket
+          </button>
+        )}
+        {report.status === 'ACKNOWLEDGED' && (
+          <button
+            type="button"
+            className="btn-secondary btn-sm"
+            disabled={busy}
+            onClick={() => onStatus('OPEN')}
+          >
+            Reopen
+          </button>
+        )}
+        {report.status !== 'RESOLVED' && (
+          <button
+            type="button"
+            className="btn-primary btn-sm"
+            disabled={busy}
+            onClick={() => onStatus('RESOLVED')}
+          >
+            Resolve
+          </button>
+        )}
+        {report.status === 'RESOLVED' && (
+          <button
+            type="button"
+            className="btn-secondary btn-sm"
+            disabled={busy}
+            onClick={() => onStatus('OPEN')}
+          >
+            Reopen
+          </button>
+        )}
+      </div>
+    </article>
   );
 }

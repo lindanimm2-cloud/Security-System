@@ -17,6 +17,7 @@ import {
 } from '@/lib/document-categories';
 import { incidentHref } from '@/lib/control-room-routes';
 import { resolveMediaUrl } from '@/lib/media-url';
+import { UiSelect } from '@/components/ui/UiSelect';
 
 type FolderNode = {
   id: string;
@@ -160,7 +161,6 @@ function DocumentsContent() {
     <div className="documents-hub">
       <div className="documents-hub__header">
         <div>
-          <h1>Documents</h1>
           <p className="text-muted">
             {library?.stats.totalDocuments ?? 0} files · {library?.stats.folderCount ?? 0} folders
             {incidentFilter && (
@@ -452,12 +452,16 @@ function NewFolderForm({
         </label>
         <label>
           Parent folder
-          <select value={parentId} onChange={(e) => setParentId(e.target.value)}>
-            <option value="">Root level</option>
-            {folders.map((f) => (
-              <option key={f.id} value={f.id}>{f.name}</option>
-            ))}
-          </select>
+          <UiSelect
+            compact={false}
+            ariaLabel="Parent folder"
+            value={parentId}
+            onChange={setParentId}
+            options={[
+              { value: '', label: 'Root level' },
+              ...folders.map((f) => ({ value: f.id, label: f.name })),
+            ]}
+          />
         </label>
         <label className="incident-report-form__full">
           Description
@@ -531,8 +535,8 @@ function UploadDocumentForm({
     <form className="portal-card documents-form" onSubmit={submit}>
       <h2>Add document</h2>
       <p className="text-muted">
-        Choose a file to register in the library (metadata + Open link). Full
-        binary storage can be connected to object storage when you go live.
+        Choose a file to register in the library (metadata and an open link).
+        Files stay available to ops from this desk.
       </p>
       <div className="incident-report-form__grid">
         <label className="incident-report-form__full">
@@ -552,43 +556,64 @@ function UploadDocumentForm({
         </label>
         <label>
           File type
-          <select value={fileType} onChange={(e) => setFileType(e.target.value)}>
-            <option value="application/pdf">PDF</option>
-            <option value="image/jpeg">Image (JPEG)</option>
-            <option value="image/png">Image (PNG)</option>
-            <option value="video/mp4">Video (MP4)</option>
-            <option value="application/vnd.ms-excel">Spreadsheet</option>
-            <option value="text/plain">Text</option>
-            <option value="application/octet-stream">Other</option>
-          </select>
+          <UiSelect
+            compact={false}
+            ariaLabel="File type"
+            value={fileType}
+            onChange={setFileType}
+            options={[
+              { value: 'application/pdf', label: 'PDF' },
+              { value: 'image/jpeg', label: 'Image (JPEG)' },
+              { value: 'image/png', label: 'Image (PNG)' },
+              { value: 'video/mp4', label: 'Video (MP4)' },
+              { value: 'application/vnd.ms-excel', label: 'Spreadsheet' },
+              { value: 'text/plain', label: 'Text' },
+              { value: 'application/octet-stream', label: 'Other' },
+            ]}
+          />
         </label>
         <label>
           Category
-          <select value={category} onChange={(e) => setCategory(e.target.value as DocumentCategoryKey)}>
-            {Object.entries(DOCUMENT_CATEGORIES).map(([k, v]) => (
-              <option key={k} value={k}>{v}</option>
-            ))}
-          </select>
+          <UiSelect
+            compact={false}
+            ariaLabel="Category"
+            value={category}
+            onChange={(value) => setCategory(value as DocumentCategoryKey)}
+            options={Object.entries(DOCUMENT_CATEGORIES).map(([k, v]) => ({
+              value: k,
+              label: v,
+            }))}
+          />
         </label>
         <label>
           Folder
-          <select value={folderId} onChange={(e) => setFolderId(e.target.value)}>
-            <option value="">No folder</option>
-            {folders.map((f) => (
-              <option key={f.id} value={f.id}>{f.name}</option>
-            ))}
-          </select>
+          <UiSelect
+            compact={false}
+            ariaLabel="Folder"
+            value={folderId}
+            onChange={setFolderId}
+            options={[
+              { value: '', label: 'No folder' },
+              ...folders.map((f) => ({ value: f.id, label: f.name })),
+            ]}
+          />
         </label>
         <label>
           Link to incident
-          <select value={incidentId} onChange={(e) => setIncidentId(e.target.value)}>
-            <option value="">None</option>
-            {incidents.map((i) => (
-              <option key={i.id} value={i.id}>
-                {i.type} — {i.client} ({i.status})
-              </option>
-            ))}
-          </select>
+          <UiSelect
+            compact={false}
+            ariaLabel="Link to incident"
+            value={incidentId}
+            onChange={setIncidentId}
+            options={[
+              { value: '', label: 'None' },
+              ...incidents.map((i) => ({
+                value: i.id,
+                label: `${i.type} — ${i.client}`,
+                meta: i.status,
+              })),
+            ]}
+          />
         </label>
         <label className="incident-report-form__full">
           Description

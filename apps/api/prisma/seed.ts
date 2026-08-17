@@ -124,6 +124,54 @@ async function main() {
     },
   });
 
+  await prisma.user.upsert({
+    where: { tenantId_email: { tenantId: tenant.id, email: 'medical@4ds.local' } },
+    update: {
+      passwordHash,
+      status: UserStatus.ACTIVE,
+      role: UserRole.MEDICAL_DISPATCHER,
+      jobTitle: 'Medical Dispatcher',
+      firstName: 'Priya',
+      lastName: 'Medics',
+      phone: '+27 82 100 0088',
+    },
+    create: {
+      tenantId: tenant.id,
+      email: 'medical@4ds.local',
+      passwordHash,
+      firstName: 'Priya',
+      lastName: 'Medics',
+      role: UserRole.MEDICAL_DISPATCHER,
+      jobTitle: 'Medical Dispatcher',
+      phone: '+27 82 100 0088',
+      status: UserStatus.ACTIVE,
+    },
+  });
+
+  await prisma.user.upsert({
+    where: { tenantId_email: { tenantId: tenant.id, email: 'crew@4ds.local' } },
+    update: {
+      passwordHash,
+      status: UserStatus.ACTIVE,
+      role: UserRole.MEDICAL_CREW,
+      jobTitle: 'Paramedic',
+      firstName: 'Andile',
+      lastName: 'Paramedic',
+      phone: '+27 82 100 0089',
+    },
+    create: {
+      tenantId: tenant.id,
+      email: 'crew@4ds.local',
+      passwordHash,
+      firstName: 'Andile',
+      lastName: 'Paramedic',
+      role: UserRole.MEDICAL_CREW,
+      jobTitle: 'Paramedic',
+      phone: '+27 82 100 0089',
+      status: UserStatus.ACTIVE,
+    },
+  });
+
   const superAdmin = await prisma.user.upsert({
     where: { tenantId_email: { tenantId: tenant.id, email: 'superadmin@4ds.local' } },
     update: {
@@ -2333,6 +2381,8 @@ async function main() {
     superAdmin: 'superadmin@4ds.local',
     owner: 'owner@4ds.local',
     developer: developer.email,
+    medical: 'medical@4ds.local',
+    crew: 'crew@4ds.local',
     manager: 'manager@4ds.local',
     supervisor: 'supervisor@4ds.local',
     admin: 'admin@demo.local',

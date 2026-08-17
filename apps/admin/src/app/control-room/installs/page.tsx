@@ -7,6 +7,7 @@ import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { useApi } from '@/hooks/useApi';
 import { adminApi, type ApiResponse } from '@/lib/api-client';
 import { getSession } from '@/lib/auth';
+import { UiSelect } from '@/components/ui/UiSelect';
 
 type Job = {
   id: string;
@@ -157,7 +158,6 @@ function InstallsContent() {
     <div className="page-content">
       <div className="page-header">
         <div>
-          <h1>Install jobs & technician team</h1>
           <p className="text-muted">
             Schedule CCTV, alarm, and access-control installs for the 3-tech Install Tech Unit.
           </p>
@@ -224,32 +224,30 @@ function InstallsContent() {
             </label>
             <label>
               Job type
-              <select
+              <UiSelect
+                compact={false}
+                ariaLabel="Job type"
                 value={form.jobType}
-                onChange={(e) => setForm({ ...form, jobType: e.target.value })}
-              >
-                {JOB_TYPES.map((t) => (
-                  <option key={t} value={t}>
-                    {t}
-                  </option>
-                ))}
-              </select>
+                onChange={(jobType) => setForm({ ...form, jobType })}
+                options={JOB_TYPES.map((t) => ({ value: t, label: t }))}
+              />
             </label>
             <label>
               Technician
-              <select
+              <UiSelect
+                compact={false}
+                ariaLabel="Technician"
                 value={form.technicianId}
-                onChange={(e) =>
-                  setForm({ ...form, technicianId: e.target.value })
-                }
-              >
-                <option value="">Unassigned</option>
-                {techs.map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.firstName} {t.lastName} — {t.jobTitle}
-                  </option>
-                ))}
-              </select>
+                onChange={(technicianId) => setForm({ ...form, technicianId })}
+                options={[
+                  { value: '', label: 'Unassigned' },
+                  ...techs.map((t) => ({
+                    value: t.id,
+                    label: `${t.firstName} ${t.lastName}`,
+                    meta: t.jobTitle ?? undefined,
+                  })),
+                ]}
+              />
             </label>
             <label>
               Client name
@@ -292,16 +290,13 @@ function InstallsContent() {
             </label>
             <label>
               Status
-              <select
+              <UiSelect
+                compact={false}
+                ariaLabel="Install status"
                 value={form.status}
-                onChange={(e) => setForm({ ...form, status: e.target.value })}
-              >
-                {JOB_STATUSES.map((s) => (
-                  <option key={s} value={s}>
-                    {s}
-                  </option>
-                ))}
-              </select>
+                onChange={(status) => setForm({ ...form, status })}
+                options={JOB_STATUSES.map((s) => ({ value: s, label: s }))}
+              />
             </label>
             <label>
               Description

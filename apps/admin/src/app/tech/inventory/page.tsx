@@ -6,6 +6,7 @@ import { ErrorAlert } from '@/components/ErrorAlert';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { useApi } from '@/hooks/useApi';
 import { techApi, type ApiResponse } from '@/lib/api-client';
+import { UiSelect } from '@/components/ui/UiSelect';
 
 type InventoryItem = {
   id: string;
@@ -103,14 +104,20 @@ function TechInventoryContent() {
         <div className="commission-form__grid">
           <div className="form-field form-field--full">
             <span>Product</span>
-            <select value={productId} onChange={(e) => setProductId(e.target.value)} required>
-              <option value="">Select partâ€¦</option>
-              {inventory.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.imageEmoji} {p.name} ({p.stock} in stock)
-                </option>
-              ))}
-            </select>
+            <UiSelect
+              compact={false}
+              ariaLabel="Product"
+              value={productId}
+              onChange={setProductId}
+              options={[
+                { value: '', label: 'Select part…' },
+                ...inventory.map((p) => ({
+                  value: p.id,
+                  label: `${p.imageEmoji} ${p.name}`,
+                  meta: `${p.stock} in stock`,
+                })),
+              ]}
+            />
           </div>
           <div className="form-field">
             <span>Quantity</span>

@@ -348,7 +348,7 @@ export class ControlRoomController {
 
   @Get('notifications')
   notifications(@CurrentUser() user: AuthUser) {
-    return this.controlRoomService.getNotifications(user.tenantId);
+    return this.controlRoomService.getNotifications(user.tenantId, user);
   }
 
   @Patch('notifications/read-all')

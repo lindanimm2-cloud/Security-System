@@ -83,6 +83,7 @@ export default function ControlRoomSettingsPage() {
   const [revenueBusy, setRevenueBusy] = useState(false);
   const [revenueMsg, setRevenueMsg] = useState('');
   const [revenueErr, setRevenueErr] = useState('');
+  const [previewNote, setPreviewNote] = useState('');
 
   async function setDeveloperRevenue(enabled: boolean) {
     setRevenueBusy(true);
@@ -106,7 +107,6 @@ export default function ControlRoomSettingsPage() {
       <div className="page-content page-content--settings">
         <div className="page-header">
           <div>
-            <h1>Settings</h1>
             <p className="text-muted">Control panel preferences and role access.</p>
           </div>
         </div>
@@ -190,18 +190,30 @@ export default function ControlRoomSettingsPage() {
                 key={label}
                 type="button"
                 className="btn-secondary btn-sm"
-                onClick={() =>
+                onClick={() => {
+                  if (alert.tier === 'normal') {
+                    setPreviewNote(
+                      'Shown in the notification bell only — routine updates do not raise a toast.',
+                    );
+                    return;
+                  }
+                  setPreviewNote('');
                   pushPriorityAlert({
                     ...alert,
                     id: `${alert.id}-${Date.now()}`,
                     createdAt: new Date().toISOString(),
-                  })
-                }
+                  });
+                }}
               >
                 Preview {label}
               </button>
             ))}
           </div>
+          {previewNote && (
+            <p className="text-muted" style={{ marginTop: '0.75rem' }} role="status">
+              {previewNote}
+            </p>
+          )}
         </div>
       </div>
     </ControlRoomLayout>

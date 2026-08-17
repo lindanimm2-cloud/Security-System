@@ -14,6 +14,7 @@ import { adminApi, type ApiResponse } from '@/lib/api-client';
 import { CONTROL_ROOM_ROUTES, dispatchHref, mapHref } from '@/lib/control-room-routes';
 import { friendlyErrorMessage } from '@/lib/friendly-error';
 import { exportCsv } from '@/lib/export-csv';
+import { UiSelect } from '@/components/ui/UiSelect';
 
 type SubscriptionSummary = {
   planName: string;
@@ -278,7 +279,6 @@ function CustomersContent() {
       <PendingVerificationsPanel />
       <div className="page-header">
         <div>
-          <h1>Customers & Subscriptions</h1>
           <p className="text-muted">
             Manage client plans, coverage, and billing status from dispatch — synced with the client portal.
           </p>
@@ -437,14 +437,17 @@ function CustomersContent() {
           <div className="form-row-2">
             <label>
               Applies to
-              <select
+              <UiSelect
+                compact={false}
+                ariaLabel="Applies to"
                 value={newCode.appliesTo}
-                onChange={(e) => setNewCode({ ...newCode, appliesTo: e.target.value })}
-              >
-                <option value="BOTH">Subscription &amp; store</option>
-                <option value="SUBSCRIPTION">Subscription only</option>
-                <option value="STORE">Store only</option>
-              </select>
+                onChange={(appliesTo) => setNewCode({ ...newCode, appliesTo })}
+                options={[
+                  { value: 'BOTH', label: 'Subscription & store' },
+                  { value: 'SUBSCRIPTION', label: 'Subscription only' },
+                  { value: 'STORE', label: 'Store only' },
+                ]}
+              />
             </label>
             <label>
               Description
@@ -518,18 +521,28 @@ function CustomersContent() {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
-        <select value={tierFilter} onChange={(e) => setTierFilter(e.target.value)}>
-          <option value="ALL">All tiers</option>
-          <option value="ESSENTIAL">Essential</option>
-          <option value="PREMIUM">Premium</option>
-        </select>
-        <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
-          <option value="ALL">All statuses</option>
-          <option value="ACTIVE">Active</option>
-          <option value="TRIALING">Trialing</option>
-          <option value="PAST_DUE">Past due</option>
-          <option value="CANCELLED">Cancelled</option>
-        </select>
+        <UiSelect
+          ariaLabel="Filter by tier"
+          value={tierFilter}
+          onChange={setTierFilter}
+          options={[
+            { value: 'ALL', label: 'All tiers' },
+            { value: 'ESSENTIAL', label: 'Essential' },
+            { value: 'PREMIUM', label: 'Premium' },
+          ]}
+        />
+        <UiSelect
+          ariaLabel="Filter by status"
+          value={statusFilter}
+          onChange={setStatusFilter}
+          options={[
+            { value: 'ALL', label: 'All statuses' },
+            { value: 'ACTIVE', label: 'Active' },
+            { value: 'TRIALING', label: 'Trialing' },
+            { value: 'PAST_DUE', label: 'Past due' },
+            { value: 'CANCELLED', label: 'Cancelled' },
+          ]}
+        />
         <button
           type="button"
           className="btn-secondary"
@@ -955,7 +968,13 @@ function CustomerSubscriptionModal({
                       ApiResponse<{ inviteCode?: string; inviteToken?: string; inviteUrl?: string }>
                     >(`/control-room/customers/${userId}/invite`, {});
                     const code = res.data.inviteCode ?? res.data.inviteToken ?? '';
-                    window.alert(`Invite code: ${code}`);
+                    const url = res.data.inviteUrl ?? `/portal/register?token=${encodeURIComponent(code)}`;
+                    try {
+                      await navigator.clipboard.writeText(code || url);
+                      setPasswordMsg(`Invite code copied: ${code || url}`);
+                    } catch {
+                      setPasswordMsg(`Invite code: ${code || url}`);
+                    }
                   } catch (err) {
                     setPasswordError(friendlyErrorMessage(err, 'save'));
                   }
@@ -1001,11 +1020,16 @@ function CustomerSubscriptionModal({
 
           <label>
             Plan tier
-            <select value={tierCode} onChange={(e) => setTierCode(e.target.value)}>
-              {catalog.tiers.map((t) => (
-                <option key={t.code} value={t.code}>{t.name} — {t.priceFormatted}</option>
-              ))}
-            </select>
+            <UiSelect
+              compact={false}
+              ariaLabel="Plan tier"
+              value={tierCode}
+              onChange={setTierCode}
+              options={catalog.tiers.map((t) => ({
+                value: t.code,
+                label: `${t.name} — ${t.priceFormatted}`,
+              }))}
+            />
           </label>
 
           {!isPremium && (
@@ -1031,12 +1055,18 @@ function CustomerSubscriptionModal({
           <div className="form-row-2">
             <label>
               Billing status
-              <select value={status} onChange={(e) => setStatus(e.target.value)}>
-                <option value="ACTIVE">Active</option>
-                <option value="TRIALING">Trialing</option>
-                <option value="PAST_DUE">Past due</option>
-                <option value="CANCELLED">Cancelled</option>
-              </select>
+              <UiSelect
+                compact={false}
+                ariaLabel="Billing status"
+                value={status}
+                onChange={setStatus}
+                options={[
+                  { value: 'ACTIVE', label: 'Active' },
+                  { value: 'TRIALING', label: 'Trialing' },
+                  { value: 'PAST_DUE', label: 'Past due' },
+                  { value: 'CANCELLED', label: 'Cancelled' },
+                ]}
+              />
             </label>
             <label>
               Valid until

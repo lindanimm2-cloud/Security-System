@@ -27,6 +27,12 @@ type StaffUser = {
   lastName: string;
 };
 
+function ticketCode(id: string): string {
+  const compact = id.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+  const tail = (compact.slice(-4) || '0000').padStart(4, '0');
+  return `DEV-${tail}`;
+}
+
 @Injectable()
 export class DeveloperService {
   constructor(
@@ -46,7 +52,42 @@ export class DeveloperService {
     if (!canContactDeveloper(user.role)) {
       throw new ForbiddenException('Your role cannot notify the developer');
     }
+    return this.createErrorReportAndNotify(user, input);
+  }
 
+  async submitErrorReportByUserId(
+    userId: string,
+    tenantId: string,
+    input: {
+      message: string;
+      path?: string;
+      userAgent?: string;
+      context?: string;
+    },
+  ) {
+    const user = await this.prisma.user.findFirst({
+      where: { id: userId, tenantId },
+      select: {
+        id: true,
+        tenantId: true,
+        role: true,
+        firstName: true,
+        lastName: true,
+      },
+    });
+    if (!user) throw new NotFoundException('Account not found');
+    return this.createErrorReportAndNotify(user, input);
+  }
+
+  private async createErrorReportAndNotify(
+    user: StaffUser,
+    input: {
+      message: string;
+      path?: string;
+      userAgent?: string;
+      context?: string;
+    },
+  ) {
     const message = (input.message ?? '').trim().slice(0, 2000);
     if (!message) throw new BadRequestException('Error message is required');
 
@@ -75,8 +116,10 @@ export class DeveloperService {
       select: { id: true },
     });
 
-    const title = 'App error reported';
+    const code = ticketCode(report.id);
+    const title = `Issue ticket ${code}`;
     const body = `${user.firstName} ${user.lastName} (${user.role}): ${message}`;
+    const link = `/control-room/developer?ticket=${report.id}`;
 
     if (developers.length) {
       await this.prisma.notification.createMany({
@@ -88,20 +131,26 @@ export class DeveloperService {
           body: body.slice(0, 500),
         })),
       });
-
-      this.realtime.emitNotification(user.tenantId, {
-        type: NotificationType.ERROR_REPORT,
-        title,
-        body: body.slice(0, 500),
-        reportId: report.id,
-        forRoles: [UserRole.DEVELOPER],
-      });
     }
+
+    this.realtime.emitNotification(user.tenantId, {
+      type: NotificationType.ERROR_REPORT,
+      category: 'DEVELOPER',
+      title,
+      body: body.slice(0, 500),
+      priority: 'high',
+      isRead: false,
+      createdAt: report.createdAt.toISOString(),
+      link,
+      reportId: report.id,
+      forRoles: [UserRole.DEVELOPER, UserRole.OWNER, UserRole.SUPER_ADMIN],
+    });
 
     this.realtime.emitCallEvent(user.tenantId, 'developer:error-report', {
       reportId: report.id,
       title,
       body,
+      link,
     });
 
     return {
@@ -110,6 +159,7 @@ export class DeveloperService {
         id: report.id,
         status: report.status,
         message: report.message,
+        ticketCode: code,
         createdAt: report.createdAt.toISOString(),
       },
     };
@@ -150,6 +200,7 @@ export class DeveloperService {
           status: r.status,
           createdAt: r.createdAt.toISOString(),
           resolvedAt: r.resolvedAt?.toISOString() ?? null,
+          ticketCode: ticketCode(r.id),
           reporter: {
             id: r.reporter.id,
             name: `${r.reporter.firstName} ${r.reporter.lastName}`.trim(),
@@ -244,6 +295,7 @@ export class DeveloperService {
           status: r.status,
           createdAt: r.createdAt.toISOString(),
           reporter: `${r.reporter.firstName} ${r.reporter.lastName} · ${r.reporter.role}`,
+          ticketCode: ticketCode(r.id),
         })),
         developers,
       },
