@@ -2,19 +2,20 @@
 
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { FormEvent, useEffect, useState } from 'react';
+import { FormEvent, Suspense, useEffect, useState } from 'react';
 import {
   AuthPortal,
   login,
   oauthClientSignIn,
 } from '@/lib/auth';
 import { applyTabTitle, bootTabSession } from '@/lib/tab-session';
+import { clearActionKind, getActionKind, setActionKind } from '@/lib/action-status';
 import { friendlyErrorMessage } from '@/lib/friendly-error';
 import { adminHomeForRole } from '@/lib/admin-home';
 import { BrandMark } from './BrandMark';
 import { ButtonSpinner } from './ButtonSpinner';
 import { LoadingSpinner } from './LoadingSpinner';
-import { ThemeToggle } from './ThemeToggle';
+import { LoginPageChrome } from './LoginPageChrome';
 import { SketchIcon, type SketchIconName } from './icons/SketchIcon';
 
 type LoginFormProps = {
@@ -32,15 +33,41 @@ const PORTAL_LINKS: {
   label: string;
   href: string;
   icon: SketchIconName;
-  portal: AuthPortal;
 }[] = [
-  { label: 'Control Panel', href: '/login', icon: 'monitor', portal: 'admin' },
-  { label: 'Client Portal', href: '/portal/login', icon: 'shield', portal: 'client' },
-  { label: 'Officer App', href: '/officer/login', icon: 'officer', portal: 'officer' },
-  { label: 'Technician', href: '/tech/login', icon: 'officer', portal: 'technician' },
+  { label: 'Control Panel', href: '/login', icon: 'monitor' },
+  { label: 'Client Portal', href: '/portal/login', icon: 'shield' },
+  { label: 'Officer App', href: '/officer/login', icon: 'officer' },
+  { label: 'Technician', href: '/tech/login', icon: 'building' },
+  { label: 'Medical', href: '/medical/login', icon: 'secure' },
 ];
 
-export function LoginForm({
+function loginPathFor(portal: AuthPortal, redirectTo: string) {
+  if (redirectTo === '/medical' || redirectTo.startsWith('/medical')) return '/medical/login';
+  if (portal === 'admin') return '/login';
+  if (portal === 'client') return '/portal/login';
+  if (portal === 'officer') return '/officer/login';
+  return '/tech/login';
+}
+
+export function LoginForm(props: LoginFormProps) {
+  return (
+    <Suspense
+      fallback={
+        <LoadingSpinner
+          brand
+          fullScreen
+          action="page"
+          label="Loading sign-in…"
+          hints={['Preparing your portal.', 'System updates underway…']}
+        />
+      }
+    >
+      <LoginFormInner {...props} />
+    </Suspense>
+  );
+}
+
+function LoginFormInner({
   portal,
   title,
   subtitle,
@@ -78,6 +105,10 @@ export function LoginForm({
   const [oauthAccept, setOauthAccept] = useState(false);
 
   useEffect(() => {
+    const pending = getActionKind();
+    if (pending === 'sign-out' || pending === 'session-expired') {
+      clearActionKind();
+    }
     bootTabSession();
     applyTabTitle(null, portal);
     try {
@@ -108,6 +139,7 @@ export function LoginForm({
       } else {
         localStorage.removeItem(REMEMBER_KEY);
       }
+      setActionKind('sign-in');
       setRedirecting(true);
       router.push(portal === 'admin' ? adminHomeForRole(session.user.role) : redirectTo);
     } catch (err) {
@@ -136,6 +168,7 @@ export function LoginForm({
         },
         { authSource: 'portal' },
       );
+      setActionKind('sign-in');
       setRedirecting(true);
       router.push(redirectTo);
     } catch (err) {
@@ -144,24 +177,16 @@ export function LoginForm({
     }
   }
 
-  const otherPortals = PORTAL_LINKS.filter((p) => p.portal !== portal);
+  const currentPath = loginPathFor(portal, redirectTo);
+  const otherPortals = PORTAL_LINKS.filter((p) => p.href !== currentPath);
 
   if (redirecting) {
-    return (
-      <LoadingSpinner
-        brand
-        fullScreen
-        label="Signing you in…"
-        hint="Opening your portal — hang tight."
-      />
-    );
+    return <LoadingSpinner brand fullScreen action="sign-in" />;
   }
 
   return (
     <div className="login-page login-page--v2">
-      <div className="login-theme-toggle">
-        <ThemeToggle />
-      </div>
+      <LoginPageChrome />
 
       <div className="login-page__inner">
         <div className="login-page__logo">

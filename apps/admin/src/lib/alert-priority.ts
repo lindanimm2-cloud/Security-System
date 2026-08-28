@@ -23,6 +23,8 @@ export type PriorityAlert = {
   link?: string;
   incidentId?: string;
   createdAt: string;
+  /** Bypass quiet mode / announce cooldown (settings “Test alert”). */
+  force?: boolean;
 };
 
 const HIGH_CATEGORIES: NotificationCategory[] = [
@@ -159,11 +161,21 @@ export function looseNotificationToAlert(raw: Record<string, unknown>): Priority
     };
   }
 
+  const priority = String(raw.priority ?? '').toUpperCase();
   let tier: AlertTier = 'high';
   let kind: PriorityAlertKind = 'high';
-  if (type.includes('emergency') || type.includes('panic') || type.includes('critical')) {
+  if (
+    priority === 'P0' ||
+    type.includes('emergency') ||
+    type.includes('panic') ||
+    type.includes('critical')
+  ) {
     tier = 'critical';
-    kind = type.includes('silent') ? 'silent' : 'critical';
+    kind = type.includes('silent') ? 'silent' : type.includes('medical') ? 'medical' : type.includes('fire') ? 'fire' : 'critical';
+  } else if (priority === 'P1') {
+    tier = 'high';
+  } else if (priority === 'P2' || priority === 'P3') {
+    return null;
   }
 
   return {
@@ -230,15 +242,24 @@ const INCIDENT_PRIORITY_RANK: Record<string, number> = {
 };
 
 /** Pin life-safety incidents above routine ones. */
-export function sortIncidentsForOps<T extends { priority: string; time?: string; createdAt?: string }>(
-  items: T[],
-): T[] {
+export function sortIncidentsForOps<
+  T extends { priority: string; type?: string; time?: string; createdAt?: string },
+>(items: T[]): T[] {
   return [...items].sort((a, b) => {
+    const typeRank = (t?: string) => {
+      const x = (t ?? '').toUpperCase();
+      if (x.includes('PANIC')) return 0;
+      if (x === 'MEDICAL' || x === 'FIRE') return 1;
+      return 2;
+    };
+    const ta = typeRank(a.type);
+    const tb = typeRank(b.type);
+    if (ta !== tb) return ta - tb;
     const pa = INCIDENT_PRIORITY_RANK[a.priority] ?? 9;
     const pb = INCIDENT_PRIORITY_RANK[b.priority] ?? 9;
     if (pa !== pb) return pa - pb;
-    const ta = new Date(a.createdAt ?? a.time ?? 0).getTime();
-    const tb = new Date(b.createdAt ?? b.time ?? 0).getTime();
-    return tb - ta;
+    const ha = new Date(a.createdAt ?? a.time ?? 0).getTime();
+    const hb = new Date(b.createdAt ?? b.time ?? 0).getTime();
+    return hb - ha;
   });
 }

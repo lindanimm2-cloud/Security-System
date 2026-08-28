@@ -27,7 +27,11 @@ export function DispatchMenuButton({
         className={className}
         aria-expanded={open}
         aria-haspopup="dialog"
-        onClick={() => setOpen((value) => !value)}
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          setOpen((value) => !value);
+        }}
       >
         {label}
       </button>

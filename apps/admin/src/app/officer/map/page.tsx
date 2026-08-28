@@ -47,7 +47,7 @@ export default function OfficerMapPage() {
 }
 
 function MapContent() {
-  const { data, loading, error , reload } = useApi(
+  const { data, loading, error, reload } = useApi(
     () => officerApi.get<ApiResponse<MapData>>('/officer/map'),
     [],
   );
@@ -55,8 +55,16 @@ function MapContent() {
   if (loading) return <LoadingSpinner label="Loading map..." fullScreen />;
   if (error) return <ErrorAlert error={error} onRetry={reload} />;
 
-  const m = data!.data;
-  const incidents = m.assignments.map((a) => ({
+  const m = data?.data && !Array.isArray(data.data) ? data.data : null;
+  if (!m?.officer || !m.center) {
+    return (
+      <ErrorAlert
+        error="Map data is still loading. Try again in a moment."
+        onRetry={reload}
+      />
+    );
+  }
+  const incidents = (m.assignments ?? []).map((a) => ({
     id: a.incident.id,
     type: a.incident.type,
     priority: 'HIGH',

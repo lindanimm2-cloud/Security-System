@@ -10,7 +10,9 @@ import {
   ProtectionStatusCard,
 } from '@/components/ops/EmergencyMode';
 import { PortalLayout } from '@/components/portal/PortalLayout';
-import { EmergencyCallButton } from '@/components/portal/EmergencyCallButton';
+import { EmergencyCallButton, EmergencyDispatchCallCard } from '@/components/portal/EmergencyCallButton';
+import { CONTROL_ROOM_LINE } from '@/lib/control-room-line';
+import { EmergencyProtectionBanner } from '@/components/security/EmergencyProtectionBanner';
 import { useApi } from '@/hooks/useApi';
 import { clientApi, type ApiResponse } from '@/lib/api-client';
 import { friendlyErrorMessage } from '@/lib/friendly-error';
@@ -92,15 +94,21 @@ function ProtectContent() {
   });
 
   return (
-    <div className="page-content">
+    <div className="page-content portal-dash">
+      <div className="portal-dash__stage">
       <div className="page-header">
         <div>
           <h1>Protect</h1>
-          <p className="text-muted">Hold to activate — never a single tap.</p>
+          <p className="text-muted">Hold to activate. Panic is the large control.</p>
         </div>
-        <Link href="/portal" className="link-sm">
-          Back home
-        </Link>
+        <div className="sec-sheet__actions">
+          <Link href="/portal" className="link-sm">
+            Dashboard
+          </Link>
+          <Link href="/portal/security" className="link-sm">
+            Protection file
+          </Link>
+        </div>
       </div>
 
       {(emergencyOpen || critical) && (
@@ -118,7 +126,11 @@ function ProtectContent() {
           }
           actions={
             <>
-              <EmergencyCallButton name="4DS Dispatch" phone="+27110000000" isDispatch />
+              <EmergencyCallButton
+                name={CONTROL_ROOM_LINE.name}
+                phone={CONTROL_ROOM_LINE.phone}
+                isDispatch
+              />
               <Link href="/portal/incidents" className="btn-sm btn-sm--link">
                 View response
               </Link>
@@ -128,67 +140,97 @@ function ProtectContent() {
         />
       )}
 
-      <ProtectionStatusCard
-        tone={tone}
-        title={
-          tone === 'emergency'
-            ? 'Emergency active'
-            : tone === 'attention'
-              ? 'Attention required'
-              : 'You are protected'
-        }
-        lines={[
-          `${d.stats.familyCount} family linked`,
-          d.properties[0]
-            ? `Home · ${d.properties[0].alarmStatus}`
-            : 'Home security ready',
-          msg || 'Hold Panic for 2 seconds only in a real emergency.',
-        ]}
-      />
+      <EmergencyDispatchCallCard />
 
       {access?.emergency !== false && (
-        <div className="protect-grid">
-          <div className="protect-tile protect-tile--panic">
+        <section className="panic-section panic-tray" aria-label="Emergency controls">
+          <HoldToActivate
+            label="Panic"
+            holdLabel="Sending panic…"
+            holdMs={3000}
+            hideHint
+            keepLabel
+            loading={busy === 'panic'}
+            disabled={!!busy && busy !== 'panic'}
+            className="hold-activate--circle panic-knob"
+            onActivate={() => send('panic')}
+          >
+            <span className="panic-knob__title">Panic</span>
+            <span className="panic-knob__sub">Hold 3 seconds</span>
+          </HoldToActivate>
+          <p className="panic-note">Release to cancel</p>
+          <div className="panic-orbit">
             <HoldToActivate
-              label="Panic"
-              holdLabel="Sending panic…"
-              loading={busy === 'panic'}
-              onActivate={() => send('panic')}
-            />
-          </div>
-          <button
-            type="button"
-            className="protect-tile"
-            disabled={!!busy}
-            onClick={() => void send('silent')}
-          >
-            <strong>Silent panic</strong>
-            <span>Discreet alert to control room</span>
-          </button>
-          {access?.medical !== false && (
-            <button
-              type="button"
-              className="protect-tile"
-              disabled={!!busy}
-              onClick={() => void send('medical')}
+              label="Silent Panic. Hold 2 seconds to notify control room discreetly."
+              holdMs={2000}
+              tone="warn"
+              hideHint
+              keepLabel
+              className="panic-orbit-btn panic-orbit-btn--silent panic-knob"
+              loading={busy === 'silent'}
+              disabled={!!busy && busy !== 'silent'}
+              onActivate={() => send('silent')}
             >
-              <strong>Medical</strong>
-              <span>Request medical assistance</span>
-            </button>
-          )}
-          <button
-            type="button"
-            className="protect-tile"
-            disabled={!!busy}
-            onClick={() => void send('fire')}
-          >
-            <strong>Fire</strong>
-            <span>Fire emergency response</span>
-          </button>
-        </div>
+              <span className="panic-knob__kicker">Hold 2s</span>
+              <span className="panic-knob__title">Silent</span>
+            </HoldToActivate>
+            {access?.medical !== false && (
+              <HoldToActivate
+                label="Medical emergency. Hold 2 seconds."
+                holdMs={2000}
+                tone="medical"
+                hideHint
+                keepLabel
+                className="panic-orbit-btn panic-orbit-btn--medical panic-knob"
+                loading={busy === 'medical'}
+                disabled={!!busy && busy !== 'medical'}
+                onActivate={() => send('medical')}
+              >
+                <span className="panic-knob__kicker">Hold 2s</span>
+                <span className="panic-knob__title">Medical</span>
+              </HoldToActivate>
+            )}
+            <HoldToActivate
+              label="Fire emergency. Hold 2 seconds."
+              holdMs={2000}
+              tone="warn"
+              hideHint
+              keepLabel
+              className="panic-orbit-btn panic-orbit-btn--fire panic-knob"
+              loading={busy === 'fire'}
+              disabled={!!busy && busy !== 'fire'}
+              onActivate={() => send('fire')}
+            >
+              <span className="panic-knob__kicker">Hold 2s</span>
+              <span className="panic-knob__title">Fire</span>
+            </HoldToActivate>
+          </div>
+        </section>
       )}
 
       {msg ? <p className="alert alert--success">{msg}</p> : null}
+
+      <div className="portal-status-dock">
+        <ProtectionStatusCard
+          tone={tone}
+          title={
+            tone === 'emergency'
+              ? 'Emergency active'
+              : tone === 'attention'
+                ? 'Attention required'
+                : 'You are protected'
+          }
+          lines={[
+            `${d.stats.familyCount} family linked`,
+            d.properties[0]
+              ? `Home · ${d.properties[0].alarmStatus}`
+              : 'Home security ready',
+            msg || 'Hold Panic for 2 seconds only in a real emergency.',
+          ]}
+        />
+        <EmergencyProtectionBanner />
+      </div>
+      </div>
     </div>
   );
 }

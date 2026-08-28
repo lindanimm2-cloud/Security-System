@@ -1,11 +1,33 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { VehicleCrewRole } from '@prisma/client';
+import { CompanyVehicleType, VehicleCrewRole } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
 
 type CrewInput = {
   officerId: string;
   role?: VehicleCrewRole;
 }[];
+
+type VehicleWriteInput = {
+  callSign?: string;
+  registration?: string;
+  make?: string;
+  model?: string;
+  color?: string | null;
+  vehicleType?: string;
+  teamName?: string;
+};
+
+const VEHICLE_TYPES = new Set<string>(Object.values(CompanyVehicleType));
+
+const TEAM_LABELS: Record<string, string> = {
+  ARMED_RESPONSE: 'Armed response',
+  MEDICAL: 'Medical',
+  PATROL: 'Patrol',
+  FIRE_TRUCK: 'Fire',
+  TACTICAL: 'Tactical',
+  MOTORCYCLE: 'Rapid response',
+  UNMARKED: 'Unmarked',
+};
 
 function dashCamsForVehicle(v: { id: string; callSign: string; status: string }) {
   const live = v.status !== 'MAINTENANCE' && v.status !== 'OFFLINE';
@@ -78,6 +100,7 @@ export class FleetService {
       color: v.color,
       year: v.year,
       vehicleType: v.vehicleType,
+      teamName: TEAM_LABELS[v.vehicleType] ?? String(v.vehicleType).replace(/_/g, ' '),
       status: v.status,
       lat: v.currentLat ? Number(v.currentLat) : null,
       lng: v.currentLng ? Number(v.currentLng) : null,
@@ -238,9 +261,16 @@ export class FleetService {
         officerId: { in: officerIds },
         companyVehicleId: { not: vehicleId },
       },
+      include: {
+        officer: { select: { firstName: true, lastName: true } },
+        companyVehicle: { select: { callSign: true } },
+      },
     });
     if (existingElsewhere.length) {
-      throw new BadRequestException('An officer is already assigned to another company vehicle');
+      const clash = existingElsewhere[0];
+      throw new BadRequestException(
+        `${clash.officer.firstName} ${clash.officer.lastName} is already assigned to ${clash.companyVehicle.callSign}. Unassign them there first.`,
+      );
     }
 
     await this.prisma.$transaction([
@@ -259,5 +289,72 @@ export class FleetService {
 
     const updated = await this.loadVehicle(vehicleId, tenantId);
     return { success: true, data: this.formatVehicle(updated) };
+  }
+
+  async createVehicle(tenantId: string, input: VehicleWriteInput) {
+    const callSign = String(input.callSign ?? '').trim();
+    const registration = String(input.registration ?? '').trim();
+    const make = String(input.make ?? '').trim();
+    const model = String(input.model ?? '').trim();
+    if (!callSign || !registration || !make || !model) {
+      throw new BadRequestException('Call sign, registration, make, and model are required');
+    }
+    const vehicleType = VEHICLE_TYPES.has(String(input.vehicleType))
+      ? (input.vehicleType as CompanyVehicleType)
+      : CompanyVehicleType.PATROL;
+
+    const clash = await this.prisma.companyVehicle.findFirst({
+      where: {
+        tenantId,
+        OR: [{ callSign }, { registration }],
+      },
+    });
+    if (clash) {
+      throw new BadRequestException('That call sign or registration is already on the fleet');
+    }
+
+    const created = await this.prisma.companyVehicle.create({
+      data: {
+        tenantId,
+        callSign,
+        registration,
+        make,
+        model,
+        color: String(input.color ?? '').trim() || null,
+        vehicleType,
+        status: 'AVAILABLE',
+        currentLat: -29.8587,
+        currentLng: 31.0218,
+      },
+    });
+
+    return { success: true, data: this.formatVehicle(await this.loadVehicle(created.id, tenantId)) };
+  }
+
+  async updateVehicle(tenantId: string, vehicleId: string, input: VehicleWriteInput) {
+    await this.loadVehicle(vehicleId, tenantId);
+    const data: {
+      callSign?: string;
+      registration?: string;
+      make?: string;
+      model?: string;
+      color?: string | null;
+      vehicleType?: CompanyVehicleType;
+    } = {};
+    if (typeof input.callSign === 'string' && input.callSign.trim()) data.callSign = input.callSign.trim();
+    if (typeof input.registration === 'string' && input.registration.trim()) {
+      data.registration = input.registration.trim();
+    }
+    if (typeof input.make === 'string' && input.make.trim()) data.make = input.make.trim();
+    if (typeof input.model === 'string' && input.model.trim()) data.model = input.model.trim();
+    if (typeof input.color === 'string') data.color = input.color.trim() || null;
+    if (typeof input.vehicleType === 'string' && VEHICLE_TYPES.has(input.vehicleType)) {
+      data.vehicleType = input.vehicleType as CompanyVehicleType;
+    }
+    if (Object.keys(data).length === 0) {
+      return { success: true, data: this.formatVehicle(await this.loadVehicle(vehicleId, tenantId)) };
+    }
+    await this.prisma.companyVehicle.update({ where: { id: vehicleId }, data });
+    return { success: true, data: this.formatVehicle(await this.loadVehicle(vehicleId, tenantId)) };
   }
 }

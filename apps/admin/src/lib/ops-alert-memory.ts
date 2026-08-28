@@ -1,4 +1,6 @@
 /** Session memory so the same non-critical briefing isn't re-announced. */
+import { isNotificationQuietHours } from '@/lib/control-room-settings';
+
 const KEY = '4ds_ops_alert_memory';
 
 type MemoryEntry = {
@@ -43,10 +45,10 @@ export function acknowledgeAnnouncement(eventId: string) {
   writeAll(map);
 }
 
-/** Quiet mode: non-critical alerts stay badge-only. */
+/** Quiet mode: non-critical alerts stay badge-only during configured quiet hours. */
 export function isOpsQuietMode(): boolean {
-  if (typeof window === 'undefined') return true;
-  return localStorage.getItem('4ds_ops_quiet') !== 'false';
+  if (typeof window === 'undefined') return false;
+  return isNotificationQuietHours();
 }
 
 export function setOpsQuietMode(on: boolean) {

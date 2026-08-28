@@ -9,3 +9,11 @@ export function isResolvedIncidentStatus(status: string) {
   const s = (status ?? '').toUpperCase();
   return s === 'RESOLVED' || s === 'CLOSED' || s === 'CANCELLED';
 }
+
+export {
+  mapIncidentStatusToCadState,
+  mapIncidentStatusToTimelineIndex,
+  isTerminalCadState,
+  cadStateLabel,
+  OPS_TIMELINE_STEPS,
+} from './psim/cad-workflow';

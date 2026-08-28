@@ -8,20 +8,24 @@ import { techApi, type ApiResponse } from '@/lib/api-client';
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { OpsMyShiftHeader } from '@/components/ops/OpsMyShiftHeader';
-import {
-  OpsCompactStats,
-  OpsNeedsYou,
-  OpsQuickWork,
-  OpsSection,
-} from '@/components/ops/OpsQuickWork';
-import { OpsSwipeRow } from '@/components/ops/OpsSwipeRow';
+import { OpsCompactStats, OpsSection } from '@/components/ops/OpsQuickWork';
 import { OpsUndoToast, useUndoToast } from '@/components/ops/OpsUndoToast';
+import { StatusBadge } from '@/components/ui/StatusBadge';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { WorkflowTracker } from '@/components/ui/WorkflowTracker';
+import { OpsDialog } from '@/components/ops/OpsDialog';
+import { ProgressBar } from '@/components/ui/ProgressBar';
 import {
-  DEFAULT_TECH_TESTS,
+  mapsUrl,
+  mergeChecklist,
   nextWorkflowStatus,
+  optionTone,
+  stageActionLabel,
   TECH_WORKFLOW,
+  whatsappUrl,
   workflowIndex,
   workflowLabel,
+  workflowStageKey,
 } from '@/lib/tech-workflow';
 
 type TechJob = {
@@ -34,6 +38,8 @@ type TechJob = {
   serial?: string;
   tests?: { id: string; label: string; done: boolean }[];
   overrideReason?: string;
+  clientName?: string;
+  clientPhone?: string;
 };
 
 type TechProfile = {
@@ -44,13 +50,13 @@ type TechProfile = {
   jobs: TechJob[];
 };
 
-function statusRank(status: string) {
-  const idx = workflowIndex(status);
-  return idx < 0 ? 9 : idx;
+function isOpenJob(status: string) {
+  return status !== 'COMPLETED' && status !== 'CANCELLED';
 }
 
-function nextStatus(status: string) {
-  return nextWorkflowStatus(status);
+function isDueSoon(job: TechJob) {
+  const t = new Date(job.scheduledAt).getTime() - Date.now();
+  return t < 4 * 3600000 && t > -3600000;
 }
 
 export default function TechDashboardPage() {
@@ -72,54 +78,70 @@ function TechDashboardContent() {
   const [jobs, setJobs] = useState<TechJob[] | null>(null);
   const [overrideReason, setOverrideReason] = useState('');
   const [serialDraft, setSerialDraft] = useState('');
+  const [serialNote, setSerialNote] = useState('');
+  const [checkOpen, setCheckOpen] = useState(false);
   const undo = useUndoToast();
 
   const profile = data?.data;
 
   useEffect(() => {
-    if (profile?.jobs) setJobs(profile.jobs);
-  }, [profile]);
+    if (profile?.jobs && jobs === null) setJobs(profile.jobs);
+  }, [profile, jobs]);
 
   const liveJobs = jobs ?? profile?.jobs ?? [];
+  const openJobs = useMemo(
+    () =>
+      liveJobs
+        .filter((j) => isOpenJob(j.status))
+        .slice()
+        .sort((a, b) => {
+          const r = workflowIndex(a.status) - workflowIndex(b.status);
+          if (r !== 0) return r;
+          return new Date(a.scheduledAt).getTime() - new Date(b.scheduledAt).getTime();
+        }),
+    [liveJobs],
+  );
+  const completedJobs = liveJobs.filter((j) => j.status === 'COMPLETED');
+  const dueSoonJobs = openJobs.filter(isDueSoon);
 
-  const queue = useMemo(() => {
-    return liveJobs
-      .filter((j) => j.status !== 'COMPLETED' && j.status !== 'CANCELLED')
-      .slice()
-      .sort((a, b) => {
-        const r = statusRank(a.status) - statusRank(b.status);
-        if (r !== 0) return r;
-        return new Date(a.scheduledAt).getTime() - new Date(b.scheduledAt).getTime();
-      });
-  }, [liveJobs]);
+  const visibleOpen =
+    filter === 'urgent' ? dueSoonJobs : filter === 'queue' ? openJobs.slice(1) : openJobs;
+  const showCompleted = filter === 'done';
+  const focusJob = showCompleted || filter === 'queue' ? null : visibleOpen[0] ?? null;
+  const restJobs = showCompleted
+    ? completedJobs
+    : filter === 'queue'
+      ? openJobs
+      : visibleOpen.slice(focusJob ? 1 : 0);
 
-  const focusJob = queue[0] ?? null;
-  const restQueue = queue.slice(1);
-  const activeCount = queue.filter((j) =>
-    !['SCHEDULED', 'COMPLETED', 'CANCELLED'].includes(j.status),
-  ).length;
-  const dueSoon = queue.filter((j) => {
-    const t = new Date(j.scheduledAt).getTime() - Date.now();
-    return t < 4 * 3600000 && t > -3600000;
-  }).length;
+  const focusChecks = focusJob ? mergeChecklist(focusJob.tests) : [];
+  const focusDone = focusChecks.filter((t) => t.done).length;
+  const checkTone = optionTone(focusDone, focusChecks.length);
+  const stageKey = focusJob ? workflowStageKey(focusJob.status) : '';
+  const stageBtn = stageKey ? `tech-stage tech-stage--${stageKey}` : '';
+  const stageLabel = focusJob ? stageActionLabel(focusJob.status) : null;
+  const completing = Boolean(focusJob && nextWorkflowStatus(focusJob.status) === 'COMPLETED');
+  const phone = focusJob?.clientPhone?.trim() ?? '';
+
+  useEffect(() => {
+    setSerialDraft(focusJob?.serial ?? '');
+    setSerialNote('');
+    setOverrideReason(focusJob?.overrideReason ?? '');
+  }, [focusJob?.id, focusJob?.serial, focusJob?.overrideReason]);
 
   async function advance(job: TechJob) {
-    const next = nextStatus(job.status);
+    const next = nextWorkflowStatus(job.status);
     if (!next) return;
-    if (next === 'COMPLETED') {
-      const tests = job.tests ?? DEFAULT_TECH_TESTS.map((t) => ({ ...t, done: false }));
-      const allDone = tests.every((t) => t.done);
-      if (!allDone && !overrideReason.trim()) {
-        setActionError('Complete the test checklist, or enter an override reason.');
-        return;
-      }
+    const tests = mergeChecklist(job.tests);
+    if (next === 'COMPLETED' && !tests.every((t) => t.done) && !overrideReason.trim()) {
+      setCheckOpen(true);
+      setActionError('Finish the site checklist, or enter an override reason.');
+      return;
     }
     const prev = job.status;
     setBusyId(job.id);
     setActionError('');
-    setJobs((list) =>
-      (list ?? liveJobs).map((j) => (j.id === job.id ? { ...j, status: next } : j)),
-    );
+    setJobs((list) => (list ?? liveJobs).map((j) => (j.id === job.id ? { ...j, status: next } : j)));
     try {
       await techApi.patch(`/store/tech/jobs/${job.id}/status`, {
         status: next,
@@ -127,46 +149,49 @@ function TechDashboardContent() {
       });
       undo.show(`Marked ${workflowLabel(next)}`, async () => {
         await techApi.patch(`/store/tech/jobs/${job.id}/status`, { status: prev });
-        void reload();
+        setJobs((list) => (list ?? liveJobs).map((j) => (j.id === job.id ? { ...j, status: prev } : j)));
       });
-      void reload({ silent: true });
     } catch (e) {
-      setJobs((list) =>
-        (list ?? liveJobs).map((j) => (j.id === job.id ? { ...j, status: prev } : j)),
-      );
-      setActionError(e instanceof Error ? e.message : 'Update failed');
+      setJobs((list) => (list ?? liveJobs).map((j) => (j.id === job.id ? { ...j, status: prev } : j)));
+      setActionError(e instanceof Error ? e.message : 'Could not update this job. Try again.');
     } finally {
       setBusyId(null);
     }
   }
 
   async function toggleTest(job: TechJob, testId: string) {
-    const tests = (job.tests ?? DEFAULT_TECH_TESTS.map((t) => ({ ...t, done: false }))).map((t) =>
-      t.id === testId ? { ...t, done: !t.done } : t,
-    );
+    const prev = mergeChecklist(job.tests);
+    const tests = prev.map((t) => (t.id === testId ? { ...t, done: !t.done } : t));
     setJobs((list) => (list ?? liveJobs).map((j) => (j.id === job.id ? { ...j, tests } : j)));
-    await techApi.patch(`/store/tech/jobs/${job.id}/tests`, { tests });
+    setActionError('');
+    try {
+      await techApi.patch(`/store/tech/jobs/${job.id}/tests`, { tests });
+    } catch {
+      setJobs((list) => (list ?? liveJobs).map((j) => (j.id === job.id ? { ...j, tests: prev } : j)));
+      setActionError('Could not save that checklist item. Try again.');
+    }
   }
 
   async function saveSerial(job: TechJob) {
-    await techApi.patch(`/store/tech/jobs/${job.id}/serial`, { serial: serialDraft || job.serial });
-    setJobs((list) =>
-      (list ?? liveJobs).map((j) =>
-        j.id === job.id ? { ...j, serial: serialDraft || j.serial } : j,
-      ),
-    );
+    const serial = serialDraft.trim() || job.serial || '';
+    if (!serial) {
+      setSerialNote('Enter a serial first.');
+      return;
+    }
+    try {
+      await techApi.patch(`/store/tech/jobs/${job.id}/serial`, { serial });
+      setJobs((list) => (list ?? liveJobs).map((j) => (j.id === job.id ? { ...j, serial } : j)));
+      setSerialDraft(serial);
+      setSerialNote('Serial saved.');
+    } catch {
+      setSerialNote('Could not save serial. Try again.');
+    }
   }
 
   if (loading) return <LoadingSpinner label="Loading jobs..." />;
   if (error || !profile) {
-    return <ErrorAlert message={error ?? 'Failed to load'} onRetry={reload} />;
+    return <ErrorAlert error={error ?? 'Failed to load'} onRetry={reload} />;
   }
-
-  const nextLabel = focusJob ? nextStatus(focusJob.status)?.replace(/_/g, ' ') : null;
-  const filteredRest =
-    filter === 'urgent'
-      ? restQueue.filter((j) => !['SCHEDULED', 'COMPLETED', 'CANCELLED'].includes(j.status))
-      : restQueue;
 
   return (
     <div className="page-content dash-ops dash-ops--tech">
@@ -174,251 +199,244 @@ function TechDashboardContent() {
         title="Today’s jobs"
         subtitle={
           focusJob
-            ? `${activeCount} active · ${queue.length} open`
-            : 'No open installs'
+            ? `${profile.stats.active} active · ${openJobs.length} open`
+            : showCompleted
+              ? `${completedJobs.length} completed`
+              : openJobs.length
+                ? `${openJobs.length} open installs`
+                : 'No open installs'
         }
         chips={[
-          { id: 'all', label: 'Everything', count: queue.length },
-          { id: 'urgent', label: 'Due soon', count: dueSoon, tone: 'urgent' },
-          { id: 'queue', label: 'Queue', count: restQueue.length, tone: 'warn' },
-          {
-            id: 'done',
-            label: 'Done',
-            count: profile.stats.completed,
-            tone: 'ok',
-          },
+          { id: 'all', label: 'Today', count: openJobs.length },
+          { id: 'urgent', label: 'Due soon', count: dueSoonJobs.length, tone: 'urgent' },
+          { id: 'queue', label: 'Up next', count: Math.max(0, openJobs.length - 1), tone: 'warn' },
+          { id: 'done', label: 'Done', count: completedJobs.length || profile.stats.completed, tone: 'ok' },
         ]}
         activeChip={filter}
         onChip={setFilter}
       />
 
-      {focusJob && nextLabel && (
-        <OpsQuickWork
-          hint={focusJob.title}
-          actions={[
-            {
-              id: 'advance',
-              label: `Mark ${nextLabel}`,
-              primary: true,
-              loading: busyId === focusJob.id,
-              disabled: !!busyId,
-              onClick: () => void advance(focusJob),
-            },
-            {
-              id: 'nav',
-              label: 'Navigate',
-              href: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(focusJob.address)}`,
-            },
-            { id: 'board', label: 'Job board', href: '/tech/jobs' },
-            { id: 'chat', label: 'Reply', href: '/tech/chat' },
-          ]}
-        />
-      )}
+      {actionError ? <ErrorAlert error={actionError} /> : null}
 
-      <section
-        className={`tech-focus-job ${focusJob ? `tech-focus-job--${focusJob.status.toLowerCase()}` : 'tech-focus-job--clear'}`}
-      >
-        <div className="tech-focus-job__head">
-          <p className="dash-ops__eyebrow">
-            <span className="ops-live-chip__dot" aria-hidden />
-            Focus job
-          </p>
-          <h1>
-            {profile.firstName},{' '}
-            {focusJob
-              ? focusJob.status === 'IN_PROGRESS'
-                ? 'finish this job'
-                : focusJob.status === 'EN_ROUTE'
-                  ? 'you are en route'
-                  : 'next up'
-              : 'you are clear'}
-          </h1>
-        </div>
+      {focusJob ? (
+        <section className={`tech-focus-job tech-focus-job--${focusJob.status.toLowerCase()}`}>
+          <div className="tech-focus-job__head">
+            <p className="dash-ops__eyebrow">
+              <span className="ops-live-chip__dot" aria-hidden />
+              Current job
+            </p>
+            <h2>
+              {profile.firstName}, {workflowLabel(focusJob.status).toLowerCase() === 'install' ? 'keep going' : 'this one first'}
+            </h2>
+          </div>
 
-        {actionError && <ErrorAlert message={actionError} />}
-
-        {focusJob ? (
           <div className="tech-focus-job__card">
-            <div className="workflow-steps" aria-label="Install workflow">
-              {TECH_WORKFLOW.map((step, idx) => (
-                <span
-                  key={step.id}
-                  className={`workflow-step ${
-                    idx < workflowIndex(focusJob.status)
-                      ? 'workflow-step--done'
-                      : idx === workflowIndex(focusJob.status)
-                        ? 'workflow-step--current'
-                        : ''
-                  }`}
-                >
-                  {step.label}
-                </span>
-              ))}
-            </div>
             <div className="tech-focus-job__meta">
-              <span className="badge">{workflowLabel(focusJob.status)}</span>
+              <StatusBadge status={focusJob.status} label={workflowLabel(focusJob.status)} pulse />
               <span className="text-muted">{focusJob.jobType}</span>
+              {focusJob.clientName ? <span className="text-muted">{focusJob.clientName}</span> : null}
             </div>
-            <h2>{focusJob.title}</h2>
+            <h3>{focusJob.title}</h3>
             <p className="tech-focus-job__address">{focusJob.address}</p>
             <p className="text-muted">
-              Scheduled {new Date(focusJob.scheduledAt).toLocaleString()}
+              {new Date(focusJob.scheduledAt).toLocaleString('en-ZA', {
+                weekday: 'short',
+                hour: '2-digit',
+                minute: '2-digit',
+              })}
             </p>
-            <label className="text-muted" style={{ display: 'block', margin: '0.65rem 0 0.35rem' }}>
-              Equipment serial
-            </label>
-            <input
-              className="input"
-              defaultValue={focusJob.serial ?? ''}
-              onChange={(e) => setSerialDraft(e.target.value)}
-              placeholder="Scan or type serial"
-            />
-            <button
-              type="button"
-              className="btn-sm"
-              style={{ marginTop: '0.35rem' }}
-              onClick={() => void saveSerial(focusJob)}
-            >
-              Save serial
-            </button>
-            <div className="check-grid">
-              {(focusJob.tests ?? DEFAULT_TECH_TESTS.map((t) => ({ ...t, done: false }))).map((t) => (
-                <label key={t.id} className="check-row">
-                  <input
-                    type="checkbox"
-                    checked={t.done}
-                    onChange={() => void toggleTest(focusJob, t.id)}
-                  />
-                  {t.label}
-                </label>
-              ))}
-            </div>
-            {nextWorkflowStatus(focusJob.status) === 'COMPLETED' && (
-              <input
-                className="input"
-                value={overrideReason}
-                onChange={(e) => setOverrideReason(e.target.value)}
-                placeholder="Override reason if tests incomplete"
-              />
-            )}
+
+            <WorkflowTracker steps={[...TECH_WORKFLOW]} currentIndex={workflowIndex(focusJob.status)} />
+
             <div className="tech-focus-job__actions">
-              {nextLabel && (
+              {stageLabel ? (
                 <button
                   type="button"
-                  className="btn-primary"
+                  className={`btn-primary ds-btn-block ${stageBtn}`}
                   disabled={busyId === focusJob.id}
                   onClick={() => void advance(focusJob)}
                 >
-                  {busyId === focusJob.id ? 'Updating…' : `Mark ${nextLabel}`}
+                  {busyId === focusJob.id ? 'Updating…' : stageLabel}
                 </button>
-              )}
-              <a
-                className="btn-secondary"
-                href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(focusJob.address)}`}
-                target="_blank"
-                rel="noreferrer"
-              >
-                Navigate
-              </a>
+              ) : null}
+              <div className="tech-job-tools">
+                <a className="btn-secondary" href={mapsUrl(focusJob.address)} target="_blank" rel="noreferrer">
+                  Navigate
+                </a>
+                {phone ? (
+                  <>
+                    <a className="btn-secondary" href={`tel:${phone}`}>
+                      Call
+                    </a>
+                    <a className="btn-secondary" href={whatsappUrl(phone)} target="_blank" rel="noreferrer">
+                      WhatsApp
+                    </a>
+                  </>
+                ) : null}
+                <Link className="btn-secondary" href="/tech/chat">
+                  Team chat
+                </Link>
+              </div>
             </div>
+
+            <label className="ds-field">
+              <span>Equipment serial</span>
+              <div className="tech-serial-row">
+                <input
+                  className="input"
+                  value={serialDraft}
+                  onChange={(e) => {
+                    setSerialDraft(e.target.value);
+                    setSerialNote('');
+                  }}
+                  placeholder="Scan or type serial"
+                />
+                <button type="button" className="btn-secondary" onClick={() => void saveSerial(focusJob)}>
+                  Save
+                </button>
+              </div>
+              {serialNote ? (
+                <small className={serialNote.includes('saved') ? 'tech-note--ok' : 'tech-note--warn'}>{serialNote}</small>
+              ) : null}
+            </label>
+
+            <button
+              type="button"
+              className={`tech-check-trigger tech-opt tech-opt--${checkTone}`}
+              onClick={() => setCheckOpen(true)}
+            >
+              <span className="tech-check-trigger__copy">
+                <strong>Site checklist</strong>
+                <span>
+                  {focusDone} of {focusChecks.length} done
+                </span>
+              </span>
+              <span className="tech-check-trigger__open">Open</span>
+            </button>
+            <ProgressBar
+              value={focusDone}
+              max={focusChecks.length || 1}
+              tone={checkTone === 'ok' ? 'success' : checkTone === 'hot' ? 'warning' : 'accent'}
+              label=""
+            />
+
+            {completing && checkTone !== 'ok' ? (
+              <label className="ds-field">
+                <span>Override reason</span>
+                <input
+                  className="input"
+                  value={overrideReason}
+                  onChange={(e) => setOverrideReason(e.target.value)}
+                  placeholder="Required if the checklist is not finished"
+                />
+              </label>
+            ) : null}
           </div>
-        ) : (
-          <div className="dash-clear">
-            <strong>No open installs</strong>
-            <p className="text-muted">When jobs are assigned, they appear here first.</p>
-            <Link href="/tech/jobs" className="btn-secondary btn-inline">
+        </section>
+      ) : showCompleted && completedJobs.length === 0 ? (
+        <EmptyState title="Nothing completed yet" body="Finished jobs will land here." />
+      ) : filter === 'urgent' && dueSoonJobs.length === 0 ? (
+        <EmptyState title="Nothing due soon" body="No jobs in the next four hours." />
+      ) : !showCompleted && openJobs.length === 0 ? (
+        <EmptyState
+          title="No open installs"
+          body="When jobs are assigned, they appear here first."
+          action={
+            <Link href="/tech/jobs" className="btn-secondary">
               Check job board
             </Link>
-          </div>
-        )}
-      </section>
+          }
+        />
+      ) : null}
 
-      {filteredRest.length > 0 && (
+      {checkOpen && focusJob ? (
+        <OpsDialog
+          title="Site checklist"
+          subtitle={`${focusDone} of ${focusChecks.length} complete`}
+          onClose={() => setCheckOpen(false)}
+        >
+          <ul className="ds-check">
+            {focusChecks.map((t) => (
+              <li key={t.id}>
+                <button
+                  type="button"
+                  className={`ds-check__row ${t.done ? 'ds-check__row--done' : 'ds-check__row--todo'}`}
+                  data-check={t.id}
+                  onClick={() => void toggleTest(focusJob, t.id)}
+                >
+                  <span className="ds-check__mark" aria-hidden>
+                    {t.done ? '✓' : '○'}
+                  </span>
+                  <span>{t.label}</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+          {stageLabel ? (
+            <button
+              type="button"
+              className={`btn-primary ds-btn-block ${stageBtn}`}
+              disabled={busyId === focusJob.id}
+              onClick={() => void advance(focusJob)}
+            >
+              {busyId === focusJob.id ? 'Updating…' : stageLabel}
+            </button>
+          ) : null}
+        </OpsDialog>
+      ) : null}
+
+      {restJobs.length > 0 && (
         <OpsSection
-          title="Up next"
+          title={showCompleted ? 'Completed' : 'Up next'}
           action={
             <Link href="/tech/jobs" className="link-sm">
-              Full queue
+              Full board
             </Link>
           }
         >
           <div className="ops-queue-list">
-            {filteredRest.slice(0, 5).map((job) => {
-              const next = nextStatus(job.status);
+            {restJobs.slice(0, 6).map((job) => {
+              const next = nextWorkflowStatus(job.status);
+              const label = stageActionLabel(job.status);
               return (
-                <OpsSwipeRow
-                  key={job.id}
-                  label={next ? next.replace(/_/g, ' ') : 'Open'}
-                  disabled={!!busyId || !next}
-                  onSwipePrimary={() => void advance(job)}
-                >
-                  <div className="ops-queue-card">
-                    <div className="card-header-row">
-                      <strong>{job.title}</strong>
-                      <span className="badge">{job.status.replace(/_/g, ' ')}</span>
-                    </div>
-                    <span className="text-muted">{job.address}</span>
-                    <div className="ops-queue-card__actions">
-                      {next && (
-                        <button
-                          type="button"
-                          className="btn-sm btn-primary"
-                          disabled={busyId === job.id}
-                          onClick={() => void advance(job)}
-                        >
-                          Mark {next.replace(/_/g, ' ')}
-                        </button>
-                      )}
-                      <a
-                        className="btn-sm btn-secondary"
-                        href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(job.address)}`}
-                        target="_blank"
-                        rel="noreferrer"
-                      >
-                        Navigate
-                      </a>
-                    </div>
+                <article key={job.id} className="ops-queue-card">
+                  <div className="card-header-row">
+                    <strong>{job.title}</strong>
+                    <StatusBadge status={job.status} label={workflowLabel(job.status)} />
                   </div>
-                </OpsSwipeRow>
+                  <span className="text-muted">{job.address}</span>
+                  <div className="ops-queue-card__actions">
+                    {next && label ? (
+                      <button
+                        type="button"
+                        className="btn-sm btn-primary"
+                        disabled={busyId === job.id}
+                        onClick={() => void advance(job)}
+                      >
+                        {busyId === job.id ? '…' : label}
+                      </button>
+                    ) : null}
+                    <a className="btn-sm btn-secondary" href={mapsUrl(job.address)} target="_blank" rel="noreferrer">
+                      Navigate
+                    </a>
+                    {job.clientPhone ? (
+                      <a className="btn-sm btn-secondary" href={`tel:${job.clientPhone}`}>
+                        Call
+                      </a>
+                    ) : null}
+                  </div>
+                </article>
               );
             })}
           </div>
         </OpsSection>
       )}
 
-      <OpsNeedsYou
-        items={
-          dueSoon > 0
-            ? [
-                {
-                  id: 'due',
-                  title: `${dueSoon} jobs due soon`,
-                  detail: 'Advance status or navigate from Quick work',
-                  href: '/tech/jobs',
-                },
-              ]
-            : []
-        }
-        viewAllHref="/tech/jobs"
-      />
-
       <OpsCompactStats
         items={[
-          {
-            label: 'Active',
-            value: String(profile.stats.active),
-            href: '/tech/jobs',
-            warn: profile.stats.active > 0,
-          },
-          {
-            label: 'Scheduled',
-            value: String(profile.stats.scheduled),
-            href: '/tech/jobs',
-          },
-          {
-            label: 'Done',
-            value: String(profile.stats.completed),
-          },
+          { label: 'Active', value: String(profile.stats.active), href: '/tech/jobs', warn: profile.stats.active > 0 },
+          { label: 'Scheduled', value: String(profile.stats.scheduled), href: '/tech/jobs' },
+          { label: 'Done', value: String(completedJobs.length || profile.stats.completed) },
         ]}
       />
 

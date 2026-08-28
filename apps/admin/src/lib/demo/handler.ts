@@ -4,8 +4,36 @@ import {
   DEMO_ERROR_REPORTS_KEY,
   developerTicketCode,
 } from '../developer-tickets';
+import { FLEET_TEAMS, fleetTeamLabel } from '../fleet-teams';
 import { getDemoCategories, getDemoProducts } from './catalog';
-import { DEMO_TENANT, demoRegisterSession } from './users';
+import { handleDeviceSecurityDemo } from './device-security';
+import {
+  demoAccessDoors,
+  demoAlarmFeed,
+  demoCompliance,
+  demoPatrolRoutes,
+  demoSecurityEvents,
+  demoWatchlists,
+  integrationsCatalog,
+  psimOverviewStats,
+} from './demo-psim';
+import { DEMO_DISPATCH_RULES } from '../psim/integration-catalog';
+import { DEMO_TENANT, demoRegisterSession, setDemoAccountPassword } from './users';
+import { canManageUserPasswords } from '../password-access';
+import {
+  demoClientProfiles,
+  demoClientVehicles,
+  demoClients,
+  demoMapClients,
+  demoMapProperties,
+  demoMapVehicles,
+  demoProperties,
+  demoSiteOpenEvents,
+  demoSurveillanceSites,
+  demoVehicleCameraFeeds,
+  syncDemoPropertyAlarm,
+  type DemoSurveillanceSite,
+} from './demo-sites';
 
 type DemoRequest = {
   portal?: AuthPortal;
@@ -43,13 +71,20 @@ const techJobs: TechJob[] = [
     jobType: 'CCTV',
     serial: 'NX-CAM-4412',
     tests: [
-      { id: 'power', label: 'Power / battery check', done: true },
-      { id: 'signal', label: 'Signal / comms test', done: false },
-      { id: 'zones', label: 'Zone walk-test', done: false },
-      { id: 'client', label: 'Client walkthrough', done: false },
+      { id: 'equipment', label: 'Confirm equipment', done: true },
+      { id: 'access', label: 'Confirm site access', done: true },
+      { id: 'mount', label: 'Mount cameras', done: true },
+      { id: 'nvr', label: 'Connect NVR', done: true },
+      { id: 'network', label: 'Configure network', done: false },
+      { id: 'cameras', label: 'Configure cameras', done: false },
+      { id: 'recording', label: 'Test recording', done: false },
+      { id: 'remote', label: 'Test remote access', done: false },
+      { id: 'demo', label: 'Client demonstration', done: false },
+      { id: 'signoff', label: 'Client sign-off', done: false },
     ],
     clientName: 'Nomsa Client',
-    equipmentNotes: '4x turret cams + NVR',
+    clientPhone: '+27821234567',
+    equipmentNotes: '4× Turret Cameras + NVR',
   },
   {
     id: 'demo-job-2',
@@ -58,6 +93,9 @@ const techJobs: TechJob[] = [
     scheduledAt: new Date(Date.now() + 3600000).toISOString(),
     address: '8 Dawncliffe Rd, Westville',
     jobType: 'ALARM',
+    clientName: 'James Demo',
+    clientPhone: '+27829876543',
+    equipmentNotes: 'Paradox Magellan panel',
   },
   {
     id: 'demo-job-3',
@@ -66,6 +104,9 @@ const techJobs: TechJob[] = [
     scheduledAt: new Date(Date.now() + 86400000).toISOString(),
     address: '215 Florida Rd, Morningside',
     jobType: 'ACCESS',
+    clientName: 'Florida Retail CC',
+    clientPhone: '+27831112233',
+    equipmentNotes: '2× readers + door controller',
   },
 ];
 
@@ -124,6 +165,15 @@ function activeDemoIncidents() {
 }
 
 let orderSeq = 1001;
+const demoServiceRequests: {
+  id: string;
+  publicRef: string;
+  kind: string;
+  title: string;
+  status: string;
+  whenLabel: string;
+  summary: string;
+}[] = [];
 const demoIncidents: {
   id: string;
   type: string;
@@ -149,7 +199,7 @@ const demoIncidents: {
   {
     id: 'demo-inc-2',
     type: 'INTRUSION',
-    status: 'OPEN',
+    status: 'DISPATCHED',
     title: 'Alarm trip — Glenwood',
     isSilent: false,
     time: '18 min ago',
@@ -159,19 +209,68 @@ const demoIncidents: {
   },
   {
     id: 'demo-inc-3',
-    type: 'THEFT',
+    type: 'MEDICAL',
     status: 'IN_PROGRESS',
-    title: 'Vehicle recovery track',
+    title: 'Medical assist — Prospecton',
     isSilent: false,
-    time: '45 min ago',
+    time: '12 min ago',
+    priority: 'CRITICAL',
+    user: 'Priya Naidoo',
+    location: 'Prospecton industrial',
+  },
+  {
+    id: 'demo-inc-4',
+    type: 'ALARM',
+    status: 'DISPATCHED',
+    title: 'Perimeter alarm — Gateway',
+    isSilent: false,
+    time: '8 min ago',
+    priority: 'MEDIUM',
+    user: 'Thabo Retail',
+    location: 'Gateway Theatre of Shopping',
+  },
+  {
+    id: 'demo-inc-5',
+    type: 'THEFT',
+    status: 'DISPATCHED',
+    title: 'Theft report — Hillcrest',
+    isSilent: false,
+    time: '22 min ago',
     priority: 'HIGH',
-    user: 'Nomsa Client',
-    location: 'N2 northbound',
+    user: 'Lerato Mokoena',
+    location: 'Hillcrest farm gate',
+  },
+  {
+    id: 'demo-inc-6',
+    type: 'FIRE',
+    status: 'OPEN',
+    title: 'Smoke alarm — Ridge clinic',
+    isSilent: false,
+    time: '4 min ago',
+    priority: 'CRITICAL',
+    user: 'Asha Patel',
+    location: 'Ridge clinic loading bay',
+  },
+  {
+    id: 'demo-inc-7',
+    type: 'OTHER',
+    status: 'OPEN',
+    title: 'Camera offline — rear yard',
+    isSilent: false,
+    time: '62 min ago',
+    priority: 'LOW',
+    user: 'Sarah Guest',
+    location: 'Morningside',
   },
 ];
 
 const demoIncidentAssignments: Record<string, string> = {
   'demo-inc-1': 'Sipho Ndlovu',
+  'demo-inc-2': 'Zanele Khumalo',
+  'demo-inc-3': 'Thabo Mokoena',
+  'demo-inc-4': 'Lebo Dlamini',
+  'demo-inc-5': 'Ruan van der Berg',
+  'demo-inc-6': 'Bongani Nkosi',
 };
 
 const demoOfficerRoster = [
@@ -182,6 +281,7 @@ const demoOfficerRoster = [
     status: 'EN_ROUTE',
     zone: 'Zone A',
     avgResponseSec: 241,
+    avatarUrl: null as string | null,
     vehicle: {
       id: 'demo-fleet-1',
       callSign: 'Unit 101',
@@ -197,13 +297,14 @@ const demoOfficerRoster = [
     status: 'BUSY',
     zone: 'Zone B',
     avgResponseSec: 310,
-    vehicle: null as {
-      id: string;
-      callSign: string;
-      registration: string;
-      role: string;
-      crewMates: { officerId: string; name: string; role: string }[];
-    } | null,
+    avatarUrl: null as string | null,
+    vehicle: {
+      id: 'demo-fleet-2',
+      callSign: 'Medic 1',
+      registration: 'ND 4DS-ALS',
+      role: 'DRIVER',
+      crewMates: [] as { officerId: string; name: string; role: string }[],
+    },
   },
   {
     id: 'demo-off-3',
@@ -212,6 +313,7 @@ const demoOfficerRoster = [
     status: 'AVAILABLE',
     zone: 'Zone C',
     avgResponseSec: 198,
+    avatarUrl: null as string | null,
     vehicle: null as {
       id: string;
       callSign: string;
@@ -224,18 +326,278 @@ const demoOfficerRoster = [
     id: 'demo-off-4',
     firstName: 'Zanele',
     lastName: 'Khumalo',
-    status: 'AVAILABLE',
+    status: 'EN_ROUTE',
     zone: 'Zone A',
     avgResponseSec: 165,
+    avatarUrl: null as string | null,
     vehicle: {
-      id: 'demo-fleet-110',
-      callSign: 'Unit 110',
-      registration: 'ND 4DS-110',
+      id: 'demo-fleet-5',
+      callSign: 'TAC 1',
+      registration: 'ND 4DS-TAC',
       role: 'DRIVER',
       crewMates: [] as { officerId: string; name: string; role: string }[],
     },
   },
+  {
+    id: 'demo-off-5',
+    firstName: 'Thabo',
+    lastName: 'Mokoena',
+    status: 'EN_ROUTE',
+    zone: 'Zone B',
+    avgResponseSec: 188,
+    avatarUrl: null as string | null,
+    vehicle: {
+      id: 'demo-fleet-4',
+      callSign: 'Engine 1',
+      registration: 'ND 4DS-FIRE',
+      role: 'DRIVER',
+      crewMates: [] as { officerId: string; name: string; role: string }[],
+    },
+  },
+  {
+    id: 'demo-off-6',
+    firstName: 'Aisha',
+    lastName: 'Khan',
+    status: 'AVAILABLE',
+    zone: 'Zone A',
+    avgResponseSec: 142,
+    avatarUrl: null as string | null,
+    vehicle: {
+      id: 'demo-fleet-6',
+      callSign: 'Bike 1',
+      registration: 'ND 4DS-RR1',
+      role: 'DRIVER',
+      crewMates: [] as { officerId: string; name: string; role: string }[],
+    },
+  },
+  {
+    id: 'demo-off-7',
+    firstName: 'Pieter',
+    lastName: 'Botha',
+    status: 'AVAILABLE',
+    zone: 'Zone C',
+    avgResponseSec: 226,
+    avatarUrl: null as string | null,
+    vehicle: {
+      id: 'demo-fleet-7',
+      callSign: 'Ghost 1',
+      registration: 'ND 4DS-UM1',
+      role: 'DRIVER',
+      crewMates: [] as { officerId: string; name: string; role: string }[],
+    },
+  },
+  // Additional crew members — passengers/support roles
+  {
+    id: 'demo-off-8',
+    firstName: 'Lebo',
+    lastName: 'Dlamini',
+    status: 'EN_ROUTE',
+    zone: 'Zone A',
+    avgResponseSec: 255,
+    avatarUrl: null as string | null,
+    vehicle: {
+      id: 'demo-fleet-1',
+      callSign: 'Unit 101',
+      registration: 'ND 4DS-101',
+      role: 'PASSENGER',
+      crewMates: [] as { officerId: string; name: string; role: string }[],
+    },
+  },
+  {
+    id: 'demo-off-9',
+    firstName: 'Naledi',
+    lastName: 'Sithole',
+    status: 'BUSY',
+    zone: 'Zone B',
+    avgResponseSec: 318,
+    avatarUrl: null as string | null,
+    vehicle: {
+      id: 'demo-fleet-2',
+      callSign: 'Medic 1',
+      registration: 'ND 4DS-ALS',
+      role: 'PASSENGER',
+      crewMates: [] as { officerId: string; name: string; role: string }[],
+    },
+  },
+  {
+    id: 'demo-off-10',
+    firstName: 'Ruan',
+    lastName: 'van der Berg',
+    status: 'EN_ROUTE',
+    zone: 'Zone B',
+    avgResponseSec: 204,
+    avatarUrl: null as string | null,
+    vehicle: {
+      id: 'demo-fleet-4',
+      callSign: 'Engine 1',
+      registration: 'ND 4DS-FIRE',
+      role: 'PASSENGER',
+      crewMates: [] as { officerId: string; name: string; role: string }[],
+    },
+  },
+  {
+    id: 'demo-off-11',
+    firstName: 'Bongani',
+    lastName: 'Nkosi',
+    status: 'EN_ROUTE',
+    zone: 'Zone B',
+    avgResponseSec: 232,
+    avatarUrl: null as string | null,
+    vehicle: {
+      id: 'demo-fleet-4',
+      callSign: 'Engine 1',
+      registration: 'ND 4DS-FIRE',
+      role: 'PASSENGER',
+      crewMates: [] as { officerId: string; name: string; role: string }[],
+    },
+  },
+  {
+    id: 'demo-off-12',
+    firstName: 'Fatima',
+    lastName: 'Essop',
+    status: 'AVAILABLE',
+    zone: 'Zone A',
+    avgResponseSec: 178,
+    avatarUrl: null as string | null,
+    vehicle: {
+      id: 'demo-fleet-5',
+      callSign: 'TAC 1',
+      registration: 'ND 4DS-TAC',
+      role: 'PASSENGER',
+      crewMates: [] as { officerId: string; name: string; role: string }[],
+    },
+  },
+  {
+    id: 'demo-off-13',
+    firstName: 'Kgosi',
+    lastName: 'Motsepe',
+    status: 'AVAILABLE',
+    zone: 'Zone A',
+    avgResponseSec: 190,
+    avatarUrl: null as string | null,
+    vehicle: {
+      id: 'demo-fleet-5',
+      callSign: 'TAC 1',
+      registration: 'ND 4DS-TAC',
+      role: 'PASSENGER',
+      crewMates: [] as { officerId: string; name: string; role: string }[],
+    },
+  },
+  {
+    id: 'demo-off-14',
+    firstName: 'Yusuf',
+    lastName: 'Adams',
+    status: 'AVAILABLE',
+    zone: 'Zone C',
+    avgResponseSec: 214,
+    avatarUrl: null as string | null,
+    vehicle: {
+      id: 'demo-fleet-7',
+      callSign: 'Ghost 1',
+      registration: 'ND 4DS-UM1',
+      role: 'PASSENGER',
+      crewMates: [] as { officerId: string; name: string; role: string }[],
+    },
+  },
+  {
+    id: 'demo-off-15',
+    firstName: 'Chantelle',
+    lastName: 'Fourie',
+    status: 'AVAILABLE',
+    zone: 'Zone C',
+    avgResponseSec: 267,
+    avatarUrl: null as string | null,
+    vehicle: null as {
+      id: string; callSign: string; registration: string;
+      role: string; crewMates: { officerId: string; name: string; role: string }[];
+    } | null,
+  },
+  {
+    id: 'demo-off-16',
+    firstName: 'Siphamandla',
+    lastName: 'Cele',
+    status: 'AVAILABLE',
+    zone: 'Zone B',
+    avgResponseSec: 243,
+    avatarUrl: null as string | null,
+    vehicle: null as {
+      id: string; callSign: string; registration: string;
+      role: string; crewMates: { officerId: string; name: string; role: string }[];
+    } | null,
+  },
 ];
+
+const OFFICER_PROFILE_KEY = '4ds-demo-officer-profiles';
+let officerProfilesHydrated = false;
+
+function persistOfficerProfiles() {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.setItem(
+      OFFICER_PROFILE_KEY,
+      JSON.stringify(
+        demoOfficerRoster.map((o) => ({
+          id: o.id,
+          firstName: o.firstName,
+          lastName: o.lastName,
+          zone: o.zone,
+          avatarUrl: o.avatarUrl ?? null,
+          status: o.status,
+          avgResponseSec: o.avgResponseSec,
+        })),
+      ),
+    );
+  } catch {
+    /* ignore quota */
+  }
+}
+
+function hydrateOfficerProfiles() {
+  if (typeof window === 'undefined') return;
+  try {
+    const raw = window.localStorage.getItem(OFFICER_PROFILE_KEY);
+    if (!raw) return;
+    const rows = JSON.parse(raw) as {
+      id: string;
+      firstName?: string;
+      lastName?: string;
+      zone?: string | null;
+      avatarUrl?: string | null;
+      status?: string;
+      avgResponseSec?: number;
+    }[];
+    if (!Array.isArray(rows)) return;
+    for (const row of rows) {
+      const existing = demoOfficerRoster.find((o) => o.id === row.id);
+      if (existing) {
+        if (row.firstName) existing.firstName = row.firstName;
+        if (row.lastName) existing.lastName = row.lastName;
+        if (row.zone !== undefined) existing.zone = row.zone ?? 'Zone A';
+        if (row.avatarUrl !== undefined) existing.avatarUrl = row.avatarUrl;
+        if (row.status) existing.status = row.status;
+      } else if (row.firstName && row.lastName) {
+        demoOfficerRoster.push({
+          id: row.id,
+          firstName: row.firstName,
+          lastName: row.lastName,
+          status: row.status ?? 'AVAILABLE',
+          zone: row.zone ?? 'Zone A',
+          avgResponseSec: row.avgResponseSec ?? 240,
+          avatarUrl: row.avatarUrl ?? null,
+          vehicle: null,
+        });
+      }
+    }
+  } catch {
+    /* ignore */
+  }
+}
+
+function ensureOfficerProfiles() {
+  if (officerProfilesHydrated) return;
+  officerProfilesHydrated = true;
+  hydrateOfficerProfiles();
+}
 
 const demoDispatches: {
   id: string;
@@ -245,6 +607,7 @@ const demoDispatches: {
     id: string;
     type: string;
     status: string;
+    priority?: string;
     client: string;
     address: string | null;
     latestReport: string | null;
@@ -258,9 +621,80 @@ const demoDispatches: {
       id: 'demo-inc-1',
       type: 'PANIC',
       status: 'DISPATCHED',
+      priority: 'CRITICAL',
       client: 'Nomsa Client',
       address: 'Umhlanga Rocks Dr',
-      latestReport: 'Unit 101 en route.',
+      latestReport: 'Unit 101 en route — ETA 4 min.',
+    },
+  },
+  {
+    id: 'demo-disp-2',
+    status: 'EN_ROUTE',
+    officer: { id: 'demo-off-4', name: 'Zanele Khumalo', status: 'EN_ROUTE' },
+    incident: {
+      id: 'demo-inc-2',
+      type: 'INTRUSION',
+      status: 'DISPATCHED',
+      priority: 'HIGH',
+      client: 'James Demo',
+      address: 'Glenwood, Durban',
+      latestReport: 'Zanele Khumalo assigned and en route.',
+    },
+  },
+  {
+    id: 'demo-disp-3',
+    status: 'ON_SCENE',
+    officer: { id: 'demo-off-5', name: 'Thabo Mokoena', status: 'ON_SCENE' },
+    incident: {
+      id: 'demo-inc-3',
+      type: 'MEDICAL',
+      status: 'IN_PROGRESS',
+      priority: 'CRITICAL',
+      client: 'Priya Naidoo',
+      address: 'Prospecton industrial',
+      latestReport: 'On scene — paramedic assist requested.',
+    },
+  },
+  {
+    id: 'demo-disp-4',
+    status: 'ACCEPTED',
+    officer: { id: 'demo-off-8', name: 'Lebo Dlamini', status: 'ASSIGNED' },
+    incident: {
+      id: 'demo-inc-4',
+      type: 'ALARM',
+      status: 'DISPATCHED',
+      priority: 'MEDIUM',
+      client: 'Thabo Retail',
+      address: 'Gateway Theatre of Shopping',
+      latestReport: 'Accepted — rolling from Ballito staging.',
+    },
+  },
+  {
+    id: 'demo-disp-5',
+    status: 'EN_ROUTE',
+    officer: { id: 'demo-off-10', name: 'Ruan van der Berg', status: 'EN_ROUTE' },
+    incident: {
+      id: 'demo-inc-5',
+      type: 'THEFT',
+      status: 'DISPATCHED',
+      priority: 'HIGH',
+      client: 'Lerato Mokoena',
+      address: 'Hillcrest farm gate',
+      latestReport: 'Suspect vehicle description logged.',
+    },
+  },
+  {
+    id: 'demo-disp-6',
+    status: 'ASSIGNED',
+    officer: { id: 'demo-off-11', name: 'Bongani Nkosi', status: 'ASSIGNED' },
+    incident: {
+      id: 'demo-inc-6',
+      type: 'FIRE',
+      status: 'OPEN',
+      priority: 'CRITICAL',
+      client: 'Asha Patel',
+      address: 'Ridge clinic loading bay',
+      latestReport: 'Assigned — awaiting accept.',
     },
   },
 ];
@@ -276,6 +710,44 @@ function mapTrail(lat: number, lng: number) {
     lng: lng - (7 - i) * 0.0014,
   }));
 }
+
+function demoDashCams(id: string, callSign: string, live: boolean) {
+  const frontStatus = !live ? 'OFFLINE' : 'ONLINE';
+  return [
+    {
+      id: `${id}-cam-front`,
+      name: 'Dash forward',
+      locationLabel: `${callSign} · windscreen`,
+      channel: 1,
+      status: live ? 'RECORDING' : 'OFFLINE',
+      snapshotUrl: null as string | null,
+      isLiveCapable: live,
+      isInterior: false,
+    },
+    {
+      id: `${id}-cam-cabin`,
+      name: 'Cabin',
+      locationLabel: `${callSign} · cabin`,
+      channel: 2,
+      status: frontStatus,
+      snapshotUrl: null as string | null,
+      isLiveCapable: live,
+      isInterior: true,
+    },
+    {
+      id: `${id}-cam-rear`,
+      name: 'Rear view',
+      locationLabel: `${callSign} · rear`,
+      channel: 3,
+      status: frontStatus,
+      snapshotUrl: null as string | null,
+      isLiveCapable: live,
+      isInterior: false,
+    },
+  ];
+}
+
+const FLEET_TEAM_VALUES = new Set(FLEET_TEAMS.map((t) => t.value));
 
 const REVENUE_KEY = '4ds-demo-dev-revenue';
 
@@ -328,35 +800,6 @@ let demoVehicleState = {
   lng: 31.04,
 };
 
-const demoClients = [
-  {
-    id: 'demo-user-client-demo-local',
-    firstName: 'Nomsa',
-    lastName: 'Client',
-    email: 'client@demo.local',
-    phone: '+27821234567',
-    subscription: {
-      planName: 'Family Protect',
-      tierCode: 'FAMILY',
-      status: 'ACTIVE',
-      memberId: 'NX-MEM-1001',
-    },
-  },
-  {
-    id: 'demo-user-james-demo-local',
-    firstName: 'James',
-    lastName: 'Demo',
-    email: 'james@demo.local',
-    phone: '+27829876543',
-    subscription: {
-      planName: 'Personal Protect',
-      tierCode: 'PERSONAL',
-      status: 'ACTIVE',
-      memberId: 'NX-MEM-1002',
-    },
-  },
-];
-
 const demoContacts = [
   {
     id: 'demo-c-1',
@@ -364,14 +807,15 @@ const demoContacts = [
     phone: '+27820001111',
     relationship: 'Spouse',
     priority: 1,
+    verifiedAt: '2026-08-18T08:00:00.000Z',
   },
   {
-    id: 'demo-c-2',
-    name: '4DS Dispatch',
-    phone: '+27111004400',
-    relationship: 'Dispatch',
-    priority: 0,
-    isDispatch: true,
+    id: 'demo-c-3',
+    name: 'John Client',
+    phone: '+27820002222',
+    relationship: 'Brother',
+    priority: 2,
+    verifiedAt: '2026-08-18T08:00:00.000Z',
   },
 ];
 
@@ -381,12 +825,17 @@ let demoMedical = {
   medications: 'Metformin 500mg daily',
   chronicConditions: 'Type 2 Diabetes',
   emergencyNotes: 'Insulin stored in fridge. Contact James if unresponsive.',
+  doctorContact: 'Dr Naidoo · +27 31 555 0199',
+  ambulancePreference: 'Netcare 911',
   isComplete: true,
 };
 
 const demoSafeZones = [
   { id: 'demo-zone-1', name: 'Home — Umhlanga', lat: '-29.7267', lng: '31.0857', radiusM: 400 },
   { id: 'demo-zone-2', name: 'School drop-off', lat: '-29.8488', lng: '31.0099', radiusM: 250 },
+  { id: 'demo-zone-3', name: 'Warehouse — Prospecton', lat: '-29.978', lng: '30.955', radiusM: 600 },
+  { id: 'demo-zone-4', name: 'Gateway retail', lat: '-29.726', lng: '31.067', radiusM: 350 },
+  { id: 'demo-zone-5', name: 'Hillcrest farmstead', lat: '-29.78', lng: '30.762', radiusM: 800 },
 ];
 
 type DemoStoreOrder = {
@@ -420,23 +869,132 @@ const demoStoreOrders: DemoStoreOrder[] = [
       { productName: 'Body armour vest', quantity: 1 },
     ],
   },
+  {
+    id: 'demo-ord-1001',
+    orderNumber: 'NX-DEMO-1001',
+    customerName: 'Priya Naidoo',
+    customerEmail: 'priya@warehouse.local',
+    customerUserId: 'demo-user-priya-warehouse-local',
+    status: 'PROCESSING',
+    totalCents: 899000,
+    totalFormatted: 'R 8990.00',
+    createdAt: new Date(Date.now() - 172800000).toISOString(),
+    itemCount: 3,
+    items: [
+      { productName: '8-channel NVR kit', quantity: 1 },
+      { productName: 'PTZ dome camera', quantity: 2 },
+    ],
+  },
+  {
+    id: 'demo-ord-1002',
+    orderNumber: 'NX-DEMO-1002',
+    customerName: 'Thabo Retail',
+    customerEmail: 'thabo@gateway.local',
+    customerUserId: 'demo-user-thabo-retail-local',
+    status: 'DELIVERED',
+    totalCents: 459900,
+    totalFormatted: 'R 4599.00',
+    createdAt: new Date(Date.now() - 432000000).toISOString(),
+    itemCount: 1,
+    items: [{ productName: 'Retail alarm panel', quantity: 1 }],
+  },
+];
+
+type DemoSalesLead = {
+  id: string;
+  companyName: string | null;
+  contactName: string;
+  contactEmail: string | null;
+  contactPhone: string | null;
+  source: string;
+  status: string;
+  interest: string | null;
+  estimatedCents: number | null;
+  notes: string | null;
+  nextFollowUp: string | null;
+  ownerUserId: string | null;
+  createdAt: string;
+};
+
+let demoSalesLeads: DemoSalesLead[] = [
+  {
+    id: 'demo-lead-1',
+    companyName: 'Gateway Retail Park',
+    contactName: 'Thabo Retail',
+    contactEmail: 'thabo@gateway.local',
+    contactPhone: '+27832223302',
+    source: 'Referral',
+    status: 'QUOTED',
+    interest: 'CCTV + patrol bundle',
+    estimatedCents: 1850000,
+    notes: 'Wants 12-camera NVR kit with monthly patrol add-on.',
+    nextFollowUp: new Date(Date.now() + 2 * 86400000).toISOString(),
+    ownerUserId: 'demo-user-sales-4ds-local',
+    createdAt: new Date(Date.now() - 5 * 86400000).toISOString(),
+  },
+  {
+    id: 'demo-lead-2',
+    companyName: 'Hillcrest Farmstead',
+    contactName: 'Lerato Mokoena',
+    contactEmail: 'lerato@hillcrest.local',
+    contactPhone: '+27834445503',
+    source: 'Website',
+    status: 'QUALIFIED',
+    interest: 'Perimeter beams + armed response',
+    estimatedCents: 720000,
+    notes: 'Site walk scheduled; needs generator backup option.',
+    nextFollowUp: new Date(Date.now() + 86400000).toISOString(),
+    ownerUserId: 'demo-user-sales-4ds-local',
+    createdAt: new Date(Date.now() - 3 * 86400000).toISOString(),
+  },
+  {
+    id: 'demo-lead-3',
+    companyName: null,
+    contactName: 'David Nkosi',
+    contactEmail: 'david.nkosi@example.com',
+    contactPhone: '+27831234567',
+    source: 'Manual',
+    status: 'NEW',
+    interest: 'Body armour + holster',
+    estimatedCents: 89000,
+    notes: 'Private security contractor — bulk quote for 6 vests.',
+    nextFollowUp: null,
+    ownerUserId: 'demo-user-sales-4ds-local',
+    createdAt: new Date(Date.now() - 86400000).toISOString(),
+  },
+  {
+    id: 'demo-lead-4',
+    companyName: 'Ridge Clinic',
+    contactName: 'Asha Patel',
+    contactEmail: 'asha@ridgeclinic.local',
+    contactPhone: '+27835556604',
+    source: 'Store walk-in',
+    status: 'CONTACTED',
+    interest: 'Panic buttons + CCTV',
+    estimatedCents: 540000,
+    notes: 'Trial tier client — upsell to business package.',
+    nextFollowUp: new Date(Date.now() + 3 * 86400000).toISOString(),
+    ownerUserId: 'demo-user-manager-4ds-local',
+    createdAt: new Date(Date.now() - 7 * 86400000).toISOString(),
+  },
+  {
+    id: 'demo-lead-5',
+    companyName: 'Prospecton Warehouse',
+    contactName: 'Priya Naidoo',
+    contactEmail: 'priya@warehouse.local',
+    contactPhone: '+27831112201',
+    source: 'Referral',
+    status: 'WON',
+    interest: 'Warehouse CCTV upgrade',
+    estimatedCents: 899000,
+    notes: 'Closed — order NX-DEMO-1001 linked.',
+    nextFollowUp: null,
+    ownerUserId: 'demo-user-sales-4ds-local',
+    createdAt: new Date(Date.now() - 14 * 86400000).toISOString(),
+  },
 ];
 
 let demoAdminProducts = getDemoProducts().map((p) => ({ ...p, isActive: true }));
-
-const demoProperties: {
-  id: string;
-  name: string;
-  alarmStatus: string;
-  alarmLinked: boolean;
-}[] = [
-  {
-    id: 'demo-prop-1',
-    name: 'Home — Umhlanga',
-    alarmStatus: 'ARMED',
-    alarmLinked: true,
-  },
-];
 
 type DemoClientChatMessage = {
   id: string;
@@ -444,26 +1002,6 @@ type DemoClientChatMessage = {
   content: string;
   createdAt: string;
   sender: { id: string; firstName: string; lastName: string; role: string };
-};
-
-const demoClientProfiles: Record<
-  string,
-  { firstName: string; lastName: string; phone: string; email: string; trackingEnabled: boolean }
-> = {
-  'demo-user-client-demo-local': {
-    firstName: 'Nomsa',
-    lastName: 'Client',
-    phone: '+27821234567',
-    email: 'client@demo.local',
-    trackingEnabled: true,
-  },
-  'demo-user-james-demo-local': {
-    firstName: 'James',
-    lastName: 'Demo',
-    phone: '+27829876543',
-    email: 'james@demo.local',
-    trackingEnabled: true,
-  },
 };
 
 const demoClientChatByClient = new Map<string, DemoClientChatMessage[]>();
@@ -514,141 +1052,9 @@ function demoClientChatThreads() {
     .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
 }
 
-const demoSurveillanceSites = [
-  {
-    id: 'demo-prop-1',
-    name: 'Home — Umhlanga',
-    address: '12 Lagoon Dr, Umhlanga',
-    propertyType: 'RESIDENTIAL',
-    alarmStatus: 'ARMED',
-    alarmLinked: true,
-    camerasLinked: true,
-    monitoringEnabled: true,
-    shareInteriorCameras: false,
-    privacy: {
-      shareInteriorCameras: false,
-      interiorUnlocked: true,
-      unlockReason: 'OWNER',
-      unlockLabel: 'Owner view',
-      interiorCameraCount: 1,
-      privateInteriorCount: 0,
-    },
-    panel: {
-      panelVendor: 'Paradox',
-      panelModel: 'MG5050+',
-      communicatorType: 'IP150',
-      monitoringAccount: 'ZA-88421',
-      partitionLabel: 'Partition 1',
-      protocol: 'Contact ID',
-      region: 'ZA',
-    },
-    cameraCount: 4,
-    onlineCameras: 4,
-    sensorCount: 8,
-    alertSensors: 0,
-    openEvents: 0,
-    cameras: [
-      {
-        id: 'demo-cam-1',
-        name: 'Front gate',
-        locationLabel: 'Driveway',
-        channel: 1,
-        status: 'ONLINE',
-        snapshotUrl: null,
-        streamUrl: 'demo',
-        isLiveCapable: true,
-        isInterior: false,
-        placement: 'EXTERIOR',
-      },
-      {
-        id: 'demo-cam-2',
-        name: 'Garage',
-        locationLabel: 'Side entrance',
-        channel: 2,
-        status: 'ONLINE',
-        snapshotUrl: null,
-        streamUrl: 'demo',
-        isLiveCapable: true,
-        isInterior: false,
-        placement: 'EXTERIOR',
-      },
-      {
-        id: 'demo-cam-3',
-        name: 'Pool & patio',
-        locationLabel: 'Back garden',
-        channel: 3,
-        status: 'RECORDING',
-        snapshotUrl: null,
-        streamUrl: 'demo',
-        isLiveCapable: true,
-        isInterior: false,
-        placement: 'EXTERIOR',
-      },
-      {
-        id: 'demo-cam-4',
-        name: 'Lounge',
-        locationLabel: 'Interior',
-        channel: 4,
-        status: 'ONLINE',
-        snapshotUrl: null,
-        streamUrl: 'demo',
-        isLiveCapable: true,
-        isInterior: true,
-        placement: 'INTERIOR',
-      },
-    ],
-    sensors: [],
-    gateCode: null as string | null,
-    accessNotes: null as string | null,
-    keyHolder: null as string | null,
-  },
-];
-
-const demoVehicleCameraFeeds = [
-  {
-    vehicleId: 'demo-veh-1',
-    registration: 'ND 123-456',
-    label: 'Toyota Fortuner',
-    cameras: [
-      {
-        id: 'demo-vcam-1',
-        name: 'Dash forward',
-        locationLabel: 'Windscreen',
-        channel: 1,
-        status: 'ONLINE',
-        snapshotUrl: null,
-        streamUrl: 'demo',
-        isLiveCapable: true,
-        isInterior: false,
-        placement: 'EXTERIOR',
-      },
-      {
-        id: 'demo-vcam-2',
-        name: 'Cabin',
-        locationLabel: 'Interior',
-        channel: 2,
-        status: 'ONLINE',
-        snapshotUrl: null,
-        streamUrl: 'demo',
-        isLiveCapable: true,
-        isInterior: true,
-        placement: 'INTERIOR',
-      },
-      {
-        id: 'demo-vcam-3',
-        name: 'Rear view',
-        locationLabel: 'Tailgate cam',
-        channel: 3,
-        status: 'RECORDING',
-        snapshotUrl: null,
-        streamUrl: 'demo',
-        isLiveCapable: true,
-        isInterior: false,
-        placement: 'EXTERIOR',
-      },
-    ],
-  },
-];
+function setDemoAlarmStatus(id: string, status: string) {
+  syncDemoPropertyAlarm(id, status);
+}
 
 type DemoVerification = {
   id: string;
@@ -702,7 +1108,7 @@ function pushDemoErrorReport(report: DemoErrorReport) {
 }
 
 function demoTicketNotifications(role?: string) {
-  if (role !== 'DEVELOPER' && role !== 'OWNER' && role !== 'SUPER_ADMIN') return [];
+  if (role !== 'DEVELOPER') return [];
   return readDemoErrorReports()
     .filter((r) => r.status !== 'RESOLVED')
     .map((r) => ({
@@ -737,7 +1143,7 @@ const demoBillingDocuments = [
     amountFormatted: 'R499.00',
     periodLabel: 'Jul 2026',
     issuedAt: new Date(Date.now() - 46 * 86400000).toISOString(),
-    downloadUrl: '/portal/subscription/receipt/PF-DEMO-0988',
+    downloadUrl: '/portal/documents/invoice/INV-2026-0714',
   },
   {
     id: 'doc-rcp-1',
@@ -746,7 +1152,7 @@ const demoBillingDocuments = [
     reference: 'PF-DEMO-1001',
     amountFormatted: 'R499.00',
     issuedAt: new Date(Date.now() - 16 * 86400000).toISOString(),
-    downloadUrl: '/portal/subscription/receipt/PF-DEMO-1001',
+    downloadUrl: '/portal/documents/receipt/PF-DEMO-1001',
   },
   {
     id: 'doc-stm-1',
@@ -756,7 +1162,7 @@ const demoBillingDocuments = [
     amountFormatted: 'R499.00',
     periodLabel: 'Jul 2026',
     issuedAt: new Date(Date.now() - 45 * 86400000).toISOString(),
-    downloadUrl: '/portal/subscription/receipt/PF-DEMO-0988',
+    downloadUrl: '/portal/documents/statement/STM-2026-07',
   },
 ];
 
@@ -941,9 +1347,13 @@ const demoFleet = [
     model: 'Hilux',
     color: 'White',
     vehicleType: 'ARMED_RESPONSE',
+    teamName: 'Armed response',
     status: 'ON_DUTY',
-    crew: [{ officerId: 'demo-off-1', name: 'Sipho Ndlovu', role: 'DRIVER', status: 'EN_ROUTE', zone: 'Zone A' }],
-    crewCount: 1,
+    crew: [
+      { officerId: 'demo-off-1', name: 'Sipho Ndlovu', role: 'DRIVER', status: 'EN_ROUTE', zone: 'Zone A' },
+      { officerId: 'demo-off-8', name: 'Lebo Dlamini', role: 'PASSENGER', status: 'EN_ROUTE', zone: 'Zone A' },
+    ],
+    crewCount: 2,
     cameras: [
       {
         id: 'demo-fleet-1-cam-front',
@@ -985,9 +1395,13 @@ const demoFleet = [
     model: 'Sprinter',
     color: 'White',
     vehicleType: 'MEDICAL',
-    status: 'AVAILABLE',
-    crew: [],
-    crewCount: 0,
+    teamName: 'Medical',
+    status: 'ON_DUTY',
+    crew: [
+      { officerId: 'demo-off-2', name: 'Raj Patel', role: 'DRIVER', status: 'BUSY', zone: 'Zone B' },
+      { officerId: 'demo-off-9', name: 'Naledi Sithole', role: 'MEDIC', status: 'BUSY', zone: 'Zone B' },
+    ],
+    crewCount: 2,
     cameras: [
       {
         id: 'demo-fleet-2-cam-front',
@@ -1029,6 +1443,7 @@ const demoFleet = [
     model: 'Ranger',
     color: 'Silver',
     vehicleType: 'PATROL',
+    teamName: 'Patrol',
     status: 'MAINTENANCE',
     crew: [],
     crewCount: 0,
@@ -1055,11 +1470,270 @@ const demoFleet = [
       },
     ],
   },
+  {
+    id: 'demo-fleet-4',
+    registration: 'ND 4DS-FIRE',
+    callSign: 'Engine 1',
+    make: 'Scania',
+    model: 'P320',
+    color: 'Red',
+    vehicleType: 'FIRE_TRUCK',
+    teamName: 'Fire',
+    status: 'ON_DUTY',
+    crew: [
+      { officerId: 'demo-off-5', name: 'Thabo Mokoena', role: 'DRIVER', status: 'EN_ROUTE', zone: 'Zone B' },
+      { officerId: 'demo-off-10', name: 'Ruan van der Berg', role: 'PASSENGER', status: 'EN_ROUTE', zone: 'Zone B' },
+      { officerId: 'demo-off-11', name: 'Bongani Nkosi', role: 'PASSENGER', status: 'EN_ROUTE', zone: 'Zone B' },
+    ],
+    crewCount: 3,
+    cameras: demoDashCams('demo-fleet-4', 'Engine 1', true),
+  },
+  {
+    id: 'demo-fleet-5',
+    registration: 'ND 4DS-TAC',
+    callSign: 'TAC 1',
+    make: 'Toyota',
+    model: 'Land Cruiser',
+    color: 'Black',
+    vehicleType: 'TACTICAL',
+    teamName: 'Tactical',
+    status: 'ON_DUTY',
+    crew: [
+      { officerId: 'demo-off-4', name: 'Zanele Khumalo', role: 'DRIVER', status: 'AVAILABLE', zone: 'Zone A' },
+      { officerId: 'demo-off-12', name: 'Fatima Essop', role: 'PASSENGER', status: 'AVAILABLE', zone: 'Zone A' },
+      { officerId: 'demo-off-13', name: 'Kgosi Motsepe', role: 'PASSENGER', status: 'AVAILABLE', zone: 'Zone A' },
+    ],
+    crewCount: 3,
+    cameras: demoDashCams('demo-fleet-5', 'TAC 1', true),
+  },
+  {
+    id: 'demo-fleet-6',
+    registration: 'ND 4DS-RR1',
+    callSign: 'Bike 1',
+    make: 'BMW',
+    model: 'R 1250 GS',
+    color: 'Yellow',
+    vehicleType: 'MOTORCYCLE',
+    teamName: 'Rapid response',
+    status: 'AVAILABLE',
+    crew: [{ officerId: 'demo-off-6', name: 'Aisha Khan', role: 'DRIVER', status: 'AVAILABLE', zone: 'Zone A' }],
+    crewCount: 1,
+    cameras: demoDashCams('demo-fleet-6', 'Bike 1', true),
+  },
+  {
+    id: 'demo-fleet-7',
+    registration: 'ND 4DS-UM1',
+    callSign: 'Ghost 1',
+    make: 'Volkswagen',
+    model: 'Polo',
+    color: 'Grey',
+    vehicleType: 'UNMARKED',
+    teamName: 'Unmarked',
+    status: 'AVAILABLE',
+    crew: [
+      { officerId: 'demo-off-7', name: 'Pieter Botha', role: 'DRIVER', status: 'AVAILABLE', zone: 'Zone C' },
+      { officerId: 'demo-off-14', name: 'Yusuf Adams', role: 'PASSENGER', status: 'AVAILABLE', zone: 'Zone C' },
+    ],
+    crewCount: 2,
+    cameras: demoDashCams('demo-fleet-7', 'Ghost 1', true),
+  },
 ];
+
+function syncOfficerCrewNames(officer: (typeof demoOfficerRoster)[number]) {
+  const name = `${officer.firstName} ${officer.lastName}`;
+  for (const vehicle of demoFleet) {
+    for (const seat of vehicle.crew) {
+      if (seat.officerId === officer.id) seat.name = name;
+    }
+  }
+}
 
 function ok<T>(data: T) {
   return { success: true as const, data };
 }
+
+type DemoManagedUser = {
+  id: string;
+  email: string;
+  firstName: string;
+  lastName: string;
+  phone: string | null;
+  avatarUrl: string | null;
+  jobTitle: string | null;
+  role: string;
+  status: string;
+  branch: { id: string; name: string; code: string } | null;
+  teams: { id: string; name: string; branchId: string; isLead: boolean }[];
+};
+
+function demoStaff(
+  email: string,
+  firstName: string,
+  lastName: string,
+  role: string,
+  extra?: Partial<Pick<DemoManagedUser, 'phone' | 'jobTitle' | 'status'>>,
+): DemoManagedUser {
+  return {
+    id: `demo-user-${email.replace(/[^a-z0-9]/gi, '-')}`,
+    email,
+    firstName,
+    lastName,
+    phone: extra?.phone ?? null,
+    avatarUrl: null,
+    jobTitle: extra?.jobTitle ?? null,
+    role,
+    status: extra?.status ?? 'ACTIVE',
+    branch: { id: 'demo-branch-1', name: 'Durban North', code: 'DBN' },
+    teams: [],
+  };
+}
+
+const demoManagedUsers: DemoManagedUser[] = [
+  demoStaff('owner@4ds.local', 'Thabo', 'Owner', 'OWNER', { jobTitle: 'Owner' }),
+  demoStaff('admin@demo.local', 'Demo', 'Admin', 'OWNER', { jobTitle: 'Control Room Admin' }),
+  demoStaff('developer@4ds.local', 'Toxic', 'Dev', 'DEVELOPER', {
+    jobTitle: 'Platform Developer',
+    phone: '+27821000099',
+  }),
+  demoStaff('manager@4ds.local', 'Ayesha', 'Manager', 'MANAGER', { jobTitle: 'Operations Manager' }),
+  demoStaff('supervisor@4ds.local', 'Mandla', 'Supervisor', 'SUPERVISOR', { jobTitle: 'Field Supervisor' }),
+  demoStaff('dispatch@demo.local', 'Lerato', 'Dispatch', 'DISPATCHER', { jobTitle: 'Control Room Operator' }),
+  demoStaff('sales@4ds.local', 'Sihle', 'Sales', 'SALES', { jobTitle: 'Sales Consultant' }),
+  demoStaff('client@demo.local', 'Nomsa', 'Client', 'USER', { phone: '+27821234567', jobTitle: 'Protected client' }),
+  demoStaff('james@demo.local', 'James', 'Demo', 'USER', { phone: '+27829876543', jobTitle: 'Protected client' }),
+  demoStaff('priya@warehouse.local', 'Priya', 'Naidoo', 'USER', { phone: '+27831112201', jobTitle: 'Warehouse client' }),
+  demoStaff('thabo@gateway.local', 'Thabo', 'Retail', 'USER', { phone: '+27832223302', jobTitle: 'Retail client' }),
+  demoStaff('lerato@hillcrest.local', 'Lerato', 'Mokoena', 'USER', { phone: '+27834445503', jobTitle: 'Farmstead client' }),
+  demoStaff('asha@ridgeclinic.local', 'Asha', 'Patel', 'USER', { phone: '+27835556604', jobTitle: 'Clinic client' }),
+  demoStaff('sarah@morningside.local', 'Sarah', 'Guest', 'USER', { phone: '+27836667705', jobTitle: 'Guest house client' }),
+  demoStaff('ndlovu@4ds.local', 'Sipho', 'Ndlovu', 'OFFICER', { phone: '+27831110001', jobTitle: 'Field Officer' }),
+  demoStaff('patel@4ds.local', 'Raj', 'Patel', 'OFFICER', { phone: '+27831110002', jobTitle: 'Senior Officer' }),
+  demoStaff('smith@4ds.local', 'John', 'Smith', 'OFFICER', { phone: '+27831110003', jobTitle: 'Field Officer' }),
+  demoStaff('tech.cameras@4ds.local', 'Camera', 'Tech', 'TECHNICIAN', { jobTitle: 'CCTV Installer' }),
+  demoStaff('tech.alarms@4ds.local', 'Alarm', 'Tech', 'TECHNICIAN', { jobTitle: 'Alarm Technician' }),
+];
+
+const DEMO_SUBSCRIPTION_MRR_CENTS: Record<string, number> = {
+  BUSINESS: 310000,
+  FAMILY: 125000,
+  HOME: 69000,
+  PERSONAL: 69000,
+};
+
+const SALES_OPEN_STATUSES = ['NEW', 'CONTACTED', 'QUALIFIED', 'QUOTED'] as const;
+const SALES_PIPELINE_STATUSES = ['NEW', 'CONTACTED', 'QUALIFIED', 'QUOTED', 'WON', 'LOST'] as const;
+
+function formatDemoZar(cents: number): string {
+  return `R ${(cents / 100).toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+function salesLeadToApi(lead: DemoSalesLead) {
+  const owner = demoManagedUsers.find((u) => u.id === lead.ownerUserId);
+  return {
+    id: lead.id,
+    companyName: lead.companyName,
+    contactName: lead.contactName,
+    contactEmail: lead.contactEmail,
+    contactPhone: lead.contactPhone,
+    source: lead.source,
+    status: lead.status,
+    interest: lead.interest,
+    estimatedCents: lead.estimatedCents,
+    estimatedFormatted: lead.estimatedCents != null ? formatDemoZar(lead.estimatedCents) : null,
+    notes: lead.notes,
+    nextFollowUp: lead.nextFollowUp,
+    ownerName: owner ? `${owner.firstName} ${owner.lastName}` : 'Unassigned',
+    ownerUserId: lead.ownerUserId,
+  };
+}
+
+function buildSalesDashboard() {
+  const leads = demoSalesLeads.map(salesLeadToApi);
+  const openLeads = demoSalesLeads.filter((l) => SALES_OPEN_STATUSES.includes(l.status as (typeof SALES_OPEN_STATUSES)[number])).length;
+  const wonDeals = demoSalesLeads.filter((l) => l.status === 'WON').length;
+  const pipelineCents = demoSalesLeads
+    .filter((l) => SALES_OPEN_STATUSES.includes(l.status as (typeof SALES_OPEN_STATUSES)[number]))
+    .reduce((n, l) => n + (l.estimatedCents ?? 0), 0);
+  const wonCents = demoSalesLeads
+    .filter((l) => l.status === 'WON')
+    .reduce((n, l) => n + (l.estimatedCents ?? 0), 0);
+  const pipeline = Object.fromEntries(
+    SALES_PIPELINE_STATUSES.map((status) => [
+      status,
+      demoSalesLeads.filter((l) => l.status === status).length,
+    ]),
+  );
+  return {
+    stats: {
+      openLeads,
+      wonDeals,
+      pipelineFormatted: formatDemoZar(pipelineCents),
+      wonFormatted: formatDemoZar(wonCents),
+      orders: demoStoreOrders.length,
+      catalogSize: demoAdminProducts.filter((p) => p.isActive).length,
+      pipeline,
+    },
+    leads,
+    recentOrders: demoStoreOrders.slice(0, 8).map((o) => ({
+      id: o.id,
+      orderNumber: o.orderNumber,
+      customerName: o.customerName,
+      status: o.status,
+      totalFormatted: o.totalFormatted,
+    })),
+  };
+}
+
+function buildBillingOverview() {
+  const activeStatuses = new Set(['ACTIVE', 'TRIALING']);
+  const pastDueRows = demoClients.filter((c) => c.subscription.status === 'PAST_DUE');
+  const activeRows = demoClients.filter((c) => activeStatuses.has(c.subscription.status));
+  const mrrCents = activeRows.reduce(
+    (n, c) => n + (DEMO_SUBSCRIPTION_MRR_CENTS[c.subscription.tierCode] ?? 69000),
+    0,
+  );
+  const revenueAtRiskCents = pastDueRows.reduce(
+    (n, c) => n + (DEMO_SUBSCRIPTION_MRR_CENTS[c.subscription.tierCode] ?? 69000),
+    0,
+  );
+  return {
+    totalSubscriptions: demoClients.length,
+    active: activeRows.length,
+    pastDueCount: pastDueRows.length,
+    revenueAtRiskFormatted: formatDemoZar(revenueAtRiskCents),
+    mrrFormatted: formatDemoZar(mrrCents),
+  };
+}
+
+const demoBranches = [
+  {
+    id: 'demo-branch-1',
+    name: 'Durban North',
+    code: 'DBN',
+    isActive: true,
+    teams: [
+      { id: 'demo-team-alpha', name: 'Alpha Response', members: [{}, {}, {}] },
+      { id: 'demo-team-night', name: 'Night Patrol', members: [{}, {}] },
+    ],
+    _count: { users: 18, officers: 12 },
+  },
+  {
+    id: 'demo-branch-2',
+    name: 'Westville',
+    code: 'WVL',
+    isActive: true,
+    teams: [{ id: 'demo-team-medic', name: 'Medical', members: [{}, {}] }],
+    _count: { users: 9, officers: 4 },
+  },
+  {
+    id: 'demo-branch-3',
+    name: 'Umhlanga',
+    code: 'UML',
+    isActive: false,
+    teams: [],
+    _count: { users: 2, officers: 0 },
+  },
+];
 
 const DEMO_CALL_KEY = '4ds-demo-active-call';
 const DEMO_DISPATCHER = {
@@ -1159,6 +1833,184 @@ function parseBody(body: unknown): Record<string, unknown> {
   return {};
 }
 
+const demoDocumentFolders: {
+  id: string;
+  name: string;
+  parentId: string | null;
+  description: string | null;
+  icon: string | null;
+}[] = [
+  { id: 'demo-doc-folder-evidence', name: 'Incident Evidence', parentId: null as string | null, description: 'Photos, statements, and captured media', icon: '📷' },
+  { id: 'demo-doc-folder-clients', name: 'Client Records', parentId: null as string | null, description: 'Contracts and ID copies', icon: '👤' },
+  { id: 'demo-doc-folder-officers', name: 'Officer Files', parentId: null as string | null, description: 'Licenses, certifications, and reports', icon: '🛡️' },
+  { id: 'demo-doc-folder-sops', name: 'Policies & SOPs', parentId: null as string | null, description: 'Operational playbooks', icon: '📘' },
+];
+
+let demoDocuments: {
+  id: string;
+  title: string;
+  description: string | null;
+  category: string;
+  fileName: string;
+  fileType: string;
+  fileUrl: string;
+  fileSizeKb: number | null;
+  tags: string[];
+  isPinned: boolean;
+  folderId: string | null;
+  incidentId: string | null;
+  createdAt: string;
+  uploadedBy: string | null;
+}[] = [
+  {
+    id: 'demo-doc-1',
+    title: 'Panic scene photos',
+    description: 'Initial responder photos from Unit 101.',
+    category: 'INCIDENT_EVIDENCE',
+    fileName: 'panic-scene-photos.pdf',
+    fileType: 'application/pdf',
+    fileUrl: `data:text/plain;charset=utf-8,${encodeURIComponent('Demo incident evidence packet')}`,
+    fileSizeKb: 412,
+    tags: ['panic', 'scene', 'unit-101'],
+    isPinned: true,
+    folderId: 'demo-doc-folder-evidence',
+    incidentId: 'demo-inc-1',
+    createdAt: new Date(Date.now() - 55 * 60000).toISOString(),
+    uploadedBy: 'Sipho Ndlovu',
+  },
+  {
+    id: 'demo-doc-2',
+    title: 'Nomsa client contract',
+    description: 'Signed client service agreement and onboarding checklist.',
+    category: 'CLIENT_RECORD',
+    fileName: 'nomsa-client-contract.pdf',
+    fileType: 'application/pdf',
+    fileUrl: `data:text/plain;charset=utf-8,${encodeURIComponent('Demo client contract')}`,
+    fileSizeKb: 188,
+    tags: ['client', 'contract', 'nomsa'],
+    isPinned: false,
+    folderId: 'demo-doc-folder-clients',
+    incidentId: null as string | null,
+    createdAt: new Date(Date.now() - 3 * 86400000).toISOString(),
+    uploadedBy: 'Lerato Dispatch',
+  },
+  {
+    id: 'demo-doc-3',
+    title: 'Officer duty roster',
+    description: 'Current response roster and handover notes.',
+    category: 'OFFICER_REPORT',
+    fileName: 'officer-duty-roster.xlsx',
+    fileType: 'application/vnd.ms-excel',
+    fileUrl: `data:text/plain;charset=utf-8,${encodeURIComponent('Demo officer roster')}`,
+    fileSizeKb: 74,
+    tags: ['officers', 'roster', 'handover'],
+    isPinned: false,
+    folderId: 'demo-doc-folder-officers',
+    incidentId: null as string | null,
+    createdAt: new Date(Date.now() - 8 * 3600000).toISOString(),
+    uploadedBy: 'Naledi Admin',
+  },
+  {
+    id: 'demo-doc-4',
+    title: 'Intrusion response SOP',
+    description: 'Step-by-step response checklist for residential intrusion alarms.',
+    category: 'POLICY_SOP',
+    fileName: 'intrusion-response-sop.pdf',
+    fileType: 'application/pdf',
+    fileUrl: `data:text/plain;charset=utf-8,${encodeURIComponent('Demo response SOP')}`,
+    fileSizeKb: 96,
+    tags: ['sop', 'intrusion', 'training'],
+    isPinned: true,
+    folderId: 'demo-doc-folder-sops',
+    incidentId: null as string | null,
+    createdAt: new Date(Date.now() - 14 * 86400000).toISOString(),
+    uploadedBy: 'Demo Admin',
+  },
+];
+
+function buildDemoDocumentFolderTree() {
+  const countForFolder = (folderId: string) =>
+    demoDocuments.filter((doc) => doc.folderId === folderId).length;
+  const nodes = demoDocumentFolders.map((folder) => ({
+    ...folder,
+    documentCount: countForFolder(folder.id),
+    children: [] as Array<{
+      id: string;
+      name: string;
+      description: string | null;
+      icon: string | null;
+      parentId: string | null;
+      documentCount: number;
+      children: unknown[];
+    }>,
+  }));
+  const byId = new Map(nodes.map((n) => [n.id, n]));
+  const roots: typeof nodes = [];
+  for (const node of nodes) {
+    if (node.parentId && byId.has(node.parentId)) {
+      byId.get(node.parentId)!.children.push(node);
+    } else {
+      roots.push(node);
+    }
+  }
+  return roots;
+}
+
+function demoDocumentLibrary() {
+  return {
+    folderTree: buildDemoDocumentFolderTree(),
+    folders: demoDocumentFolders.map((folder) => {
+      const inFolder = demoDocuments.filter((doc) => doc.folderId === folder.id);
+      const latest = inFolder.reduce<string | null>(
+        (acc, doc) => (!acc || doc.createdAt > acc ? doc.createdAt : acc),
+        null,
+      );
+      return {
+        id: folder.id,
+        name: folder.name,
+        parentId: folder.parentId,
+        icon: folder.icon,
+        documentCount: inFolder.length,
+        updatedAt: latest ?? new Date().toISOString(),
+      };
+    }),
+    categories: Object.keys(
+      demoDocuments.reduce<Record<string, number>>((acc, doc) => {
+        acc[doc.category] = (acc[doc.category] ?? 0) + 1;
+        return acc;
+      }, {}),
+    ).map((category) => ({
+      category,
+      count: demoDocuments.filter((doc) => doc.category === category).length,
+    })),
+    stats: {
+      totalDocuments: demoDocuments.length,
+      pinned: demoDocuments.filter((doc) => doc.isPinned).length,
+      folderCount: demoDocumentFolders.length,
+    },
+  };
+}
+
+function decorateDemoDocument(doc: (typeof demoDocuments)[number]) {
+  const folder = demoDocumentFolders.find((f) => f.id === doc.folderId) ?? null;
+  const incident = doc.incidentId
+    ? demoIncidents.find((i) => i.id === doc.incidentId) ?? null
+    : null;
+  return {
+    ...doc,
+    folder: folder ? { id: folder.id, name: folder.name } : null,
+    incident: incident
+      ? {
+          id: incident.id,
+          type: incident.type,
+          title: incident.title,
+          address: incident.location,
+          status: incident.status,
+        }
+      : null,
+  };
+}
+
 export async function handleDemoRequest<T>({
   path,
   method,
@@ -1166,13 +2018,29 @@ export async function handleDemoRequest<T>({
   session,
   portal,
 }: DemoRequest): Promise<T> {
-  // Simulate slight network latency for realism
-  await new Promise((r) => setTimeout(r, 120));
+  ensureOfficerProfiles();
 
   const { clean, params } = parsePath(path);
   const m = method.toUpperCase();
   const payload = parseBody(body);
   const user = session?.user;
+
+  const security = handleDeviceSecurityDemo({
+    clean,
+    method: m,
+    payload: (payload ?? {}) as Record<string, unknown>,
+    session,
+  });
+  if (security) {
+    const data = security.response.data as { error?: string; message?: string } | null;
+    if (data && typeof data === 'object' && data.error) {
+      throw new Error(data.message ?? 'Request failed');
+    }
+    if (security.incident) demoIncidents.unshift(security.incident);
+    if (security.notification) demoClientNotifications.unshift(security.notification);
+    if (security.crNotification) demoControlRoomNotifications.unshift(security.crNotification);
+    return security.response as T;
+  }
 
   // ——— Store (public) ———
   if (clean === '/store/catalog' && m === 'GET') {
@@ -1289,6 +2157,141 @@ export async function handleDemoRequest<T>({
       return ok(order ?? { ok: true }) as T;
     }
   }
+  if (clean === '/store/sales/dashboard' && m === 'GET') {
+    return ok(buildSalesDashboard()) as T;
+  }
+  if (clean === '/store/sales/users' && m === 'GET') {
+    const salesRoles = new Set(['SALES', 'MANAGER', 'OWNER', 'DISPATCHER']);
+    return ok(
+      demoManagedUsers
+        .filter((u) => salesRoles.has(u.role) && u.status === 'ACTIVE')
+        .map((u) => ({
+          id: u.id,
+          firstName: u.firstName,
+          lastName: u.lastName,
+          email: u.email,
+          role: u.role,
+        })),
+    ) as T;
+  }
+  if (clean === '/store/sales/leads' && m === 'POST') {
+    const id = typeof payload.id === 'string' && payload.id ? payload.id : `demo-lead-${Date.now()}`;
+    const existing = demoSalesLeads.find((l) => l.id === id);
+    const next: DemoSalesLead = {
+      id,
+      companyName:
+        payload.companyName === null || typeof payload.companyName === 'string'
+          ? payload.companyName
+          : (existing?.companyName ?? null),
+      contactName: String(payload.contactName ?? existing?.contactName ?? ''),
+      contactEmail:
+        payload.contactEmail === null || typeof payload.contactEmail === 'string'
+          ? payload.contactEmail
+          : (existing?.contactEmail ?? null),
+      contactPhone:
+        payload.contactPhone === null || typeof payload.contactPhone === 'string'
+          ? payload.contactPhone
+          : (existing?.contactPhone ?? null),
+      source: String(payload.source ?? existing?.source ?? 'Manual'),
+      status: String(payload.status ?? existing?.status ?? 'NEW'),
+      interest:
+        payload.interest === null || typeof payload.interest === 'string'
+          ? payload.interest
+          : (existing?.interest ?? null),
+      estimatedCents:
+        payload.estimatedCents === null
+          ? null
+          : Number(payload.estimatedCents ?? existing?.estimatedCents ?? 0) || null,
+      notes:
+        payload.notes === null || typeof payload.notes === 'string'
+          ? payload.notes
+          : (existing?.notes ?? null),
+      nextFollowUp:
+        payload.nextFollowUp === null || typeof payload.nextFollowUp === 'string'
+          ? payload.nextFollowUp
+          : (existing?.nextFollowUp ?? null),
+      ownerUserId:
+        payload.ownerUserId === null || typeof payload.ownerUserId === 'string'
+          ? payload.ownerUserId
+          : (existing?.ownerUserId ?? null),
+      createdAt: existing?.createdAt ?? new Date().toISOString(),
+    };
+    if (existing) Object.assign(existing, next);
+    else demoSalesLeads.unshift(next);
+    return ok(salesLeadToApi(existing ?? next)) as T;
+  }
+  if (clean === '/store/installs' && m === 'GET') {
+    const scheduled = techJobs.filter((j) => j.status === 'SCHEDULED').length;
+    const inProgress = techJobs.filter((j) => !['SCHEDULED', 'COMPLETED', 'CANCELLED'].includes(j.status)).length;
+    const completed = techJobs.filter((j) => j.status === 'COMPLETED').length;
+    const techs = demoManagedUsers.filter((u) => u.role === 'TECHNICIAN');
+    return {
+      success: true as const,
+      data: techJobs.map((j, index) => {
+        const tech = techs[index % Math.max(techs.length, 1)];
+        return {
+          id: j.id,
+          title: j.title,
+          description: j.description ?? null,
+          jobType: j.jobType,
+          status: j.status,
+          clientName: j.clientName ?? 'Demo client',
+          clientPhone: j.clientPhone ?? null,
+          address: j.address,
+          scheduledAt: j.scheduledAt,
+          equipmentNotes: j.equipmentNotes ?? null,
+          technicianId: tech?.id ?? null,
+          technicianName: tech ? `${tech.firstName} ${tech.lastName}` : 'Unassigned',
+        };
+      }),
+      stats: { scheduled, inProgress, completed },
+    } as T;
+  }
+  if (clean === '/store/installs' && m === 'POST') {
+    const id = typeof payload.id === 'string' && payload.id ? payload.id : `demo-job-${Date.now()}`;
+    const existing = techJobs.find((j) => j.id === id);
+    const next: TechJob = {
+      id,
+      title: String(payload.title ?? existing?.title ?? 'Install job'),
+      description:
+        payload.description === null || typeof payload.description === 'string'
+          ? payload.description ?? undefined
+          : existing?.description,
+      jobType: String(payload.jobType ?? existing?.jobType ?? 'CCTV'),
+      status: String(payload.status ?? existing?.status ?? 'SCHEDULED'),
+      clientName: String(payload.clientName ?? existing?.clientName ?? 'Demo client'),
+      clientPhone:
+        payload.clientPhone === null || typeof payload.clientPhone === 'string'
+          ? payload.clientPhone ?? undefined
+          : existing?.clientPhone,
+      address: String(payload.address ?? existing?.address ?? 'Durban'),
+      scheduledAt: String(payload.scheduledAt ?? existing?.scheduledAt ?? new Date().toISOString()),
+      equipmentNotes:
+        payload.equipmentNotes === null || typeof payload.equipmentNotes === 'string'
+          ? payload.equipmentNotes ?? undefined
+          : existing?.equipmentNotes,
+      tests: existing?.tests,
+      serial: existing?.serial,
+    };
+    if (existing) Object.assign(existing, next);
+    else techJobs.unshift(next);
+    return ok(next) as T;
+  }
+  if (clean === '/store/technicians' && m === 'GET') {
+    return ok(
+      demoManagedUsers
+        .filter((u) => u.role === 'TECHNICIAN' && u.status === 'ACTIVE')
+        .map((u) => ({
+          id: u.id,
+          firstName: u.firstName,
+          lastName: u.lastName,
+          email: u.email,
+          jobTitle: u.jobTitle,
+          phone: u.phone,
+          teams: u.teams.map((t) => t.name),
+        })),
+    ) as T;
+  }
 
   // ——— Client ———
   if (clean === '/client/profile' && m === 'GET') {
@@ -1300,7 +2303,11 @@ export async function handleDemoRequest<T>({
       phone: profile?.phone ?? user?.phone ?? '+27821234567',
       firstName: profile?.firstName ?? user?.firstName ?? 'Nomsa',
       lastName: profile?.lastName ?? user?.lastName ?? 'Client',
+      role: 'CLIENT',
+      roleLabel: 'Primary subscriber',
       trackingEnabled: profile?.trackingEnabled ?? true,
+      lastLocationAt: new Date().toISOString(),
+      createdAt: '2024-03-12T08:00:00.000Z',
       tenant: {
         name: user?.tenant?.name ?? DEMO_TENANT.name,
         slug: user?.tenant?.slug ?? DEMO_TENANT.slug,
@@ -1355,6 +2362,12 @@ export async function handleDemoRequest<T>({
           : demoMedical.chronicConditions,
       emergencyNotes:
         typeof payload.emergencyNotes === 'string' ? payload.emergencyNotes : demoMedical.emergencyNotes,
+      doctorContact:
+        typeof payload.doctorContact === 'string' ? payload.doctorContact : demoMedical.doctorContact,
+      ambulancePreference:
+        typeof payload.ambulancePreference === 'string'
+          ? payload.ambulancePreference
+          : demoMedical.ambulancePreference,
       isComplete: true,
     };
     return ok({ ...demoMedical }) as T;
@@ -1364,8 +2377,9 @@ export async function handleDemoRequest<T>({
       id: `demo-c-${Date.now()}`,
       name: String(payload.name ?? 'Contact'),
       phone: String(payload.phone ?? ''),
-      relationship: typeof payload.relationship === 'string' ? payload.relationship : null,
+      relationship: typeof payload.relationship === 'string' ? payload.relationship : 'Contact',
       priority: demoContacts.length + 1,
+      verifiedAt: new Date().toISOString(),
     };
     demoContacts.push(contact);
     return ok(contact) as T;
@@ -1434,10 +2448,15 @@ export async function handleDemoRequest<T>({
           theftRecovery: demoVehicleState.theftRecovery,
         },
       ],
-      properties: [...demoProperties],
+      properties: demoProperties.filter((p) => {
+        const site = demoSurveillanceSites.find((s) => s.id === p.id);
+        if (!site) return p.id === 'demo-prop-1';
+        const ownerId = user?.id ?? 'demo-user-client-demo-local';
+        return site.owner.id === ownerId || site.owner.email === user?.email || p.id === 'demo-prop-1';
+      }),
       family: [
-        { id: 'demo-fam-1', name: 'Thandi Client', trackingEnabled: true },
-        { id: 'demo-fam-2', name: 'Lerato Client', trackingEnabled: false },
+        { id: 'demo-fam-1', name: 'Thandi Client', trackingEnabled: true, phone: '+27821234568' },
+        { id: 'demo-fam-2', name: 'Lerato Client', trackingEnabled: false, phone: '+27821234569' },
       ],
       contacts: demoContacts,
       recentIncidents: demoIncidents.map((i) => ({
@@ -1454,13 +2473,42 @@ export async function handleDemoRequest<T>({
       ],
       medicalComplete: true,
       safeZoneCount: demoSafeZones.length,
+      liveResponse: {
+        id: 'demo-inc-1',
+        publicRef: 'NX-0001',
+        type: 'PANIC',
+        status: 'DISPATCHED',
+        events: [
+          {
+            id: 'demo-ev-1',
+            kind: 'event',
+            type: 'incident.created',
+            source: 'portal',
+            createdAt: new Date().toISOString(),
+          },
+          {
+            id: 'demo-ev-2',
+            kind: 'event',
+            type: 'dispatch.created',
+            source: 'control-room',
+            createdAt: new Date().toISOString(),
+          },
+          {
+            id: 'demo-ev-3',
+            kind: 'event',
+            type: 'dispatch.en_route',
+            source: 'officer',
+            createdAt: new Date().toISOString(),
+          },
+        ],
+      },
     }) as T;
   }
   if (clean === '/client/contacts' && m === 'GET') {
     return {
       success: true,
       data: demoContacts,
-      meta: { dispatchLine: { name: '4DS Dispatch', phone: '+27111004400' } },
+      meta: { dispatchLine: { name: '4DS Control Room', phone: '+27111004400' } },
     } as T;
   }
   if (clean === '/client/subscription/access' && m === 'GET') {
@@ -1750,6 +2798,26 @@ export async function handleDemoRequest<T>({
       gateCode: typeof payload.gateCode === 'string' ? payload.gateCode : null,
       accessNotes: 'Pending control-room verification',
       keyHolder: null,
+      owner: {
+        id: 'demo-user-client',
+        name: 'Nomsa Client',
+        email: 'client@demo.local',
+        phone: '+27821234567',
+        membershipNumber: 'NX-MEM-PENDING',
+        plan: 'Pending verification',
+        tier: 'HOME',
+        subscriptionStatus: 'PENDING',
+        joinedAt: new Date().toISOString(),
+      },
+      linkedVehicles: [],
+      assignedFleet: [],
+      subscription: {
+        plan: 'Pending verification',
+        status: 'PENDING',
+        renewalDate: new Date().toISOString().slice(0, 10),
+        monthlyAmount: 0,
+        addons: [],
+      },
       panel: {
         panelVendor: 'Pending',
         panelModel: '—',
@@ -1759,7 +2827,10 @@ export async function handleDemoRequest<T>({
         protocol: 'Contact ID',
         region: 'ZA',
       },
-    });
+      lat: DURBAN.lat + (Math.random() - 0.5) * 0.08,
+      lng: DURBAN.lng + (Math.random() - 0.5) * 0.08,
+      mapAlarm: 'ALARM_OK',
+    } satisfies DemoSurveillanceSite);
     demoPendingVerifications.push({
       id: `ver-prop-${siteId}`,
       type: 'PROPERTY',
@@ -1822,11 +2893,31 @@ export async function handleDemoRequest<T>({
   {
     const alarmMatch = clean.match(/^\/client\/properties\/([^/]+)\/alarm$/);
     if (alarmMatch && m === 'PATCH') {
+      const status = typeof payload.status === 'string' ? payload.status : 'DISARMED';
+      setDemoAlarmStatus(alarmMatch[1], status);
+      const site = demoSurveillanceSites.find((s) => s.id === alarmMatch[1]);
       const prop = demoProperties.find((p) => p.id === alarmMatch[1]);
-      if (prop && typeof payload.status === 'string') {
-        prop.alarmStatus = payload.status;
-      }
-      return ok(prop ?? { ok: true }) as T;
+      return ok(site ?? prop ?? { id: alarmMatch[1], alarmStatus: status }) as T;
+    }
+  }
+  {
+    const panicMatch = clean.match(/^\/client\/properties\/([^/]+)\/panic$/);
+    if (panicMatch && m === 'POST') {
+      const siteId = panicMatch[1];
+      const site = demoSurveillanceSites.find((s) => s.id === siteId);
+      demoIncidents.unshift({
+        id: `demo-inc-${Date.now()}`,
+        type: 'PANIC',
+        status: 'OPEN',
+        title: `Home panic — ${site?.name ?? 'Property'}`,
+        isSilent: false,
+        time: 'Just now',
+        priority: 'CRITICAL',
+        user: user ? `${user.firstName ?? ''} ${user.lastName ?? ''}`.trim() || user.email : 'Nomsa Client',
+        location: site?.address ?? 'Home',
+      });
+      setDemoAlarmStatus(siteId, 'TRIGGERED');
+      return ok({ created: true, incidentId: demoIncidents[0].id }) as T;
     }
   }
   if (clean === '/client/notifications' && m === 'GET') {
@@ -1848,10 +2939,24 @@ export async function handleDemoRequest<T>({
     }
   }
   if (clean === '/client/surveillance/sites' && m === 'GET') {
-    return ok(demoSurveillanceSites) as T;
+    const ownerId = user?.id ?? 'demo-user-client-demo-local';
+    const owned = demoSurveillanceSites.filter(
+      (s) => s.owner.id === ownerId || s.owner.email === user?.email,
+    );
+    return ok(owned.length ? owned : demoSurveillanceSites.filter((s) => s.id === 'demo-prop-1')) as T;
   }
   if (clean === '/client/surveillance/dashboard-feeds' && m === 'GET') {
-    const homeSite = demoSurveillanceSites.find((s) => s.cameraCount > 0);
+    const ownerId = user?.id ?? 'demo-user-client-demo-local';
+    const ownedSites = demoSurveillanceSites.filter(
+      (s) => s.owner.id === ownerId || s.owner.email === user?.email,
+    );
+    const homeSite =
+      ownedSites.find((s) => s.cameraCount > 0) ??
+      demoSurveillanceSites.find((s) => s.id === 'demo-prop-1');
+    const ownedVehicleIds = new Set(
+      (ownedSites.length ? ownedSites : demoSurveillanceSites.filter((s) => s.id === 'demo-prop-1'))
+        .flatMap((s) => s.linkedVehicles.map((v) => v.id)),
+    );
     return ok({
       home: homeSite
         ? {
@@ -1872,23 +2977,25 @@ export async function handleDemoRequest<T>({
             })),
           }
         : null,
-      vehicles: demoVehicleCameraFeeds.map((v) => ({
-        id: v.vehicleId,
-        label: v.label,
-        subtitle: v.registration,
-        href: `/portal/vehicles/${v.vehicleId}`,
-        onlineCount: v.cameras.filter((c) => c.status.toUpperCase() !== 'OFFLINE').length,
-        cameras: v.cameras.map((c) => ({
-          id: c.id,
-          name: c.name,
-          locationLabel: c.locationLabel,
-          channel: c.channel,
-          status: c.status,
-          snapshotUrl: c.snapshotUrl,
-          isLiveCapable: c.isLiveCapable,
-          isInterior: c.isInterior,
+      vehicles: demoVehicleCameraFeeds
+        .filter((v) => ownedVehicleIds.has(v.vehicleId))
+        .map((v) => ({
+          id: v.vehicleId,
+          label: v.label,
+          subtitle: v.registration,
+          href: `/portal/vehicles/${v.vehicleId}`,
+          onlineCount: v.cameras.filter((c) => c.status.toUpperCase() !== 'OFFLINE').length,
+          cameras: v.cameras.map((c) => ({
+            id: c.id,
+            name: c.name,
+            locationLabel: c.locationLabel,
+            channel: c.channel,
+            status: c.status,
+            snapshotUrl: c.snapshotUrl,
+            isLiveCapable: c.isLiveCapable,
+            isInterior: c.isInterior,
+          })),
         })),
-      })),
     }) as T;
   }
   {
@@ -2029,6 +3136,8 @@ export async function handleDemoRequest<T>({
           trackingEnabled: true,
           familyMessagingEnabled: true,
           lastLocationAt: new Date(Date.now() - 180000).toISOString(),
+          phone: '+27821234568',
+          userId: 'demo-fam-1',
         },
         {
           id: 'demo-fam-2',
@@ -2037,6 +3146,8 @@ export async function handleDemoRequest<T>({
           trackingEnabled: false,
           familyMessagingEnabled: false,
           lastLocationAt: null,
+          phone: '+27821234569',
+          userId: 'demo-fam-2',
         },
       ],
     }) as T;
@@ -2094,22 +3205,27 @@ export async function handleDemoRequest<T>({
     return ok(msg) as T;
   }
   if (clean === '/client/vehicles' && m === 'GET') {
-    return ok([
-      {
-        id: 'demo-veh-1',
-        registration: 'ND 123-456',
-        make: 'Toyota',
-        model: 'Fortuner',
-        variant: 'GD-6',
-        year: 2022,
-        color: 'White',
-        vin: 'JTMDN123456789012',
-        trackerLinked: true,
-        theftRecovery: demoVehicleState.theftRecovery,
-        immobiliserOn: demoVehicleState.immobiliserOn,
-        insuranceInfo: 'Santam comprehensive',
-      },
-    ]) as T;
+    const ownerId = user?.id ?? 'demo-user-client-demo-local';
+    const list = demoClientVehicles.filter(
+      (v) => v.ownerId === ownerId || v.ownerName.toLowerCase().includes(String(user?.firstName ?? 'nomsa').toLowerCase()),
+    );
+    const scoped = list.length ? list : demoClientVehicles.filter((v) => v.id === 'demo-veh-1');
+    return ok(
+      scoped.map((v) => ({
+        id: v.id,
+        registration: v.registration,
+        make: v.make,
+        model: v.model,
+        variant: v.variant,
+        year: v.year,
+        color: v.color,
+        vin: v.vin,
+        trackerLinked: v.trackerLinked,
+        theftRecovery: v.id === 'demo-veh-1' ? demoVehicleState.theftRecovery : v.theftRecovery,
+        immobiliserOn: v.id === 'demo-veh-1' ? demoVehicleState.immobiliserOn : v.immobiliserOn,
+        insuranceInfo: v.insuranceInfo,
+      })),
+    ) as T;
   }
   if (clean === '/client/subscription' && m === 'GET') {
     return ok({
@@ -2128,6 +3244,52 @@ export async function handleDemoRequest<T>({
       },
       isOverdue: false,
     }) as T;
+  }
+  if (clean === '/client/service-requests' && m === 'POST') {
+    const kind = String(payload.kind ?? 'escort');
+    const details = (payload.details ?? {}) as Record<string, unknown>;
+    const titles: Record<string, string> = {
+      'check-in': 'Check-in timer',
+      journey: 'Journey monitoring',
+      escort: 'Escort request',
+      wellness: 'Wellness check',
+      roadside: 'Roadside assistance',
+      'share-location': 'Live location sharing',
+    };
+    const title = titles[kind] ?? 'Service request';
+    const from = String(details.fromLocation ?? details.location ?? '');
+    const to = String(details.toLocation ?? '');
+    const extras = [
+      details.vehicleCount ? `${details.vehicleCount} vehicle(s)` : '',
+      details.hasCargo ? String(details.productType || 'cargo') : '',
+    ].filter(Boolean);
+    const summary = [to ? `${from} → ${to}` : from || 'Submitted from portal', ...extras].join(' · ');
+    const id = `demo-svc-${Date.now()}`;
+    const publicRef = `NX-S${String(demoServiceRequests.length + 21).padStart(3, '0')}`;
+    demoServiceRequests.unshift({
+      id,
+      publicRef,
+      kind,
+      title,
+      status: 'OPEN',
+      whenLabel: 'Just now',
+      summary,
+    });
+    demoIncidents.unshift({
+      id,
+      type: 'OTHER',
+      status: 'OPEN',
+      title,
+      isSilent: false,
+      time: 'Just now',
+      priority: kind === 'escort' || kind === 'roadside' ? 'HIGH' : 'MEDIUM',
+      user: 'Nomsa Client',
+      location: summary,
+    });
+    return ok({ id, publicRef, title }) as T;
+  }
+  if (clean === '/client/service-requests' && m === 'GET') {
+    return ok(demoServiceRequests) as T;
   }
   if (clean === '/client/incidents' && m === 'GET') {
     return ok(
@@ -2288,13 +3450,18 @@ export async function handleDemoRequest<T>({
         },
       ],
       platformLinks: [
-        { label: 'Control room', href: '/control-room' },
+        { label: 'Ops Board', href: '/control-room' },
         { label: 'Live map', href: '/control-room/map' },
+        { label: 'CCTV', href: '/control-room/surveillance' },
+        { label: 'Vehicles', href: '/control-room/fleet' },
+        { label: 'Incidents', href: '/control-room/incidents' },
+        { label: 'Device security', href: '/control-room/device-security' },
+        { label: 'Dispatch', href: '/control-room/dispatch' },
         { label: 'Customers', href: '/control-room/customers' },
-        { label: 'Fleet', href: '/control-room/fleet' },
-        { label: 'Billing verifications', href: '/control-room/customers' },
+        { label: 'Gear store', href: '/control-room/store' },
+        { label: 'Internal chat', href: '/control-room/chat' },
         { label: 'Client portal', href: '/portal' },
-        { label: 'Settings', href: '/control-room/settings' },
+        { label: 'Settings', href: '/control-room/my-settings' },
       ],
     }) as T;
   }
@@ -2342,17 +3509,44 @@ export async function handleDemoRequest<T>({
         vehiclesAvailable: 3,
         ambulancesAvailable: 2,
       },
-      incidents: active.map((i) => ({
-        id: i.id,
-        type: i.type,
-        user: i.user,
-        location: i.location,
-        time: i.time,
-        priority: i.priority,
-        status: i.status,
-        officer: demoIncidentAssignments[i.id] ?? null,
-        slaBreached: i.type === 'INTRUSION' || i.time.includes('18'),
-      })),
+      incidents: active.map((i) => {
+        const officerName = demoIncidentAssignments[i.id] ?? null;
+        const officer = demoOfficerRoster.find(
+          (o) => `${o.firstName} ${o.lastName}` === officerName,
+        );
+        const mins = Number((i.time.match(/(\d+)\s*min/) ?? [])[1] ?? (i.time.includes('h') ? 62 : 2));
+        const createdAt = new Date(Date.now() - mins * 60_000).toISOString();
+        const dispatched = Boolean(officerName) || ['DISPATCHED', 'EN_ROUTE', 'IN_PROGRESS', 'ON_SCENE'].includes(i.status);
+        const isJames = i.user.includes('James');
+        return {
+          id: i.id,
+          type: i.type,
+          user: i.user,
+          location: i.location,
+          time: i.time,
+          priority: i.priority,
+          status: i.status,
+          createdAt,
+          officer: officerName,
+          unit: officer?.vehicle?.callSign ?? null,
+          etaDueAt: dispatched ? new Date(Date.now() + 4 * 60_000 + 32_000).toISOString() : null,
+          isSilent: i.isSilent,
+          source: i.type === 'PANIC' ? (i.isSilent ? 'DURESS' : 'APP PANIC') : null,
+          cameraCount: isJames ? 6 : i.type === 'OTHER' ? 4 : 4,
+          camerasOnline: isJames ? 4 : i.type === 'OTHER' ? 2 : 4,
+          gpsAvailable: i.type !== 'THEFT',
+          distanceKm: i.type === 'THEFT' ? null : isJames ? 1.2 : 0.8,
+          userPhone:
+            i.user === 'Nomsa Client'
+              ? '+27821234567'
+              : i.user === 'James Demo'
+                ? '+27820000001'
+                : '+27820001111',
+          officerPhone: officerName ? '+27831110001' : null,
+          slaTargetSec: i.priority === 'CRITICAL' ? 180 : i.priority === 'HIGH' ? 300 : 600,
+          slaBreached: i.type === 'INTRUSION' || mins >= 15,
+        };
+      }),
       officers: demoOfficerRoster.map((o) => ({
         id: o.id,
         name: `${o.firstName} ${o.lastName}`,
@@ -2380,6 +3574,113 @@ export async function handleDemoRequest<T>({
       },
     }) as T;
   }
+  if (clean === '/control-room/psim/overview' && m === 'GET') {
+    const sourceCounts = new Map<string, number>();
+    for (const e of demoSecurityEvents) {
+      sourceCounts.set(e.source, (sourceCounts.get(e.source) ?? 0) + 1);
+    }
+    return ok({
+      overview: {
+        stats: psimOverviewStats(),
+        eventMix: [...sourceCounts.entries()].map(([label, value]) => ({
+          label: label.charAt(0) + label.slice(1).toLowerCase(),
+          value,
+          tone: 'accent' as const,
+        })),
+        alarmTrend: [
+          { label: '06:00', value: 12 },
+          { label: '08:00', value: 28 },
+          { label: '10:00', value: 41 },
+          { label: '12:00', value: 35 },
+          { label: '14:00', value: 22 },
+          { label: '16:00', value: 18 },
+        ],
+      },
+      alarms: demoAlarmFeed,
+      access: demoAccessDoors,
+      patrols: demoPatrolRoutes,
+      compliance: demoCompliance,
+      watchlists: demoWatchlists,
+      rules: DEMO_DISPATCH_RULES,
+      integrations: integrationsCatalog(),
+      events: demoSecurityEvents,
+    }) as T;
+  }
+  {
+    const alarmAck = clean.match(/^\/control-room\/alarms\/([^/]+)\/ack$/);
+    if (alarmAck && m === 'POST') {
+      const row = demoAlarmFeed.find((a) => a.id === alarmAck[1]);
+      if (row) row.status = 'ACK';
+      return ok(row ?? { id: alarmAck[1], status: 'ACK' }) as T;
+    }
+  }
+  {
+    const evtAck = clean.match(/^\/control-room\/psim\/events\/([^/]+)\/ack$/);
+    if (evtAck && m === 'POST') {
+      const evt = demoSecurityEvents.find((e) => e.id === evtAck[1]);
+      if (evt) evt.acknowledged = true;
+      return ok(evt ?? { id: evtAck[1], acknowledged: true }) as T;
+    }
+  }
+  const crSiteMatch = clean.match(/^\/control-room\/surveillance\/sites\/([^/]+)$/);
+  if (crSiteMatch && m === 'GET') {
+    const siteId = crSiteMatch[1];
+    const s = demoSurveillanceSites.find((x) => x.id === siteId);
+    if (!s) return ok(null) as T;
+    return ok({
+      id: s.id,
+      name: s.name,
+      address: s.address,
+      propertyType: s.propertyType,
+      alarmStatus: s.alarmStatus,
+      monitoringEnabled: s.monitoringEnabled,
+      gateCode: s.gateCode,
+      accessNotes: s.accessNotes,
+      keyHolder: s.keyHolder,
+      panel: s.panel,
+      privacy: s.privacy,
+      client: {
+        id: s.owner.id,
+        name: s.owner.name,
+        email: s.owner.email,
+        phone: s.owner.phone,
+      },
+      owner: s.owner,
+      linkedVehicles: s.linkedVehicles,
+      assignedFleet: s.assignedFleet,
+      subscription: s.subscription,
+      cameras: s.cameras,
+      sensors: s.sensors,
+      events: [
+        {
+          id: 'demo-ev-1',
+          type: 'MOTION',
+          severity: 'HIGH',
+          status: 'OPEN',
+          title: 'Motion detected — front gate',
+          description: 'Movement detected at perimeter camera during after-hours window.',
+          cidCode: '570',
+          triggeredAt: new Date(Date.now() - 8 * 60000).toISOString(),
+          incidentId: null,
+          camera: { id: 'demo-cam-1', name: 'Front gate', locationLabel: 'Driveway' },
+          sensor: null,
+        },
+        {
+          id: 'demo-ev-2',
+          type: 'INTRUSION',
+          severity: 'CRITICAL',
+          status: 'OPEN',
+          title: 'Door forced — server room',
+          description: 'Zone 3 back gate PIR triggered with no arm/disarm sequence.',
+          cidCode: '130',
+          triggeredAt: new Date(Date.now() - 3 * 60000).toISOString(),
+          incidentId: 'demo-inc-1',
+          camera: null,
+          sensor: { id: 'demo-sens-3', name: 'Back gate PIR', zoneNumber: 3, sensorType: 'PIR' },
+        },
+      ],
+    }) as T;
+  }
   if (clean === '/control-room/surveillance' && m === 'GET') {
     const sites = demoSurveillanceSites.map((s) => ({
       id: s.id,
@@ -2395,22 +3696,24 @@ export async function handleDemoRequest<T>({
       onlineCameras: s.onlineCameras,
       sensorCount: s.sensorCount,
       client: {
-        id: 'demo-user-client',
-        name: 'Nomsa Client',
-        email: 'nomsa@demo.4ds',
-        phone: '+27821234567',
+        id: s.owner.id,
+        name: s.owner.name,
+        email: s.owner.email,
+        phone: s.owner.phone,
       },
       cameras: s.cameras,
-      openEvents: [] as { id: string; title: string }[],
+      openEvents: demoSiteOpenEvents(s.id),
     }));
+    const totalOpenEvents = sites.reduce((n, s) => n + (s.openEvents?.length ?? 0), 0);
+    const triggeredSites = sites.filter((s) => (s.openEvents?.length ?? 0) > 0).length;
     return ok({
       stats: {
         sites: sites.length,
         cameras: sites.reduce((n, s) => n + s.cameraCount, 0),
         sensors: sites.reduce((n, s) => n + s.sensorCount, 0),
-        openEvents: 0,
-        triggeredSites: 0,
-        offlineCameras: 0,
+        openEvents: totalOpenEvents,
+        triggeredSites,
+        offlineCameras: sites.reduce((n, s) => n + (s.cameraCount - s.onlineCameras), 0),
       },
       sites,
     }) as T;
@@ -2423,94 +3726,75 @@ export async function handleDemoRequest<T>({
     };
     return ok({
       center: DURBAN,
-      clients: [
-        {
-          id: 'demo-user-client',
-          name: 'Nomsa Client',
-          lat: demoClientLocation.lat,
-          lng: demoClientLocation.lng,
-          clientType: 'VIP',
-          membershipNumber: 'NX-MEM-1001',
-          tierCode: 'FAMILY',
-          planName: 'Family Protect',
-          subscriptionStatus: 'ACTIVE',
-          addons: ['HOME_SECURITY'],
-          phone: '+27821234567',
-          emergencyContacts: [{ name: 'Thandi', phone: '+27820001111' }],
-          status: 'ONLINE',
-          batteryPct: 86,
-          updatedAt: new Date().toISOString(),
-        },
-      ],
+      clients: demoMapClients(),
       officers: [
         {
           id: 'demo-off-1',
-          name: 'Sipho Ndlovu',
+          name: `${demoOfficerRoster.find((o) => o.id === 'demo-off-1')?.firstName ?? 'Sipho'} ${demoOfficerRoster.find((o) => o.id === 'demo-off-1')?.lastName ?? 'Ndlovu'}`,
           lat: -29.835,
           lng: 31.002,
           officerType: 'ARMED_RESPONSE',
           unitNumber: 'AR-101',
           status: demoOfficerRoster.find((o) => o.id === 'demo-off-1')?.status ?? 'EN_ROUTE',
           phone: '+27831110001',
-          zone: 'Zone A',
+          zone: demoOfficerRoster.find((o) => o.id === 'demo-off-1')?.zone ?? 'Zone A',
+          avatarUrl: demoOfficerRoster.find((o) => o.id === 'demo-off-1')?.avatarUrl ?? null,
         },
         {
           id: 'demo-off-3',
-          name: 'John Smith',
+          name: `${demoOfficerRoster.find((o) => o.id === 'demo-off-3')?.firstName ?? 'John'} ${demoOfficerRoster.find((o) => o.id === 'demo-off-3')?.lastName ?? 'Smith'}`,
           lat: -29.83,
           lng: 30.93,
           officerType: 'ARMED_RESPONSE',
           unitNumber: 'AR-103',
           status: demoOfficerRoster.find((o) => o.id === 'demo-off-3')?.status ?? 'AVAILABLE',
-          zone: 'Zone C',
+          zone: demoOfficerRoster.find((o) => o.id === 'demo-off-3')?.zone ?? 'Zone C',
+          avatarUrl: demoOfficerRoster.find((o) => o.id === 'demo-off-3')?.avatarUrl ?? null,
         },
-      ],
-      vehicles: [
         {
-          id: 'demo-veh-1',
-          lat: demoVehicleState.lat,
-          lng: demoVehicleState.lng,
-          vehicleType: demoVehicleState.theftRecovery ? 'STOLEN' : 'CLIENT',
-          registration: 'ND 123-456',
-          make: 'Toyota',
-          model: 'Fortuner',
-          owner: 'Nomsa Client',
-          trackerStatus: 'ONLINE',
-          speed: demoVehicleState.theftRecovery ? 68 : 42,
-          updatedAt: new Date().toISOString(),
+          id: 'demo-off-4',
+          name: `${demoOfficerRoster.find((o) => o.id === 'demo-off-4')?.firstName ?? 'Zanele'} ${demoOfficerRoster.find((o) => o.id === 'demo-off-4')?.lastName ?? 'Khumalo'}`,
+          lat: -29.76,
+          lng: 31.03,
+          officerType: 'TACTICAL',
+          unitNumber: 'TAC-1',
+          status: demoOfficerRoster.find((o) => o.id === 'demo-off-4')?.status ?? 'AVAILABLE',
+          zone: demoOfficerRoster.find((o) => o.id === 'demo-off-4')?.zone ?? 'Zone A',
+          avatarUrl: demoOfficerRoster.find((o) => o.id === 'demo-off-4')?.avatarUrl ?? null,
         },
-      ],
-      fleet: [
         {
-          id: 'demo-fleet-1',
-          lat: -29.84,
-          lng: 31.0,
-          vehicleType: 'ARMED_RESPONSE',
-          registration: 'ND 4DS-101',
-          callSign: 'Unit 101',
-          make: 'Toyota',
-          model: 'Hilux',
-          status: 'ON_DUTY',
-          trackerStatus: 'ONLINE',
-          speed: 55,
-          crew: [{ officerId: 'demo-off-1', name: 'Sipho Ndlovu', role: 'DRIVER' }],
-          crewCount: 1,
-          isCompanyFleet: true as const,
-          updatedAt: new Date().toISOString(),
+          id: 'demo-off-6',
+          name: `${demoOfficerRoster.find((o) => o.id === 'demo-off-6')?.firstName ?? 'Aisha'} ${demoOfficerRoster.find((o) => o.id === 'demo-off-6')?.lastName ?? 'Khan'}`,
+          lat: -29.55,
+          lng: 31.2,
+          officerType: 'RAPID_RESPONSE',
+          unitNumber: 'BIKE-1',
+          status: demoOfficerRoster.find((o) => o.id === 'demo-off-6')?.status ?? 'AVAILABLE',
+          zone: demoOfficerRoster.find((o) => o.id === 'demo-off-6')?.zone ?? 'Zone B',
+          avatarUrl: demoOfficerRoster.find((o) => o.id === 'demo-off-6')?.avatarUrl ?? null,
         },
       ],
-      properties: [
-        {
-          id: 'demo-prop-1',
-          lat: -29.728,
-          lng: 31.085,
-          propertyType: 'ALARM_ACTIVE',
-          name: 'Home — Umhlanga',
-          address: '12 Lagoon Dr, Umhlanga',
-          alarmStatus: 'ARMED',
-          owner: 'Nomsa Client',
-        },
-      ],
+      vehicles: demoMapVehicles(),
+      fleet: demoFleet.map((v, i) => ({
+        id: v.id,
+        lat: DURBAN.lat + 0.012 - i * 0.007,
+        lng: DURBAN.lng - 0.01 + i * 0.006,
+        vehicleType: v.vehicleType,
+        teamName: v.teamName ?? fleetTeamLabel(v.vehicleType),
+        registration: v.registration,
+        callSign: v.callSign,
+        make: v.make,
+        model: v.model,
+        color: v.color,
+        status: v.status,
+        trackerStatus: v.status === 'MAINTENANCE' ? 'OFFLINE' : 'ONLINE',
+        speed: v.status === 'ON_DUTY' || v.status === 'EN_ROUTE' ? 48 : 0,
+        crew: v.crew.map((c) => ({ officerId: c.officerId, name: c.name, role: c.role })),
+        crewCount: v.crewCount,
+        isCompanyFleet: true as const,
+        updatedAt: new Date().toISOString(),
+      })),
+      properties: demoMapProperties(),
       incidents: activeDemoIncidents().map((i, idx) => {
         const coords = incidentCoords[i.id] ?? {
           lat: DURBAN.lat + idx * 0.01,
@@ -2570,7 +3854,7 @@ export async function handleDemoRequest<T>({
   }
   if (clean === '/calls/directory' && m === 'GET') {
     return ok({
-      dispatchLine: { name: '4DS Dispatch', phone: '+27111004400' },
+      dispatchLine: { name: '4DS Control Room', phone: '+27111004400' },
       officers: [
         {
           officerId: 'demo-off-1',
@@ -2735,68 +4019,31 @@ export async function handleDemoRequest<T>({
           location: 'Durban',
         } as (typeof demoIncidents)[number]);
 
-      const officers = [
-        {
-          id: 'demo-off-1',
-          name: 'Sipho Ndlovu',
-          status: 'EN_ROUTE',
-          zone: 'Zone A',
-          available: false,
-          distanceKm: 1.2,
-          eta: '4 min',
-          unitCallSign: 'Unit 101',
-          vehicleType: 'ARMED_RESPONSE',
-          registration: 'ND 4DS-101',
-        },
-        {
-          id: 'demo-off-2',
-          name: 'Raj Patel',
-          status: 'BUSY',
-          zone: 'Zone B',
-          available: false,
-          distanceKm: 3.4,
-          eta: '9 min',
-          unitCallSign: 'Unit 204',
-          vehicleType: 'PATROL',
-          registration: 'ND 4DS-204',
-        },
-        {
-          id: 'demo-off-3',
-          name: 'John Smith',
-          status: 'AVAILABLE',
-          zone: 'Zone C',
-          available: true,
-          distanceKm: 2.1,
-          eta: '6 min',
-          unitCallSign: 'AR-103',
-          vehicleType: 'ARMED_RESPONSE',
-          registration: null as string | null,
-        },
-        {
-          id: 'demo-off-4',
-          name: 'Zanele Khumalo',
-          status: 'AVAILABLE',
-          zone: 'Zone A',
-          available: true,
-          distanceKm: 0.8,
-          eta: '3 min',
-          unitCallSign: 'Unit 110',
-          vehicleType: 'PATROL',
-          registration: 'ND 4DS-110',
-        },
-      ].sort(
-        (a, b) =>
-          Number(b.available) - Number(a.available) ||
-          (a.distanceKm ?? 99) - (b.distanceKm ?? 99),
-      );
+      const officers = demoOfficerRoster
+        .map((o, i) => {
+          const unit = demoFleet.find((v) => v.crew.some((c) => c.officerId === o.id));
+          return {
+            id: o.id,
+            name: `${o.firstName} ${o.lastName}`,
+            status: o.status,
+            zone: o.zone,
+            available: o.status === 'AVAILABLE',
+            distanceKm: Number((0.8 + i * 0.55).toFixed(1)),
+            eta: `${3 + i} min`,
+            unitCallSign: unit?.callSign ?? null,
+            vehicleType: unit?.vehicleType ?? 'PATROL',
+            registration: unit?.registration ?? null,
+          };
+        })
+        .sort(
+          (a, b) =>
+            Number(b.available) - Number(a.available) ||
+            (a.distanceKm ?? 99) - (b.distanceKm ?? 99),
+        );
 
-      const assigned =
-        incident.id === 'demo-inc-1' ||
-        ['DISPATCHED', 'IN_PROGRESS'].includes(incident.status.toUpperCase())
-          ? 'Sipho Ndlovu'
-          : null;
-      const canDispatch =
-        !assigned && ['OPEN', 'ACTIVE', 'PENDING'].includes(incident.status.toUpperCase());
+      const assigned = demoIncidentAssignments[incident.id] ?? null;
+      const resolved = ['RESOLVED', 'CLOSED', 'CANCELLED'].includes(incident.status.toUpperCase());
+      const canDispatch = !resolved;
 
       return ok({
         incident: {
@@ -2908,8 +4155,211 @@ export async function handleDemoRequest<T>({
     });
     return ok({ ok: true, medicalTicket: true }) as T;
   }
+  if (clean === '/control-room/documents/library' && m === 'GET') {
+    return ok(demoDocumentLibrary()) as T;
+  }
+  if (clean === '/control-room/documents/incidents' && m === 'GET') {
+    return ok(
+      demoIncidents.map((incident) => ({
+        id: incident.id,
+        type: incident.type,
+        title: incident.title,
+        status: incident.status,
+        address: incident.location,
+        client: incident.user,
+        documentCount: demoDocuments.filter((doc) => doc.incidentId === incident.id).length,
+      })),
+    ) as T;
+  }
+  if (clean === '/control-room/documents' && m === 'GET') {
+    const folderId = params.get('folderId');
+    const category = params.get('category');
+    const pinned = params.get('pinned') === 'true';
+    const incidentId = params.get('incidentId');
+    const search = (params.get('search') ?? '').trim().toLowerCase();
+    const docs = demoDocuments
+      .filter((doc) => !folderId || doc.folderId === folderId)
+      .filter((doc) => !category || doc.category === category)
+      .filter((doc) => !pinned || doc.isPinned)
+      .filter((doc) => !incidentId || doc.incidentId === incidentId)
+      .filter((doc) => {
+        if (!search) return true;
+        return [doc.title, doc.description ?? '', doc.fileName, ...doc.tags]
+          .join(' ')
+          .toLowerCase()
+          .includes(search);
+      })
+      .map(decorateDemoDocument);
+    return ok(docs) as T;
+  }
+  if (clean === '/control-room/documents/folders' && m === 'POST') {
+    const name = String(payload.name ?? '').trim();
+    if (!name) throw new Error('Folder name is required');
+    const folder = {
+      id: `demo-doc-folder-${Date.now()}`,
+      name,
+      parentId:
+        typeof payload.parentId === 'string' && payload.parentId.trim()
+          ? payload.parentId.trim()
+          : null,
+      description:
+        typeof payload.description === 'string' && payload.description.trim()
+          ? payload.description.trim()
+          : null,
+      icon: '📁',
+    };
+    demoDocumentFolders.push(folder);
+    return ok(folder) as T;
+  }
+  if (clean === '/control-room/documents' && m === 'POST') {
+    const title = String(payload.title ?? '').trim();
+    const category = String(payload.category ?? 'OTHER').trim();
+    const fileName = String(payload.fileName ?? `${title || 'document'}.txt`).trim();
+    const fileType = String(payload.fileType ?? 'text/plain').trim();
+    if (!title) throw new Error('Title is required');
+    const doc = {
+      id: `demo-doc-${Date.now()}`,
+      title,
+      description:
+        typeof payload.description === 'string' && payload.description.trim()
+          ? payload.description.trim()
+          : null,
+      category,
+      fileName,
+      fileType,
+      fileUrl: `data:text/plain;charset=utf-8,${encodeURIComponent(`Demo document: ${title}`)}`,
+      fileSizeKb: Number.isFinite(Number(payload.fileSizeKb)) ? Number(payload.fileSizeKb) : 24,
+      tags: Array.isArray(payload.tags)
+        ? payload.tags.map((t) => String(t).trim()).filter(Boolean)
+        : typeof payload.tags === 'string'
+          ? payload.tags.split(',').map((t) => t.trim()).filter(Boolean)
+          : [],
+      isPinned: Boolean(payload.isPinned),
+      folderId:
+        typeof payload.folderId === 'string' && payload.folderId.trim()
+          ? payload.folderId.trim()
+          : null,
+      incidentId:
+        typeof payload.incidentId === 'string' && payload.incidentId.trim()
+          ? payload.incidentId.trim()
+          : null,
+      createdAt: new Date().toISOString(),
+      uploadedBy: user ? `${user.firstName} ${user.lastName}`.trim() : 'Demo Admin',
+    };
+    demoDocuments.unshift(doc);
+    return ok(decorateDemoDocument(doc)) as T;
+  }
+  {
+    const documentPatch = clean.match(/^\/control-room\/documents\/([^/]+)$/);
+    if (documentPatch && m === 'PATCH') {
+      const doc = demoDocuments.find((item) => item.id === documentPatch[1]);
+      if (!doc) throw new Error('Document not found');
+      if (payload.isPinned !== undefined) doc.isPinned = Boolean(payload.isPinned);
+      if (typeof payload.title === 'string' && payload.title.trim()) doc.title = payload.title.trim();
+      if (typeof payload.description === 'string') doc.description = payload.description.trim() || null;
+      return ok(decorateDemoDocument(doc)) as T;
+    }
+    if (documentPatch && m === 'DELETE') {
+      demoDocuments = demoDocuments.filter((item) => item.id !== documentPatch[1]);
+      return ok({ ok: true }) as T;
+    }
+  }
+  {
+    const documentLink = clean.match(/^\/control-room\/documents\/([^/]+)\/link-incident$/);
+    if (documentLink && m === 'PATCH') {
+      const doc = demoDocuments.find((item) => item.id === documentLink[1]);
+      if (!doc) throw new Error('Document not found');
+      doc.incidentId =
+        typeof payload.incidentId === 'string' && payload.incidentId.trim()
+          ? payload.incidentId.trim()
+          : null;
+      return ok(decorateDemoDocument(doc)) as T;
+    }
+  }
   if (clean === '/control-room/fleet' && m === 'GET') {
+    const seen = new Set<string>();
+    for (const vehicle of demoFleet) {
+      vehicle.crew = vehicle.crew.filter((c) => {
+        if (!c.officerId || seen.has(c.officerId)) return false;
+        seen.add(c.officerId);
+        return true;
+      });
+      vehicle.crewCount = vehicle.crew.length;
+      if (!vehicle.teamName) vehicle.teamName = fleetTeamLabel(vehicle.vehicleType);
+    }
     return ok(demoFleet) as T;
+  }
+  if (clean === '/control-room/fleet' && m === 'POST') {
+    const callSign = String(payload.callSign ?? '').trim();
+    const registration = String(payload.registration ?? '').trim();
+    const make = String(payload.make ?? '').trim();
+    const model = String(payload.model ?? '').trim();
+    const color = String(payload.color ?? '').trim();
+    const rawVehicleType = String(payload.vehicleType ?? '');
+    const vehicleType: typeof demoFleet[number]['vehicleType'] =
+      FLEET_TEAMS.some((t) => t.value === rawVehicleType)
+        ? (rawVehicleType as typeof demoFleet[number]['vehicleType'])
+        : 'PATROL';
+    const teamName =
+      String(payload.teamName ?? '').trim() || fleetTeamLabel(vehicleType);
+    if (!callSign || !registration || !make || !model) {
+      return { success: false as const, message: 'Call sign, registration, make, and model are required.' } as T;
+    }
+    const clash = demoFleet.find(
+      (v) =>
+        v.callSign.toLowerCase() === callSign.toLowerCase() ||
+        v.registration.toLowerCase() === registration.toLowerCase(),
+    );
+    if (clash) {
+      return { success: false as const, message: 'That call sign or registration is already on the board.' } as T;
+    }
+    const id = `demo-fleet-${Date.now()}`;
+    const vehicle = {
+      id,
+      registration,
+      callSign,
+      make,
+      model,
+      color,
+      vehicleType,
+      teamName,
+      status: 'AVAILABLE',
+      crew: [] as typeof demoFleet[number]['crew'],
+      crewCount: 0,
+      cameras: demoDashCams(id, callSign, true),
+    };
+    demoFleet.push(vehicle);
+    return ok(vehicle) as T;
+  }
+  {
+    const fleetPatch = clean.match(/^\/control-room\/fleet\/([^/]+)$/);
+    if (fleetPatch && m === 'PATCH') {
+      const vehicle = demoFleet.find((v) => v.id === fleetPatch[1]);
+      if (!vehicle) {
+        return { success: false as const, message: 'Vehicle not found.' } as T;
+      }
+      if (typeof payload.callSign === 'string' && payload.callSign.trim()) {
+        vehicle.callSign = payload.callSign.trim();
+      }
+      if (typeof payload.registration === 'string' && payload.registration.trim()) {
+        vehicle.registration = payload.registration.trim();
+      }
+      if (typeof payload.make === 'string' && payload.make.trim()) vehicle.make = payload.make.trim();
+      if (typeof payload.model === 'string' && payload.model.trim()) vehicle.model = payload.model.trim();
+      if (typeof payload.color === 'string') vehicle.color = payload.color.trim();
+      if (
+        typeof payload.vehicleType === 'string' &&
+        FLEET_TEAMS.some((t) => t.value === payload.vehicleType)
+      ) {
+        const nextType = payload.vehicleType as typeof demoFleet[number]['vehicleType'];
+        Object.assign(vehicle, { vehicleType: nextType });
+      }
+      if (typeof payload.teamName === 'string') {
+        vehicle.teamName = payload.teamName.trim() || fleetTeamLabel(vehicle.vehicleType);
+      }
+      vehicle.cameras = demoDashCams(vehicle.id, vehicle.callSign, vehicle.status !== 'MAINTENANCE');
+      return ok(vehicle) as T;
+    }
   }
   {
     const incMatch = clean.match(/^\/control-room\/incidents\/([^/]+)$/);
@@ -2967,15 +4417,27 @@ export async function handleDemoRequest<T>({
       ],
       officerPerformance: [
         { name: 'Sipho Ndlovu', avgResponseSec: 240, status: 'EN_ROUTE', rank: 'Senior', skills: ['ARMED', 'MEDIC_FIRST_AID'] },
-        { name: 'Zanele Khumalo', avgResponseSec: 190, status: 'AVAILABLE', rank: 'Lead', skills: ['ARMED', 'DRIVER'] },
-        { name: 'John Smith', avgResponseSec: 310, status: 'AVAILABLE', rank: 'Officer', skills: ['PATROL'] },
+        { name: 'Zanele Khumalo', avgResponseSec: 165, status: 'AVAILABLE', rank: 'Lead', skills: ['ARMED', 'DRIVER'] },
+        { name: 'Raj Patel', avgResponseSec: 310, status: 'BUSY', rank: 'Medic', skills: ['MEDIC', 'DRIVER'] },
+        { name: 'Thabo Mokoena', avgResponseSec: 188, status: 'EN_ROUTE', rank: 'Fire', skills: ['FIRE', 'DRIVER'] },
+        { name: 'Aisha Khan', avgResponseSec: 142, status: 'AVAILABLE', rank: 'Rapid', skills: ['MOTORCYCLE', 'ARMED'] },
+        { name: 'Pieter Botha', avgResponseSec: 226, status: 'AVAILABLE', rank: 'Covert', skills: ['UNMARKED', 'SURVEILLANCE'] },
+        { name: 'John Smith', avgResponseSec: 198, status: 'AVAILABLE', rank: 'Officer', skills: ['PATROL'] },
       ],
       aiSuggestions: [
         {
           id: 'ai-1',
-          title: 'Recommend Unit 110',
-          detail: 'Closest available · 0.8 km · rating 4.8 — suggestion only',
+          title: 'Recommend Bike 1',
+          detail: 'Closest available · 0.8 km · rapid response — suggestion only',
         },
+      ],
+      incidentTrend: [
+        { label: 'Mar', value: 6 },
+        { label: 'Apr', value: 8 },
+        { label: 'May', value: 5 },
+        { label: 'Jun', value: 9 },
+        { label: 'Jul', value: 7 },
+        { label: 'Aug', value: 42 },
       ],
     }) as T;
   }
@@ -2989,16 +4451,16 @@ export async function handleDemoRequest<T>({
         slaBreached: i.type === 'INTRUSION',
       })),
       officers: {
-        onDuty: 4,
+        onDuty: 6,
         onScene: 1,
-        available: 2,
+        available: 3,
         needingAttention: 1,
-        roster: [
-          { id: 'demo-off-1', name: 'Sipho Ndlovu', status: 'EN_ROUTE', zone: 'Zone A' },
-          { id: 'demo-off-3', name: 'John Smith', status: 'AVAILABLE', zone: 'Zone C' },
-          { id: 'demo-off-4', name: 'Zanele Khumalo', status: 'AVAILABLE', zone: 'Zone A' },
-          { id: 'demo-off-2', name: 'Raj Patel', status: 'BUSY', zone: 'Zone B' },
-        ],
+        roster: demoOfficerRoster.map((o) => ({
+          id: o.id,
+          name: `${o.firstName} ${o.lastName}`,
+          status: o.status,
+          zone: o.zone,
+        })),
       },
     }) as T;
   }
@@ -3037,23 +4499,135 @@ export async function handleDemoRequest<T>({
   }
 
   if (clean === '/control-room/officers' && m === 'GET') {
+    // Build a reverse lookup: officerId → fleet vehicle they're crew on
+    const crewMap: Record<string, typeof demoFleet[number]> = {};
+    for (const v of demoFleet) {
+      for (const seat of v.crew) {
+        crewMap[seat.officerId] = v;
+      }
+    }
+    // Phone lookup from demo accounts
+    const phoneMap: Record<string, string> = {
+      'demo-off-1': '+27831110001', 'demo-off-2': '+27831110002',
+      'demo-off-3': '+27831110003', 'demo-off-4': '+27831110004',
+      'demo-off-5': '+27831110005', 'demo-off-6': '+27831110006',
+      'demo-off-7': '+27831110007', 'demo-off-8': '+27831110008',
+      'demo-off-9': '+27831110009', 'demo-off-10': '+27831110010',
+      'demo-off-11': '+27831110011', 'demo-off-12': '+27831110012',
+      'demo-off-13': '+27831110013', 'demo-off-14': '+27831110014',
+      'demo-off-15': '+27831110015', 'demo-off-16': '+27831110016',
+    };
+    const emailMap: Record<string, string> = {
+      'demo-off-1': 'ndlovu@4ds.local', 'demo-off-2': 'patel@4ds.local',
+      'demo-off-3': 'smith@4ds.local', 'demo-off-4': 'khumalo@4ds.local',
+      'demo-off-5': 'mokoena@4ds.local', 'demo-off-6': 'khan@4ds.local',
+      'demo-off-7': 'botha@4ds.local', 'demo-off-8': 'dlamini@4ds.local',
+      'demo-off-9': 'sithole@4ds.local', 'demo-off-10': 'vanderberg@4ds.local',
+      'demo-off-11': 'nkosi@4ds.local', 'demo-off-12': 'essop@4ds.local',
+      'demo-off-13': 'motsepe@4ds.local', 'demo-off-14': 'adams@4ds.local',
+      'demo-off-15': 'fourie@4ds.local', 'demo-off-16': 'cele@4ds.local',
+    };
+    const rankMap: Record<string, string> = {
+      'demo-off-1': 'Senior Officer', 'demo-off-2': 'Paramedic',
+      'demo-off-3': 'Officer', 'demo-off-4': 'Tactical Lead',
+      'demo-off-5': 'Fire Officer', 'demo-off-6': 'Motorcycle Officer',
+      'demo-off-7': 'Detective', 'demo-off-8': 'Officer',
+      'demo-off-9': 'Medic', 'demo-off-10': 'Fire Fighter',
+      'demo-off-11': 'Fire Fighter', 'demo-off-12': 'Tactical Officer',
+      'demo-off-13': 'Tactical Officer', 'demo-off-14': 'Covert Officer',
+      'demo-off-15': 'Officer', 'demo-off-16': 'Officer',
+    };
     return ok(
-      demoOfficerRoster.map((o) => ({
-        id: o.id,
-        firstName: o.firstName,
-        lastName: o.lastName,
-        status: o.status,
-        zone: o.zone,
-        avgResponseSec: o.avgResponseSec,
-        vehicle: o.vehicle,
-      })),
+      demoOfficerRoster.map((o) => {
+        const fleetV = crewMap[o.id];
+        const seatRole = fleetV?.crew.find((c) => c.officerId === o.id)?.role ?? null;
+        return {
+          id: o.id,
+          firstName: o.firstName,
+          lastName: o.lastName,
+          status: o.status,
+          zone: o.zone,
+          avgResponseSec: o.avgResponseSec,
+          avatarUrl: o.avatarUrl ?? null,
+          phone: phoneMap[o.id] ?? null,
+          email: emailMap[o.id] ?? null,
+          rank: rankMap[o.id] ?? 'Officer',
+          vehicle: o.vehicle,
+          assignedFleet: fleetV
+            ? {
+                id: fleetV.id,
+                callSign: fleetV.callSign,
+                registration: fleetV.registration,
+                vehicleType: fleetV.vehicleType,
+                teamName: fleetV.teamName,
+                status: fleetV.status,
+                seatRole,
+                crewCount: fleetV.crewCount,
+                crewNames: fleetV.crew.filter((c) => c.officerId !== o.id).map((c) => c.name),
+              }
+            : null,
+        };
+      }),
     ) as T;
+  }
+  if (clean === '/control-room/officers' && m === 'POST') {
+    const firstName = String(payload.firstName ?? '').trim();
+    const lastName = String(payload.lastName ?? '').trim();
+    const zone = String(payload.zone ?? '').trim() || 'Zone A';
+    const avatarUrl = typeof payload.avatarUrl === 'string' && payload.avatarUrl.trim() ? payload.avatarUrl : null;
+    if (!firstName || !lastName) {
+      return { success: false as const, message: 'First and last name are required.' } as T;
+    }
+    const officer = {
+      id: `demo-off-${Date.now()}`,
+      firstName,
+      lastName,
+      status: 'AVAILABLE',
+      zone,
+      avgResponseSec: 240,
+      avatarUrl,
+      vehicle: null as typeof demoOfficerRoster[number]['vehicle'],
+    };
+    demoOfficerRoster.push(officer);
+    persistOfficerProfiles();
+    return ok(officer) as T;
+  }
+  {
+    const officerPatch = clean.match(/^\/control-room\/officers\/([^/]+)$/);
+    if (officerPatch && m === 'PATCH') {
+      const officer = demoOfficerRoster.find((o) => o.id === officerPatch[1]);
+      if (!officer) {
+        return { success: false as const, message: 'Officer not found.' } as T;
+      }
+      if (typeof payload.firstName === 'string' && payload.firstName.trim()) {
+        officer.firstName = payload.firstName.trim();
+      }
+      if (typeof payload.lastName === 'string' && payload.lastName.trim()) {
+        officer.lastName = payload.lastName.trim();
+      }
+      if (typeof payload.zone === 'string') officer.zone = payload.zone.trim() || 'Zone A';
+      if (payload.avatarUrl === null) officer.avatarUrl = null;
+      if (typeof payload.avatarUrl === 'string') {
+        officer.avatarUrl = payload.avatarUrl.trim() || null;
+      }
+      syncOfficerCrewNames(officer);
+      persistOfficerProfiles();
+      return ok({
+        id: officer.id,
+        firstName: officer.firstName,
+        lastName: officer.lastName,
+        zone: officer.zone,
+        avatarUrl: officer.avatarUrl,
+        status: officer.status,
+      }) as T;
+    }
   }
   {
     const officerStatusMatch = clean.match(/^\/control-room\/officers\/([^/]+)\/status$/);
     if (officerStatusMatch && m === 'PATCH') {
       const officer = demoOfficerRoster.find((o) => o.id === officerStatusMatch[1]);
       if (officer && typeof payload.status === 'string') officer.status = payload.status;
+      persistOfficerProfiles();
       return ok({
         id: officer?.id ?? officerStatusMatch[1],
         status: officer?.status ?? payload.status,
@@ -3065,6 +4639,42 @@ export async function handleDemoRequest<T>({
   }
   if (clean === '/control-room/clients' && m === 'GET') {
     return ok(demoClients) as T;
+  }
+  if (clean === '/control-room/incidents' && m === 'GET') {
+    return ok(
+      demoIncidents.map((i) => ({
+        id: i.id,
+        type: i.type,
+        status: i.status,
+        priority: i.priority,
+        user: i.user,
+        location: i.location,
+        time: i.time,
+        officer: demoIncidentAssignments[i.id] ?? null,
+        title: i.title,
+      })),
+    ) as T;
+  }
+  {
+    const incGet = clean.match(/^\/control-room\/incidents\/([^/]+)$/);
+    if (incGet && m === 'GET') {
+      const inc = demoIncidents.find((i) => i.id === incGet[1]) ?? demoIncidents[0];
+      const assigned = demoIncidentAssignments[inc.id] ?? 'Unassigned';
+      return ok({
+        id: inc.id,
+        type: inc.type,
+        status: inc.status,
+        priority: inc.priority,
+        user: inc.user,
+        location: inc.location,
+        description: inc.title,
+        notes: [],
+        dispatches: assigned === 'Unassigned'
+          ? []
+          : [{ id: `demo-disp-${inc.id}`, status: inc.status, officer: assigned }],
+        media: [],
+      }) as T;
+    }
   }
   if (clean === '/control-room/incidents' && m === 'POST') {
     const client =
@@ -3092,6 +4702,31 @@ export async function handleDemoRequest<T>({
     if (fleetCrewMatch && m === 'PATCH') {
       const vehicle = demoFleet.find((v) => v.id === fleetCrewMatch[1]);
       const crewPayload = Array.isArray(payload.crew) ? payload.crew : [];
+      const officerIds = crewPayload
+        .map((slot: { officerId?: string }) => slot.officerId)
+        .filter((id): id is string => Boolean(id));
+      if (new Set(officerIds).size !== officerIds.length) {
+        return { success: false as const, message: 'The same officer cannot hold two seats on this unit.' } as T;
+      }
+      const drivers = crewPayload.filter(
+        (slot: { role?: string }) => (slot.role ?? 'PASSENGER') === 'DRIVER',
+      );
+      if (crewPayload.length > 0 && drivers.length !== 1) {
+        return { success: false as const, message: 'Each unit needs exactly one driver.' } as T;
+      }
+      for (const id of officerIds) {
+        const elsewhere = demoFleet.find(
+          (v) => v.id !== fleetCrewMatch[1] && v.crew.some((c) => c.officerId === id),
+        );
+        if (elsewhere) {
+          const officer = demoOfficerRoster.find((o) => o.id === id);
+          const name = officer ? `${officer.firstName} ${officer.lastName}` : 'That officer';
+          return {
+            success: false as const,
+            message: `${name} is already assigned to ${elsewhere.callSign}. Unassign them there first.`,
+          } as T;
+        }
+      }
       if (vehicle) {
         vehicle.crew = crewPayload.map((slot: { officerId?: string; role?: string }) => {
           const officer = demoOfficerRoster.find((o) => o.id === slot.officerId);
@@ -3100,7 +4735,7 @@ export async function handleDemoRequest<T>({
             name: officer ? `${officer.firstName} ${officer.lastName}` : 'Officer',
             role: slot.role ?? 'PASSENGER',
             status: officer?.status ?? 'AVAILABLE',
-            zone: officer?.zone ?? null,
+            zone: officer?.zone ?? '',
           };
         });
         vehicle.crewCount = vehicle.crew.length;
@@ -3111,23 +4746,177 @@ export async function handleDemoRequest<T>({
   }
 
   if (clean.startsWith('/control-room/') && (m === 'GET' || m === 'POST' || m === 'PATCH' || m === 'DELETE')) {
+    if (clean === '/control-room/users' && m === 'GET') {
+      return ok(demoManagedUsers) as T;
+    }
+    if (clean === '/control-room/users' && m === 'POST') {
+      const email = String(payload.email ?? '').trim().toLowerCase();
+      const firstName = String(payload.firstName ?? '').trim();
+      const lastName = String(payload.lastName ?? '').trim();
+      const role = String(payload.role ?? 'DISPATCHER').trim();
+      if (!email || !firstName || !lastName) {
+        return { success: false as const, message: 'Name and email are required' } as T;
+      }
+      if (demoManagedUsers.some((item) => item.email === email)) {
+        return { success: false as const, message: 'A user with this email already exists' } as T;
+      }
+      const isClientRole = role === 'USER' || role === 'FAMILY_MEMBER';
+      const password = typeof payload.password === 'string' ? payload.password.trim() : '';
+      if (password && !canManageUserPasswords(user?.role)) {
+        return {
+          success: false as const,
+          message: 'Only owners, developers, and tenant admins can set staff passwords',
+        } as T;
+      }
+      if (!isClientRole && password.length < 8) {
+        return { success: false as const, message: 'Password must be at least 8 characters' } as T;
+      }
+      if (password.length >= 8) setDemoAccountPassword(email, password);
+      const created = demoStaff(email, firstName, lastName, role, {
+        phone: typeof payload.phone === 'string' ? payload.phone.trim() || null : null,
+        jobTitle: typeof payload.jobTitle === 'string' ? payload.jobTitle.trim() || null : null,
+        status:
+          typeof payload.status === 'string'
+            ? payload.status
+            : isClientRole
+              ? 'PENDING_VERIFICATION'
+              : 'ACTIVE',
+      });
+      if (typeof payload.avatarUrl === 'string') created.avatarUrl = payload.avatarUrl || null;
+      demoManagedUsers.unshift(created);
+      if (isClientRole) {
+        return ok({
+          ...created,
+          inviteToken: 'NX-DEMO01',
+          inviteUrl: '/portal/register?token=NX-DEMO01',
+        }) as T;
+      }
+      return ok(created) as T;
+    }
+    if (clean === '/control-room/branches' && m === 'GET') {
+      return ok(demoBranches) as T;
+    }
+    if (clean === '/control-room/branches' && m === 'POST') {
+      const name = String(payload.name ?? '').trim();
+      const code = String(payload.code ?? '').trim().toUpperCase();
+      if (!name || !code) return { success: false as const, message: 'Name and code are required' } as T;
+      const branch = {
+        id: `demo-branch-${Date.now()}`,
+        name,
+        code,
+        isActive: true,
+        teams: [] as { id: string; name: string; members: {}[] }[],
+        _count: { users: 0, officers: 0 },
+      };
+      demoBranches.push(branch);
+      return ok(branch) as T;
+    }
+    {
+      const branchPatch = clean.match(/^\/control-room\/branches\/([^/]+)$/);
+      if (branchPatch && m === 'PATCH') {
+        const branch = demoBranches.find((item) => item.id === branchPatch[1]);
+        if (!branch) return { success: false as const, message: 'Branch not found' } as T;
+        if (typeof payload.name === 'string') branch.name = payload.name;
+        if (typeof payload.code === 'string') branch.code = payload.code.toUpperCase();
+        if (typeof payload.isActive === 'boolean') branch.isActive = payload.isActive;
+        return ok(branch) as T;
+      }
+    }
+    {
+      const userPatch = clean.match(/^\/control-room\/users\/([^/]+)$/);
+      if (userPatch && m === 'PATCH') {
+        const target = demoManagedUsers.find((item) => item.id === userPatch[1]);
+        if (!target) return { success: false as const, message: 'User not found' } as T;
+        if (typeof payload.firstName === 'string' && payload.firstName.trim()) {
+          target.firstName = payload.firstName.trim();
+        }
+        if (typeof payload.lastName === 'string' && payload.lastName.trim()) {
+          target.lastName = payload.lastName.trim();
+        }
+        if (payload.phone === null || typeof payload.phone === 'string') {
+          target.phone = typeof payload.phone === 'string' ? payload.phone.trim() || null : null;
+        }
+        if (payload.jobTitle === null || typeof payload.jobTitle === 'string') {
+          target.jobTitle = typeof payload.jobTitle === 'string' ? payload.jobTitle.trim() || null : null;
+        }
+        if (typeof payload.status === 'string' && payload.status.trim()) {
+          target.status = payload.status.trim();
+        }
+        if (typeof payload.role === 'string' && payload.role.trim()) {
+          target.role = payload.role.trim();
+        }
+        if (typeof payload.avatarUrl === 'string') {
+          target.avatarUrl = payload.avatarUrl || null;
+        }
+        if (typeof payload.password === 'string' && payload.password.trim()) {
+          if (!canManageUserPasswords(user?.role)) {
+            return {
+              success: false as const,
+              message: 'Only owners, developers, and tenant admins can change user passwords',
+            } as T;
+          }
+          if (payload.password.trim().length < 8) {
+            return { success: false as const, message: 'Password must be at least 8 characters' } as T;
+          }
+          setDemoAccountPassword(target.email, payload.password.trim());
+        }
+        return ok(target) as T;
+      }
+    }
     if (clean === '/control-room/customers' && m === 'GET') {
-      return ok([
-        {
-          id: 'demo-user-client-demo-local',
-          firstName: 'Nomsa',
-          lastName: 'Client',
-          email: 'client@demo.local',
-          phone: '+27821234567',
+      const rows = demoClients.map((c) => {
+        const propertyCount = demoSurveillanceSites.filter((s) => s.owner.id === c.id).length;
+        const vehicleCount = demoClientVehicles.filter((v) => v.ownerId === c.id).length;
+        return {
+          id: c.id,
+          firstName: c.firstName,
+          lastName: c.lastName,
+          email: c.email,
+          phone: c.phone,
+          role: 'USER',
+          status: 'ACTIVE',
+          incidentCount: c.id.includes('client-demo') ? 2 : c.id.includes('thabo') ? 1 : 0,
+          vehicleCount,
+          propertyCount,
+          subscription: {
+            planName: c.subscription.planName,
+            tierCode: c.subscription.tierCode,
+            tierLabel: c.subscription.tierCode,
+            addons: [],
+            activeAddonDetails: [],
+            status: c.subscription.status,
+            priceFormatted:
+              c.subscription.tierCode === 'BUSINESS'
+                ? 'R3,100.00'
+                : c.subscription.tierCode === 'FAMILY'
+                  ? 'R1,250.00'
+                  : 'R690.00',
+            memberId: c.subscription.memberId,
+            validUntil: new Date(Date.now() + 30 * 86400000).toISOString(),
+            access: {
+              home: true,
+              vehicle: vehicleCount > 0,
+              family: c.subscription.tierCode === 'FAMILY',
+              medical: true,
+              personal: true,
+              emergency: true,
+            },
+          },
+        };
+      });
+      return {
+        success: true as const,
+        data: rows,
+        stats: {
+          total: rows.length,
+          premium: rows.filter((r) => r.subscription.tierCode === 'BUSINESS' || r.subscription.tierCode === 'FAMILY').length,
+          pastDue: rows.filter((r) => r.subscription.status === 'PAST_DUE').length,
+          active: rows.filter((r) => r.subscription.status === 'ACTIVE' || r.subscription.status === 'TRIALING').length,
         },
-        {
-          id: 'demo-user-james-demo-local',
-          firstName: 'James',
-          lastName: 'Demo',
-          email: 'james@demo.local',
-          phone: '+27829876543',
-        },
-      ]) as T;
+      } as T;
+    }
+    if (clean === '/control-room/billing/overview' && m === 'GET') {
+      return ok(buildBillingOverview()) as T;
     }
     if (clean === '/control-room/client-chats' && m === 'GET') {
       return ok(demoClientChatThreads()) as T;
@@ -3315,6 +5104,138 @@ export async function handleDemoRequest<T>({
       queue: open,
     }) as T;
   }
+  if (clean === '/officer/status' && m === 'PATCH') {
+    const next = payload.status as string | undefined;
+    const roster = (
+      demoOfficerRoster.find(
+        (o) => o.firstName === user?.firstName && o.lastName === user?.lastName,
+      ) ?? demoOfficerRoster[0]
+    ) as (typeof demoOfficerRoster)[number] & { phone?: string | null };
+    if (roster && next) roster.status = next;
+    return ok({ ok: true, status: next ?? roster?.status ?? 'AVAILABLE' }) as T;
+  }
+  if (clean === '/officer/profile' && m === 'GET') {
+    const roster = (
+      demoOfficerRoster.find(
+        (o) => o.firstName === user?.firstName && o.lastName === user?.lastName,
+      ) ?? demoOfficerRoster[0]
+    ) as (typeof demoOfficerRoster)[number] & { phone?: string | null };
+    return ok({
+      firstName: user?.firstName ?? roster?.firstName ?? 'Sipho',
+      lastName: user?.lastName ?? roster?.lastName ?? 'Ndlovu',
+      email: user?.email ?? 'ndlovu@4ds.local',
+      phone: roster?.phone ?? user?.phone ?? '+27831110001',
+      zone: roster?.zone ?? 'Zone A',
+      status: roster?.status ?? 'AVAILABLE',
+      avgResponseSec: roster?.avgResponseSec ?? 280,
+      avatarUrl: roster?.avatarUrl ?? null,
+    }) as T;
+  }
+  if (clean === '/officer/profile' && m === 'PATCH') {
+    const roster = (
+      demoOfficerRoster.find(
+        (o) => o.firstName === user?.firstName && o.lastName === user?.lastName,
+      ) ?? demoOfficerRoster[0]
+    ) as (typeof demoOfficerRoster)[number] & { phone?: string | null };
+    if (roster) {
+      if (payload.phone !== undefined) roster.phone = payload.phone as string;
+      if (payload.avatarUrl !== undefined) roster.avatarUrl = payload.avatarUrl as string | null;
+    }
+    return ok({ ok: true }) as T;
+  }
+  if (clean === '/officer/map' && m === 'GET') {
+    const roster = demoOfficerRoster.find(
+      (o) => o.firstName === user?.firstName && o.lastName === user?.lastName,
+    ) ?? demoOfficerRoster[0];
+    const open = officerDispatches.filter((d) => d.status !== 'COMPLETED');
+    return ok({
+      center: { lat: -29.835, lng: 31.002 },
+      officer: {
+        id: roster?.id ?? 'demo-off-1',
+        name: `${user?.firstName ?? roster?.firstName ?? 'Sipho'} ${user?.lastName ?? roster?.lastName ?? 'Ndlovu'}`,
+        lat: -29.835,
+        lng: 31.002,
+        status: roster?.status ?? 'EN_ROUTE',
+        avatarUrl: roster?.avatarUrl ?? null,
+      },
+      assignments: open.map((d) => ({
+        dispatchId: d.id,
+        status: d.status,
+        incident: {
+          id: d.incident.id,
+          type: d.incident.type,
+          lat: d.incident.lat,
+          lng: d.incident.lng,
+          address: d.incident.address,
+          client: d.incident.client,
+        },
+      })),
+    }) as T;
+  }
+  if (clean === '/officer/active-incident' && m === 'GET') {
+    const active = officerDispatches.find((d) =>
+      ['ACCEPTED', 'EN_ROUTE', 'ON_SCENE'].includes(d.status),
+    );
+    if (!active) return ok(null) as T;
+    return ok({
+      incidentId: active.incident.id,
+      type: active.incident.type,
+      status: active.status,
+      client: active.incident.client,
+      address: active.incident.address ?? null,
+    }) as T;
+  }
+  if (clean === '/officer/surveillance' && m === 'GET') {
+    const incidentId = params.get('incidentId');
+    const active =
+      (incidentId
+        ? officerDispatches.find((d) => d.incident.id === incidentId)
+        : officerDispatches.find((d) =>
+            ['ACCEPTED', 'EN_ROUTE', 'ON_SCENE', 'ASSIGNED'].includes(d.status),
+          )) ?? null;
+    const site = demoSurveillanceSites[0] ?? null;
+    if (!active || !site) return ok(null) as T;
+    const siteEvents = Array.isArray(((site as unknown) as { openEvents?: unknown }).openEvents)
+      ? ((((site as unknown) as {
+          openEvents?: Array<{
+            id: string;
+            title: string;
+            type: string;
+            status: string;
+            triggeredAt: string;
+          }>;
+        }).openEvents) ?? [])
+      : [];
+    return ok({
+      incidentId: active.incident.id,
+      property: {
+        id: site.id,
+        name: site.name,
+        address: site.address,
+        accessNotes: site.accessNotes ?? null,
+        gateCode: site.gateCode ?? null,
+        keyHolder: site.keyHolder ?? null,
+        alarmStatus: site.alarmStatus,
+      },
+      privacy: site.privacy,
+      cameras: (site.cameras ?? []).map((camera) => ({
+        id: camera.id,
+        name: camera.name,
+        locationLabel: camera.locationLabel,
+        channel: camera.channel,
+        status: camera.status,
+        isInterior: camera.isInterior ?? false,
+        privacyLocked: Boolean(camera.isInterior && !site.privacy?.interiorUnlocked),
+      })),
+      events: siteEvents.map((event) => ({
+        id: event.id,
+        title: event.title,
+        type: event.type,
+        status: event.status,
+        triggeredAt: event.triggeredAt,
+      })),
+    }) as T;
+  }
   if (clean === '/officer/sos' && m === 'POST') {
     return ok({
       ok: true,
@@ -3359,13 +5280,18 @@ export async function handleDemoRequest<T>({
   if (clean === '/store/tech/me' && m === 'GET') {
     const scheduled = techJobs.filter((j) => j.status === 'SCHEDULED').length;
     const active = techJobs.filter((j) =>
-      ['EN_ROUTE', 'IN_PROGRESS'].includes(j.status),
+      !['SCHEDULED', 'COMPLETED', 'CANCELLED'].includes(j.status),
     ).length;
     const completed = techJobs.filter((j) => j.status === 'COMPLETED').length;
     return ok({
       firstName: user?.firstName ?? 'Camera',
       lastName: user?.lastName ?? 'Tech',
+      email: user?.email ?? 'tech.cameras@4ds.local',
+      phone: user?.phone ?? '+27 82 000 0040',
       jobTitle: user?.jobTitle ?? 'CCTV Installer',
+      avatarUrl: null,
+      branch: { name: 'Sandton', code: 'JHB-01' },
+      teams: [{ id: 'team-install-a', name: 'Install Team A', isLead: false }],
       stats: { scheduled, active, completed },
       jobs: [...techJobs],
     }) as T;
@@ -3414,6 +5340,91 @@ export async function handleDemoRequest<T>({
       if (job && typeof payload.serial === 'string') job.serial = payload.serial;
       return ok(job ?? { ok: true }) as T;
     }
+  }
+  if (clean === '/store/tech/team' && m === 'GET') {
+    const meId = user?.id ?? 'demo-tech';
+    return ok({
+      id: 'demo-tech-team',
+      name: 'Install Tech Unit',
+      branch: { id: 'demo-branch-dbn', name: 'Durban', code: 'DBN' },
+      myRole: 'MEMBER',
+      members: [
+        {
+          id: meId,
+          firstName: user?.firstName ?? 'Camera',
+          lastName: user?.lastName ?? 'Tech',
+          email: user?.email ?? 'tech.cameras@4ds.local',
+          phone: user?.phone ?? '+27831110900',
+          jobTitle: user?.jobTitle ?? 'CCTV Installer',
+          isLead: false,
+          isMe: true,
+          openJobs: techJobs.filter((j) => !['COMPLETED', 'CANCELLED'].includes(j.status)).length,
+          statusLabel: 'On job',
+        },
+        {
+          id: 'demo-tech-2',
+          firstName: 'Alarm',
+          lastName: 'Tech',
+          email: 'tech.alarms@4ds.local',
+          phone: '+27831110901',
+          jobTitle: 'Alarm Technician',
+          isLead: true,
+          isMe: false,
+          openJobs: 1,
+          statusLabel: 'Available',
+        },
+        {
+          id: 'demo-tech-3',
+          firstName: 'Access',
+          lastName: 'Tech',
+          email: 'tech.access@4ds.local',
+          phone: '+27831110902',
+          jobTitle: 'Access Control',
+          isLead: false,
+          isMe: false,
+          openJobs: 0,
+          statusLabel: 'Available',
+        },
+      ],
+    }) as T;
+  }
+  if (clean === '/store/tech/inventory' && m === 'GET') {
+    return ok(
+      getDemoProducts().slice(0, 12).map((p) => ({
+        id: p.id,
+        sku: p.sku,
+        name: p.name,
+        description: p.description,
+        category: p.category,
+        stock: p.stock,
+        imageEmoji: p.imageEmoji,
+        lowStock: p.stock < 8,
+        priceFormatted: p.priceFormatted,
+      })),
+    ) as T;
+  }
+  if (clean === '/store/tech/stock-requests' && m === 'GET') {
+    return ok([]) as T;
+  }
+  if (clean === '/store/tech/properties' && m === 'GET') {
+    return ok([
+      {
+        id: 'demo-prop-berea',
+        name: 'Berea residence',
+        address: '42 Musgrave Rd, Berea, Durban',
+        camerasLinked: true,
+        cameraCount: 4,
+        clientName: 'Nomsa Client',
+      },
+      {
+        id: 'demo-prop-westville',
+        name: 'Westville home',
+        address: '18 Jan Hofmeyr Rd, Westville',
+        camerasLinked: false,
+        cameraCount: 0,
+        clientName: 'James Demo',
+      },
+    ]) as T;
   }
   if (clean.startsWith('/store/tech/') && (m === 'GET' || m === 'POST' || m === 'PATCH')) {
     if (m === 'GET') return ok([]) as T;
@@ -3513,6 +5524,81 @@ export async function handleDemoRequest<T>({
     return ok({
       user: session.user,
       tokens: { accessToken: session.accessToken, refreshToken: 'demo', expiresIn: 86400 },
+    }) as T;
+  }
+
+  if (clean.startsWith('/incidents/') && m === 'GET') {
+    const id = clean.split('/')[2];
+    const suffix = clean.split('/').slice(3).join('/');
+    if (suffix === 'timeline') {
+      const created = Date.now() - 8 * 60_000;
+      return ok([
+        {
+          id: `${id}-ev-created`,
+          kind: 'event',
+          type: 'incident.created',
+          source: 'portal',
+          createdAt: new Date(created).toISOString(),
+        },
+        {
+          id: `${id}-ev-dispatch`,
+          kind: 'event',
+          type: 'dispatch.created',
+          source: 'control-room',
+          createdAt: new Date(created + 45_000).toISOString(),
+        },
+        {
+          id: `${id}-ev-accept`,
+          kind: 'event',
+          type: 'dispatch.accepted',
+          source: 'officer',
+          createdAt: new Date(created + 90_000).toISOString(),
+        },
+        {
+          id: `${id}-ev-enroute`,
+          kind: 'event',
+          type: 'dispatch.en_route',
+          source: 'officer',
+          createdAt: new Date(created + 2 * 60_000).toISOString(),
+        },
+      ]) as T;
+    }
+    if (suffix === 'resources') {
+      const officer = demoIncidentAssignments[id] ?? 'Sipho Ndlovu';
+      return ok([
+        {
+          id: `${id}-res-1`,
+          callSign: officer.split(' ')[0] ? `Unit · ${officer}` : 'O-24',
+          kind: 'officer',
+          status: 'EN_ROUTE',
+          etaSeconds: 180,
+          lat: DURBAN.lat,
+          lng: DURBAN.lng,
+          incidentId: id,
+        },
+      ]) as T;
+    }
+    if (suffix === 'chat') {
+      return ok({ conversationId: 'demo-inc-chat', incidentId: id, messages: [] }) as T;
+    }
+    return ok({
+      id,
+      publicRef: 'NX-0001',
+      type: 'PANIC',
+      status: 'DISPATCHED',
+      timeline: [],
+      resources: [],
+    }) as T;
+  }
+  if (clean.startsWith('/incidents/') && clean.endsWith('/agencies') && m === 'POST') {
+    return ok({ ok: true, agency: (payload as { agency?: string }).agency ?? 'SECURITY' }) as T;
+  }
+  if (clean.startsWith('/incidents/') && clean.endsWith('/chat') && m === 'POST') {
+    return ok({
+      id: `demo-msg-${Date.now()}`,
+      content: String((payload as { content?: string }).content ?? ''),
+      createdAt: new Date().toISOString(),
+      sender: { id: 'demo', firstName: 'You', lastName: '', role: 'DISPATCHER' },
     }) as T;
   }
 

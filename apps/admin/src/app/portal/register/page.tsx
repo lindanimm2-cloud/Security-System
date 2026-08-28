@@ -6,12 +6,11 @@ import { FormEvent, Suspense, useEffect, useMemo, useState } from 'react';
 import { BrandMark } from '@/components/BrandMark';
 import { ButtonSpinner } from '@/components/ButtonSpinner';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
-import { ThemeToggle } from '@/components/ThemeToggle';
+import { LoginPageChrome } from '@/components/LoginPageChrome';
+import { UiSelect } from '@/components/ui/UiSelect';
 import { SketchIcon } from '@/components/icons/SketchIcon';
-import {
-  completeClientRegistration,
-  fetchClientInvite,
-} from '@/lib/auth';
+import { completeClientRegistration, fetchClientInvite } from '@/lib/auth';
+import { setActionKind } from '@/lib/action-status';
 import { friendlyErrorMessage } from '@/lib/friendly-error';
 
 const STEPS = [
@@ -23,6 +22,21 @@ const STEPS = [
 ] as const;
 
 const BLOOD_TYPES = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-', 'Unknown'] as const;
+const RELATIONSHIP_OPTIONS = [
+  'Spouse',
+  'Partner',
+  'Parent',
+  'Child',
+  'Sibling',
+  'Grandparent',
+  'Grandchild',
+  'Aunt / Uncle',
+  'Cousin',
+  'Guardian',
+  'Caregiver',
+  'Neighbor',
+  'Friend',
+] as const;
 
 type FormState = {
   tenantSlug: string;
@@ -59,6 +73,13 @@ const INITIAL: FormState = {
   emergencyNotes: '',
   acceptTerms: false,
 };
+
+function relationshipSelectValue(value: string) {
+  if (!value.trim()) return '';
+  return RELATIONSHIP_OPTIONS.includes(value as (typeof RELATIONSHIP_OPTIONS)[number])
+    ? value
+    : 'Other';
+}
 
 function RegisterWizard() {
   const router = useRouter();
@@ -211,6 +232,7 @@ function RegisterWizard() {
         acceptTerms: true,
       });
 
+      setActionKind('sign-in');
       router.push('/portal');
       router.refresh();
     } catch (err) {
@@ -224,8 +246,13 @@ function RegisterWizard() {
       <LoadingSpinner
         brand
         fullScreen
+        action="sign-in"
         label="Creating your account…"
-        hint="Signing you into the client portal…"
+        hints={[
+          'Signing you into the client portal…',
+          'System updates underway…',
+          'Setting up protection access.',
+        ]}
       />
     );
   }
@@ -235,8 +262,13 @@ function RegisterWizard() {
       <LoadingSpinner
         brand
         fullScreen
-        label="Checking invite…"
-        hint="Validating your registration code…"
+        action="page"
+        label="Checking your invite…"
+        hints={[
+          'Validating your registration code.',
+          'System updates underway…',
+          'Preparing the account wizard.',
+        ]}
       />
     );
   }
@@ -244,9 +276,7 @@ function RegisterWizard() {
   if (!inviteToken) {
     return (
       <div className="login-page login-page--v2">
-        <div className="login-theme-toggle">
-          <ThemeToggle />
-        </div>
+        <LoginPageChrome />
         <div className="login-page__inner">
           <div className="login-page__logo">
             <BrandMark variant="portal" href={false} showProduct={false} />
@@ -311,9 +341,7 @@ function RegisterWizard() {
   if (inviteError) {
     return (
       <div className="login-page login-page--v2">
-        <div className="login-theme-toggle">
-          <ThemeToggle />
-        </div>
+        <LoginPageChrome />
         <div className="login-page__inner">
           <div className="login-page__logo">
             <BrandMark variant="portal" href={false} showProduct={false} />
@@ -339,9 +367,7 @@ function RegisterWizard() {
 
   return (
     <div className="login-page login-page--v2 register-page">
-      <div className="login-theme-toggle">
-        <ThemeToggle />
-      </div>
+      <LoginPageChrome />
 
       <div className="login-page__inner register-page__inner">
         <div className="login-page__logo">
@@ -527,14 +553,35 @@ function RegisterWizard() {
                 <label className="login-field">
                   <span>Relationship</span>
                   <span className="login-input-wrap">
-                    <input
-                      value={form.emergencyRelationship}
-                      onChange={(e) => patch({ emergencyRelationship: e.target.value })}
-                      placeholder="Spouse, parent, friend…"
-                      required
+                    <UiSelect
+                      value={relationshipSelectValue(form.emergencyRelationship)}
+                      onChange={(value) =>
+                        patch({ emergencyRelationship: value === 'Other' ? '' : value })
+                      }
+                      options={[
+                        { value: '', label: 'Select relationship' },
+                        ...RELATIONSHIP_OPTIONS.map((option) => ({ value: option, label: option })),
+                        { value: 'Other', label: 'Other' },
+                      ]}
+                      ariaLabel="Relationship"
+                      compact={false}
+                      className="form-field-select"
                     />
                   </span>
                 </label>
+                {relationshipSelectValue(form.emergencyRelationship) === 'Other' && (
+                  <label className="login-field">
+                    <span>Other relationship</span>
+                    <span className="login-input-wrap">
+                      <input
+                        value={form.emergencyRelationship}
+                        onChange={(e) => patch({ emergencyRelationship: e.target.value })}
+                        placeholder="e.g. Fiance, godparent, family friend"
+                        required
+                      />
+                    </span>
+                  </label>
+                )}
               </>
             )}
 
@@ -695,8 +742,12 @@ export default function PortalRegisterPage() {
         <LoadingSpinner
           brand
           fullScreen
+          action="page"
           label="Loading registration…"
-          hint="Preparing your invite wizard…"
+          hints={[
+            'Preparing your invite wizard…',
+            'System updates underway…',
+          ]}
         />
       }
     >

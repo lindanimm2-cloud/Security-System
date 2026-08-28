@@ -3,6 +3,8 @@ import { ThemeProvider } from '@/components/ThemeProvider';
 import { CallShell } from '@/components/calls/CallShell';
 import { TabSessionBoot } from '@/components/TabSessionBoot';
 import './globals.css';
+import './control-room-polish.css';
+import './psim-hub.css';
 
 export const metadata: Metadata = {
   title: {
@@ -22,8 +24,18 @@ const themeScript = `
     if (pref === 'light') return 'light';
     if (pref === 'dark') return 'dark';
     if (pref === 'schedule') {
-      var h = new Date().getHours();
-      return (h >= 18 || h < 6) ? 'dark' : 'light';
+      var lightKey = '4ds-theme-schedule-light';
+      var darkKey = '4ds-theme-schedule-dark';
+      var lightFrom = localStorage.getItem(lightKey) || '06:00';
+      var darkFrom = localStorage.getItem(darkKey) || '18:00';
+      var now = new Date();
+      var nowMins = now.getHours() * 60 + now.getMinutes();
+      var darkStart = parseInt(darkFrom.split(':')[0], 10) * 60;
+      var lightStart = parseInt(lightFrom.split(':')[0], 10) * 60;
+      if (darkStart > lightStart) {
+        return (nowMins >= darkStart || nowMins < lightStart) ? 'dark' : 'light';
+      }
+      return (nowMins >= darkStart && nowMins < lightStart) ? 'dark' : 'light';
     }
     try {
       return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';

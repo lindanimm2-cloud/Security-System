@@ -6,6 +6,9 @@ export const THEME_STORAGE_KEY = '4ds-theme';
 export const THEME_PREFERENCE_KEY = '4ds-theme-preference';
 /** Set when the user explicitly chooses a theme (toggle or settings). */
 export const THEME_USER_SET_KEY = '4ds-theme-user-set';
+export const THEME_SCHEDULE_LIGHT_KEY = '4ds-theme-schedule-light';
+export const THEME_SCHEDULE_DARK_KEY = '4ds-theme-schedule-dark';
+export const THEME_SCHEDULE_CHANGED_EVENT = '4ds-theme-schedule-changed';
 
 export const THEME_PREFERENCE_LABELS: Record<ThemePreference, string> = {
   light: 'Light',
@@ -21,13 +24,44 @@ export const THEME_PREFERENCE_HINTS: Record<ThemePreference, string> = {
   schedule: 'Dark from 6:00 PM to 6:00 AM, light during the day.',
 };
 
-const SCHEDULE_DARK_START_HOUR = 18;
-const SCHEDULE_DARK_END_HOUR = 6;
+const DEFAULT_SCHEDULE_LIGHT = '06:00';
+const DEFAULT_SCHEDULE_DARK = '18:00';
 const DEFAULT_PREFERENCE: ThemePreference = 'dark';
 
+function parseScheduleHour(time: string): number {
+  const [h] = time.split(':').map((part) => parseInt(part, 10));
+  return Number.isFinite(h) ? h : 0;
+}
+
+export function getScheduleHours(): { lightFrom: string; darkFrom: string } {
+  if (typeof window === 'undefined') {
+    return { lightFrom: DEFAULT_SCHEDULE_LIGHT, darkFrom: DEFAULT_SCHEDULE_DARK };
+  }
+  return {
+    lightFrom: localStorage.getItem(THEME_SCHEDULE_LIGHT_KEY) ?? DEFAULT_SCHEDULE_LIGHT,
+    darkFrom: localStorage.getItem(THEME_SCHEDULE_DARK_KEY) ?? DEFAULT_SCHEDULE_DARK,
+  };
+}
+
+export function setScheduleHours(lightFrom: string, darkFrom: string) {
+  if (typeof window === 'undefined') return;
+  localStorage.setItem(THEME_SCHEDULE_LIGHT_KEY, lightFrom);
+  localStorage.setItem(THEME_SCHEDULE_DARK_KEY, darkFrom);
+  window.dispatchEvent(new CustomEvent(THEME_SCHEDULE_CHANGED_EVENT));
+}
+
 export function isScheduleDarkHour(date = new Date()): boolean {
+  const { lightFrom, darkFrom } = getScheduleHours();
   const hour = date.getHours();
-  return hour >= SCHEDULE_DARK_START_HOUR || hour < SCHEDULE_DARK_END_HOUR;
+  const minute = date.getMinutes();
+  const nowMins = hour * 60 + minute;
+  const darkStart = parseScheduleHour(darkFrom) * 60;
+  const lightStart = parseScheduleHour(lightFrom) * 60;
+
+  if (darkStart > lightStart) {
+    return nowMins >= darkStart || nowMins < lightStart;
+  }
+  return nowMins >= darkStart && nowMins < lightStart;
 }
 
 export function resolveTheme(preference: ThemePreference, date = new Date()): Theme {

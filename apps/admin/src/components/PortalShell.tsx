@@ -15,9 +15,14 @@ import { PortalProtectionBadge } from './portal/PortalProtectionBadge';
 import { BrandMark } from './BrandMark';
 import { ThemeToggle } from './ThemeToggle';
 import { MobileBottomNav } from './nav/MobileBottomNav';
-import { clientApi, type ApiResponse } from '@/lib/api-client';
+import { clientApi } from '@/lib/api-client';
 import { useSidebarCollapsed } from '@/hooks/useSidebarCollapsed';
-import { SidebarCollapseButton, SignOutIcon } from '@/components/nav/SidebarCollapseButton';
+import { useActionHandoff } from '@/hooks/useActionHandoff';
+import { getOrCreateLocalDeviceId } from '@/lib/device-security';
+import { navHrefIsActive } from '@/lib/nav-active';
+import { SidebarCollapseButton, SidebarWebsiteLink, SignOutIcon } from '@/components/nav/SidebarCollapseButton';
+import { FloatingSupportDock } from './FloatingSupportDock';
+import { ShellRouteActions } from './nav/ShellRouteActions';
 
 export function PortalShell({
   session,
@@ -29,9 +34,15 @@ export function PortalShell({
   const router = useRouter();
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
-  const [unread, setUnread] = useState(0);
   const { collapsed, toggle } = useSidebarCollapsed();
+  const handoff = useActionHandoff();
   const { access, loading: accessLoading, tierCode } = useSubscriptionAccess();
+  const hideQuickActions = /^\/portal\/(?:chat|messages|communications|family\/chat|contacts)(?:\/|$)/.test(
+    pathname,
+  );
+  const showSilentFab =
+    pathname === '/portal' ||
+    /^\/portal\/(?:protect|emergency|security)(?:\/|$)/.test(pathname);
   const navSections = useMemo(() => {
     const sections = filterPortalNav(access, accessLoading);
     if (tierCode !== 'PREMIUM') return sections;
@@ -48,34 +59,9 @@ export function PortalShell({
         label: item.mobileLabel,
         icon: item.icon,
         exact: item.exact,
-        badge: item.href === '/portal' && unread > 0 ? unread : undefined,
       })),
-    [access, accessLoading, unread],
+    [access, accessLoading],
   );
-
-  useEffect(() => {
-    let cancelled = false;
-    async function poll() {
-      try {
-        const res = await clientApi.get<
-          ApiResponse<{ unreadCount?: number; stats?: { unreadNotifications?: number } }>
-        >('/client/notifications');
-        if (cancelled) return;
-        setUnread(res.data?.unreadCount ?? 0);
-      } catch {
-        /* keep last */
-      }
-    }
-    void poll();
-    const onChanged = () => void poll();
-    window.addEventListener('4ds-notifications-changed', onChanged);
-    const id = window.setInterval(() => void poll(), 30000);
-    return () => {
-      cancelled = true;
-      window.clearInterval(id);
-      window.removeEventListener('4ds-notifications-changed', onChanged);
-    };
-  }, []);
 
   useEffect(() => {
     if (accessLoading || !access) return;
@@ -88,6 +74,11 @@ export function PortalShell({
   useEffect(() => {
     setMenuOpen(false);
   }, [pathname]);
+
+  useEffect(() => {
+    const publicId = getOrCreateLocalDeviceId();
+    void clientApi.post('/client/security/devices/heartbeat', { publicId }).catch(() => undefined);
+  }, []);
 
   useEffect(() => {
     document.body.style.overflow = menuOpen ? 'hidden' : '';
@@ -104,16 +95,24 @@ export function PortalShell({
   }, []);
 
   function logout() {
-    clearSession('client');
-    router.push('/portal/login');
+    handoff.begin('sign-out', () => {
+      clearSession('client');
+      router.push('/portal/login');
+    });
   }
 
+  const navHrefs = useMemo(
+    () => navSections.flatMap((section) => section.items.map((item) => item.href)),
+    [navSections],
+  );
+
   function isActive(href: string, exact?: boolean) {
-    if (exact) return pathname === href;
-    return pathname === href || pathname.startsWith(`${href}/`);
+    return navHrefIsActive(pathname, href, exact, navHrefs);
   }
 
   return (
+    <>
+      {handoff.overlay}
     <div className="shell shell--portal shell--with-bottom-nav">
       <header className="mobile-shell-header mobile-shell-header--portal">
         <button
@@ -126,11 +125,13 @@ export function PortalShell({
           <span className={`menu-toggle-icon ${menuOpen ? 'menu-toggle-icon--open' : ''}`} />
         </button>
         <BrandMark variant="portal" compact />
+        <h1 className="mobile-shell-header__title">4DS Protect</h1>
         <div className="mobile-topbar-actions">
+          <ShellRouteActions homeHref="/portal" compact />
           <PortalProtectionBadge compact />
-          <PortalNotificationCenter />
-          <ThemeToggle className="theme-toggle--compact" />
           <PortalNavClock compact />
+          <ThemeToggle className="theme-toggle--compact" />
+          <PortalNotificationCenter />
         </div>
       </header>
 
@@ -161,7 +162,7 @@ export function PortalShell({
                 <Link
                   key={item.href}
                   href={item.href}
-                  title={item.label}
+                  data-tip={item.label}
                   aria-label={item.label}
                   className={`portal-sidebar-link ${isActive(item.href, item.exact) ? 'portal-sidebar-link--active' : ''}`}
                 >
@@ -178,6 +179,7 @@ export function PortalShell({
           <div className="portal-sidebar-user sidebar-user-copy">
             {session.user.firstName} {session.user.lastName}
           </div>
+          <SidebarWebsiteLink />
           <button
             type="button"
             className="btn-ghost btn-ghost--full sidebar-signout"
@@ -204,10 +206,11 @@ export function PortalShell({
             </div>
           </div>
           <div className="topbar-actions">
+            <ShellRouteActions homeHref="/portal" />
             <PortalNavClock />
-            <PortalNotificationCenter />
             <ThemeToggle className="theme-toggle--compact" />
             <PortalProtectionBadge />
+            <PortalNotificationCenter />
           </div>
         </header>
         <main className="portal-main portal-main--with-sidebar portal-main--with-call-bar">
@@ -216,8 +219,14 @@ export function PortalShell({
         </main>
       </div>
 
-      <MiniCallSafetyBar />
+      {!hideQuickActions && (
+        <div className="portal-floating-actions" aria-label="Portal quick actions">
+          <FloatingSupportDock chatHref="/portal/chat" className="support-fab-dock--inline" />
+          {!showSilentFab ? null : <MiniCallSafetyBar variant="docked" />}
+        </div>
+      )}
       <MobileBottomNav items={mobileNavItems} ariaLabel="Client Portal" />
     </div>
+    </>
   );
 }

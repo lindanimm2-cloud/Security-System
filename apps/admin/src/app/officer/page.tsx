@@ -15,6 +15,7 @@ import {
   primaryTaskAction,
 } from '@/lib/officer-task-theme';
 import { officerApi, type ApiResponse } from '@/lib/api-client';
+import { shouldBackgroundPoll } from '@/lib/demo/is-demo-mode';
 import { OpsMyShiftHeader } from '@/components/ops/OpsMyShiftHeader';
 import {
   OpsCompactStats,
@@ -103,6 +104,7 @@ function DashboardContent() {
   const undo = useUndoToast();
 
   useEffect(() => {
+    if (!shouldBackgroundPoll()) return;
     const id = window.setInterval(() => void reload({ silent: true }), 20000);
     return () => window.clearInterval(id);
   }, [reload]);
@@ -245,7 +247,14 @@ function DashboardContent() {
     },
   ];
 
-  const checkIns = ['Safe', 'Arrived', 'Leaving', 'Backup', 'Medical', 'Supervisor'] as const;
+  const checkIns = [
+    { kind: 'Safe', label: "I'm safe" },
+    { kind: 'Arrived', label: 'On site' },
+    { kind: 'Leaving', label: 'Leaving scene' },
+    { kind: 'Backup', label: 'Request backup' },
+    { kind: 'Medical', label: 'Need medic' },
+    { kind: 'Supervisor', label: 'Call supervisor' },
+  ] as const;
 
   return (
     <div className="dash-ops dash-ops--officer">
@@ -319,14 +328,14 @@ function DashboardContent() {
       </div>
 
       <div className="check-grid" aria-label="Quick check-ins">
-        {checkIns.map((kind) => (
+        {checkIns.map((item) => (
           <button
-            key={kind}
+            key={item.kind}
             type="button"
             className="check-row"
-            onClick={() => void checkIn(kind)}
+            onClick={() => void checkIn(item.kind)}
           >
-            <strong>{kind}</strong>
+            <strong>{item.label}</strong>
           </button>
         ))}
       </div>

@@ -12,6 +12,7 @@ export type QuickWorkAction = {
   primary?: boolean;
   disabled?: boolean;
   loading?: boolean;
+  className?: string;
 };
 
 function ActionControl({
@@ -105,7 +106,7 @@ export function OpsQuickWork({
           <ActionControl
             key={a.id}
             action={a}
-            className={`ops-quick-work__btn ${a.primary ? 'ops-quick-work__btn--primary' : ''}`}
+            className={`ops-quick-work__btn ${a.primary ? 'ops-quick-work__btn--primary' : ''} ${a.className ?? ''}`.trim()}
           />
         ))}
         {secondary.length > 0 ? (
@@ -115,7 +116,7 @@ export function OpsQuickWork({
                 <ActionControl
                   key={a.id}
                   action={a}
-                  className={`ops-quick-work__btn ${a.primary ? 'ops-quick-work__btn--primary' : ''}`}
+                  className={`ops-quick-work__btn ${a.primary ? 'ops-quick-work__btn--primary' : ''} ${a.className ?? ''}`.trim()}
                 />
               ))}
             </div>

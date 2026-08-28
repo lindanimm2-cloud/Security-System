@@ -1,7 +1,7 @@
 export type ErrorTone = 'load' | 'save' | 'action' | 'login' | 'call' | 'upload';
 
 const DEFAULTS: Record<ErrorTone, string> = {
-  load: "Couldn't load. Try again.",
+  load: "Unable to load this page. Check your connection and try again.",
   save: "Couldn't save. Try again.",
   action: 'Try again.',
   login: 'Try again or contact support.',
@@ -26,14 +26,19 @@ function isTechnicalMessage(message: string): boolean {
 }
 
 export const SIGN_IN_REQUIRED_MESSAGE = 'Please sign in again.';
+export const REPORT_NEEDS_SIGN_IN_MESSAGE =
+  'Sign in so we can attach your report to your account.';
 
 export function isSignInRequiredMessage(message: string | null | undefined): boolean {
   if (!message) return false;
   const normalized = message.trim().toLowerCase();
   return (
     normalized === SIGN_IN_REQUIRED_MESSAGE.toLowerCase() ||
+    normalized === REPORT_NEEDS_SIGN_IN_MESSAGE.toLowerCase() ||
     normalized === 'session expired' ||
-    normalized === 'not authenticated'
+    normalized === 'not authenticated' ||
+    normalized.includes('attach your report to your account') ||
+    normalized.includes('please sign in again')
   );
 }
 
@@ -45,6 +50,11 @@ export function friendlyErrorMessage(err: unknown, tone: ErrorTone = 'action'): 
 
   if (message === 'Session expired' || message === 'Not authenticated') {
     return SIGN_IN_REQUIRED_MESSAGE;
+  }
+
+  // Never surface developer-report prompts on the login form — they look like a sign-in block.
+  if (tone === 'login' && isSignInRequiredMessage(message)) {
+    return DEFAULTS.login;
   }
 
   if (isTechnicalMessage(message)) {

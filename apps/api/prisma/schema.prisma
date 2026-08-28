@@ -22,6 +22,9 @@ enum UserRole {
   DEVELOPER
   MEDICAL_DISPATCHER
   MEDICAL_CREW
+  FIRE_DISPATCHER
+  FIRE_CREW
+  FIRE_SUPERVISOR
 }
 
 enum ProductCategory {
@@ -155,6 +158,82 @@ enum NotificationType {
   MESSAGE
   BILLING
   ERROR_REPORT
+  DEVICE_SECURITY
+}
+
+enum TrustedDeviceStatus {
+  TRUSTED
+  TEMPORARY
+  PENDING_VERIFICATION
+  LOST
+  STOLEN
+  REVOKED
+  BLOCKED
+}
+
+enum EmergencySessionStatus {
+  ACTIVE
+  EXPIRED
+  REVOKED
+}
+
+enum EmergencySessionPurpose {
+  LOST_DEVICE
+  BORROWED_DEVICE
+  WEB_RECOVERY
+  TEST
+}
+
+enum PanicSource {
+  APP_PANIC
+  NATIVE_SOS
+  WEB_EMERGENCY_ACCESS
+  DURESS
+  CONTROL_ROOM
+  TEST
+}
+
+enum DeviceLostReason {
+  LOST
+  STOLEN
+  DAMAGED
+  REPLACED
+  UNKNOWN
+}
+
+enum PanicWorkflowStatus {
+  NEW
+  ACKNOWLEDGED
+  CONTACTING_CLIENT
+  DISPATCHED
+  RESPONDING
+  ON_SCENE
+  RESOLVED
+  FALSE_ALARM
+  CANCELLED
+  ESCALATED
+  UNABLE_TO_CONTACT
+}
+
+enum NativeSosCapability {
+  SUPPORTED
+  PARTIALLY_SUPPORTED
+  NOT_AVAILABLE
+  PERMISSION_REQUIRED
+}
+
+enum LocationTrackingMode {
+  OFF
+  EMERGENCY_ONLY
+  CONTINUOUS
+}
+
+enum SecurityConsentKind {
+  EMERGENCY_SOS
+  EMERGENCY_LOCATION
+  MEDICAL_PROFILE
+  DEVICE_REGISTRATION
+  PRIVACY_POLICY
 }
 
 enum ConversationType {
@@ -164,6 +243,29 @@ enum ConversationType {
   FAMILY
   TECH_TEAM
   DEV_SUPPORT
+  INCIDENT
+}
+
+enum IncidentClassification {
+  SECURITY
+  MEDICAL
+  FIRE
+  ACCIDENT
+  THEFT
+  OTHER
+}
+
+enum ResponseAgency {
+  SECURITY
+  MEDICAL
+  FIRE
+}
+
+enum NotificationPriority {
+  P0
+  P1
+  P2
+  P3
 }
 
 enum ErrorReportStatus {
@@ -359,6 +461,7 @@ model Tenant {
   officers           Officer[]
   incidents          Incident[]
   incidentNotes      IncidentNote[]
+  incidentEvents     IncidentEvent[]
   emergencyContacts  EmergencyContact[]
   families           Family[]
   notifications      Notification[]
@@ -384,6 +487,13 @@ model Tenant {
   discountCodes      DiscountCode[]
   stockRequests      StockRequest[]
   errorReports       ErrorReport[]
+  trustedDevices     TrustedDevice[]
+  emergencySessions  EmergencySession[]
+  panicEvents        PanicEvent[]
+  securityAudits     SecurityAuditEvent[]
+  securityLockdowns  SecurityLockdown[]
+  securityConsents   SecurityConsent[]
+  deviceSessions     DeviceSession[]
 
   @@map("tenants")
 }
@@ -422,6 +532,7 @@ model User {
   familyMemberships FamilyMember[]
   ownedFamilies     Family[]           @relation("FamilyOwner")
   notifications     Notification[]
+  incidentEvents    IncidentEvent[]
   messages          Message[]
   medicalProfile    MedicalProfile?
   vehicles          Vehicle[]
@@ -437,7 +548,15 @@ model User {
   loyalty           ClientLoyalty?
   stockRequests     StockRequest[] @relation("StockRequestRequester")
   stockReviews      StockRequest[] @relation("StockRequestReviewer")
-  errorReports      ErrorReport[]
+  errorReports       ErrorReport[]
+  trustedDevices     TrustedDevice[]
+  emergencySessions  EmergencySession[]
+  panicEvents        PanicEvent[]
+  securityAudits     SecurityAuditEvent[]  @relation("SecurityAuditActor")
+  securityLockdowns  SecurityLockdown[]
+  securityConsents   SecurityConsent[]
+  securitySettings   ClientSecuritySettings?
+  deviceSessions     DeviceSession[]
 
   @@unique([tenantId, email])
   @@index([tenantId, status])
@@ -490,6 +609,7 @@ model CompanyVehicle {
 
   tenant Tenant               @relation(fields: [tenantId], references: [id])
   crew   CompanyVehicleCrew[]
+  dispatches Dispatch[]
 
   @@unique([tenantId, registration])
   @@unique([tenantId, callSign])
@@ -520,8 +640,10 @@ model EmergencyContact {
   phone         String
   relationship  String?
   priority      Int      @default(1)
-  notifyOnPanic Boolean  @default(true) @map("notify_on_panic")
-  createdAt     DateTime @default(now()) @map("created_at")
+  notifyOnPanic       Boolean   @default(true) @map("notify_on_panic")
+  permissionToContact Boolean   @default(true) @map("permission_to_contact")
+  verifiedAt          DateTime? @map("verified_at")
+  createdAt           DateTime  @default(now()) @map("created_at")
   updatedAt     DateTime @updatedAt @map("updated_at")
 
   tenant Tenant @relation(fields: [tenantId], references: [id])
@@ -561,35 +683,56 @@ model FamilyMember {
 }
 
 model Incident {
-  id               String           @id @default(uuid()) @db.Uuid
-  tenantId         String           @map("tenant_id") @db.Uuid
-  userId           String           @map("user_id") @db.Uuid
+  id               String                 @id @default(uuid()) @db.Uuid
+  tenantId         String                 @map("tenant_id") @db.Uuid
+  userId           String                 @map("user_id") @db.Uuid
+  publicRef        String                 @map("public_ref")
   type             IncidentType
-  status           IncidentStatus   @default(ACTIVE)
-  priority         IncidentPriority @default(HIGH)
+  classification   IncidentClassification @default(SECURITY)
+  involvedAgencies String[]               @default([]) @map("involved_agencies")
+  status           IncidentStatus         @default(ACTIVE)
+  priority         IncidentPriority       @default(HIGH)
   title            String?
   description      String?
-  lat              Decimal          @db.Decimal(10, 8)
-  lng              Decimal          @db.Decimal(11, 8)
+  lat              Decimal                @db.Decimal(10, 8)
+  lng              Decimal                @db.Decimal(11, 8)
   address          String?
-  vehicleMake      String?          @map("vehicle_make")
-  vehicleModel     String?          @map("vehicle_model")
-  vehicleColor     String?          @map("vehicle_color")
-  vehiclePlate     String?          @map("vehicle_plate")
-  isSilent         Boolean          @default(false) @map("is_silent")
-  resolvedAt       DateTime?        @map("resolved_at")
-  createdAt        DateTime         @default(now()) @map("created_at")
-  updatedAt        DateTime         @updatedAt @map("updated_at")
+  propertyId       String?                @map("property_id") @db.Uuid
+  vehicleId        String?                @map("vehicle_id") @db.Uuid
+  vehicleMake      String?                @map("vehicle_make")
+  vehicleModel     String?                @map("vehicle_model")
+  vehicleColor     String?                @map("vehicle_color")
+  vehiclePlate     String?                @map("vehicle_plate")
+  isSilent         Boolean                @default(false) @map("is_silent")
+  contextSnapshot  Json                   @default("{}") @map("context_snapshot")
+  conversationId   String?                @map("conversation_id") @db.Uuid
+  ackedAt          DateTime?              @map("acked_at")
+  dispatchedAt     DateTime?              @map("dispatched_at")
+  onSceneAt        DateTime?              @map("on_scene_at")
+  resolvedAt       DateTime?              @map("resolved_at")
+  createdAt        DateTime               @default(now()) @map("created_at")
+  updatedAt        DateTime               @updatedAt @map("updated_at")
 
-  tenant     Tenant      @relation(fields: [tenantId], references: [id])
-  user       User        @relation(fields: [userId], references: [id])
-  dispatches Dispatch[]
-  media      IncidentMedia[]
-  notes      IncidentNote[]
-  documents  Document[]
+  tenant       Tenant          @relation(fields: [tenantId], references: [id])
+  user         User            @relation(fields: [userId], references: [id])
+  property     Property?       @relation(fields: [propertyId], references: [id], onDelete: SetNull)
+  vehicle      Vehicle?        @relation(fields: [vehicleId], references: [id], onDelete: SetNull)
+  conversation Conversation?   @relation(fields: [conversationId], references: [id], onDelete: SetNull)
+  dispatches   Dispatch[]
+  media        IncidentMedia[]
+  notes        IncidentNote[]
+  documents    Document[]
+  events       IncidentEvent[]
+  panicEvents  PanicEvent[]
+  notifications Notification[]
+  alarmEvents  AlarmEvent[]
+  calls        CallSession[]
 
+  @@unique([tenantId, publicRef])
   @@index([tenantId, status])
   @@index([userId])
+  @@index([propertyId])
+  @@index([vehicleId])
   @@map("incidents")
 }
 
@@ -664,8 +807,10 @@ model MedicalProfile {
   allergies          String?
   medications        String?
   chronicConditions  String?  @map("chronic_conditions")
-  emergencyNotes     String?  @map("emergency_notes")
-  createdAt          DateTime @default(now()) @map("created_at")
+  emergencyNotes       String?  @map("emergency_notes")
+  doctorContact        String?  @map("doctor_contact")
+  ambulancePreference  String?  @map("ambulance_preference")
+  createdAt            DateTime @default(now()) @map("created_at")
   updatedAt          DateTime @updatedAt @map("updated_at")
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -699,6 +844,7 @@ model Vehicle {
 
   tenant Tenant @relation(fields: [tenantId], references: [id])
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  incidents Incident[]
 
   @@index([userId])
   @@map("vehicles")
@@ -736,6 +882,7 @@ model Property {
   cameras     Camera[]
   sensors     Sensor[]
   alarmEvents AlarmEvent[]
+  incidents   Incident[]
 
   @@index([userId])
   @@index([tenantId])
@@ -816,13 +963,15 @@ model AlarmEvent {
   createdAt      DateTime         @default(now()) @map("created_at")
   updatedAt      DateTime         @updatedAt @map("updated_at")
 
-  tenant   Tenant   @relation(fields: [tenantId], references: [id])
-  property Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
-  camera   Camera?  @relation(fields: [cameraId], references: [id], onDelete: SetNull)
-  sensor   Sensor?  @relation(fields: [sensorId], references: [id], onDelete: SetNull)
+  tenant   Tenant    @relation(fields: [tenantId], references: [id])
+  property Property  @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  camera   Camera?   @relation(fields: [cameraId], references: [id], onDelete: SetNull)
+  sensor   Sensor?   @relation(fields: [sensorId], references: [id], onDelete: SetNull)
+  incident Incident? @relation(fields: [incidentId], references: [id], onDelete: SetNull)
 
   @@index([propertyId, triggeredAt])
   @@index([tenantId, status])
+  @@index([incidentId])
   @@map("alarm_events")
 }
 
@@ -906,35 +1055,46 @@ model IncidentMedia {
 }
 
 model Dispatch {
-  id         String         @id @default(uuid()) @db.Uuid
-  tenantId   String         @map("tenant_id") @db.Uuid
-  incidentId String         @map("incident_id") @db.Uuid
-  officerId  String         @map("officer_id") @db.Uuid
-  status     DispatchStatus @default(ASSIGNED)
-  createdAt  DateTime       @default(now()) @map("created_at")
-  updatedAt  DateTime       @updatedAt @map("updated_at")
+  id               String         @id @default(uuid()) @db.Uuid
+  tenantId         String         @map("tenant_id") @db.Uuid
+  incidentId       String         @map("incident_id") @db.Uuid
+  officerId        String?        @map("officer_id") @db.Uuid
+  companyVehicleId String?        @map("company_vehicle_id") @db.Uuid
+  agency           ResponseAgency @default(SECURITY)
+  etaSeconds       Int?           @map("eta_seconds")
+  status           DispatchStatus @default(ASSIGNED)
+  createdAt        DateTime       @default(now()) @map("created_at")
+  updatedAt        DateTime       @updatedAt @map("updated_at")
 
-  incident Incident @relation(fields: [incidentId], references: [id], onDelete: Cascade)
-  officer  Officer  @relation(fields: [officerId], references: [id])
+  incident       Incident        @relation(fields: [incidentId], references: [id], onDelete: Cascade)
+  officer        Officer?        @relation(fields: [officerId], references: [id])
+  companyVehicle CompanyVehicle? @relation(fields: [companyVehicleId], references: [id], onDelete: SetNull)
 
   @@index([incidentId])
+  @@index([officerId])
+  @@index([companyVehicleId])
   @@map("dispatches")
 }
 
 model Notification {
-  id        String           @id @default(uuid()) @db.Uuid
-  tenantId  String           @map("tenant_id") @db.Uuid
-  userId    String           @map("user_id") @db.Uuid
-  type      NotificationType
-  title     String
-  body      String
-  isRead    Boolean          @default(false) @map("is_read")
-  createdAt DateTime         @default(now()) @map("created_at")
+  id         String               @id @default(uuid()) @db.Uuid
+  tenantId   String               @map("tenant_id") @db.Uuid
+  userId     String               @map("user_id") @db.Uuid
+  incidentId String?              @map("incident_id") @db.Uuid
+  type       NotificationType
+  priority   NotificationPriority @default(P2)
+  title      String
+  body       String
+  deepLink   String?              @map("deep_link")
+  isRead     Boolean              @default(false) @map("is_read")
+  createdAt  DateTime             @default(now()) @map("created_at")
 
-  tenant Tenant @relation(fields: [tenantId], references: [id])
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tenant   Tenant    @relation(fields: [tenantId], references: [id])
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  incident Incident? @relation(fields: [incidentId], references: [id], onDelete: SetNull)
 
   @@index([userId, isRead])
+  @@index([incidentId])
   @@map("notifications")
 }
 
@@ -1018,6 +1178,7 @@ model Conversation {
   tenant   Tenant    @relation(fields: [tenantId], references: [id])
   team     Team?     @relation(fields: [teamId], references: [id], onDelete: SetNull)
   messages Message[]
+  incidents Incident[]
 
   @@index([tenantId, type])
   @@index([teamId])
@@ -1076,11 +1237,13 @@ model CallSession {
   tenant    Tenant     @relation(fields: [tenantId], references: [id])
   initiator User       @relation("CallInitiator", fields: [initiatorUserId], references: [id])
   target    User?      @relation("CallTarget", fields: [targetUserId], references: [id])
+  incident  Incident?  @relation(fields: [incidentId], references: [id], onDelete: SetNull)
   notes     CallNote[]
 
   @@index([tenantId, status])
   @@index([initiatorUserId])
   @@index([targetUserId])
+  @@index([incidentId])
   @@map("call_sessions")
 }
 
@@ -1099,18 +1262,49 @@ model CallNote {
   @@map("call_notes")
 }
 
+model IncidentEvent {
+  id          String   @id @default(uuid()) @db.Uuid
+  tenantId    String   @map("tenant_id") @db.Uuid
+  incidentId  String?  @map("incident_id") @db.Uuid
+  type        String
+  actorUserId String?  @map("actor_user_id") @db.Uuid
+  source      String
+  payload     Json     @default("{}")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  tenant   Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  incident Incident? @relation(fields: [incidentId], references: [id], onDelete: Cascade)
+  actor    User?     @relation(fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  @@index([incidentId, createdAt])
+  @@index([tenantId, createdAt])
+  @@index([type])
+  @@map("incident_events")
+}
+
+model RolePermission {
+  role           UserRole
+  permissionCode String   @map("permission_code")
+
+  @@id([role, permissionCode])
+  @@map("role_permissions")
+}
+
 model RefreshToken {
   id        String    @id @default(uuid()) @db.Uuid
   tokenHash String    @unique @map("token_hash")
   userId    String?   @map("user_id") @db.Uuid
   tenantId  String?   @map("tenant_id") @db.Uuid
+  deviceId  String?   @map("device_id") @db.Uuid
   expiresAt DateTime  @map("expires_at")
   revokedAt DateTime? @map("revoked_at")
   createdAt DateTime  @default(now()) @map("created_at")
 
-  user   User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
-  tenant Tenant? @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user   User?          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tenant Tenant?        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  device TrustedDevice? @relation(fields: [deviceId], references: [id], onDelete: SetNull)
 
+  @@index([deviceId])
   @@map("refresh_tokens")
 }
 
@@ -1302,3 +1496,252 @@ model InstallJob {
   @@index([technicianId, status])
   @@map("install_jobs")
 }
+
+model TrustedDevice {
+  id                   String              @id @default(uuid()) @db.Uuid
+  tenantId             String              @map("tenant_id") @db.Uuid
+  userId               String              @map("user_id") @db.Uuid
+  publicId             String              @unique @map("public_id")
+  name                 String
+  deviceType           String              @map("device_type")
+  osName               String?             @map("os_name")
+  osVersion            String?             @map("os_version")
+  appVersion           String?             @map("app_version")
+  userAgent            String?             @map("user_agent")
+  fingerprintHash      String?             @map("fingerprint_hash")
+  status               TrustedDeviceStatus @default(PENDING_VERIFICATION)
+  isPrimary            Boolean             @default(false) @map("is_primary")
+  isLocked             Boolean             @default(false) @map("is_locked")
+  lostReason           DeviceLostReason?   @map("lost_reason")
+  nativeSos            NativeSosCapability @default(NOT_AVAILABLE) @map("native_sos")
+  nativeSosNote        String?             @map("native_sos_note")
+  lastLat              Decimal?            @map("last_lat") @db.Decimal(10, 8)
+  lastLng              Decimal?            @map("last_lng") @db.Decimal(11, 8)
+  lastLocationAccuracy Float?              @map("last_location_accuracy")
+  lastActiveAt         DateTime?           @map("last_active_at")
+  lastAuthAt           DateTime?           @map("last_auth_at")
+  lastFailedAuthAt     DateTime?           @map("last_failed_auth_at")
+  registeredAt         DateTime            @default(now()) @map("registered_at")
+  revokedAt            DateTime?           @map("revoked_at")
+  lockedAt             DateTime?           @map("locked_at")
+  createdAt            DateTime            @default(now()) @map("created_at")
+  updatedAt            DateTime            @updatedAt @map("updated_at")
+
+  tenant             Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user               User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sessions           DeviceSession[]
+  emergencySessions  EmergencySession[]
+  panicEvents        PanicEvent[]
+  securityEvents     DeviceSecurityEvent[]
+  refreshTokens      RefreshToken[]
+
+  @@index([userId, status])
+  @@index([tenantId, status])
+  @@index([publicId])
+  @@map("trusted_devices")
+}
+
+model DeviceSession {
+  id               String    @id @default(uuid()) @db.Uuid
+  tenantId         String    @map("tenant_id") @db.Uuid
+  deviceId         String    @map("device_id") @db.Uuid
+  userId           String    @map("user_id") @db.Uuid
+  ipAddress        String?   @map("ip_address")
+  authMethod       String?   @map("auth_method")
+  isEmergency      Boolean   @default(false) @map("is_emergency")
+  lastSeenAt       DateTime  @default(now()) @map("last_seen_at")
+  expiresAt        DateTime? @map("expires_at")
+  revokedAt        DateTime? @map("revoked_at")
+  createdAt        DateTime  @default(now()) @map("created_at")
+
+  tenant Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  device TrustedDevice @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  user   User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([deviceId, revokedAt])
+  @@index([userId, revokedAt])
+  @@map("device_sessions")
+}
+
+model EmergencySession {
+  id             String                   @id @default(uuid()) @db.Uuid
+  tenantId       String                   @map("tenant_id") @db.Uuid
+  userId         String                   @map("user_id") @db.Uuid
+  deviceId       String?                  @map("device_id") @db.Uuid
+  tokenHash      String                   @unique @map("token_hash")
+  purpose        EmergencySessionPurpose
+  status         EmergencySessionStatus   @default(ACTIVE)
+  authMethod     String                   @map("auth_method")
+  ipAddress      String?                  @map("ip_address")
+  actionsJson    Json                     @default("[]") @map("actions_json")
+  expiresAt      DateTime                 @map("expires_at")
+  revokedAt      DateTime?                @map("revoked_at")
+  createdAt      DateTime                 @default(now()) @map("created_at")
+
+  tenant Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user   User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  device TrustedDevice? @relation(fields: [deviceId], references: [id], onDelete: SetNull)
+  panicEvents PanicEvent[]
+
+  @@index([userId, status])
+  @@index([tenantId, status, expiresAt])
+  @@map("emergency_sessions")
+}
+
+model PanicEvent {
+  id                    String              @id @default(uuid()) @db.Uuid
+  tenantId              String              @map("tenant_id") @db.Uuid
+  userId                String              @map("user_id") @db.Uuid
+  deviceId              String?             @map("device_id") @db.Uuid
+  sessionId             String?             @map("session_id") @db.Uuid
+  incidentId            String?             @map("incident_id") @db.Uuid
+  source                PanicSource
+  workflowStatus        PanicWorkflowStatus @default(NEW) @map("workflow_status")
+  transmissionStatus    String              @default("SENT") @map("transmission_status")
+  idempotencyKey        String?             @map("idempotency_key")
+  lat                   Decimal?            @db.Decimal(10, 8)
+  lng                   Decimal?            @db.Decimal(11, 8)
+  locationAccuracy      Float?              @map("location_accuracy")
+  locationSource        String?             @map("location_source")
+  batteryLevel          Int?                @map("battery_level")
+  networkStatus         String?             @map("network_status")
+  authenticated         Boolean             @default(true)
+  isTest                Boolean             @default(false) @map("is_test")
+  isSilent              Boolean             @default(false) @map("is_silent")
+  acknowledgedAt        DateTime?           @map("acknowledged_at")
+  acknowledgedByUserId  String?             @map("acknowledged_by_user_id") @db.Uuid
+  dispatcherName        String?             @map("dispatcher_name")
+  responseUnit          String?             @map("response_unit")
+  resolvedAt            DateTime?           @map("resolved_at")
+  cancellationReason    String?             @map("cancellation_reason")
+  cancelRequestedAt     DateTime?           @map("cancel_requested_at")
+  createdAt             DateTime            @default(now()) @map("created_at")
+  updatedAt             DateTime            @updatedAt @map("updated_at")
+
+  tenant    Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user      User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  device    TrustedDevice?      @relation(fields: [deviceId], references: [id], onDelete: SetNull)
+  session   EmergencySession?   @relation(fields: [sessionId], references: [id], onDelete: SetNull)
+  incident  Incident?           @relation(fields: [incidentId], references: [id], onDelete: SetNull)
+  history   PanicEventHistory[]
+
+  @@unique([tenantId, idempotencyKey])
+  @@index([userId, createdAt])
+  @@index([tenantId, workflowStatus, createdAt])
+  @@index([incidentId])
+  @@map("panic_events")
+}
+
+model PanicEventHistory {
+  id          String   @id @default(uuid()) @db.Uuid
+  panicEventId String  @map("panic_event_id") @db.Uuid
+  fromStatus  String?  @map("from_status")
+  toStatus    String   @map("to_status")
+  actorUserId String?  @map("actor_user_id") @db.Uuid
+  actorRole   String?  @map("actor_role")
+  note        String?
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  panicEvent PanicEvent @relation(fields: [panicEventId], references: [id], onDelete: Cascade)
+
+  @@index([panicEventId, createdAt])
+  @@map("panic_event_history")
+}
+
+model DeviceSecurityEvent {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  deviceId  String?  @map("device_id") @db.Uuid
+  type      String
+  payload   Json     @default("{}")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  device TrustedDevice? @relation(fields: [deviceId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, createdAt])
+  @@index([userId, createdAt])
+  @@index([type])
+  @@map("device_security_events")
+}
+
+model SecurityLockdown {
+  id          String    @id @default(uuid()) @db.Uuid
+  tenantId    String    @map("tenant_id") @db.Uuid
+  userId      String    @map("user_id") @db.Uuid
+  reason      String?
+  active      Boolean   @default(true)
+  activatedAt DateTime  @default(now()) @map("activated_at")
+  cancelledAt DateTime? @map("cancelled_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, active])
+  @@map("security_lockdowns")
+}
+
+model SecurityAuditEvent {
+  id            String   @id @default(uuid()) @db.Uuid
+  tenantId      String   @map("tenant_id") @db.Uuid
+  actorUserId   String?  @map("actor_user_id") @db.Uuid
+  actorRole     String?  @map("actor_role")
+  accountUserId String?  @map("account_user_id") @db.Uuid
+  deviceId      String?  @map("device_id") @db.Uuid
+  sessionId     String?  @map("session_id") @db.Uuid
+  action        String
+  result        String   @default("SUCCESS")
+  reason        String?
+  source        String?
+  target        String?
+  previousState Json?    @map("previous_state")
+  newState      Json?    @map("new_state")
+  ipAddress     String?  @map("ip_address")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  actor  User?  @relation("SecurityAuditActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, createdAt])
+  @@index([accountUserId, createdAt])
+  @@index([action])
+  @@map("security_audit_events")
+}
+
+model SecurityConsent {
+  id            String              @id @default(uuid()) @db.Uuid
+  tenantId      String              @map("tenant_id") @db.Uuid
+  userId        String              @map("user_id") @db.Uuid
+  kind          SecurityConsentKind
+  version       String
+  policyVersion String              @map("policy_version")
+  accepted      Boolean
+  ipAddress     String?             @map("ip_address")
+  deviceId      String?             @map("device_id") @db.Uuid
+  createdAt     DateTime            @default(now()) @map("created_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, kind, createdAt])
+  @@map("security_consents")
+}
+
+model ClientSecuritySettings {
+  userId                     String               @id @map("user_id") @db.Uuid
+  duressEnabled              Boolean              @default(false) @map("duress_enabled")
+  duressPinHash              String?              @map("duress_pin_hash")
+  panicHoldMs                Int                  @default(3000) @map("panic_hold_ms")
+  emergencySessionMinutes    Int                  @default(10) @map("emergency_session_minutes")
+  trackingMode               LocationTrackingMode @default(EMERGENCY_ONLY) @map("tracking_mode")
+  emergencySetupCompletedAt  DateTime?            @map("emergency_setup_completed_at")
+  panicTestedAt              DateTime?            @map("panic_tested_at")
+  createdAt                  DateTime             @default(now()) @map("created_at")
+  updatedAt                  DateTime             @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("client_security_settings")
+}
+

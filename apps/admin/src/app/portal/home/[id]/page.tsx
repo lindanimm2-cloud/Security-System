@@ -87,6 +87,7 @@ function SiteContent() {
   const id = String(params.id ?? '');
   const { access, loading: accessLoading } = useSubscriptionAccess();
   const [loadingId, setLoadingId] = useState<string | null>(null);
+  const [optimisticStatus, setOptimisticStatus] = useState<string | null>(null);
   const { data, loading, error, reload } = useApi(
     () => clientApi.get<ApiResponse<SiteDetail>>(`/client/surveillance/sites/${id}`),
     [id],
@@ -94,9 +95,12 @@ function SiteContent() {
 
   async function setMode(mode: ArmMode) {
     setLoadingId(mode);
+    setOptimisticStatus(mode);
     try {
       await clientApi.patch(`/client/properties/${id}/alarm`, { status: mode });
       reload();
+    } catch {
+      setOptimisticStatus(null);
     } finally {
       setLoadingId(null);
     }
@@ -137,6 +141,7 @@ function SiteContent() {
 
   const site = data!.data;
   const panel = site.panel;
+  const displayStatus = optimisticStatus ?? site.alarmStatus;
 
   return (
     <div className="page-content">
@@ -148,8 +153,8 @@ function SiteContent() {
           <h1>{site.name}</h1>
           <p className="text-muted">{site.address}</p>
         </div>
-        <span className={`status-pill status-pill--${site.alarmStatus.toLowerCase()}`}>
-          {alarmStatusLabel(site.alarmStatus)}
+        <span className={`status-pill status-pill--${displayStatus.toLowerCase().replace(/_/g, '-')}`}>
+          {alarmStatusLabel(displayStatus)}
         </span>
       </div>
 
@@ -172,18 +177,37 @@ function SiteContent() {
       )}
 
       <div className="arm-mode-row" style={{ marginBottom: '1rem' }}>
-        {ARM_MODE_OPTIONS.map((opt) => (
-          <button
-            key={opt.value}
-            type="button"
-            title={opt.hint}
-            className={`arm-mode-btn ${site.alarmStatus === opt.value ? 'arm-mode-btn--active' : ''} ${opt.value === 'DISARMED' ? 'arm-mode-btn--disarm' : ''}`}
-            disabled={!!loadingId}
-            onClick={() => void setMode(opt.value)}
-          >
-            {loadingId === opt.value ? '…' : opt.label}
-          </button>
-        ))}
+        {ARM_MODE_OPTIONS.map((opt) => {
+          const active = displayStatus === opt.value;
+          return (
+            <button
+              key={opt.value}
+              type="button"
+              title={opt.hint}
+              aria-pressed={active}
+              className={`arm-mode-btn arm-mode-btn--${opt.colorKey} ${active ? 'arm-mode-btn--active' : ''}`}
+              disabled={!!loadingId}
+              onClick={() => void setMode(opt.value)}
+            >
+              {loadingId === opt.value ? (
+                <span style={{ fontSize: '1.1rem' }}>…</span>
+              ) : (
+                <>
+                  <svg
+                    className="arm-mode-btn__icon"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    aria-hidden
+                    dangerouslySetInnerHTML={{ __html: opt.icon }}
+                  />
+                  <span className="arm-mode-btn__label">{opt.label}</span>
+                  {active ? <span className="arm-mode-btn__dot" aria-hidden /> : null}
+                </>
+              )}
+            </button>
+          );
+        })}
         <button type="button" className="btn-danger btn-sm" disabled={!!loadingId} onClick={() => void homePanic()}>
           {loadingId === 'panic' ? 'Sending…' : 'Home Panic'}
         </button>
@@ -215,7 +239,7 @@ function SiteContent() {
       <section className="portal-card">
         <div className="card-header-row">
           <h2>Interior camera privacy</h2>
-          <span className={`status-pill ${site.shareInteriorCameras ? 'status-pill--resolved' : 'status-pill--acknowledged'}`}>
+          <span className={`status-pill ${site.shareInteriorCameras ? 'status-pill--pending' : 'status-pill--ok'}`}>
             {site.shareInteriorCameras ? 'Shared with responders' : 'Private by default'}
           </span>
         </div>
@@ -227,7 +251,7 @@ function SiteContent() {
           <p className="text-muted" style={{ margin: '0 0 0.75rem' }}>
             {site.privacy!.interiorCameraCount} interior camera
             {site.privacy!.interiorCameraCount === 1 ? '' : 's'} on this site
-            {site.alarmStatus === 'TRIGGERED' ? ' · currently unlocked (alarm)' : ''}
+            {displayStatus === 'TRIGGERED' ? ' · currently unlocked (alarm)' : ''}
           </p>
         )}
         <label className="privacy-toggle">
@@ -237,6 +261,7 @@ function SiteContent() {
             disabled={loadingId === 'privacy'}
             onChange={(e) => void setInteriorShare(e.target.checked)}
           />
+          <span className="privacy-toggle__switch" aria-hidden />
           <span>
             {loadingId === 'privacy'
               ? 'Updating…'

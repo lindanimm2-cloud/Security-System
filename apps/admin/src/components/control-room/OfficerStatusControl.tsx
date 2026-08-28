@@ -5,7 +5,12 @@ import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { OpsMenuDropdown } from '@/components/ops/OpsMenuDropdown';
 import { adminApi } from '@/lib/api-client';
 import { friendlyErrorMessage } from '@/lib/friendly-error';
-import { OFFICER_STATUSES, officerStatusLabel, officerStatusSlug } from '@/lib/officer-status';
+import {
+  OFFICER_STATUSES,
+  isSameOfficerStatus,
+  officerStatusLabel,
+  officerStatusSlug,
+} from '@/lib/officer-status';
 
 type Props = {
   officerId: string;
@@ -24,7 +29,7 @@ export function OfficerStatusControl({
   const [error, setError] = useState('');
 
   async function setStatus(next: string) {
-    if (next === status || updating) return;
+    if (isSameOfficerStatus(next, status) || updating) return;
     setUpdating(true);
     setError('');
     try {
@@ -52,7 +57,7 @@ export function OfficerStatusControl({
             id: s.value,
             label: s.label,
             description: s.hint,
-            active: status === s.value,
+            active: isSameOfficerStatus(status, s.value),
             tone: s.value === 'OFF_DUTY' ? 'danger' : s.value === 'AVAILABLE' ? 'ok' : 'default',
             className: `officer-status-item officer-status-item--${officerStatusSlug(s.value)}`,
             leading: <OfficerStatusDot status={s.value} />,
@@ -73,7 +78,7 @@ export function OfficerStatusControl({
             key={s.value}
             type="button"
             className={`officer-status-btn officer-status-btn--${officerStatusSlug(s.value)} ${
-              status === s.value ? 'officer-status-btn--active' : ''
+              isSameOfficerStatus(status, s.value) ? 'officer-status-btn--active' : ''
             }`}
             title={s.hint}
             disabled={updating}

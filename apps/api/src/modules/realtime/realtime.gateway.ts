@@ -1,6 +1,9 @@
 import {
+  ConnectedSocket,
+  MessageBody,
   OnGatewayConnection,
   OnGatewayDisconnect,
+  SubscribeMessage,
   WebSocketGateway,
   WebSocketServer,
 } from '@nestjs/websockets';
@@ -24,7 +27,7 @@ export type MapIncidentPayload = {
 };
 
 export type PositionUpdatePayload = {
-  entityType: 'client' | 'officer' | 'vehicle';
+  entityType: 'client' | 'officer' | 'vehicle' | 'fleet';
   id: string;
   lat: number;
   lng: number;
@@ -59,7 +62,10 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
 
       client.data.userId = payload.sub;
       client.data.tenantId = payload.tenantId;
+      client.data.role = payload.role;
       client.join(`tenant:${payload.tenantId}`);
+      client.join(`user:${payload.sub}`);
+      if (payload.role) client.join(`role:${payload.role}`);
       this.logger.log(`Client connected: ${payload.sub} (tenant ${payload.tenantId})`);
     } catch {
       client.disconnect();
@@ -70,8 +76,34 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
     this.logger.log(`Client disconnected: ${client.data.userId ?? 'unknown'}`);
   }
 
-  emitIncidentCreated(tenantId: string, incident: MapIncidentPayload) {
+  @SubscribeMessage('incident:subscribe')
+  handleIncidentSubscribe(@ConnectedSocket() client: Socket, @MessageBody() body: { incidentId?: string }) {
+    if (body?.incidentId) client.join(`incident:${body.incidentId}`);
+  }
+
+  @SubscribeMessage('incident:unsubscribe')
+  handleIncidentUnsubscribe(@ConnectedSocket() client: Socket, @MessageBody() body: { incidentId?: string }) {
+    if (body?.incidentId) client.leave(`incident:${body.incidentId}`);
+  }
+
+  emitIncidentCreated(tenantId: string, incident: MapIncidentPayload & { publicRef?: string }) {
     this.server.to(`tenant:${tenantId}`).emit('incident:created', incident);
+  }
+
+  emitPlatformEvent(
+    tenantId: string,
+    event: string,
+    payload: Record<string, unknown> | MapIncidentPayload,
+    rooms?: { incidentId?: string | null; userId?: string | null },
+  ) {
+    this.server.to(`tenant:${tenantId}`).emit(event, payload);
+    this.server.to(`tenant:${tenantId}`).emit('platform:event', { event, payload });
+    if (rooms?.incidentId) {
+      this.server.to(`incident:${rooms.incidentId}`).emit(event, payload);
+    }
+    if (rooms?.userId) {
+      this.server.to(`user:${rooms.userId}`).emit(event, payload);
+    }
   }
 
   emitPositionUpdates(tenantId: string, updates: PositionUpdatePayload[]) {
@@ -80,6 +112,8 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
 
   emitNotification(tenantId: string, notification: Record<string, unknown>) {
     this.server.to(`tenant:${tenantId}`).emit('notification:new', notification);
+    const userId = typeof notification.userId === 'string' ? notification.userId : null;
+    if (userId) this.server.to(`user:${userId}`).emit('notification:new', notification);
   }
 
   emitChatMessage(tenantId: string, message: Record<string, unknown>) {

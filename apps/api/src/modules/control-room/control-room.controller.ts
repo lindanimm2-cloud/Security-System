@@ -288,9 +288,61 @@ export class ControlRoomController {
     return this.controlRoomService.listOfficers(user.tenantId);
   }
 
+  @Post('officers')
+  createOfficer(
+    @CurrentUser() user: AuthUser,
+    @Body() body: { firstName?: string; lastName?: string; zone?: string; avatarUrl?: string | null },
+  ) {
+    return this.controlRoomService.createOfficer(user.tenantId, body);
+  }
+
+  @Patch('officers/:id')
+  updateOfficerProfile(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Body() body: { firstName?: string; lastName?: string; zone?: string; avatarUrl?: string | null },
+  ) {
+    return this.controlRoomService.updateOfficerProfile(user.tenantId, id, body);
+  }
+
   @Get('fleet')
   fleet(@CurrentUser() user: AuthUser) {
     return this.controlRoomService.listFleet(user.tenantId);
+  }
+
+  @Post('fleet')
+  createFleet(
+    @CurrentUser() user: AuthUser,
+    @Body()
+    body: {
+      callSign?: string;
+      registration?: string;
+      make?: string;
+      model?: string;
+      color?: string;
+      vehicleType?: string;
+      teamName?: string;
+    },
+  ) {
+    return this.controlRoomService.createFleetVehicle(user.tenantId, body);
+  }
+
+  @Patch('fleet/:id')
+  updateFleet(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Body()
+    body: {
+      callSign?: string;
+      registration?: string;
+      make?: string;
+      model?: string;
+      color?: string;
+      vehicleType?: string;
+      teamName?: string;
+    },
+  ) {
+    return this.controlRoomService.updateFleetVehicle(user.tenantId, id, body);
   }
 
   @Patch('fleet/:id/crew')

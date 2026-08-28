@@ -5,8 +5,13 @@ export default function PortalLoading() {
     <LoadingSpinner
       brand
       fullScreen
+      action="open-portal"
       label="Loading client portal…"
-      hint="Pulling protection status and alerts."
+      hints={[
+        'Pulling protection status and alerts.',
+        'System updates underway…',
+        'Checking your cover.',
+      ]}
     />
   );
 }

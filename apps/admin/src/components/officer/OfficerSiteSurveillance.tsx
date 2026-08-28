@@ -64,6 +64,17 @@ export function OfficerSiteSurveillance({ incidentId }: Props) {
   if (error || !data?.data) return null;
 
   const ctx = data.data;
+  if (
+    typeof ctx !== 'object' ||
+    ctx === null ||
+    Array.isArray(ctx) ||
+    !('cameras' in ctx) ||
+    !Array.isArray(ctx.cameras) ||
+    !('events' in ctx) ||
+    !Array.isArray(ctx.events)
+  ) {
+    return null;
+  }
   if (!ctx.property && ctx.cameras.length === 0) return null;
 
   const privacy = ctx.privacy;
@@ -80,39 +91,47 @@ export function OfficerSiteSurveillance({ incidentId }: Props) {
       </div>
 
       {ctx.property && (
-        <>
-          <p>
-            <strong>{ctx.property.name}</strong>
-          </p>
-          <p className="text-muted">{ctx.property.address}</p>
-          {ctx.property.gateCode && (
-            <p>
-              <strong>Gate:</strong> {ctx.property.gateCode}
+        <div className="officer-surveillance__summary">
+          <div>
+            <p className="officer-surveillance__title">
+              <strong>{ctx.property.name}</strong>
             </p>
+            <p className="text-muted officer-surveillance__address">{ctx.property.address}</p>
+          </div>
+          <div className="officer-surveillance__facts">
+            {ctx.property.gateCode && (
+              <div className="officer-surveillance__fact">
+                <span>Gate</span>
+                <strong>{ctx.property.gateCode}</strong>
+              </div>
+            )}
+            {ctx.property.keyHolder && (
+              <div className="officer-surveillance__fact">
+                <span>Key holder</span>
+                <strong>{ctx.property.keyHolder}</strong>
+              </div>
+            )}
+          </div>
+          {ctx.property.accessNotes && (
+            <p className="text-muted officer-surveillance__notes">{ctx.property.accessNotes}</p>
           )}
-          {ctx.property.keyHolder && (
-            <p>
-              <strong>Key holder:</strong> {ctx.property.keyHolder}
-            </p>
-          )}
-          {ctx.property.accessNotes && <p className="text-muted">{ctx.property.accessNotes}</p>}
-        </>
+        </div>
       )}
 
       {privacy && privacy.privateInteriorCount > 0 && !privacy.interiorUnlocked && (
-        <p className="text-muted" style={{ margin: '0.5rem 0 0' }}>
+        <p className="text-muted officer-surveillance__privacy-note">
           {privacy.privateInteriorCount} interior camera
           {privacy.privateInteriorCount === 1 ? '' : 's'} private until client shares or alarm/panic unlocks.
         </p>
       )}
       {privacy?.interiorUnlocked && privacy.interiorCameraCount > 0 && (
-        <p className="text-muted" style={{ margin: '0.5rem 0 0' }}>
+        <p className="text-muted officer-surveillance__privacy-note">
           {privacy.unlockLabel}
         </p>
       )}
 
       {ctx.cameras.length > 0 && (
-        <div className="camera-grid" style={{ marginTop: '0.75rem' }}>
+        <div className="camera-grid officer-surveillance__grid">
           {ctx.cameras.map((c) => (
             <div key={c.id} className={`camera-tile ${c.privacyLocked ? 'camera-tile--locked' : ''}`}>
               <div
@@ -138,7 +157,7 @@ export function OfficerSiteSurveillance({ incidentId }: Props) {
       )}
 
       {ctx.events.length > 0 && (
-        <ul className="status-list" style={{ marginTop: '0.75rem' }}>
+        <ul className="status-list officer-surveillance__events">
           {ctx.events.slice(0, 4).map((e) => (
             <li key={e.id} className="status-list-item">
               <span>{e.title}</span>

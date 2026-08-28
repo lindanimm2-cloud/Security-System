@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { ControlRoomLayout } from '@/components/control-room/ControlRoomLayout';
 import { ErrorAlert } from '@/components/ErrorAlert';
 import { InternalChat } from '@/components/InternalChat';
@@ -14,6 +14,9 @@ import {
   DEMO_ERROR_REPORTS_KEY,
   developerTicketCode,
 } from '@/lib/developer-tickets';
+import { shouldBackgroundPoll } from '@/lib/demo/is-demo-mode';
+import { ListSearch } from '@/components/ui/ListSearch';
+import { matchesSearch } from '@/lib/list-search';
 
 type Desk = {
   tenantName: string;
@@ -79,6 +82,7 @@ function DeveloperDeskContent() {
   const [actionError, setActionError] = useState('');
   const [filter, setFilter] = useState<TicketFilter>('OPEN');
   const [focusId, setFocusId] = useState<string | null>(null);
+  const [search, setSearch] = useState('');
 
   const desk = useApi(
     () =>
@@ -119,11 +123,11 @@ function DeveloperDeskContent() {
     };
     window.addEventListener(DEMO_DEV_TICKET_EVENT, onTicket);
     window.addEventListener('storage', onStorage);
-    const poll = window.setInterval(refresh, 4000);
+    const poll = shouldBackgroundPoll() ? window.setInterval(refresh, 4000) : null;
     return () => {
       window.removeEventListener(DEMO_DEV_TICKET_EVENT, onTicket);
       window.removeEventListener('storage', onStorage);
-      window.clearInterval(poll);
+      if (poll) window.clearInterval(poll);
     };
   }, [reports.reload, desk.reload]);
 
@@ -147,34 +151,60 @@ function DeveloperDeskContent() {
     }
   }
 
+  const list = reports.data?.data;
+  const deskData = desk.data?.data;
+  const allReports = list?.reports ?? [];
+  const statusFiltered = useMemo(
+    () => allReports.filter((r) => (filter === 'ALL' ? true : r.status === filter)),
+    [allReports, filter],
+  );
+  const filtered = useMemo(
+    () =>
+      statusFiltered.filter((r) =>
+        matchesSearch(
+          search,
+          r.message,
+          r.path,
+          r.status,
+          r.reporter.name,
+          r.reporter.email,
+          r.id,
+          r.ticketCode,
+          developerTicketCode(r.id),
+        ),
+      ),
+    [statusFiltered, search],
+  );
+
   if (desk.loading || reports.loading) {
     return <LoadingSpinner label="Loading developer desk…" fullScreen />;
   }
 
-  if (!session || !['DEVELOPER', 'OWNER', 'SUPER_ADMIN'].includes(session.user.role)) {
+  if (!session || session.user.role !== 'DEVELOPER') {
     return (
       <div className="empty-state portal-card">
-        Developer desk is for the developer profile (owner can also view reports).
+        Developer desk is only available on the developer sign-in.
       </div>
     );
   }
 
-  const list = reports.data?.data;
-  const deskData = desk.data?.data;
-  const allReports = list?.reports ?? [];
   const ackCount = allReports.filter((r) => r.status === 'ACKNOWLEDGED').length;
   const resolvedCount = allReports.filter((r) => r.status === 'RESOLVED').length;
   const openCount = list?.openCount ?? allReports.filter((r) => r.status === 'OPEN').length;
   const platformLinks = deskData?.platformLinks ?? [
-    { label: 'Control room', href: '/control-room' },
+    { label: 'Ops Board', href: '/control-room' },
     { label: 'Live map', href: '/control-room/map' },
+    { label: 'CCTV', href: '/control-room/surveillance' },
+    { label: 'Vehicles', href: '/control-room/fleet' },
+    { label: 'Incidents', href: '/control-room/incidents' },
+    { label: 'Device security', href: '/control-room/device-security' },
+    { label: 'Dispatch', href: '/control-room/dispatch' },
     { label: 'Customers', href: '/control-room/customers' },
-    { label: 'Fleet', href: '/control-room/fleet' },
+    { label: 'Gear store', href: '/control-room/store' },
+    { label: 'Internal chat', href: '/control-room/chat' },
     { label: 'Client portal', href: '/portal' },
-    { label: 'Settings', href: '/control-room/settings' },
+    { label: 'Settings', href: '/control-room/my-settings' },
   ];
-
-  const filtered = allReports.filter((r) => (filter === 'ALL' ? true : r.status === filter));
 
   return (
     <div className="page-content">
@@ -244,11 +274,23 @@ function DeveloperDeskContent() {
             </button>
           ))}
         </div>
+        <div className="list-search-bar">
+          <ListSearch
+            value={search}
+            onChange={setSearch}
+            placeholder="Search tickets, path, reporter…"
+            resultCount={filtered.length}
+            totalCount={statusFiltered.length}
+            id="dev-ticket-search"
+          />
+        </div>
         {!filtered.length ? (
           <p className="text-muted">
-            {filter === 'OPEN'
-              ? 'No open tickets. New issues appear here the moment someone taps “Send details to developer”.'
-              : 'No tickets in this view.'}
+            {search.trim()
+              ? 'No tickets match this search.'
+              : filter === 'OPEN'
+                ? 'No open tickets. New issues appear here the moment someone taps “Send details to developer”.'
+                : 'No tickets in this view.'}
           </p>
         ) : (
           <div className="dev-ticket-list">

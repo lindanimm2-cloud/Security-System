@@ -134,26 +134,32 @@ export function SlideCarouselCard({
   className = '',
   children,
 }: SlideCarouselCardProps) {
-  const card = (
-    <article
-      data-slide
-      className={`slide-carousel__card slide-carousel__card--${tone} ${wide ? 'slide-carousel__card--wide' : ''} ${className}`.trim()}
-    >
+  const cardClass = `slide-carousel__card slide-carousel__card--${tone} ${wide ? 'slide-carousel__card--wide' : ''} ${href ? 'slide-carousel__card--link' : ''} ${className}`.trim();
+  const inner = (
+    <>
       <div className="slide-carousel__card-top">
         <h3>{title}</h3>
         {href ? (
-          <Link
-            href={href}
-            className="slide-carousel__expand"
-            aria-label={expandLabel ?? `Open ${title}`}
-          >
+          <span className="slide-carousel__expand" aria-hidden>
             <ExpandIcon />
-          </Link>
+          </span>
         ) : null}
       </div>
       <div className="slide-carousel__card-body">{children}</div>
-    </article>
+    </>
   );
 
-  return card;
+  if (href) {
+    return (
+      <Link data-slide href={href} className={cardClass} aria-label={expandLabel ?? `Open ${title}`}>
+        {inner}
+      </Link>
+    );
+  }
+
+  return (
+    <article data-slide className={cardClass}>
+      {inner}
+    </article>
+  );
 }

@@ -99,6 +99,11 @@ export function applyTabTitle(session: AuthSession | null, portal?: AuthPortal |
   }
   const name = `${session.user.firstName} ${session.user.lastName}`.trim() || session.user.email;
   const role = session.user.role.replace(/_/g, ' ');
-  const where = portal ? PORTAL_LABEL[portal] : '4DS Nexus';
+  const where =
+    session.user.role === 'DEVELOPER'
+      ? 'Developer'
+      : portal
+        ? PORTAL_LABEL[portal]
+        : '4DS Nexus';
   document.title = `${name} · ${role} · ${where}`;
 }

@@ -10,6 +10,11 @@ import {
 } from '@/lib/auth';
 import { applyTabTitle, bootTabSession } from '@/lib/tab-session';
 import { LoadingSpinner } from './LoadingSpinner';
+import {
+  PORTAL_BOOT_COPY,
+  actionCopy,
+  getActionKind,
+} from '@/lib/action-status';
 
 export function AuthGuard({
   portal,
@@ -63,27 +68,29 @@ export function AuthGuard({
   }, [portal, loginPath, router]);
 
   if (!ready || !session) {
-    const labels: Record<AuthPortal, { label: string; hint: string }> = {
-      admin: {
-        label: 'Opening control room…',
-        hint: 'Verifying your session and live ops access.',
-      },
-      client: {
-        label: 'Opening client portal…',
-        hint: 'Checking your protection profile.',
-      },
-      officer: {
-        label: 'Opening officer app…',
-        hint: 'Loading your assignment queue.',
-      },
-      technician: {
-        label: 'Opening technician desk…',
-        hint: 'Loading your install queue.',
-      },
-    };
-    const copy = labels[portal];
+    const live = typeof window !== 'undefined' ? getSession(portal) : null;
+    const action = getActionKind();
+    const copy =
+      action === 'sign-out' || action === 'session-expired' || action === 'sign-in'
+        ? actionCopy(action)
+        : live
+          ? (PORTAL_BOOT_COPY[portal] ?? actionCopy('open-portal'))
+          : {
+              label: 'Redirecting to sign-in…',
+              hints: [
+                'Your session is no longer active.',
+                'Taking you to the login screen.',
+                'System updates underway…',
+              ],
+            };
     return (
-      <LoadingSpinner brand fullScreen label={copy.label} hint={copy.hint} />
+      <LoadingSpinner
+        brand
+        fullScreen
+        action={action ?? undefined}
+        label={copy.label}
+        hints={copy.hints}
+      />
     );
   }
 

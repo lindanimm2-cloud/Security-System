@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import {
   useCallback,
   useEffect,
@@ -11,13 +11,31 @@ import {
   useState,
   type PointerEvent as ReactPointerEvent,
 } from 'react';
+import { EyeLensCriticalPanel, EyeLensMiniPlayer } from '@/components/control-room/EyeLensCriticalPanel';
+import { useTheme } from '@/components/ThemeProvider';
+import { useCallsOptional } from '@/components/calls/CallProvider';
 import { useApi } from '@/hooks/useApi';
+import { usePlatformEvents } from '@/hooks/usePlatformEvents';
 import { adminApi, type ApiResponse } from '@/lib/api-client';
 import { getSession } from '@/lib/auth';
+import { canAccessControlRoomRoute } from '@/lib/control-room-nav';
+import { CR_SETTINGS_CHANGED_EVENT } from '@/lib/control-room-settings';
 import { CONTROL_ROOM_ROUTES, customerHref } from '@/lib/control-room-routes';
-import { fetchInternalChat } from '@/lib/internal-chat-api';
-import { useCallsOptional } from '@/components/calls/CallProvider';
+import { shouldBackgroundPoll } from '@/lib/demo/is-demo-mode';
+import {
+  criticalLensQueue,
+  effectiveLensSettings,
+  lensBadge,
+  lensRouteContext,
+  loadLensSettings,
+  playLensAlertTone,
+  recordLensAudit,
+  type CrLensSettings,
+} from '@/lib/eye-lens';
 import { friendlyErrorMessage } from '@/lib/friendly-error';
+import { fetchInternalChat } from '@/lib/internal-chat-api';
+import { type OpsIncident } from '@/lib/ops-incident';
+import { CrmEyeLensIcons as I } from '@/components/control-room/CrmEyeLensIcons';
 
 type Lead = {
   id: string;
@@ -32,39 +50,10 @@ type Lead = {
   ownerName: string;
 };
 
-type SalesDash = {
-  stats: {
-    openLeads: number;
-    wonDeals: number;
-    pipelineFormatted: string;
-    wonFormatted: string;
-    orders: number;
-    pipeline: Record<string, number>;
-  };
-  leads: Lead[];
-};
-
-type NotificationData = {
-  unreadCount: number;
-};
-
-type BillingOverview = {
-  pastDueCount: number;
-  revenueAtRiskFormatted: string;
-};
-
-type CustomerRow = {
-  id: string;
-  firstName: string;
-  lastName: string;
-  email: string;
-  phone: string | null;
-};
-
-type CustomersResponse = {
-  data: CustomerRow[];
-};
-
+type SalesDash = { leads: Lead[] };
+type NotificationData = { unreadCount: number };
+type CustomerRow = { id: string; firstName: string; lastName: string; email: string; phone: string | null };
+type CustomersResponse = { data: CustomerRow[] };
 type DashboardLite = {
   stats: {
     activeIncidents: number;
@@ -72,9 +61,9 @@ type DashboardLite = {
     availableOfficers: number;
     totalOfficers: number;
   };
-  incidents: { id: string; type: string; user: string; priority: string }[];
+  incidents: OpsIncident[];
+  officers?: { id: string; name: string; status: string; zone?: string }[];
 };
-
 type PanelTab = 'intel' | 'search' | 'notify';
 
 async function softGet<T>(path: string): Promise<T | null> {
@@ -84,154 +73,69 @@ async function softGet<T>(path: string): Promise<T | null> {
     return null;
   }
 }
-type Insight = {
-  id: string;
-  tone: 'hot' | 'warn' | 'info' | 'good';
-  title: string;
-  detail: string;
-  href: string;
-  action: string;
-};
 
 const HIDDEN_KEY = 'crm-eye-lens-hidden';
 const POS_KEY = 'crm-eye-lens-pos';
 const MODE_KEY = 'crm-eye-lens-mode';
+const SELECTED_KEY = 'crm-eye-lens-selected';
+const ACK_KEY = 'crm-eye-lens-ack';
+const SEEN_KEY = 'crm-eye-lens-seen';
+
+const DEFAULT_PLACEHOLDER: CrLensSettings = {
+  enabled: true,
+  showP1: true,
+  showPanic: true,
+  showSla: true,
+  showOpsAlerts: true,
+  autoPeek: true,
+  soundPanic: true,
+  autoCollapse: 'never',
+  dockEdge: 'bottom',
+};
 
 function startOfDay(d = new Date()) {
   return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
 }
-
 function endOfDay(d = new Date()) {
   return startOfDay(d) + 86400000 - 1;
 }
 
-function formatFollowUp(iso: string) {
-  const t = new Date(iso).getTime();
-  const today = startOfDay();
-  if (t < today) return 'Overdue';
-  if (t <= endOfDay()) return 'Today';
-  if (t <= endOfDay(new Date(Date.now() + 86400000))) return 'Tomorrow';
-  return new Date(iso).toLocaleDateString('en-ZA', { day: '2-digit', month: 'short' });
-}
-
-function IconEye({ active }: { active?: boolean }) {
-  return (
-    <svg width="19" height="19" viewBox="0 0 24 24" fill="none" aria-hidden>
-      <path
-        d="M2.5 12s3.8-6.5 9.5-6.5S21.5 12 21.5 12 17.7 18.5 12 18.5 2.5 12 2.5 12z"
-        stroke="currentColor"
-        strokeWidth="1.7"
-      />
-      <circle cx="12" cy="12" r="3.1" stroke="currentColor" strokeWidth="1.7" />
-      <circle cx="12" cy="12" r={active ? 1.55 : 1.15} fill="currentColor" />
-      <path d="M12 5.5v1.2M12 17.3v1.2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-    </svg>
-  );
-}
-
-function IconMap() {
-  return (
-    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden>
-      <path d="M9 4.5l6 2.2 5-2.2v14.2l-5 2.2-6-2.2-5 2.2V6.7l5-2.2z" />
-      <path d="M9 4.5v14.2M15 6.7v14.2" />
-    </svg>
-  );
-}
-
-function IconBell() {
-  return (
-    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden>
-      <path d="M6.2 9.2a5.8 5.8 0 0111.6 0c0 4.2 1.4 5.4 1.4 5.4H4.8s1.4-1.2 1.4-5.4z" />
-      <path d="M10 18.6a2 2 0 004 0" />
-    </svg>
-  );
-}
-
-function IconChat() {
-  return (
-    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden>
-      <path d="M5 5.5h14a1.5 1.5 0 011.5 1.5v8a1.5 1.5 0 01-1.5 1.5H9.2L5 20.2V7A1.5 1.5 0 015 5.5z" />
-    </svg>
-  );
-}
-
-function IconPhone() {
-  return (
-    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden>
-      <path d="M7.2 3.8l2.4 2.4a1.2 1.2 0 010 1.7l-1.3 1.3a12.5 12.5 0 006.5 6.5l1.3-1.3a1.2 1.2 0 011.7 0l2.4 2.4a1.2 1.2 0 010 1.7l-1.5 1.5c-.8.8-2 .9-3 .5A18.5 18.5 0 014.2 7.3c-.4-1-.3-2.2.5-3l1.5-1.5a1.2 1.2 0 011.7 0z" />
-    </svg>
-  );
-}
-
-function IconSearch() {
-  return (
-    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden>
-      <circle cx="11" cy="11" r="6.2" />
-      <path d="M16 16l4.2 4.2" />
-    </svg>
-  );
-}
-
-function IconInbox() {
-  return (
-    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden>
-      <path d="M4 13.5l1.6-7.2A2 2 0 017.55 5h8.9a2 2 0 011.95 1.3L20 13.5" />
-      <path d="M4 13.5h4.2l1.3 2h5l1.3-2H20v4a2 2 0 01-2 2H6a2 2 0 01-2-2v-4z" />
-    </svg>
-  );
-}
-
-function IconCalendar() {
-  return (
-    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden>
-      <rect x="4" y="5.5" width="16" height="14" rx="2" />
-      <path d="M8 3.8v3.2M16 3.8v3.2M4 10h16" />
-      <path d="M8.5 14h.01M12 14h.01M15.5 14h.01M8.5 17h.01M12 17h.01" />
-    </svg>
-  );
-}
-
-function IconGear() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden>
-      <circle cx="12" cy="12" r="3" />
-      <path d="M12 3.5v2.2M12 18.3v2.2M4.9 6.6l1.6 1.6M17.5 15.8l1.6 1.6M3.5 12h2.2M18.3 12h2.2M4.9 17.4l1.6-1.6M17.5 8.2l1.6-1.6" />
-    </svg>
-  );
-}
-
-function IconDrag() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
-      <circle cx="9" cy="7" r="1.4" />
-      <circle cx="15" cy="7" r="1.4" />
-      <circle cx="9" cy="12" r="1.4" />
-      <circle cx="15" cy="12" r="1.4" />
-      <circle cx="9" cy="17" r="1.4" />
-      <circle cx="15" cy="17" r="1.4" />
-    </svg>
-  );
-}
-
-function IconExpand() {
-  return (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden>
-      <path d="M8 3H3v5M16 3h5v5M8 21H3v-5M16 21h5v-5" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
-}
-
-function Badge({ count }: { count: number }) {
+function Badge({ count, tone }: { count: number; tone?: 'critical' | 'panic' | 'info' }) {
   if (count <= 0) return null;
-  return <span className="eye-lens__badge">{count > 99 ? '99+' : count}</span>;
+  return (
+    <span className={`eye-lens__badge ${tone ? `eye-lens__badge--${tone}` : ''}`}>
+      {count > 99 ? '99+' : count}
+    </span>
+  );
+}
+
+function readJson<T>(key: string, fallback: T): T {
+  try {
+    const raw = sessionStorage.getItem(key);
+    if (!raw) return fallback;
+    return JSON.parse(raw) as T;
+  } catch {
+    return fallback;
+  }
+}
+
+function Chevron() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+      <path d="M6 14l6-6 6 6" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
 }
 
 export function CrmEyeLens() {
   const router = useRouter();
+  const pathname = usePathname() ?? '';
+  const { theme, toggleTheme } = useTheme();
   const dockRef = useRef<HTMLDivElement>(null);
   const barRef = useRef<HTMLDivElement>(null);
-  const panelRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef<{ ox: number; oy: number; px: number; py: number } | null>(null);
+  const interactingRef = useRef(false);
+  const lastOpenAuditRef = useRef(0);
 
   const [hidden, setHidden] = useState(false);
   const [ready, setReady] = useState(false);
@@ -243,34 +147,29 @@ export function CrmEyeLens() {
   const [panelFit, setPanelFit] = useState({
     placement: 'above' as 'above' | 'below',
     left: 0,
-    width: 360,
-    maxHeight: 360,
+    width: 380,
+    maxHeight: 420,
   });
-  const autoOpenedRef = useRef(false);
-  const firstName = getSession('admin')?.user.firstName ?? 'Operator';
-  const calls = useCallsOptional();
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [ackedIds, setAckedIds] = useState<Set<string>>(new Set());
+  const [peekId, setPeekId] = useState<string | null>(null);
+  const [lensSettings, setLensSettings] = useState<CrLensSettings>(DEFAULT_PLACEHOLDER);
   const [callBusy, setCallBusy] = useState(false);
+  const session = getSession('admin');
+  const role = session?.user.role ?? 'DISPATCHER';
+  const actor = session ? `${session.user.firstName} ${session.user.lastName}` : 'Control room';
+  const calls = useCallsOptional();
 
   const { data: dashRes, reload: reloadDash } = useApi(
     () => softGet<ApiResponse<DashboardLite>>('/control-room/dashboard'),
     [],
   );
-  const { data: salesRes, reload: reloadSales } = useApi(
-    () => softGet<ApiResponse<SalesDash>>('/store/sales/dashboard'),
-    [],
-  );
+  const { data: salesRes } = useApi(() => softGet<ApiResponse<SalesDash>>('/store/sales/dashboard'), []);
   const { data: notifRes, reload: reloadNotifs } = useApi(
     () => softGet<ApiResponse<NotificationData>>('/control-room/notifications'),
     [],
   );
-  const { data: billingRes, reload: reloadBilling } = useApi(
-    () => softGet<ApiResponse<BillingOverview>>('/control-room/billing/overview'),
-    [],
-  );
-  const { data: customersRes } = useApi(
-    () => softGet<CustomersResponse>('/control-room/customers'),
-    [],
-  );
+  const { data: customersRes } = useApi(() => softGet<CustomersResponse>('/control-room/customers'), []);
   const { data: chatRes, reload: reloadChat } = useApi(async () => {
     try {
       return await fetchInternalChat('admin', 'internal');
@@ -279,65 +178,123 @@ export function CrmEyeLens() {
     }
   }, []);
 
+  usePlatformEvents('admin', ['incident:created', 'incident:updated', 'incident:acked', 'dispatch:updated'], () => {
+    void reloadDash({ silent: true });
+  });
+
   useEffect(() => {
     try {
       setHidden(sessionStorage.getItem(HIDDEN_KEY) === '1');
       const savedMode = localStorage.getItem(MODE_KEY);
-      if (savedMode === 'bar' || savedMode === 'mini') {
-        setMini(savedMode === 'mini');
-      } else {
-        setMini(window.matchMedia('(max-width: 900px)').matches);
-      }
+      if (savedMode === 'bar' || savedMode === 'mini') setMini(savedMode === 'mini');
+      else setMini(window.matchMedia('(max-width: 900px)').matches);
+      const lensEdge = loadLensSettings().dockEdge;
       const raw = localStorage.getItem(POS_KEY);
       if (raw) {
         const parsed = JSON.parse(raw) as { x: number; y: number };
-        if (typeof parsed.x === 'number' && typeof parsed.y === 'number') {
-          setPos(parsed);
-        }
+        const validPos =
+          typeof parsed.x === 'number' &&
+          typeof parsed.y === 'number' &&
+          !(lensEdge === 'bottom' && parsed.y < window.innerHeight * 0.35);
+        if (validPos) setPos(parsed);
+        else localStorage.removeItem(POS_KEY);
       }
+      setSelectedId(sessionStorage.getItem(SELECTED_KEY));
+      setAckedIds(new Set(readJson<string[]>(ACK_KEY, [])));
     } catch {
       /* ignore */
     }
+    setLensSettings(loadLensSettings());
     setReady(true);
   }, []);
 
   useEffect(() => {
+    function sync() {
+      setLensSettings(loadLensSettings());
+    }
+    window.addEventListener(CR_SETTINGS_CHANGED_EVENT, sync);
+    window.addEventListener('focus', sync);
+    window.addEventListener('storage', sync);
+    return () => {
+      window.removeEventListener(CR_SETTINGS_CHANGED_EVENT, sync);
+      window.removeEventListener('focus', sync);
+      window.removeEventListener('storage', sync);
+    };
+  }, []);
+
+  const prevDockEdgeRef = useRef<CrLensSettings['dockEdge'] | null>(null);
+
+  useEffect(() => {
+    if (prevDockEdgeRef.current === null) {
+      prevDockEdgeRef.current = lensSettings.dockEdge;
+      return;
+    }
+    if (prevDockEdgeRef.current === lensSettings.dockEdge) return;
+    prevDockEdgeRef.current = lensSettings.dockEdge;
+    setPos(null);
+    try {
+      localStorage.removeItem(POS_KEY);
+    } catch {
+      /* ignore */
+    }
+  }, [lensSettings.dockEdge]);
+
+  useEffect(() => {
+    if (!shouldBackgroundPoll()) return;
     const id = window.setInterval(() => {
       void reloadDash({ silent: true });
-      void reloadSales({ silent: true });
       void reloadNotifs({ silent: true });
-      void reloadBilling({ silent: true });
       void reloadChat({ silent: true });
     }, 30000);
     return () => window.clearInterval(id);
-  }, [reloadDash, reloadSales, reloadNotifs, reloadBilling, reloadChat]);
+  }, [reloadDash, reloadNotifs, reloadChat]);
 
   const dash = dashRes?.data;
-  const criticals = dash?.stats.criticalIncidents ?? 0;
-  const openIncidents = dash?.stats.activeIncidents ?? 0;
-  const availableOfficers = dash?.stats.availableOfficers ?? 0;
-  const totalOfficers = dash?.stats.totalOfficers ?? 0;
-  const hotIncidents = useMemo(
-    () =>
-      (dash?.incidents ?? []).filter((i) =>
-        ['critical', 'CRITICAL', 'high', 'HIGH'].includes(i.priority),
-      ),
-    [dash],
+  const incidents = dash?.incidents ?? [];
+  const settings = effectiveLensSettings(lensSettings);
+  const queue = useMemo(() => criticalLensQueue(incidents, settings, ackedIds), [incidents, settings, ackedIds]);
+  const badge = lensBadge(queue);
+  const slaCount = queue.filter((i) => i.slaBreached).length;
+  const selected = incidents.find((i) => i.id === selectedId) ?? queue.find((i) => i.id === selectedId) ?? null;
+  const peek = peekId ? (incidents.find((i) => i.id === peekId) ?? queue.find((i) => i.id === peekId) ?? null) : null;
+  const context = lensRouteContext(pathname);
+  const panicLive = badge.panic;
+
+  const perms = useMemo(
+    () => ({
+      map: canAccessControlRoomRoute(role, CONTROL_ROOM_ROUTES.map),
+      cctv: canAccessControlRoomRoute(role, CONTROL_ROOM_ROUTES.surveillance),
+      fleet: canAccessControlRoomRoute(role, CONTROL_ROOM_ROUTES.fleet),
+      dispatch: canAccessControlRoomRoute(role, CONTROL_ROOM_ROUTES.dispatch),
+      call: canAccessControlRoomRoute(role, CONTROL_ROOM_ROUTES.communications) || Boolean(calls?.portal),
+    }),
+    [role, calls],
   );
 
-  /** Auto-open critical menu once on desktop; mobile stays badge-first to reduce clutter. */
   useEffect(() => {
-    if (hidden || !ready) return;
-    if (criticals > 0 && !autoOpenedRef.current) {
-      autoOpenedRef.current = true;
-      setTab('intel');
-      const isMobile = window.matchMedia('(max-width: 900px)').matches;
-      if (!isMobile) setOpen(true);
+    if (!ready) return;
+    try {
+      const seen = new Set(readJson<string[]>(SEEN_KEY, []));
+      if (seen.size === 0 && queue.length > 0) {
+        sessionStorage.setItem(SEEN_KEY, JSON.stringify(queue.map((i) => i.id)));
+        return;
+      }
+      const newcomers = queue.filter((i) => !seen.has(i.id));
+      if (newcomers.length === 0) return;
+      const hot = newcomers.find((i) => i.type.toUpperCase().includes('PANIC')) ?? newcomers[0];
+      for (const item of newcomers) seen.add(item.id);
+      sessionStorage.setItem(SEEN_KEY, JSON.stringify([...seen]));
+      if (settings.autoPeek && hot) {
+        setPeekId(hot.id);
+        window.setTimeout(() => setPeekId((cur) => (cur === hot.id ? null : cur)), 2500);
+      }
+      if (settings.soundPanic && (hot.type.toUpperCase().includes('PANIC') || hot.slaBreached)) {
+        playLensAlertTone();
+      }
+    } catch {
+      /* ignore */
     }
-    if (criticals === 0) {
-      autoOpenedRef.current = false;
-    }
-  }, [criticals, hidden, ready]);
+  }, [queue, ready, settings.autoPeek, settings.soundPanic]);
 
   const layoutPanel = useCallback(() => {
     const dock = dockRef.current;
@@ -347,7 +304,7 @@ export function CrmEyeLens() {
     const gap = 10;
     const vw = window.innerWidth;
     const vh = window.innerHeight;
-    const width = Math.min(360, vw - pad * 2);
+    const width = Math.min(400, vw - pad * 2);
     const spaceAbove = Math.max(0, rect.top - pad);
     const spaceBelow = Math.max(0, vh - rect.bottom - pad);
     const comfortable = 220;
@@ -358,15 +315,10 @@ export function CrmEyeLens() {
           ? 'below'
           : 'above';
     const available = (placement === 'below' ? spaceBelow : spaceAbove) - gap;
-    const maxHeight = Math.max(140, Math.min(vh * 0.56, available));
+    const maxHeight = Math.max(180, Math.min(vh * 0.72, available > 120 ? available : vh * 0.62));
     const center = rect.left + rect.width / 2;
     const viewLeft = Math.min(Math.max(pad, center - width / 2), vw - width - pad);
-    setPanelFit({
-      placement,
-      left: viewLeft - rect.left,
-      width,
-      maxHeight,
-    });
+    setPanelFit({ placement, left: viewLeft - rect.left, width, maxHeight });
   }, []);
 
   useLayoutEffect(() => {
@@ -380,23 +332,19 @@ export function CrmEyeLens() {
       ro?.disconnect();
       window.removeEventListener('resize', layoutPanel);
     };
-  }, [ready, hidden, open, pos, mini, layoutPanel]);
+  }, [ready, hidden, open, pos, mini, layoutPanel, selectedId]);
 
-  /** Close panel when pressing outside it (scrim + pointer outside toolbar/panel). */
   useEffect(() => {
     if (!open) return;
-
     function onPointerDown(event: MouseEvent | TouchEvent) {
       const target = event.target as Node | null;
       if (!target) return;
       if (dockRef.current?.contains(target)) return;
       setOpen(false);
     }
-
     function onKeyDown(event: KeyboardEvent) {
       if (event.key === 'Escape') setOpen(false);
     }
-
     document.addEventListener('mousedown', onPointerDown);
     document.addEventListener('touchstart', onPointerDown, { passive: true });
     document.addEventListener('keydown', onKeyDown);
@@ -407,187 +355,60 @@ export function CrmEyeLens() {
     };
   }, [open]);
 
-  const stats = salesRes?.data?.stats;
+  useEffect(() => {
+    if (!open || settings.autoCollapse === 'never') return;
+    if (interactingRef.current || panicLive) return;
+    const ms = settings.autoCollapse === '5' ? 5000 : 10000;
+    const id = window.setTimeout(() => {
+      if (!interactingRef.current && !panicLive) setOpen(false);
+    }, ms);
+    return () => window.clearTimeout(id);
+  }, [open, settings.autoCollapse, panicLive, selectedId, tab]);
+
   const leads = salesRes?.data?.leads ?? [];
   const unread = notifRes?.data?.unreadCount ?? 0;
-  const pastDue = billingRes?.data?.pastDueCount ?? 0;
-  const atRisk = billingRes?.data?.revenueAtRiskFormatted ?? '';
-
   const customers = useMemo(() => customersRes?.data ?? [], [customersRes]);
-
   const chatUnread = useMemo(() => {
-    const me = getSession('admin')?.user.id;
+    const me = session?.user.id;
     if (!me) return 0;
     const messages = chatRes?.data?.messages ?? [];
     const cutoff = Date.now() - 60 * 60 * 1000;
-    return messages.filter(
-      (m) => m.sender.id !== me && new Date(m.createdAt).getTime() > cutoff,
-    ).length;
-  }, [chatRes]);
+    return messages.filter((m) => m.sender.id !== me && new Date(m.createdAt).getTime() > cutoff).length;
+  }, [chatRes, session]);
 
   const followUps = useMemo(() => {
     const nowEnd = endOfDay(new Date(Date.now() + 2 * 86400000));
     return leads
       .filter((l) => l.nextFollowUp && !['WON', 'LOST'].includes(l.status))
       .filter((l) => new Date(l.nextFollowUp!).getTime() <= nowEnd)
-      .sort(
-        (a, b) =>
-          new Date(a.nextFollowUp!).getTime() - new Date(b.nextFollowUp!).getTime(),
-      );
+      .sort((a, b) => new Date(a.nextFollowUp!).getTime() - new Date(b.nextFollowUp!).getTime());
   }, [leads]);
-
-  const overdueFollowUps = followUps.filter(
-    (l) => new Date(l.nextFollowUp!).getTime() < startOfDay(),
-  );
-  const dueToday = followUps.filter((l) => {
-    const t = new Date(l.nextFollowUp!).getTime();
-    return t >= startOfDay() && t <= endOfDay();
-  });
-
-  const insights = useMemo<Insight[]>(() => {
-    const items: Insight[] = [];
-
-    if (criticals > 0) {
-      const top = hotIncidents[0];
-      items.push({
-        id: 'critical',
-        tone: 'hot',
-        title: `${criticals} critical open`,
-        detail: top
-          ? `${top.type} · ${top.user} — dispatch now`
-          : 'Life-safety incidents need an operator.',
-        href: CONTROL_ROOM_ROUTES.incidents,
-        action: 'Handle',
-      });
-    }
-
-    if (openIncidents > 0 && criticals === 0) {
-      items.push({
-        id: 'open-inc',
-        tone: 'warn',
-        title: `${openIncidents} active incident${openIncidents === 1 ? '' : 's'}`,
-        detail: 'Board is live — keep dispatch coverage tight.',
-        href: CONTROL_ROOM_ROUTES.dispatch,
-        action: 'Dispatch',
-      });
-    }
-
-    if (totalOfficers > 0 && availableOfficers / Math.max(1, totalOfficers) < 0.35) {
-      items.push({
-        id: 'coverage',
-        tone: 'warn',
-        title: `Low officer coverage · ${availableOfficers}/${totalOfficers}`,
-        detail: 'Available units are thin for current load.',
-        href: CONTROL_ROOM_ROUTES.officers,
-        action: 'Officers',
-      });
-    }
-
-    if (unread > 0) {
-      items.push({
-        id: 'alerts',
-        tone: criticals > 0 ? 'hot' : 'warn',
-        title: `${unread} unread ops alert${unread === 1 ? '' : 's'}`,
-        detail: 'Signals that may affect field response or accounts.',
-        href: CONTROL_ROOM_ROUTES.incidents,
-        action: 'Review',
-      });
-    }
-
-    if (pastDue > 0) {
-      items.push({
-        id: 'past-due',
-        tone: 'info',
-        title: `${pastDue} past-due subscription${pastDue === 1 ? '' : 's'}`,
-        detail: atRisk ? `${atRisk} at risk — renewals need chase.` : 'Billing needs attention.',
-        href: `${CONTROL_ROOM_ROUTES.customers}?filter=PAST_DUE`,
-        action: 'Customers',
-      });
-    }
-
-    if (overdueFollowUps.length > 0) {
-      const first = overdueFollowUps[0];
-      items.push({
-        id: 'overdue-fu',
-        tone: 'info',
-        title: `${overdueFollowUps.length} overdue sales follow-up${overdueFollowUps.length === 1 ? '' : 's'}`,
-        detail: `Start with ${first.contactName}${first.companyName ? ` · ${first.companyName}` : ''}.`,
-        href: '/control-room/sales',
-        action: 'Sales',
-      });
-    } else if (dueToday.length > 0) {
-      items.push({
-        id: 'due-today',
-        tone: 'good',
-        title: `${dueToday.length} follow-up${dueToday.length === 1 ? '' : 's'} due today`,
-        detail: dueToday
-          .slice(0, 2)
-          .map((l) => l.contactName)
-          .join(', '),
-        href: '/control-room/sales',
-        action: 'Pipeline',
-      });
-    }
-
-    if (items.length === 0) {
-      items.push({
-        id: 'clear',
-        tone: 'good',
-        title: 'Ops lens clear',
-        detail: 'No critical incidents or overdue chase items right now.',
-        href: CONTROL_ROOM_ROUTES.map,
-        action: 'Live map',
-      });
-    }
-
-    return items.slice(0, 5);
-  }, [
-    criticals,
-    hotIncidents,
-    openIncidents,
-    availableOfficers,
-    totalOfficers,
-    unread,
-    pastDue,
-    atRisk,
-    overdueFollowUps,
-    dueToday,
-  ]);
+  const calendarBadge = followUps.filter((l) => new Date(l.nextFollowUp!).getTime() <= endOfDay()).length;
 
   const searchHits = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (q.length < 2) return { leads: [] as Lead[], customers: [] as CustomerRow[] };
-
-    const leadHits = leads
-      .filter((l) =>
-        [l.contactName, l.companyName, l.contactEmail, l.contactPhone, l.interest]
-          .filter(Boolean)
-          .join(' ')
-          .toLowerCase()
-          .includes(q),
-      )
-      .slice(0, 6);
-
-    const customerHits = customers
-      .filter((c) =>
-        [`${c.firstName} ${c.lastName}`, c.email, c.phone]
-          .filter(Boolean)
-          .join(' ')
-          .toLowerCase()
-          .includes(q),
-      )
-      .slice(0, 6);
-
-    return { leads: leadHits, customers: customerHits };
+    return {
+      leads: leads
+        .filter((l) =>
+          [l.contactName, l.companyName, l.contactEmail, l.contactPhone, l.interest]
+            .filter(Boolean)
+            .join(' ')
+            .toLowerCase()
+            .includes(q),
+        )
+        .slice(0, 6),
+      customers: customers
+        .filter((c) =>
+          [`${c.firstName} ${c.lastName}`, c.email, c.phone].filter(Boolean).join(' ').toLowerCase().includes(q),
+        )
+        .slice(0, 6),
+    };
   }, [query, leads, customers]);
 
   const callTarget = useCallback(
-    async (target: {
-      userId?: string;
-      name: string;
-      phone?: string | null;
-      incidentId?: string;
-    }) => {
+    async (target: { userId?: string; name: string; phone?: string | null; incidentId?: string }) => {
+      recordLensAudit('Call initiated', `${target.name}${target.incidentId ? ` · ${target.incidentId}` : ''}`, actor);
       if (!calls?.portal) {
         router.push(CONTROL_ROOM_ROUTES.communications);
         return;
@@ -607,37 +428,8 @@ export function CrmEyeLens() {
         setCallBusy(false);
       }
     },
-    [calls, router],
+    [calls, router, actor],
   );
-
-  async function handleLensCall() {
-    const hot = hotIncidents[0] ?? dash?.incidents?.[0];
-    const match =
-      (hot
-        ? customers.find((c) => `${c.firstName} ${c.lastName}` === hot.user)
-        : null) ??
-      searchHits.customers[0] ??
-      customers[0];
-    if (match) {
-      await callTarget({
-        userId: match.id,
-        name: `${match.firstName} ${match.lastName}`,
-        phone: match.phone,
-        incidentId: hot?.id,
-      });
-      return;
-    }
-    if (hot) {
-      await callTarget({ name: hot.user, incidentId: hot.id });
-      return;
-    }
-    if (!calls?.portal) {
-      router.push(CONTROL_ROOM_ROUTES.communications);
-      return;
-    }
-    setTab('search');
-    setOpen(true);
-  }
 
   const persistMode = useCallback((nextMini: boolean) => {
     setMini(nextMini);
@@ -647,6 +439,29 @@ export function CrmEyeLens() {
       /* ignore */
     }
   }, []);
+
+  const persistSelected = useCallback((id: string | null) => {
+    setSelectedId(id);
+    try {
+      if (id) sessionStorage.setItem(SELECTED_KEY, id);
+      else sessionStorage.removeItem(SELECTED_KEY);
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
+  const openLens = useCallback(
+    (nextTab: PanelTab = 'intel') => {
+      setTab(nextTab);
+      setOpen(true);
+      const now = Date.now();
+      if (nextTab === 'intel' && now - lastOpenAuditRef.current > 20_000) {
+        lastOpenAuditRef.current = now;
+        recordLensAudit('Lens opened', 'Critical Quick Actions', actor);
+      }
+    },
+    [actor],
+  );
 
   const hide = useCallback(() => {
     setHidden(true);
@@ -669,34 +484,52 @@ export function CrmEyeLens() {
     }
   }, [persistMode]);
 
+  async function acknowledge(incident: OpsIncident) {
+    setAckedIds((cur) => {
+      const next = new Set(cur);
+      next.add(incident.id);
+      try {
+        sessionStorage.setItem(ACK_KEY, JSON.stringify([...next]));
+      } catch {
+        /* ignore */
+      }
+      return next;
+    });
+    recordLensAudit('Incident acknowledged', `${incident.type} · ${incident.user}`, actor);
+    try {
+      await adminApi.post(`/control-room/incidents/${incident.id}/notes`, { body: 'Ops timeline: ACK' });
+    } catch {
+      /* demo / offline */
+    }
+    void reloadDash({ silent: true });
+  }
+
+  async function escalate(incident: OpsIncident) {
+    recordLensAudit('Escalation initiated', `${incident.type} · ${incident.user}`, actor);
+    try {
+      await adminApi.post(`/control-room/incidents/${incident.id}/notes`, { body: 'Ops timeline: ESCALATE' });
+    } catch {
+      /* demo / offline */
+    }
+  }
+
   function onDragStart(e: ReactPointerEvent<HTMLButtonElement>) {
     const dock = dockRef.current;
     if (!dock) return;
     e.preventDefault();
     const rect = dock.getBoundingClientRect();
-    dragRef.current = {
-      ox: e.clientX,
-      oy: e.clientY,
-      px: pos?.x ?? rect.left,
-      py: pos?.y ?? rect.top,
-    };
+    dragRef.current = { ox: e.clientX, oy: e.clientY, px: pos?.x ?? rect.left, py: pos?.y ?? rect.top };
     (e.target as HTMLElement).setPointerCapture(e.pointerId);
   }
-
   function onDragMove(e: ReactPointerEvent<HTMLButtonElement>) {
     const dock = dockRef.current;
     if (!dragRef.current || !dock) return;
-    const dx = e.clientX - dragRef.current.ox;
-    const dy = e.clientY - dragRef.current.oy;
-    const w = dock.offsetWidth;
-    const h = dock.offsetHeight;
     const next = {
-      x: Math.min(Math.max(8, dragRef.current.px + dx), window.innerWidth - w - 8),
-      y: Math.min(Math.max(8, dragRef.current.py + dy), window.innerHeight - h - 8),
+      x: Math.min(Math.max(8, dragRef.current.px + (e.clientX - dragRef.current.ox)), window.innerWidth - dock.offsetWidth - 8),
+      y: Math.min(Math.max(8, dragRef.current.py + (e.clientY - dragRef.current.oy)), window.innerHeight - dock.offsetHeight - 8),
     };
     setPos(next);
   }
-
   function onDragEnd() {
     if (!pos) {
       dragRef.current = null;
@@ -710,19 +543,22 @@ export function CrmEyeLens() {
     dragRef.current = null;
   }
 
+  const policyForce = panicLive;
+  const showLens = settings.enabled || policyForce;
   if (!ready) return null;
+  if (!showLens) return null;
 
   if (hidden) {
     return (
       <button
         type="button"
-        className={`eye-lens-restore ${criticals > 0 ? 'eye-lens-restore--hot' : ''}`}
+        className={`eye-lens-restore eye-lens-restore--bottom ${panicLive ? 'eye-lens-restore--panic' : badge.count > 0 ? 'eye-lens-restore--hot' : ''}`}
         onClick={restore}
-        title="Open 4DS Ops Lens"
-        aria-label="Open 4DS Ops Lens"
+        data-tip="Critical Quick Actions"
+        aria-label="Open Critical Quick Actions Lens"
       >
-        <IconEye active />
-        {criticals > 0 && <Badge count={criticals} />}
+        {panicLive ? <I.Panic /> : <I.Eye active />}
+        <Badge count={badge.count} tone={panicLive ? 'panic' : badge.count > 0 ? 'critical' : undefined} />
       </button>
     );
   }
@@ -731,437 +567,367 @@ export function CrmEyeLens() {
     pos != null
       ? { left: pos.x, top: pos.y, right: 'auto' as const, bottom: 'auto' as const, transform: 'none' }
       : undefined;
+  const lensTone = panicLive ? 'panic' : badge.count > 0 ? 'critical' : 'idle';
+  const showMiniPlayer = Boolean(selected) && !open;
+
+  function goCall(incident: OpsIncident, target: 'client' | 'officer') {
+    if (target === 'officer') {
+      void callTarget({ name: incident.officer ?? 'Officer', phone: incident.officerPhone, incidentId: incident.id });
+      return;
+    }
+    void callTarget({ name: incident.user, phone: incident.userPhone, incidentId: incident.id });
+  }
+
+  function goNav(href: string) {
+    if (href.includes('map')) recordLensAudit('Map opened', href, actor);
+    else if (href.includes('surveillance')) recordLensAudit('CCTV opened', href, actor);
+    else if (href.includes('incidents')) recordLensAudit('Incident opened', href, actor);
+    setOpen(false);
+    router.push(href);
+  }
 
   return (
     <>
       {open ? (
-        <button
-          type="button"
-          className="eye-lens-scrim"
-          aria-label="Close quick actions"
-          onClick={() => setOpen(false)}
-        />
+        <button type="button" className="eye-lens-scrim" aria-label="Close Critical Quick Actions" onClick={() => setOpen(false)} />
       ) : null}
       <div
         ref={dockRef}
-        className={`eye-lens-dock ${mini ? 'eye-lens-dock--mini' : ''} ${pos != null ? 'eye-lens-dock--placed' : ''} ${open ? 'eye-lens-dock--open' : ''}`}
+        className={`eye-lens-dock eye-lens-dock--${settings.dockEdge} ${mini ? 'eye-lens-dock--mini' : ''} ${pos != null ? 'eye-lens-dock--placed' : ''} ${open ? 'eye-lens-dock--open' : ''}`}
         style={barStyle}
+        onPointerDown={() => {
+          interactingRef.current = true;
+        }}
+        onPointerUp={() => {
+          window.setTimeout(() => {
+            interactingRef.current = false;
+          }, 400);
+        }}
       >
-      <div
-        ref={barRef}
-        className={`eye-lens ${mini ? 'eye-lens--mini' : ''} ${open ? 'eye-lens--open' : ''} ${criticals > 0 ? 'eye-lens--hot' : ''}`}
-        role="toolbar"
-        aria-label="4DS Ops Lens"
-      >
-        <button
-          type="button"
-          className="eye-lens__drag"
-          aria-label="Drag ops lens"
-          title="Drag"
-          onPointerDown={onDragStart}
-          onPointerMove={onDragMove}
-          onPointerUp={onDragEnd}
-          onPointerCancel={onDragEnd}
+        <div
+          ref={barRef}
+          className={`eye-lens eye-lens--${lensTone} ${mini ? 'eye-lens--mini' : ''} ${open ? 'eye-lens--open' : ''}`}
+          role="toolbar"
+          aria-label="Control Room Command Dock"
         >
-          <IconDrag />
-        </button>
-
-        <button
-          type="button"
-          className={`eye-lens__tool eye-lens__tool--eye ${open && tab === 'intel' ? 'eye-lens__tool--active' : ''} ${criticals > 0 ? 'eye-lens__tool--critical' : ''}`}
-          aria-pressed={open && tab === 'intel'}
-          aria-label="Ops intel"
-          title="Ops Eye"
-          onClick={() => {
-            if (open && tab === 'intel') setOpen(false);
-            else {
-              setTab('intel');
-              setOpen(true);
-            }
-          }}
-        >
-          <IconEye active={(open && tab === 'intel') || criticals > 0} />
-          <Badge count={criticals} />
-        </button>
-
-        {mini ? (
           <button
             type="button"
-            className="eye-lens__copy"
-            aria-label={
-              criticals > 0
-                ? `${criticals} critical — expand tools`
-                : `Expand ops tools for ${firstName}`
-            }
-            title="Show ops tools"
-            onClick={() => {
-              persistMode(false);
-              if (criticals > 0) {
-                setTab('intel');
-                setOpen(true);
+            className="eye-lens__drag"
+            aria-label="Move command dock"
+            title="Move"
+            onPointerDown={onDragStart}
+            onPointerMove={onDragMove}
+            onPointerUp={onDragEnd}
+            onPointerCancel={onDragEnd}
+          >
+            <I.Drag />
+          </button>
+
+          <div className="eye-lens__group" role="group" aria-label="Command">
+            <button
+              type="button"
+              className={`eye-lens__tool eye-lens__tool--eye ${open && tab === 'intel' ? 'eye-lens__tool--active' : ''} ${panicLive ? 'eye-lens__tool--panic' : badge.count > 0 ? 'eye-lens__tool--critical' : ''}`}
+              aria-pressed={open && tab === 'intel'}
+              aria-label={
+                panicLive
+                  ? `Critical Quick Actions, ${badge.count} panic`
+                  : `Critical Quick Actions${badge.count ? `, ${badge.count} requiring attention` : ''}`
               }
+              data-tip="Critical Quick Actions"
+              onClick={() => {
+                if (open && tab === 'intel') setOpen(false);
+                else openLens('intel');
+              }}
+            >
+              {panicLive ? <I.Panic /> : <I.Eye active={open && tab === 'intel'} />}
+              <Badge count={badge.count} tone={panicLive ? 'panic' : badge.count > 0 ? 'critical' : undefined} />
+            </button>
+            <button
+              type="button"
+              className={`eye-lens__tool ${open && tab === 'notify' ? 'eye-lens__tool--active-soft' : ''}`}
+              aria-label={`Notifications${unread ? `, ${unread} unread` : ''}`}
+              data-tip="Notifications"
+              onClick={() => {
+                openLens('notify');
+                void reloadNotifs();
+              }}
+            >
+              <I.Bell />
+              <Badge count={unread} tone="info" />
+            </button>
+            {canAccessControlRoomRoute(role, CONTROL_ROOM_ROUTES.chat) ? (
+              <button
+                type="button"
+                className="eye-lens__tool"
+                aria-label={`Communications${chatUnread ? `, ${chatUnread} recent` : ''}`}
+                data-tip="Communications"
+                onClick={() => router.push(CONTROL_ROOM_ROUTES.chat)}
+              >
+                <I.Chat />
+                <Badge count={chatUnread} tone="info" />
+              </button>
+            ) : null}
+          </div>
+
+          <div className="eye-lens__tools">
+            <span className="eye-lens__rule" aria-hidden />
+            <div className="eye-lens__group" role="group" aria-label="Operations">
+              {perms.map ? (
+                <button
+                  type="button"
+                  className={`eye-lens__tool ${pathname.includes('/control-room/map') ? 'eye-lens__tool--on' : ''}`}
+                  aria-label="Live Map"
+                  data-tip="Live Map"
+                  onClick={() => router.push(CONTROL_ROOM_ROUTES.map)}
+                >
+                  <I.Map />
+                </button>
+              ) : null}
+              {perms.call ? (
+                <button
+                  type="button"
+                  className="eye-lens__tool"
+                  aria-label="Control Room Calling"
+                  data-tip={callBusy ? "Connecting…" : "Control Room Calling"}
+                  disabled={callBusy}
+                  onClick={() => {
+                    const hot = selected ?? queue[0];
+                    if (hot) goCall(hot, 'client');
+                    else router.push(CONTROL_ROOM_ROUTES.communications);
+                  }}
+                >
+                  <I.Phone />
+                </button>
+              ) : null}
+              <button
+                type="button"
+                className={`eye-lens__tool ${open && tab === 'search' ? 'eye-lens__tool--active-soft' : ''}`}
+                aria-label="Global Search"
+                data-tip="Global Search"
+                onClick={() => openLens('search')}
+              >
+                <I.Search />
+              </button>
+              {perms.fleet ? (
+                <button
+                  type="button"
+                  className={`eye-lens__tool ${pathname.includes('/control-room/fleet') ? 'eye-lens__tool--on' : ''}`}
+                  aria-label="Fleet & Units"
+                  data-tip="Fleet & Units"
+                  onClick={() => router.push(CONTROL_ROOM_ROUTES.fleet)}
+                >
+                  <I.Fleet />
+                </button>
+              ) : null}
+              <button
+                type="button"
+                className="eye-lens__tool"
+                aria-label="Operations Calendar"
+                data-tip="Operations Calendar"
+                onClick={() => router.push('/control-room/sales')}
+              >
+                <I.Calendar />
+                <Badge count={calendarBadge} tone="info" />
+              </button>
+            </div>
+            <span className="eye-lens__rule" aria-hidden />
+            <div className="eye-lens__group" role="group" aria-label="System">
+              <button type="button" className="eye-lens__tool" aria-label="Display Settings" data-tip="Display Settings" onClick={toggleTheme}>
+                <I.Display dark={theme === 'dark'} />
+              </button>
+              <button type="button" className="eye-lens__close" aria-label="Close Command Dock" data-tip="Close Command Dock" onClick={hide}>
+                ×
+              </button>
+            </div>
+          </div>
+
+          {mini ? (
+            <button type="button" className="eye-lens__expand" aria-label="Expand command dock" data-tip="Expand" onClick={() => persistMode(false)}>
+              <I.Expand />
+            </button>
+          ) : null}
+        </div>
+
+        {peek && !open ? (
+          <button
+            type="button"
+            className="eye-lens-peek"
+            onClick={() => {
+              persistSelected(peek.id);
+              openLens('intel');
+              setPeekId(null);
             }}
           >
-            <strong>{criticals > 0 ? `${criticals} critical` : firstName}</strong>
-            <span>
-              {criticals > 0
-                ? 'Needs action now'
-                : unread > 0
-                  ? `${unread} update${unread === 1 ? '' : 's'} waiting`
-                  : `Here are your updates, ${firstName}.`}
-            </span>
+            <strong>
+              {peek.type.toUpperCase().includes('PANIC') ? 'P1 PANIC' : peek.type} · {peek.user}
+            </strong>
+            <span>Respond now</span>
           </button>
         ) : null}
 
-        <div className="eye-lens__tools">
-        <button
-          type="button"
-          className={`eye-lens__tool ${open && tab === 'notify' ? 'eye-lens__tool--active-soft' : ''}`}
-          aria-label={`Notifications${unread ? `, ${unread} unread` : ''}`}
-          title="Alerts"
-          onClick={() => {
-            setTab('notify');
-            setOpen(true);
-            void reloadNotifs();
-          }}
-        >
-          <IconBell />
-          <Badge count={unread} />
-        </button>
-
-        <button
-          type="button"
-          className="eye-lens__tool"
-          aria-label={`Chat${chatUnread ? `, ${chatUnread} recent` : ''}`}
-          title="Team chat"
-          onClick={() => router.push(CONTROL_ROOM_ROUTES.chat)}
-        >
-          <IconChat />
-          <Badge count={chatUnread} />
-        </button>
-
-        <button
-          type="button"
-          className="eye-lens__tool"
-          aria-label="Live map"
-          title="Live map"
-          onClick={() => router.push(CONTROL_ROOM_ROUTES.map)}
-        >
-          <IconMap />
-        </button>
-
-        <button
-          type="button"
-          className="eye-lens__tool"
-          aria-label="Call client / dispatch"
-          title={callBusy ? 'Connecting…' : 'Call'}
-          disabled={callBusy}
-          onClick={() => void handleLensCall()}
-        >
-          <IconPhone />
-        </button>
-
-        <button
-          type="button"
-          className={`eye-lens__tool ${open && tab === 'search' ? 'eye-lens__tool--active-soft' : ''}`}
-          aria-label="Search customers"
-          title="Search"
-          onClick={() => {
-            setTab('search');
-            setOpen(true);
-          }}
-        >
-          <IconSearch />
-        </button>
-
-        <button
-          type="button"
-          className="eye-lens__tool"
-          aria-label="Documents"
-          title="Documents"
-          onClick={() => router.push(CONTROL_ROOM_ROUTES.documents)}
-        >
-          <IconInbox />
-        </button>
-
-        <button
-          type="button"
-          className="eye-lens__tool"
-          aria-label="Sales follow-ups"
-          title="Follow-ups"
-          onClick={() => {
-            setTab('intel');
-            setOpen(true);
-            router.push('/control-room/sales');
-          }}
-        >
-          <IconCalendar />
-          <Badge count={overdueFollowUps.length + dueToday.length} />
-        </button>
-
-        <button
-          type="button"
-          className="eye-lens__tool eye-lens__tool--gear"
-          aria-label="Settings"
-          title="Settings"
-          onClick={() => router.push('/control-room/settings')}
-        >
-          <IconGear />
-        </button>
-        </div>
-
-        {mini ? (
-          <button
-            type="button"
-            className="eye-lens__expand"
-            aria-label="Expand ops tools"
-            title="Expand"
-            onClick={() => persistMode(false)}
-          >
-            <IconExpand />
-          </button>
-        ) : (
-          <button
-            type="button"
-            className="eye-lens__close"
-            aria-label="Collapse to mini view"
-            title="Mini view"
-            onClick={() => {
-              setOpen(false);
-              persistMode(true);
+        {showMiniPlayer && selected ? (
+          <EyeLensMiniPlayer
+            incident={selected}
+            acked={ackedIds.has(selected.id)}
+            callBusy={callBusy}
+            perms={perms}
+            onOpen={() => openLens('intel')}
+            onCall={(target) => goCall(selected, target)}
+            onAssigned={() => {
+              recordLensAudit('Dispatch initiated', `${selected.type} · ${selected.user}`, actor);
+              void reloadDash();
             }}
+            onNavigate={goNav}
+          />
+        ) : null}
+
+        {open ? (
+          <div
+            className={`eye-lens-panel ${panelFit.placement === 'below' ? 'eye-lens-panel--below' : 'eye-lens-panel--above'} ${panicLive ? 'eye-lens-panel--panic' : badge.count > 0 ? 'eye-lens-panel--critical' : ''}`}
+            style={{ left: panelFit.left, width: panelFit.width, maxHeight: panelFit.maxHeight }}
+            role="dialog"
+            aria-modal="true"
+            aria-label={tab === 'intel' ? 'Critical Quick Actions' : tab === 'search' ? 'Global Search' : 'Notifications'}
           >
-            ×
-          </button>
-        )}
-      </div>
+            {tab === 'intel' ? (
+              <EyeLensCriticalPanel
+                tab="intel"
+                incidents={queue}
+                selected={selected}
+                ackedIds={ackedIds}
+                activeCount={dash?.stats.activeIncidents ?? incidents.length}
+                fieldAvailable={dash?.stats.availableOfficers ?? 0}
+                fieldTotal={dash?.stats.totalOfficers ?? 0}
+                slaCount={slaCount}
+                callBusy={callBusy}
+                context={context}
+                perms={perms}
+                availableOfficers={dash?.officers ?? []}
+                onSelect={(id) => {
+                  persistSelected(id);
+                  const item = incidents.find((i) => i.id === id);
+                  if (item) recordLensAudit('Incident viewed', `${item.type} · ${item.user}`, actor);
+                }}
+                onBack={() => persistSelected(null)}
+                onCollapse={() => setOpen(false)}
+                onAcknowledge={(incident) => void acknowledge(incident)}
+                onCall={goCall}
+                onEscalate={(incident) => void escalate(incident)}
+                onAssigned={() => {
+                  if (selected) recordLensAudit('Dispatch initiated', `${selected.type} · ${selected.user}`, actor);
+                  void reloadDash();
+                }}
+                onNavigate={goNav}
+              />
+            ) : null}
 
-      {open && (
-        <div
-          ref={panelRef}
-          className={`eye-lens-panel ${panelFit.placement === 'below' ? 'eye-lens-panel--below' : 'eye-lens-panel--above'} ${criticals > 0 ? 'eye-lens-panel--critical' : ''}`}
-          style={{
-            left: panelFit.left,
-            width: panelFit.width,
-            maxHeight: panelFit.maxHeight,
-          }}
-          role="dialog"
-          aria-modal="true"
-          aria-label="4DS Ops Lens"
-        >
-          <div className="eye-lens-panel__header">
-            <div>
-              <p className="eye-lens-panel__eyebrow">
-                {criticals > 0 ? 'Critical quick actions' : '4DS Ops Lens'}
-              </p>
-              <h3>
-                {tab === 'intel' && (criticals > 0 ? 'Needs action now' : 'Quick actions')}
-                {tab === 'search' && 'Find people'}
-                {tab === 'notify' && 'Ops alerts'}
-              </h3>
-            </div>
-            <button
-              type="button"
-              className="eye-lens-panel__x"
-              aria-label="Close panel"
-              onClick={() => setOpen(false)}
-            >
-              ×
-            </button>
-          </div>
-
-          {tab === 'intel' && (
-            <div className="eye-lens-panel__body">
-              <div className="eye-lens-stats">
-                <div className="eye-lens-stat">
-                  <span>Critical</span>
-                  <strong className={criticals > 0 ? 'eye-lens-stat--hot' : ''}>{criticals}</strong>
-                </div>
-                <div className="eye-lens-stat">
-                  <span>Incidents</span>
-                  <strong>{openIncidents}</strong>
-                </div>
-                <div className="eye-lens-stat">
-                  <span>Officers</span>
-                  <strong>
-                    {availableOfficers}/{Math.max(totalOfficers, availableOfficers)}
-                  </strong>
-                </div>
-                <div className="eye-lens-stat">
-                  <span>Alerts</span>
-                  <strong className={unread > 0 ? 'eye-lens-stat--hot' : ''}>{unread}</strong>
-                </div>
-              </div>
-
-              <ul className="eye-lens-insights">
-                {insights.map((item) => (
-                  <li key={item.id} className={`eye-lens-insight eye-lens-insight--${item.tone}`}>
-                    <div>
-                      <strong>{item.title}</strong>
-                      <p>{item.detail}</p>
-                    </div>
-                    <Link href={item.href} className="eye-lens-insight__go" onClick={() => setOpen(false)}>
-                      {item.action}
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-
-              {hotIncidents.length > 0 && (
-                <div className="eye-lens-section">
-                  <h4>Hot incidents</h4>
-                  <ul className="eye-lens-list">
-                    {hotIncidents.slice(0, 4).map((i) => (
-                      <li key={i.id}>
-                        <div>
-                          <strong>{i.type}</strong>
-                          <span>{i.user}</span>
-                        </div>
-                        <Link
-                          href={CONTROL_ROOM_ROUTES.dispatch}
-                          className="eye-lens-call-btn"
-                          onClick={() => setOpen(false)}
-                        >
-                          Dispatch
-                        </Link>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-
-              {followUps.length > 0 && (
-                <div className="eye-lens-section">
-                  <h4>Sales follow-ups</h4>
-                  <ul className="eye-lens-list">
-                    {followUps.slice(0, 3).map((l) => (
-                      <li key={l.id}>
-                        <div>
-                          <strong>{l.contactName}</strong>
-                          <span>
-                            {l.companyName ? `${l.companyName} · ` : ''}
-                            {l.status}
-                          </span>
-                        </div>
-                        <em>{formatFollowUp(l.nextFollowUp!)}</em>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-            </div>
-          )}
-
-          {tab === 'search' && (
-            <div className="eye-lens-panel__body">
-              <label className="eye-lens-search">
-                <IconSearch />
-                <input
-                  autoFocus
-                  type="search"
-                  placeholder="Search leads or customers…"
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                />
-              </label>
-
-              {query.trim().length < 2 ? (
-                <p className="eye-lens-empty">Type at least 2 characters to search.</p>
-              ) : searchHits.leads.length === 0 && searchHits.customers.length === 0 ? (
-                <p className="eye-lens-empty">No matches for “{query.trim()}”.</p>
-              ) : (
-                <>
-                  {searchHits.leads.length > 0 && (
-                    <div className="eye-lens-section">
-                      <h4>Leads</h4>
-                      <ul className="eye-lens-list">
-                        {searchHits.leads.map((l) => (
-                          <li key={l.id}>
-                            <div>
-                              <strong>{l.contactName}</strong>
-                              <span>
-                                {l.status}
-                                {l.estimatedFormatted ? ` · ${l.estimatedFormatted}` : ''}
-                              </span>
-                            </div>
-                            <Link href="/control-room/sales" onClick={() => setOpen(false)}>
-                              Open
-                            </Link>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-                  {searchHits.customers.length > 0 && (
-                    <div className="eye-lens-section">
-                      <h4>Customers</h4>
-                      <ul className="eye-lens-list">
-                        {searchHits.customers.map((c) => (
-                          <li key={c.id}>
-                            <div>
-                              <strong>
-                                {c.firstName} {c.lastName}
-                              </strong>
-                              <span>{c.email}</span>
-                            </div>
-                            <div className="eye-lens-list__actions">
-                              <button
-                                type="button"
-                                className="eye-lens-call-btn"
-                                disabled={callBusy}
-                                onClick={() =>
-                                  void callTarget({
-                                    userId: c.id,
-                                    name: `${c.firstName} ${c.lastName}`,
-                                    phone: c.phone,
-                                  })
-                                }
-                              >
-                                Call
-                              </button>
-                              <Link href={customerHref(c.id)} onClick={() => setOpen(false)}>
+            {tab === 'search' ? (
+              <div className="eye-lens-panel__body">
+                <header className="eye-lens-head">
+                  <div>
+                    <p className="eye-lens-head__title">Global Search</p>
+                    <p className="eye-lens-head__sub">Customers and leads</p>
+                  </div>
+                  <button type="button" className="eye-lens-collapse" aria-label="Collapse search" onClick={() => setOpen(false)}>
+                    <Chevron />
+                  </button>
+                </header>
+                <label className="eye-lens-search">
+                  <I.Search />
+                  <input autoFocus type="search" placeholder="Search leads or customers…" value={query} onChange={(e) => setQuery(e.target.value)} />
+                </label>
+                {query.trim().length < 2 ? (
+                  <p className="eye-lens-empty">Type at least 2 characters to search.</p>
+                ) : searchHits.leads.length === 0 && searchHits.customers.length === 0 ? (
+                  <p className="eye-lens-empty">No matches for “{query.trim()}”.</p>
+                ) : (
+                  <>
+                    {searchHits.leads.length > 0 ? (
+                      <div className="eye-lens-section">
+                        <h4>Leads</h4>
+                        <ul className="eye-lens-list">
+                          {searchHits.leads.map((l) => (
+                            <li key={l.id}>
+                              <div>
+                                <strong>{l.contactName}</strong>
+                                <span>
+                                  {l.status}
+                                  {l.estimatedFormatted ? ` · ${l.estimatedFormatted}` : ''}
+                                </span>
+                              </div>
+                              <Link href="/control-room/sales" onClick={() => setOpen(false)}>
                                 Open
                               </Link>
-                            </div>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-                </>
-              )}
-            </div>
-          )}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    ) : null}
+                    {searchHits.customers.length > 0 ? (
+                      <div className="eye-lens-section">
+                        <h4>Customers</h4>
+                        <ul className="eye-lens-list">
+                          {searchHits.customers.map((c) => (
+                            <li key={c.id}>
+                              <div>
+                                <strong>
+                                  {c.firstName} {c.lastName}
+                                </strong>
+                                <span>{c.email}</span>
+                              </div>
+                              <div className="eye-lens-list__actions">
+                                <button
+                                  type="button"
+                                  className="eye-lens-call-btn"
+                                  disabled={callBusy}
+                                  onClick={() => void callTarget({ userId: c.id, name: `${c.firstName} ${c.lastName}`, phone: c.phone })}
+                                >
+                                  Call
+                                </button>
+                                <Link href={customerHref(c.id)} onClick={() => setOpen(false)}>
+                                  Open
+                                </Link>
+                              </div>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    ) : null}
+                  </>
+                )}
+              </div>
+            ) : null}
 
-          {tab === 'notify' && (
-            <div className="eye-lens-panel__body">
-              <div className={`eye-lens-notify ${unread > 0 ? 'eye-lens-notify--live' : ''}`}>
-                <strong>{unread}</strong>
-                <span>unread ops notification{unread === 1 ? '' : 's'}</span>
+            {tab === 'notify' ? (
+              <div className="eye-lens-panel__body">
+                <header className="eye-lens-head">
+                  <div>
+                    <p className="eye-lens-head__title">Notifications</p>
+                    <p className="eye-lens-head__sub">Routine ops updates</p>
+                  </div>
+                  <button type="button" className="eye-lens-collapse" aria-label="Collapse notifications" onClick={() => setOpen(false)}>
+                    <Chevron />
+                  </button>
+                </header>
+                <div className={`eye-lens-notify ${unread > 0 ? 'eye-lens-notify--live' : ''}`}>
+                  <strong>{unread}</strong>
+                  <span>unread notification{unread === 1 ? '' : 's'}</span>
+                </div>
+                <p className="eye-lens-empty">
+                  The Lens badge only counts panic, duress, P1 and critical SLA items. Routine notifications stay here.
+                </p>
+                <div className="eye-lens-panel__actions">
+                  <Link href={CONTROL_ROOM_ROUTES.incidents} className="eye-lens-btn eye-lens-btn--primary" onClick={() => setOpen(false)}>
+                    Incidents
+                  </Link>
+                  <Link href={CONTROL_ROOM_ROUTES.map} className="eye-lens-btn" onClick={() => setOpen(false)}>
+                    Live map
+                  </Link>
+                </div>
               </div>
-              <p className="eye-lens-empty">
-                Critical items are sorted first in the bell feed. Jump to incidents or dispatch if something looks urgent.
-              </p>
-              <div className="eye-lens-panel__actions">
-                <Link
-                  href={CONTROL_ROOM_ROUTES.incidents}
-                  className="eye-lens-btn eye-lens-btn--primary"
-                  onClick={() => setOpen(false)}
-                >
-                  Incidents
-                </Link>
-                <Link
-                  href={CONTROL_ROOM_ROUTES.map}
-                  className="eye-lens-btn"
-                  onClick={() => setOpen(false)}
-                >
-                  Live map
-                </Link>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
+            ) : null}
+          </div>
+        ) : null}
       </div>
     </>
   );

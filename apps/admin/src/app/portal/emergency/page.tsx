@@ -1,10 +1,13 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { EmergencyDispatchCallCard } from '@/components/portal/EmergencyCallButton';
 import { FeatureHub } from '@/components/portal/FeatureHub';
 import { PortalLayout } from '@/components/portal/PortalLayout';
+import { HoldToActivate } from '@/components/ops/EmergencyMode';
+import { EmergencyProtectionBanner } from '@/components/security/EmergencyProtectionBanner';
 import { useApi } from '@/hooks/useApi';
 import { clientApi, type ApiResponse } from '@/lib/api-client';
 
@@ -71,84 +74,89 @@ function EmergencyContent() {
   return (
     <FeatureHub
       title="Emergency Hub"
-      subtitle="One-touch emergency activation and discreet silent alerts."
+      subtitle="Hold Panic in a real emergency. Silent Panic is a 2-second hold."
       features={[
-        { title: 'Panic Button', description: 'Immediately alerts the control room with your details and location.', status: 'Ready', href: '/portal/emergency#emergency-actions', action: 'Activate below' },
-        { title: 'Silent Panic', description: 'Discreet activation — appears normal on device while notifying dispatch.', status: 'Ready', href: '/portal/emergency#emergency-actions', action: 'Activate below' },
-        { title: 'Emergency Contacts', description: 'Trusted contacts who receive alerts during emergencies.', href: '/portal/contacts', action: 'Manage contacts' },
-        { title: 'Medical Emergency', description: 'Automatically requests ambulance and shares your medical profile.', status: 'Ready', href: '/portal/emergency#emergency-actions', action: 'Request below' },
-        { title: 'Fire Emergency', description: 'Requests fire response and notifies the nearest fire unit and dispatch.', status: 'Ready', href: '/portal/emergency#emergency-actions', action: 'Request below' },
-        { title: 'Home Panic', description: 'Trigger emergency response for your registered property.', href: '/portal/home', action: 'Go to home security' },
-        { title: 'Incident History', description: 'Complete record of alerts, responses, and outcomes.', href: '/portal/incidents', action: 'View history' },
+        { title: 'Panic Button', description: 'Hold to alert control room with your details and location.', status: 'Ready', href: '/portal/emergency#emergency-actions', action: 'Hold Panic below' },
+        { title: 'Silent Panic', description: 'Hold 2 seconds. Control room is notified discreetly.', status: 'Ready', href: '/portal/emergency#emergency-actions', action: 'Hold Silent below' },
+        { title: 'Emergency Contacts', description: 'People we can contact if you are unavailable.', href: '/portal/contacts', action: 'Manage contacts' },
+        { title: 'Medical Emergency', description: 'Requests ambulance and shares your medical profile.', status: 'Ready', href: '/portal/emergency#emergency-actions', action: 'Request ambulance below' },
+        { title: 'Fire Emergency', description: 'Requests fire response and notifies dispatch.', status: 'Ready', href: '/portal/emergency#emergency-actions', action: 'Hold Fire below' },
+        { title: 'Home security', description: 'Alarms and CCTV for a registered property. Use Fire below for a property emergency.', href: '/portal/home', action: 'Open home security' },
+        { title: 'Trusted devices', description: 'Primary phone, lock, mark lost, or replace.', href: '/portal/security/devices', action: 'Open devices' },
+        { title: 'Emergency access', description: 'Recover from another phone without weakening authentication.', href: '/portal/security/emergency-access', action: 'Open recovery' },
+        { title: 'Incident History', description: 'Alerts, responses, and outcomes.', href: '/portal/incidents', action: 'View history' },
       ]}
     >
-      {contactsMeta?.meta?.dispatchLine && (
-        <EmergencyDispatchCallCard
-          name={contactsMeta.meta.dispatchLine.name}
-          phone={contactsMeta.meta.dispatchLine.phone}
-        />
-      )}
+      <EmergencyDispatchCallCard
+        name={contactsMeta?.meta?.dispatchLine?.name}
+        phone={contactsMeta?.meta?.dispatchLine?.phone}
+      />
 
-      <div id="emergency-actions" className="emergency-actions">
-        <button
-          type="button"
-          className={`panic-button ${panicLoading ? 'panic-button--loading' : ''}`}
-          onClick={() => trigger(false)}
+      <EmergencyProtectionBanner compact />
+
+      <div id="emergency-actions" className="emergency-actions panic-tray">
+        <HoldToActivate
+          label="Panic"
+          holdMs={3000}
+          hideHint
+          keepLabel
+          loading={panicLoading}
           disabled={anyLoading}
+          className="hold-activate--circle panic-knob"
+          onActivate={() => trigger(false)}
         >
-          {panicLoading ? <LoadingSpinner label="" size="sm" /> : (
-            <span className="panic-button-inner">
-              <span className="panic-icon">!</span>
-              <span className="panic-label">PANIC</span>
-            </span>
-          )}
-        </button>
+          <span className="panic-knob__title">Panic</span>
+          <span className="panic-knob__sub">Hold 3 seconds</span>
+        </HoldToActivate>
+        <p className="panic-note">Release to cancel</p>
         <div className="emergency-actions__secondary panic-orbit">
-          <button
-            type="button"
-            className="panic-orbit-btn panic-orbit-btn--silent"
-            onClick={() => trigger(true)}
-            disabled={anyLoading}
+          <HoldToActivate
+            label="Silent Panic. Hold 2 seconds to notify control room discreetly."
+            holdMs={2000}
+            tone="warn"
+            hideHint
+            keepLabel
+            className="panic-orbit-btn panic-orbit-btn--silent panic-knob"
+            loading={silentLoading}
+            disabled={anyLoading && !silentLoading}
+            onActivate={() => trigger(true)}
           >
-            {silentLoading ? <LoadingSpinner label="" size="sm" /> : (
-              <>
-                <span className="panic-orbit-btn__glyph">S</span>
-                <span className="panic-orbit-btn__label">Silent Panic</span>
-              </>
-            )}
-          </button>
+            <span className="panic-knob__kicker">Hold 2s</span>
+            <span className="panic-knob__title">Silent</span>
+          </HoldToActivate>
           <button
             type="button"
-            className="panic-orbit-btn panic-orbit-btn--medical"
+            className="panic-orbit-btn panic-orbit-btn--medical panic-knob"
             onClick={requestAmbulance}
             disabled={anyLoading}
           >
             {medicalLoading ? <LoadingSpinner label="" size="sm" /> : (
               <>
-                <span className="panic-orbit-btn__glyph">+</span>
-                <span className="panic-orbit-btn__label">Request Ambulance</span>
+                <span className="panic-knob__kicker">Hold 2s</span>
+                <span className="panic-knob__title">Medical</span>
               </>
             )}
           </button>
           <button
             type="button"
-            className="panic-orbit-btn panic-orbit-btn--fire"
+            className="panic-orbit-btn panic-orbit-btn--fire panic-knob"
             onClick={requestFire}
             disabled={anyLoading}
           >
             {fireLoading ? <LoadingSpinner label="" size="sm" /> : (
               <>
-                <span className="panic-orbit-btn__glyph">F</span>
-                <span className="panic-orbit-btn__label">Fire Emergency</span>
+                <span className="panic-knob__kicker">Hold 2s</span>
+                <span className="panic-knob__title">Fire</span>
               </>
             )}
           </button>
         </div>
       </div>
       {msg && <p className="alert alert--success">{msg}</p>}
-      <p className="text-muted medical-emergency-hint">
-        Set up your medical profile under <a href="/portal/medical">Medical</a> so responders receive allergies, medications, and instructions.
-      </p>
+          <p className="text-muted medical-emergency-hint">
+            Set up your medical profile under <Link href="/portal/medical">Medical</Link> so responders receive
+            allergies, medications, and instructions.
+          </p>
     </FeatureHub>
   );
 }

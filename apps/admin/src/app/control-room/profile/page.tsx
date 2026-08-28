@@ -7,7 +7,10 @@ import { ControlRoomLayout } from '@/components/control-room/ControlRoomLayout';
 import { ErrorAlert } from '@/components/ErrorAlert';
 import { ThemeSettings } from '@/components/ThemeSettings';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
+import { OpsDialog } from '@/components/ops/OpsDialog';
+import { UserAvatar } from '@/components/ui/UserAvatar';
 import { useApi } from '@/hooks/useApi';
+import { useActionHandoff } from '@/hooks/useActionHandoff';
 import { adminApi, type ApiResponse } from '@/lib/api-client';
 import { clearSession, getSession, updateSessionUser } from '@/lib/auth';
 import { roleDisplayLabel } from '@/lib/role-labels';
@@ -31,12 +34,13 @@ type DeveloperDesk = {
 
 const DEVELOPER_LINKS = [
   { label: 'Developer desk', href: '/control-room/developer', desc: 'Issue tickets & support chat' },
+  { label: 'Ops Board', href: '/control-room', desc: 'Live incidents, CCTV wall, fleet strip' },
   { label: 'Live map', href: '/control-room/map', desc: 'Fleet & incident positions' },
   { label: 'Incidents', href: '/control-room/incidents', desc: 'Panic, medical, and dispatch queue' },
   { label: 'Customers', href: '/control-room/customers', desc: 'CRM, subscriptions, billing checks' },
   { label: 'Gear store', href: '/control-room/store', desc: 'Inventory & POS (revenue may be hidden)' },
   { label: 'Internal chat', href: '/control-room/chat', desc: 'Staff channels incl. dev-support' },
-  { label: 'Settings', href: '/control-room/settings', desc: 'Theme, alerts, role access guide' },
+  { label: 'Settings', href: '/control-room/my-settings', desc: 'Personal preferences' },
 ];
 
 const DEVELOPER_ACCESS = [
@@ -60,6 +64,7 @@ function ProfileContent() {
   const router = useRouter();
   const session = getSession('admin');
   const isDeveloper = session?.user.role === 'DEVELOPER';
+  const handoff = useActionHandoff();
 
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -149,12 +154,15 @@ function ProfileContent() {
   }
 
   function logout() {
-    clearSession('admin');
-    router.push('/login?as=developer');
+    handoff.begin('sign-out', () => {
+      clearSession('admin');
+      router.push(isDeveloper ? '/login?as=developer' : '/login');
+    });
   }
 
   return (
     <div className="page-content page-content--profile">
+      {handoff.overlay}
       <div className="page-header">
         <div>
           <p className="text-muted">
@@ -163,15 +171,9 @@ function ProfileContent() {
               : 'Your control panel account and preferences.'}
           </p>
         </div>
-        {!editing ? (
-          <button type="button" className="btn-secondary" onClick={() => setEditing(true)}>
-            Edit profile
-          </button>
-        ) : (
-          <button type="button" className="btn-ghost" onClick={cancelEdit}>
-            Cancel
-          </button>
-        )}
+        <button type="button" className="btn-secondary" onClick={() => setEditing(true)}>
+          Edit profile
+        </button>
       </div>
 
       {saveMsg && (
@@ -185,11 +187,8 @@ function ProfileContent() {
 
       <section className="profile-hero portal-card">
         <div className="profile-hero-main">
-          <div className="profile-avatar profile-avatar--lg">
-            {p.firstName[0]}
-            {p.lastName[0]}
-          </div>
-          <div>
+          <UserAvatar firstName={p.firstName} lastName={p.lastName} size="lg" />
+          <div className="profile-hero-copy">
             <h2 className="profile-hero-name">{fullName}</h2>
             <p className="text-muted">{p.email}</p>
             <div className="profile-hero-badges">
@@ -218,75 +217,33 @@ function ProfileContent() {
         )}
       </section>
 
-      {editing ? (
-        <section className="portal-card profile-section">
-          <h2>Edit details</h2>
-          <form onSubmit={(e) => void handleSave(e)} className="form-grid">
-            <label className="form-field">
-              <span>First name</span>
-              <input
-                value={firstName}
-                onChange={(e) => setFirstName(e.target.value)}
-                required
-              />
-            </label>
-            <label className="form-field">
-              <span>Last name</span>
-              <input value={lastName} onChange={(e) => setLastName(e.target.value)} required />
-            </label>
-            <label className="form-field">
-              <span>Phone</span>
-              <input
-                type="tel"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                placeholder="+27 …"
-              />
-            </label>
-            <label className="form-field">
-              <span>Job title</span>
-              <input
-                value={jobTitle}
-                onChange={(e) => setJobTitle(e.target.value)}
-                placeholder="Platform Developer"
-              />
-            </label>
-            <div className="entity-card-actions" style={{ gridColumn: '1 / -1' }}>
-              <button type="submit" className="btn-primary" disabled={saving}>
-                {saving ? 'Saving…' : 'Save profile'}
-              </button>
-            </div>
-          </form>
-        </section>
-      ) : (
-        <section className="portal-card profile-section">
-          <h2>Account details</h2>
-          <dl className="profile-summary-grid">
-            <div className="profile-summary-item">
-              <dt>Email</dt>
-              <dd>{p.email}</dd>
-            </div>
-            <div className="profile-summary-item">
-              <dt>Phone</dt>
-              <dd>{p.phone ?? '—'}</dd>
-            </div>
-            <div className="profile-summary-item">
-              <dt>Job title</dt>
-              <dd>{p.jobTitle ?? '—'}</dd>
-            </div>
-            <div className="profile-summary-item">
-              <dt>Role</dt>
-              <dd>{roleDisplayLabel(p.role)}</dd>
-            </div>
-            <div className="profile-summary-item">
-              <dt>Tenant slug</dt>
-              <dd>
-                <code>{p.tenant?.slug ?? 'demo'}</code>
-              </dd>
-            </div>
-          </dl>
-        </section>
-      )}
+      <section className="portal-card profile-section">
+        <h2>Account details</h2>
+        <dl className="profile-summary-grid">
+          <div className="profile-summary-item">
+            <dt>Email</dt>
+            <dd>{p.email}</dd>
+          </div>
+          <div className="profile-summary-item">
+            <dt>Phone</dt>
+            <dd>{p.phone ?? '—'}</dd>
+          </div>
+          <div className="profile-summary-item">
+            <dt>Job title</dt>
+            <dd>{p.jobTitle ?? '—'}</dd>
+          </div>
+          <div className="profile-summary-item">
+            <dt>Role</dt>
+            <dd>{roleDisplayLabel(p.role)}</dd>
+          </div>
+          <div className="profile-summary-item">
+            <dt>Tenant slug</dt>
+            <dd>
+              <code>{p.tenant?.slug ?? 'demo'}</code>
+            </dd>
+          </div>
+        </dl>
+      </section>
 
       {isDeveloper && (
         <>
@@ -401,6 +358,53 @@ function ProfileContent() {
           </Link>
         </div>
       </section>
+      {editing && (
+        <OpsDialog
+          title="Edit profile"
+          subtitle="Update your control room account details."
+          onClose={cancelEdit}
+        >
+          <form onSubmit={(e) => void handleSave(e)} className="form-grid">
+            <label className="form-field">
+              <span>First name</span>
+              <input
+                value={firstName}
+                onChange={(e) => setFirstName(e.target.value)}
+                required
+              />
+            </label>
+            <label className="form-field">
+              <span>Last name</span>
+              <input value={lastName} onChange={(e) => setLastName(e.target.value)} required />
+            </label>
+            <label className="form-field">
+              <span>Phone</span>
+              <input
+                type="tel"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                placeholder="+27 …"
+              />
+            </label>
+            <label className="form-field">
+              <span>Job title</span>
+              <input
+                value={jobTitle}
+                onChange={(e) => setJobTitle(e.target.value)}
+                placeholder="Platform Developer"
+              />
+            </label>
+            <div className="profile-form-actions">
+              <button type="button" className="btn-ghost" onClick={cancelEdit}>
+                Cancel
+              </button>
+              <button type="submit" className="btn-primary" disabled={saving}>
+                {saving ? 'Saving…' : 'Save profile'}
+              </button>
+            </div>
+          </form>
+        </OpsDialog>
+      )}
     </div>
   );
 }

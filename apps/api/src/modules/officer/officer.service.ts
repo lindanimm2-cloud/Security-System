@@ -14,6 +14,8 @@ import {
 } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
 import { RealtimeGateway } from '../realtime/realtime.gateway';
+import { IncidentKernelService } from '../incident-kernel/incident-kernel.service';
+import { PlatformEvent } from '../incident-kernel/incident-events';
 import {
   haversineKm,
   officerAvailableMarker,
@@ -25,6 +27,7 @@ export class OfficerService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly realtime: RealtimeGateway,
+    private readonly kernel: IncidentKernelService,
   ) {}
 
   private async resolveOfficer(tenantId: string, email: string) {
@@ -279,6 +282,17 @@ export class OfficerService {
       where: { id: officer.id },
       data: { status },
     });
+    const active = await this.prisma.dispatch.findFirst({
+      where: { officerId: officer.id, tenantId, status: { notIn: ['COMPLETED', 'CANCELLED'] } },
+      select: { incidentId: true },
+    });
+    await this.kernel.recordEvent({
+      tenantId,
+      incidentId: active?.incidentId,
+      type: PlatformEvent.UNIT_STATUS_UPDATED,
+      source: 'officer',
+      payload: { officerId: officer.id, status },
+    });
     return { success: true, data: updated };
   }
 
@@ -288,6 +302,16 @@ export class OfficerService {
       where: { id: officer.id },
       data: { currentLat: lat, currentLng: lng },
     });
+    const active = await this.prisma.dispatch.findFirst({
+      where: { officerId: officer.id, tenantId, status: { notIn: ['COMPLETED', 'CANCELLED'] } },
+      select: { incidentId: true },
+    });
+    this.realtime.emitPlatformEvent(
+      tenantId,
+      PlatformEvent.UNIT_LOCATION_UPDATED,
+      { entityType: 'officer', id: officer.id, lat, lng, incidentId: active?.incidentId ?? null },
+      { incidentId: active?.incidentId },
+    );
     return { success: true, data: updated };
   }
 
@@ -447,24 +471,24 @@ export class OfficerService {
       body.lng ??
       (officer.currentLng ? Number(officer.currentLng) : 31.0218);
 
-    const incident = await this.prisma.incident.create({
-      data: {
-        tenantId,
-        userId: client.id,
-        type: body.type ?? IncidentType.OTHER,
-        status: IncidentStatus.ACTIVE,
-        priority: body.priority ?? IncidentPriority.MEDIUM,
-        title: body.title ?? 'Officer field report',
-        description:
-          trimmed ||
-          (files.length === 1
-            ? `Field evidence: ${files[0].originalname}`
-            : `Field evidence: ${files.length} attachments`),
-        lat,
-        lng,
-        address: body.address ?? officer.zone ?? 'Field location',
-      },
-      include: { user: true },
+    const incident = await this.kernel.createFromEmergency({
+      tenantId,
+      userId: client.id,
+      type: body.type ?? IncidentType.OTHER,
+      title: body.title ?? 'Officer field report',
+      description:
+        trimmed ||
+        (files.length === 1
+          ? `Field evidence: ${files[0].originalname}`
+          : `Field evidence: ${files.length} attachments`),
+      lat,
+      lng,
+      address: body.address ?? officer.zone ?? 'Field location',
+      priority: body.priority ?? IncidentPriority.MEDIUM,
+      source: 'officer',
+      actorUserId: undefined,
+      kind: 'manual',
+      autoDispatch: false,
     });
 
     await this.prisma.incidentNote.create({
@@ -480,21 +504,15 @@ export class OfficerService {
             : `Attached ${files.length} files`),
       },
     });
+    await this.kernel.recordNoteEvent(
+      tenantId,
+      incident.id,
+      'officer',
+      null,
+      trimmed || 'Field evidence attached',
+    );
 
     const media = await saveIncidentMedia(this.prisma, tenantId, incident.id, files);
-
-    this.realtime.emitIncidentCreated(tenantId, {
-      id: incident.id,
-      type: incident.type,
-      priority: incident.priority,
-      status: incident.status,
-      name: `${incident.user.firstName} ${incident.user.lastName}`,
-      lat: Number(incident.lat),
-      lng: Number(incident.lng),
-      address: incident.address,
-      isSilent: false,
-      createdAt: incident.createdAt.toISOString(),
-    });
 
     return {
       success: true,
@@ -813,6 +831,11 @@ export class OfficerService {
     const updated = await this.prisma.dispatch.findUnique({
       where: { id: dispatchId },
       include: { incident: { include: { user: true } } },
+    });
+    await this.kernel.recordDispatchAdvance({
+      tenantId,
+      dispatchId,
+      source: 'officer',
     });
 
     return { success: true, data: this.formatDispatch(updated!) };

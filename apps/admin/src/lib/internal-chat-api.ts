@@ -15,6 +15,8 @@ export type InternalChatData = {
   team?: { id: string; name: string };
 };
 
+const TEAM_THREAD_ID = '__team__';
+
 function channelPath(channel: ChatChannel) {
   if (channel === 'tech-team') return '/chat/tech-team';
   if (channel === 'dev-support') return '/chat/dev-support';
@@ -107,4 +109,54 @@ export async function sendInternalChatMessage(
   }
 
   return json as ApiResponse<ChatMessage>;
+}
+
+function readReceiptsKey(portal: AuthPortal, channel: ChatChannel, userId: string) {
+  return `4ds-chat-read:${portal}:${channel}:${userId}`;
+}
+
+function loadReceipts(key: string): Record<string, string> {
+  if (typeof window === 'undefined') return {};
+  try {
+    const raw = window.localStorage.getItem(key);
+    if (!raw) return {};
+    return JSON.parse(raw) as Record<string, string>;
+  } catch {
+    return {};
+  }
+}
+
+export async function fetchInternalChatUnreadCount(
+  portal: AuthPortal,
+  channel: ChatChannel = 'internal',
+): Promise<number> {
+  const session = getSession(portal);
+  const currentUserId = session?.user.id ?? '';
+  if (!currentUserId) return 0;
+
+  const res = await fetchInternalChat(portal, channel);
+  const data = res.data;
+  const receipts = loadReceipts(readReceiptsKey(portal, channel, currentUserId));
+  const teamReadAt = receipts[TEAM_THREAD_ID] ? new Date(receipts[TEAM_THREAD_ID]).getTime() : 0;
+
+  const teamUnread = data.messages.filter(
+    (message) =>
+      message.sender.id !== currentUserId && new Date(message.createdAt).getTime() > teamReadAt,
+  ).length;
+
+  const directUnread = data.participants
+    .filter((participant) => participant.id !== currentUserId)
+    .reduce((sum, participant) => {
+      const readAt = receipts[participant.id] ? new Date(receipts[participant.id]).getTime() : 0;
+      return (
+        sum +
+        data.messages.filter(
+          (message) =>
+            message.sender.id === participant.id &&
+            new Date(message.createdAt).getTime() > readAt,
+        ).length
+      );
+    }, 0);
+
+  return teamUnread + directUnread;
 }

@@ -5,8 +5,13 @@ export default function ControlRoomLoading() {
     <LoadingSpinner
       brand
       fullScreen
+      action="open-portal"
       label="Loading control room…"
-      hint="Syncing incidents, map, and dispatch."
+      hints={[
+        'Syncing incidents, map, and dispatch.',
+        'System updates underway…',
+        'Pulling live ops data…',
+      ]}
     />
   );
 }

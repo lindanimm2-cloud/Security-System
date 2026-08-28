@@ -9,6 +9,7 @@ export type FolderNode = {
   icon: string | null;
   parentId: string | null;
   documentCount: number;
+  updatedAt: string;
   children: FolderNode[];
 };
 
@@ -43,6 +44,7 @@ export class DocumentsService {
           icon: f.icon,
           parentId: f.parentId,
           documentCount: f._count.documents,
+          updatedAt: f.updatedAt.toISOString(),
         })),
         categories: categoryCounts.map((c) => ({
           category: c.category,
@@ -294,6 +296,7 @@ export class DocumentsService {
       description: string | null;
       icon: string | null;
       parentId: string | null;
+      updatedAt?: Date;
       _count: { documents: number };
     }[],
   ): FolderNode[] {
@@ -306,6 +309,7 @@ export class DocumentsService {
         icon: f.icon,
         parentId: f.parentId,
         documentCount: f._count.documents,
+        updatedAt: (f.updatedAt ?? new Date()).toISOString(),
         children: [],
       });
     }

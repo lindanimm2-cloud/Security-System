@@ -24,13 +24,16 @@ export function BrandMark({
   href,
   compact = false,
   showProduct = true,
+  productLabel,
 }: {
   variant: BrandVariant;
   href?: string | false;
   compact?: boolean;
   showProduct?: boolean;
+  /** Override the portal product name (e.g. Developer desk). */
+  productLabel?: string;
 }) {
-  const product = PRODUCT_LABELS[variant];
+  const product = productLabel ?? PRODUCT_LABELS[variant];
   const link = href === false ? undefined : (href ?? HOME_HREFS[variant]);
 
   const inner = (

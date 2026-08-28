@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { CctvLiveFeed, type CctvCamera } from '@/components/portal/CctvLiveFeed';
 import { useApi } from '@/hooks/useApi';
+import { shouldBackgroundPoll } from '@/lib/demo/is-demo-mode';
 import { adminApi, type ApiResponse } from '@/lib/api-client';
 import { CONTROL_ROOM_ROUTES } from '@/lib/control-room-routes';
 
@@ -43,6 +44,7 @@ export function DashboardCctvWall() {
   const [tab, setTab] = useState<FeedTab>('dash');
 
   useEffect(() => {
+    if (!shouldBackgroundPoll()) return;
     const id = window.setInterval(() => {
       void reload({ silent: true });
       void reloadFleet({ silent: true });
@@ -151,7 +153,7 @@ export function DashboardCctvWall() {
           {rest.length > 0 ? (
             <div className="ops-cctv__strip">
               {rest.map((c) => (
-                <CctvLiveFeed key={c.id} camera={c} href={href} />
+                <CctvLiveFeed key={c.id} camera={c} href={href} compact />
               ))}
             </div>
           ) : null}

@@ -28,7 +28,7 @@ export function FeatureHub({
           {subtitle && <p className="text-muted">{subtitle}</p>}
         </div>
         {sectionLocked && accessKey && (
-          <Link href={`/portal/subscription/upgrade?addon=${accessKey === 'home' ? 'HOME_SECURITY' : accessKey === 'vehicle' ? 'VEHICLE_RESPONSE' : accessKey === 'family' ? 'FAMILY' : 'MEDICAL_PLUS'}`} className="btn-primary">
+          <Link href={`/portal/subscription/upgrade?addon=${accessKey === 'home' ? 'HOME_SECURITY' : accessKey === 'vehicle' ? 'VEHICLE_RESPONSE' : accessKey === 'family' ? 'FAMILY' : 'MEDICAL_PLUS'}`} className="btn-secondary">
             Upgrade plan
           </Link>
         )}

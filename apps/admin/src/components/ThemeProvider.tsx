@@ -6,6 +6,7 @@ import {
   applyThemePreview,
   getStoredPreference,
   resolveTheme,
+  THEME_SCHEDULE_CHANGED_EVENT,
   type Theme,
   type ThemePreference,
 } from '@/lib/theme';
@@ -59,7 +60,12 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       const tick = () => syncResolvedTheme('schedule', false);
       tick();
       const id = window.setInterval(tick, 60_000);
-      return () => window.clearInterval(id);
+      const onScheduleChange = () => tick();
+      window.addEventListener(THEME_SCHEDULE_CHANGED_EVENT, onScheduleChange);
+      return () => {
+        window.clearInterval(id);
+        window.removeEventListener(THEME_SCHEDULE_CHANGED_EVENT, onScheduleChange);
+      };
     }
 
     return undefined;

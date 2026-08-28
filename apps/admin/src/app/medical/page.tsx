@@ -21,7 +21,13 @@ type MedicalTicket = {
   securityTicketId: string;
 };
 
-const CREW_FLOW = ['ACCEPTED', 'EN_ROUTE', 'ARRIVED', 'TRANSPORT', 'HOSPITAL', 'HANDOVER'] as const;
+const CREW_FLOW = ['ACCEPTED', 'EN_ROUTE', 'ARRIVED', 'TRANSPORT', 'HOSPITAL', 'HANDOVER', 'COMPLETED'] as const;
+
+function nextCrewStatus(status: string) {
+  const idx = CREW_FLOW.indexOf(status as (typeof CREW_FLOW)[number]);
+  if (idx < 0) return 'ACCEPTED';
+  return CREW_FLOW[idx + 1] ?? 'COMPLETED';
+}
 
 export default function MedicalQueuePage() {
   return (
@@ -40,9 +46,8 @@ function MedicalQueueContent() {
   const tickets = data?.data ?? [];
 
   async function advance(id: string, status: string) {
-    const idx = CREW_FLOW.indexOf(status as (typeof CREW_FLOW)[number]);
-    const next =
-      idx < 0 ? 'ACCEPTED' : CREW_FLOW[idx + 1] ?? 'HANDOVER';
+    const next = nextCrewStatus(status);
+    if (status === 'COMPLETED') return;
     setBusy(id);
     try {
       await adminApi.patch(`/medical/tickets/${id}`, { status: next });
@@ -94,10 +99,14 @@ function MedicalQueueContent() {
               <button
                 type="button"
                 className="btn-sm btn-primary"
-                disabled={busy === t.id || t.status === 'HANDOVER'}
+                disabled={busy === t.id || t.status === 'COMPLETED'}
                 onClick={() => void advance(t.id, t.status)}
               >
-                {t.status === 'OPEN' || t.status === 'NEW' ? 'Accept' : `Next · ${t.status}`}
+                {t.status === 'OPEN' || t.status === 'NEW'
+                  ? 'Accept'
+                  : t.status === 'COMPLETED'
+                    ? 'Completed'
+                    : `Next · ${nextCrewStatus(t.status).replace(/_/g, ' ')}`}
               </button>
               <Link href="/medical/crew" className="btn-sm">
                 Recommend unit

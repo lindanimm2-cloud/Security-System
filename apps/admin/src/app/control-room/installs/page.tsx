@@ -1,13 +1,21 @@
 'use client';
 
-import { FormEvent, useState } from 'react';
+import { FormEvent, useMemo, useState } from 'react';
 import { ControlRoomLayout } from '@/components/control-room/ControlRoomLayout';
 import { ErrorAlert } from '@/components/ErrorAlert';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
+import { MetricStrip } from '@/components/ui/MetricStrip';
+import { StatusBadge } from '@/components/ui/StatusBadge';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { ListSearch } from '@/components/ui/ListSearch';
+import { OpsDialog } from '@/components/ops/OpsDialog';
 import { useApi } from '@/hooks/useApi';
 import { adminApi, type ApiResponse } from '@/lib/api-client';
 import { getSession } from '@/lib/auth';
 import { UiSelect } from '@/components/ui/UiSelect';
+import { workflowLabel } from '@/lib/tech-workflow';
+import { matchesSearch } from '@/lib/list-search';
+import { TechProfileCard } from '@/components/ui/TechProfileCard';
 
 type Job = {
   id: string;
@@ -73,6 +81,8 @@ function InstallsContent() {
 
   const [formError, setFormError] = useState('');
   const [saving, setSaving] = useState(false);
+  const [formOpen, setFormOpen] = useState(false);
+  const [search, setSearch] = useState('');
   const [form, setForm] = useState({
     id: '',
     title: '',
@@ -101,6 +111,18 @@ function InstallsContent() {
       equipmentNotes: job.equipmentNotes ?? '',
       technicianId: job.technicianId ?? '',
     });
+    setFormOpen(true);
+  }
+
+  function openCreateForm() {
+    resetForm();
+    setFormOpen(true);
+  }
+
+  function closeFormDialog() {
+    resetForm();
+    setFormOpen(false);
+    setFormError('');
   }
 
   function resetForm() {
@@ -137,7 +159,7 @@ function InstallsContent() {
         equipmentNotes: form.equipmentNotes || null,
         technicianId: form.technicianId || null,
       });
-      resetForm();
+      closeFormDialog();
       reload();
     } catch (err) {
       setFormError(err instanceof Error ? err.message : 'Save failed');
@@ -145,6 +167,24 @@ function InstallsContent() {
       setSaving(false);
     }
   }
+
+  const jobs = data?.data ?? [];
+  const filteredJobs = useMemo(
+    () =>
+      jobs.filter((job) =>
+        matchesSearch(
+          search,
+          job.title,
+          job.clientName,
+          job.clientPhone,
+          job.address,
+          job.jobType,
+          job.technicianName,
+          job.status,
+        ),
+      ),
+    [jobs, search],
+  );
 
   if (loading) return <LoadingSpinner label="Loading installs..." />;
   if (error || !data) {
@@ -164,54 +204,122 @@ function InstallsContent() {
         </div>
       </div>
 
-      <div className="stats-grid">
-        <div className="stat-card">
-          <span className="stat-label">Scheduled</span>
-          <strong className="stat-value">{data.stats.scheduled}</strong>
-        </div>
-        <div className="stat-card">
-          <span className="stat-label">Active</span>
-          <strong className="stat-value">{data.stats.inProgress}</strong>
-        </div>
-        <div className="stat-card">
-          <span className="stat-label">Completed</span>
-          <strong className="stat-value">{data.stats.completed}</strong>
-        </div>
-        <div className="stat-card">
-          <span className="stat-label">Technicians</span>
-          <strong className="stat-value">{techs.length}</strong>
-        </div>
-      </div>
+      <MetricStrip
+        items={[
+          { id: 'scheduled', label: 'Scheduled', value: data.stats.scheduled, hint: 'Queued', tone: 'warning' },
+          { id: 'active', label: 'In progress', value: data.stats.inProgress, hint: 'Active now', tone: 'active' },
+          { id: 'done', label: 'Completed', value: data.stats.completed, hint: 'This week', tone: 'success' },
+          { id: 'techs', label: 'Technicians', value: techs.length, hint: 'Install unit', tone: 'neutral' },
+        ]}
+      />
 
-      <div className="card-panel" style={{ marginTop: '1.25rem' }}>
-        <h2>Technician profiles</h2>
-        <div className="tech-profile-grid">
-          {techs.map((t) => (
-            <article key={t.id} className="tech-profile-card">
-              <div className="avatar avatar--admin">
-                {t.firstName[0]}
-                {t.lastName[0]}
-              </div>
-              <div>
-                <strong>
-                  {t.firstName} {t.lastName}
-                </strong>
-                <div className="text-muted">{t.jobTitle}</div>
-                <div style={{ fontSize: '0.85rem' }}>{t.email}</div>
-                <div style={{ fontSize: '0.85rem' }}>{t.phone}</div>
-                <div className="badge" style={{ marginTop: 6 }}>
-                  {t.teams.join(', ') || 'Unassigned'}
-                </div>
-              </div>
-            </article>
-          ))}
+      <section className="card-panel page-section">
+        <div className="card-header-row card-header-row--panel">
+          <div>
+            <h2>Install tech unit</h2>
+            <p className="text-muted">{techs.length} technicians on the roster</p>
+          </div>
         </div>
-      </div>
+        {techs.length === 0 ? (
+          <EmptyState title="No technicians" body="Add technicians in Teams & Users to assign install jobs." />
+        ) : (
+          <div className="tech-profile-grid">
+            {techs.map((t) => (
+              <TechProfileCard
+                key={t.id}
+                firstName={t.firstName}
+                lastName={t.lastName}
+                jobTitle={t.jobTitle}
+                email={t.email}
+                phone={t.phone}
+                teams={t.teams}
+                badge={
+                  t.teams.length ? (
+                    <span className="status-pill status-pill--ok">Assigned</span>
+                  ) : (
+                    <span className="status-pill status-pill--pending">Available</span>
+                  )
+                }
+              />
+            ))}
+          </div>
+        )}
+      </section>
 
-      <div className={`split-panels${canManageInstalls ? '' : ' split-panels--single'}`} style={{ marginTop: '1.25rem' }}>
-        {canManageInstalls && (
-        <div className="card-panel">
-          <h2>{form.id ? 'Edit job' : 'Schedule install'}</h2>
+      <section className="card-panel page-section">
+          <div className="card-header-row card-header-row--panel">
+            <h2>Job board ({filteredJobs.length})</h2>
+            {canManageInstalls && (
+              <button type="button" className="btn-primary btn-sm" onClick={openCreateForm}>
+                + Schedule install
+              </button>
+            )}
+          </div>
+          <div className="list-search-bar">
+            <ListSearch
+              value={search}
+              onChange={setSearch}
+              placeholder="Search jobs, client, tech, status…"
+              resultCount={filteredJobs.length}
+              totalCount={jobs.length}
+            />
+          </div>
+          {jobs.length === 0 ? (
+            <EmptyState title="No install jobs" body="Schedule a job to assign it to the install tech unit." />
+          ) : filteredJobs.length === 0 ? (
+            <EmptyState title="No matches" body="Try another title, client, address, or technician." />
+          ) : (
+          <div className="table-wrap">
+            <table className="data-table data-table--cards">
+              <thead>
+                <tr>
+                  <th>Job</th>
+                  <th>Tech</th>
+                  <th>When</th>
+                  <th>Status</th>
+                  {canManageInstalls && <th />}
+                </tr>
+              </thead>
+              <tbody>
+                {filteredJobs.map((job) => (
+                  <tr key={job.id}>
+                    <td data-label="Job">
+                      <div>{job.title}</div>
+                      <div className="text-muted" style={{ fontSize: '0.85rem' }}>
+                        {job.jobType} · {job.clientName}
+                      </div>
+                    </td>
+                    <td data-label="Tech">{job.technicianName}</td>
+                    <td data-label="When">{new Date(job.scheduledAt).toLocaleString()}</td>
+                    <td data-label="Status">
+                      <StatusBadge status={job.status} label={workflowLabel(job.status)} />
+                    </td>
+                    {canManageInstalls && (
+                    <td data-label="Actions">
+                      <button
+                        type="button"
+                        className="btn-ghost"
+                        onClick={() => editJob(job)}
+                      >
+                        Edit
+                      </button>
+                    </td>
+                    )}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          )}
+      </section>
+
+      {formOpen && canManageInstalls && (
+        <OpsDialog
+          title={form.id ? 'Edit job' : 'Schedule install'}
+          subtitle="Assign CCTV, alarm, or access-control work to the install tech unit."
+          onClose={closeFormDialog}
+          wide
+        >
           {formError && <ErrorAlert message={formError} />}
           <form className="stack-form" onSubmit={saveJob}>
             <label>
@@ -318,71 +426,17 @@ function InstallsContent() {
                 }
               />
             </label>
-            <div style={{ display: 'flex', gap: '0.5rem' }}>
+            <div className="fleet-form__actions">
+              <button type="button" className="btn-ghost" onClick={closeFormDialog}>
+                Cancel
+              </button>
               <button type="submit" className="btn-primary" disabled={saving}>
                 {saving ? 'Saving...' : form.id ? 'Update job' : 'Create job'}
               </button>
-              {form.id && (
-                <button
-                  type="button"
-                  className="btn-secondary"
-                  onClick={resetForm}
-                >
-                  Cancel
-                </button>
-              )}
             </div>
           </form>
-        </div>
-        )}
-
-        <div className="card-panel">
-          <h2>Job board</h2>
-          <div className="table-wrap">
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th>Job</th>
-                  <th>Tech</th>
-                  <th>When</th>
-                  <th>Status</th>
-                  {canManageInstalls && <th />}
-                </tr>
-              </thead>
-              <tbody>
-                {data.data.map((job) => (
-                  <tr key={job.id}>
-                    <td>
-                      <div>{job.title}</div>
-                      <div className="text-muted" style={{ fontSize: '0.85rem' }}>
-                        {job.jobType} · {job.clientName}
-                      </div>
-                    </td>
-                    <td>{job.technicianName}</td>
-                    <td>{new Date(job.scheduledAt).toLocaleString()}</td>
-                    <td>
-                      <span className="badge">
-                        {job.status.replace(/_/g, ' ')}
-                      </span>
-                    </td>
-                    {canManageInstalls && (
-                    <td>
-                      <button
-                        type="button"
-                        className="btn-ghost"
-                        onClick={() => editJob(job)}
-                      >
-                        Edit
-                      </button>
-                    </td>
-                    )}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
+        </OpsDialog>
+      )}
     </div>
   );
 }

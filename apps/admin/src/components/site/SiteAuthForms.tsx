@@ -10,6 +10,7 @@ import { friendlyErrorMessage } from '@/lib/friendly-error';
 import { ErrorAlert } from '@/components/ErrorAlert';
 import { LoadingButton } from '@/components/LoadingButton';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
+import { setActionKind } from '@/lib/action-status';
 
 export type SiteAuthMode = 'signin' | 'register';
 type OAuthProvider = 'google' | 'apple';
@@ -56,6 +57,7 @@ export function SiteAuthForms({
   const [oauthAccept, setOauthAccept] = useState(false);
 
   async function finishSession() {
+    setActionKind('sign-in');
     setCompleting(true);
     try {
       await onSignedIn();
@@ -158,8 +160,12 @@ export function SiteAuthForms({
       <LoadingSpinner
         brand
         fullScreen
-        label="Signing you in…"
-        hint="Loading your shop account…"
+        action="sign-in"
+        hints={[
+          'Loading your shop account…',
+          'System updates underway…',
+          'Opening your orders and profile.',
+        ]}
       />
     );
   }

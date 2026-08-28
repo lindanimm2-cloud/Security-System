@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import { useState, type FormEvent } from 'react';
 import { TechLayout } from '@/components/tech/TechLayout';
@@ -7,6 +7,10 @@ import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { useApi } from '@/hooks/useApi';
 import { techApi, type ApiResponse } from '@/lib/api-client';
 import { UiSelect } from '@/components/ui/UiSelect';
+import { ListSearch } from '@/components/ui/ListSearch';
+import { matchesSearch } from '@/lib/list-search';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { OpsDialog } from '@/components/ops/OpsDialog';
 
 type InventoryItem = {
   id: string;
@@ -53,6 +57,21 @@ function TechInventoryContent() {
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState('');
   const [actionError, setActionError] = useState('');
+  const [search, setSearch] = useState('');
+  const [requestOpen, setRequestOpen] = useState(false);
+
+  function openRequestForm(productId = '') {
+    setProductId(productId);
+    setQuantity('1');
+    setNotes('');
+    setActionError('');
+    setRequestOpen(true);
+  }
+
+  function closeRequestForm() {
+    setRequestOpen(false);
+    setActionError('');
+  }
 
   async function submitRequest(e: FormEvent) {
     e.preventDefault();
@@ -69,6 +88,7 @@ function TechInventoryContent() {
       setMsg('Parts request submitted to store / control room.');
       setNotes('');
       setQuantity('1');
+      closeRequestForm();
       reloadReq();
       reloadInv();
     } catch (err) {
@@ -83,6 +103,19 @@ function TechInventoryContent() {
 
   const inventory = invData.data;
   const requests = reqData?.data ?? [];
+  const filteredInventory = inventory.filter((p) =>
+    matchesSearch(search, p.name, p.sku, p.category, p.description),
+  );
+  const filteredRequests = requests.filter((r) =>
+    matchesSearch(
+      search,
+      r.product.name,
+      r.product.sku,
+      r.product.category,
+      r.status,
+      r.notes,
+    ),
+  );
 
   return (
     <div className="page-content">
@@ -93,66 +126,92 @@ function TechInventoryContent() {
             Browse CCTV / gear stock and request parts for installs. Control room fulfills requests.
           </p>
         </div>
+        <button type="button" className="btn-primary btn-sm" onClick={() => openRequestForm()}>
+          + Request parts
+        </button>
       </div>
 
       {msg && <div className="alert alert--success">{msg}</div>}
       {actionError && <ErrorAlert message={actionError} />}
       {reqError && <ErrorAlert message={reqError} onRetry={reloadReq} />}
 
-      <form className="portal-card commission-form stack-form" onSubmit={submitRequest}>
-        <h2 style={{ margin: 0 }}>Request parts</h2>
-        <div className="commission-form__grid">
-          <div className="form-field form-field--full">
-            <span>Product</span>
-            <UiSelect
-              compact={false}
-              ariaLabel="Product"
-              value={productId}
-              onChange={setProductId}
-              options={[
-                { value: '', label: 'Select part…' },
-                ...inventory.map((p) => ({
-                  value: p.id,
-                  label: `${p.imageEmoji} ${p.name}`,
-                  meta: `${p.stock} in stock`,
-                })),
-              ]}
-            />
-          </div>
-          <div className="form-field">
-            <span>Quantity</span>
-            <input
-              type="number"
-              min={1}
-              max={50}
-              value={quantity}
-              onChange={(e) => setQuantity(e.target.value)}
-              required
-            />
-          </div>
-          <div className="form-field">
-            <span>Notes (job / site)</span>
-            <input
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              placeholder="For Umhlanga CCTV install"
-            />
-          </div>
-        </div>
-        <div className="commission-form__actions">
-          <button type="submit" className="btn-primary" disabled={busy}>
-            {busy ? 'Submittingâ€¦' : 'Submit request'}
-          </button>
-        </div>
-      </form>
+      <div className="list-search-bar">
+        <ListSearch
+          value={search}
+          onChange={setSearch}
+          placeholder="Search parts, SKU, category…"
+          resultCount={filteredInventory.length}
+          totalCount={inventory.length}
+        />
+      </div>
 
-      <section className="portal-card" style={{ marginTop: '1.25rem' }}>
-        <h2>My requests</h2>
-        {requests.length === 0 ? (
-          <p className="text-muted">No stock requests yet.</p>
+      {requestOpen && (
+        <OpsDialog
+          title="Request parts"
+          subtitle="Submit a stock request for an install job — control room fulfills it."
+          onClose={closeRequestForm}
+        >
+          {actionError && <ErrorAlert message={actionError} />}
+          <form className="stack-form" onSubmit={submitRequest}>
+            <label>
+              Product
+              <UiSelect
+                compact={false}
+                ariaLabel="Product"
+                value={productId}
+                onChange={setProductId}
+                options={[
+                  { value: '', label: 'Select part…' },
+                  ...inventory.map((p) => ({
+                    value: p.id,
+                    label: `${p.imageEmoji} ${p.name}`,
+                    meta: `${p.stock} in stock`,
+                  })),
+                ]}
+              />
+            </label>
+            <label>
+              Quantity
+              <input
+                type="number"
+                min={1}
+                max={50}
+                value={quantity}
+                onChange={(e) => setQuantity(e.target.value)}
+                required
+              />
+            </label>
+            <label>
+              Notes (job / site)
+              <input
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                placeholder="For Umhlanga CCTV install"
+              />
+            </label>
+            <div className="fleet-form__actions">
+              <button type="button" className="btn-ghost" onClick={closeRequestForm}>
+                Cancel
+              </button>
+              <button type="submit" className="btn-primary" disabled={busy}>
+                {busy ? 'Submitting…' : 'Submit request'}
+              </button>
+            </div>
+          </form>
+        </OpsDialog>
+      )}
+
+      <section className="card-panel page-section">
+        <div className="card-header-row card-header-row--panel">
+          <h2>My requests</h2>
+        </div>
+        {filteredRequests.length === 0 ? (
+          <p className="text-muted">
+            {search.trim() ? 'No matching requests.' : 'No stock requests yet.'}
+          </p>
         ) : (
           <ul className="status-list">
-            {requests.map((r) => (
+            {filteredRequests.map((r) => (
               <li key={r.id} className="status-list-item">
                 <div>
                   <strong>
@@ -160,8 +219,8 @@ function TechInventoryContent() {
                   </strong>
                   <p className="text-muted" style={{ margin: '0.15rem 0 0' }}>
                     Qty {r.quantity}
-                    {r.notes ? ` Â· ${r.notes}` : ''}
-                    {' Â· '}
+                    {r.notes ? ` · ${r.notes}` : ''}
+                    {' · '}
                     {new Date(r.createdAt).toLocaleString()}
                   </p>
                 </div>
@@ -174,34 +233,48 @@ function TechInventoryContent() {
         )}
       </section>
 
-      <section className="portal-card" style={{ marginTop: '1.25rem' }}>
-        <h2>Available stock</h2>
-        <div className="tech-profile-grid">
-          {inventory.map((p) => (
-            <article key={p.id} className="tech-profile-card">
-              <div className="card-header-row">
-                <h3 style={{ margin: 0, fontSize: '1rem' }}>
-                  {p.imageEmoji} {p.name}
-                </h3>
-                <span className={`status-pill ${p.lowStock ? 'status-pill--alert' : 'status-pill--ok'}`}>
-                  {p.stock} left
-                </span>
-              </div>
-              <p className="text-muted" style={{ margin: '0.35rem 0' }}>
-                {p.category} Â· {p.sku}
-              </p>
-              <p style={{ fontSize: '0.9rem' }}>{p.description}</p>
-              <button
-                type="button"
-                className="btn-secondary btn-sm"
-                style={{ marginTop: '0.65rem' }}
-                onClick={() => setProductId(p.id)}
-              >
-                Request this
-              </button>
-            </article>
-          ))}
+      <section className="card-panel page-section">
+        <div className="card-header-row card-header-row--panel">
+          <h2>Available stock ({filteredInventory.length})</h2>
         </div>
+        {filteredInventory.length === 0 ? (
+          <EmptyState
+            title={search.trim() ? 'No matches' : 'No stock'}
+            body={search.trim() ? 'Try a different part name or SKU.' : 'Inventory is empty.'}
+          />
+        ) : (
+          <div className="tech-profile-grid tech-profile-grid--inventory">
+            {filteredInventory.map((p) => (
+              <article key={p.id} className="tech-profile-card tech-profile-card--inventory">
+                <div className="tech-profile-card__head">
+                  <span className="tech-profile-card__emoji" aria-hidden>
+                    {p.imageEmoji}
+                  </span>
+                  <div className="tech-profile-card__identity">
+                    <strong>{p.name}</strong>
+                    <span className="tech-profile-card__role">
+                      {p.category} · {p.sku}
+                    </span>
+                  </div>
+                  <span className={`status-pill ${p.lowStock ? 'status-pill--alert' : 'status-pill--ok'}`}>
+                    {p.stock} left
+                  </span>
+                </div>
+                <p className="tech-profile-card__note">{p.description}</p>
+                <div className="tech-profile-card__footer">
+                  <span className="text-muted">{p.priceFormatted}</span>
+                  <button
+                    type="button"
+                    className="btn-secondary btn-sm"
+                    onClick={() => openRequestForm(p.id)}
+                  >
+                    Request
+                  </button>
+                </div>
+              </article>
+            ))}
+          </div>
+        )}
       </section>
     </div>
   );

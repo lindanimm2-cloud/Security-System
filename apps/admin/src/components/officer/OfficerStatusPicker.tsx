@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { OFFICER_STATUSES, officerStatusSlug } from '@/lib/officer-status';
+import { OFFICER_STATUSES, isSameOfficerStatus, officerStatusSlug } from '@/lib/officer-status';
 import { officerApi } from '@/lib/api-client';
 import { useOfficerStatus } from '@/components/officer/OfficerStatusProvider';
 
@@ -17,7 +17,7 @@ export function OfficerStatusPicker({ status, onUpdated, layout = 'grid' }: Prop
   const [msg, setMsg] = useState('');
 
   async function setStatus(next: string) {
-    if (next === status || updating) return;
+    if (isSameOfficerStatus(next, status) || updating) return;
     setUpdating(true);
     setMsg('');
     try {
@@ -38,7 +38,7 @@ export function OfficerStatusPicker({ status, onUpdated, layout = 'grid' }: Prop
       <div className={wrapClass} role="group" aria-label="Shift status">
         {OFFICER_STATUSES.map((s) => {
           const slug = officerStatusSlug(s.value);
-          const active = status === s.value;
+          const active = isSameOfficerStatus(status, s.value);
           return (
             <button
               key={s.value}

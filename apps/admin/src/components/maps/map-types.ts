@@ -102,6 +102,7 @@ export type MapFleetVehicle = {
   lat: number;
   lng: number;
   vehicleType: string;
+  teamName?: string | null;
   registration: string;
   callSign: string;
   make: string;

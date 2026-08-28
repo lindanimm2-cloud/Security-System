@@ -6,3 +6,8 @@
 export function isDemoMode(): boolean {
   return process.env.NEXT_PUBLIC_DEMO_MODE !== 'false';
 }
+
+/** Demo data is already in memory — background refetch just janks the UI. */
+export function shouldBackgroundPoll(): boolean {
+  return !isDemoMode();
+}

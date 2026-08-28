@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { CctvLiveFeed, type CctvCamera } from '@/components/portal/CctvLiveFeed';
 import { SlideCarousel, SlideCarouselCard } from '@/components/portal/SlideCarousel';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
@@ -23,12 +23,16 @@ type DashboardFeeds = {
   vehicles: FeedSource[];
 };
 
+type Props = {
+  /** Strip carousel chrome so this can sit inside Home Security. */
+  embedded?: boolean;
+};
+
 function onlineCount(cameras: CctvCamera[], fallback?: number) {
   return fallback ?? cameras.filter((c) => c.status.toUpperCase() !== 'OFFLINE').length;
 }
 
-/** Live CCTV — horizontal swipe cards (home + vehicle). */
-export function DashboardLiveCctv() {
+function useDashboardFeeds() {
   const { access, loading: accessLoading } = useSubscriptionAccess();
   const { data, loading } = useApi(
     () => clientApi.get<ApiResponse<DashboardFeeds>>('/client/surveillance/dashboard-feeds'),
@@ -52,7 +56,22 @@ export function DashboardLiveCctv() {
     return list;
   }, [home, vehicles]);
 
-  if (accessLoading || loading) {
+  return { sources, loading: accessLoading || loading };
+}
+
+/** Live CCTV — carousel on its own, or a compact pane inside Home Security. */
+export function DashboardLiveCctv({ embedded = false }: Props) {
+  const { sources, loading } = useDashboardFeeds();
+  const [activeKey, setActiveKey] = useState<string | null>(null);
+
+  if (loading) {
+    if (embedded) {
+      return (
+        <div className="home-sec__watch home-sec__watch--loading">
+          <LoadingSpinner label="Loading cameras…" size="sm" />
+        </div>
+      );
+    }
     return (
       <SlideCarousel title="Live feeds" subtitle="Loading cameras…">
         <SlideCarouselCard title="…" wide>
@@ -64,11 +83,57 @@ export function DashboardLiveCctv() {
 
   if (sources.length === 0) return null;
 
+  const selected = sources.find((s) => s.key === activeKey) ?? sources[0];
+  const cameras = selected.source.cameras;
+  const primary = cameras[0];
+  const rest = cameras.slice(1, 3);
+  const online = onlineCount(cameras, selected.source.onlineCount);
   const totalOnline = sources.reduce(
     (n, s) => n + onlineCount(s.source.cameras, s.source.onlineCount),
     0,
   );
   const totalCams = sources.reduce((n, s) => n + s.source.cameras.length, 0);
+
+  if (embedded) {
+    return (
+      <div className="home-sec__watch">
+        <div className="home-sec__watch-head">
+          <div>
+            <p className="home-sec__watch-kicker">Live cameras</p>
+            <p className="home-sec__watch-title">{selected.source.label}</p>
+          </div>
+          <span className="home-sec__watch-count">
+            {online}/{cameras.length} live
+          </span>
+        </div>
+        {sources.length > 1 ? (
+          <div className="home-sec__watch-tabs" role="tablist" aria-label="Camera sources">
+            {sources.map((s) => (
+              <button
+                key={s.key}
+                type="button"
+                role="tab"
+                aria-selected={s.key === selected.key}
+                className={`home-sec__watch-tab ${s.key === selected.key ? 'home-sec__watch-tab--active' : ''}`}
+                onClick={() => setActiveKey(s.key)}
+              >
+                {s.kind === 'home' ? 'Home' : s.source.label}
+              </button>
+            ))}
+          </div>
+        ) : null}
+        <div className="home-sec__watch-grid">
+          <CctvLiveFeed camera={primary} href={selected.source.href} featured />
+          {rest.map((c) => (
+            <CctvLiveFeed key={c.id} camera={c} href={selected.source.href} compact />
+          ))}
+        </div>
+        <Link href={selected.source.href} className="home-sec__watch-open">
+          Open live view
+        </Link>
+      </div>
+    );
+  }
 
   return (
     <SlideCarousel
@@ -79,10 +144,10 @@ export function DashboardLiveCctv() {
       className="slide-carousel--feeds"
     >
       {sources.map(({ key, kind, source }) => {
-        const cameras = source.cameras;
-        const primary = cameras[0];
-        const rest = cameras.slice(1, 2);
-        const online = onlineCount(cameras, source.onlineCount);
+        const cams = source.cameras;
+        const feat = cams[0];
+        const extra = cams.slice(1, 2);
+        const on = onlineCount(cams, source.onlineCount);
 
         return (
           <SlideCarouselCard
@@ -94,12 +159,12 @@ export function DashboardLiveCctv() {
           >
             <p className="slide-carousel__feed-name">{source.label}</p>
             <p className="text-muted slide-carousel__feed-meta">
-              {online}/{cameras.length} online
+              {on}/{cams.length} online
               {source.subtitle && kind === 'vehicle' ? ` · ${source.subtitle}` : ''}
             </p>
             <div className="slide-carousel__feed-layout">
-              <CctvLiveFeed camera={primary} href={source.href} featured />
-              {rest.map((c) => (
+              <CctvLiveFeed camera={feat} href={source.href} featured />
+              {extra.map((c) => (
                 <CctvLiveFeed key={c.id} camera={c} href={source.href} />
               ))}
             </div>

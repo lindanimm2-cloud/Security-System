@@ -6,6 +6,7 @@ import { ErrorAlert } from '@/components/ErrorAlert';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { useApi } from '@/hooks/useApi';
 import { techApi, type ApiResponse } from '@/lib/api-client';
+import { TechProfileCard } from '@/components/ui/TechProfileCard';
 
 type TeamData = {
   id: string;
@@ -43,7 +44,7 @@ function TechTeamContent() {
   if (loading) return <LoadingSpinner label="Loading team..." />;
   if (error) return <ErrorAlert message={error} onRetry={reload} />;
 
-  const team = data?.data;
+  const team = Array.isArray(data?.data) ? null : data?.data;
   if (!team) {
     return (
       <div className="page-content">
@@ -76,39 +77,45 @@ function TechTeamContent() {
         </div>
       </div>
 
-      <div className="tech-profile-grid">
-        {team.members.map((m) => (
-          <article
-            key={m.id}
-            className={`tech-profile-card ${m.isMe ? 'tech-profile-card--me' : ''}`}
-          >
-            <div className="card-header-row">
-              <h2 style={{ margin: 0, fontSize: '1.05rem' }}>
-                {m.firstName} {m.lastName}
-                {m.isMe ? ' (you)' : ''}
-              </h2>
-              {m.isLead && <span className="badge">Lead</span>}
-            </div>
-            <p className="text-muted" style={{ margin: '0.35rem 0' }}>
-              {m.jobTitle ?? 'Technician'}
-            </p>
-            <p>
-              <span className={`status-pill status-pill--${m.statusLabel === 'Available' ? 'ok' : 'pending'}`}>
-                {m.statusLabel}
-              </span>
-              {m.openJobs > 0 ? ` · ${m.openJobs} open job${m.openJobs === 1 ? '' : 's'}` : ''}
-            </p>
-            {m.phone && (
-              <p style={{ marginTop: '0.5rem' }}>
-                <a href={`tel:${m.phone}`}>{m.phone}</a>
-              </p>
-            )}
-            <p className="text-muted" style={{ fontSize: '0.85rem' }}>
-              {m.email}
-            </p>
-          </article>
-        ))}
-      </div>
+      <section className="card-panel page-section">
+        <div className="card-header-row card-header-row--panel">
+          <div>
+            <h2>Team roster</h2>
+            <p className="text-muted">{team.members.length} technicians in {team.name}</p>
+          </div>
+        </div>
+        <div className="tech-profile-grid">
+          {team.members.map((m) => (
+            <TechProfileCard
+              key={m.id}
+              firstName={m.firstName}
+              lastName={m.lastName}
+              jobTitle={m.jobTitle ?? 'Technician'}
+              email={m.email}
+              phone={m.phone}
+              highlight={m.isMe}
+              badge={
+                <>
+                  {m.isLead ? <span className="badge">Lead</span> : null}
+                  <span
+                    className={`status-pill status-pill--${
+                      m.statusLabel === 'Available' ? 'ok' : 'pending'
+                    }`}
+                  >
+                    {m.statusLabel}
+                  </span>
+                </>
+              }
+            >
+              {m.openJobs > 0 ? (
+                <p className="tech-profile-card__note">
+                  {m.openJobs} open job{m.openJobs === 1 ? '' : 's'}
+                </p>
+              ) : null}
+            </TechProfileCard>
+          ))}
+        </div>
+      </section>
     </div>
   );
 }

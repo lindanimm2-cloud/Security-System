@@ -5,8 +5,13 @@ export default function Loading() {
     <LoadingSpinner
       brand
       fullScreen
+      action="page"
       label="Loading Nexus…"
-      hint="Preparing your workspace."
+      hints={[
+        'Preparing your workspace.',
+        'System updates underway…',
+        'Checking connections…',
+      ]}
     />
   );
 }

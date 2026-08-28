@@ -5,8 +5,13 @@ export default function TechLoading() {
     <LoadingSpinner
       brand
       fullScreen
+      action="open-portal"
       label="Loading technician desk…"
-      hint="Loading your install queue."
+      hints={[
+        'Loading your install queue.',
+        'System updates underway…',
+        'Checking job assignments.',
+      ]}
     />
   );
 }

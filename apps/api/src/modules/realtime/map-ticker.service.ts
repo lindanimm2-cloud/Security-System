@@ -24,7 +24,7 @@ export class MapTickerService implements OnModuleInit, OnModuleDestroy {
   private async tick() {
     const tenants = await this.prisma.tenant.findMany({ select: { id: true } });
     for (const tenant of tenants) {
-      const [officers, vehicles, clients] = await Promise.all([
+      const [officers, vehicles, clients, fleet] = await Promise.all([
         this.prisma.officer.findMany({
           where: { tenantId: tenant.id, isActive: true, currentLat: { not: null } },
           select: { id: true, currentLat: true, currentLng: true },
@@ -41,6 +41,10 @@ export class MapTickerService implements OnModuleInit, OnModuleDestroy {
             role: { in: ['USER', 'FAMILY_MEMBER'] },
           },
           select: { id: true, lastKnownLat: true, lastKnownLng: true },
+        }),
+        this.prisma.companyVehicle.findMany({
+          where: { tenantId: tenant.id, isActive: true, currentLat: { not: null } },
+          select: { id: true, currentLat: true, currentLng: true },
         }),
       ]);
 
@@ -62,6 +66,12 @@ export class MapTickerService implements OnModuleInit, OnModuleDestroy {
           id: c.id,
           lat: this.jitter(Number(c.lastKnownLat), Number(c.lastKnownLng), c.id, 0.001).lat,
           lng: this.jitter(Number(c.lastKnownLat), Number(c.lastKnownLng), c.id, 0.001).lng,
+        })),
+        ...fleet.map((f) => ({
+          entityType: 'fleet' as const,
+          id: f.id,
+          lat: this.jitter(Number(f.currentLat), Number(f.currentLng), f.id, 0.0015).lat,
+          lng: this.jitter(Number(f.currentLat), Number(f.currentLng), f.id, 0.0015).lng,
         })),
       ];
 

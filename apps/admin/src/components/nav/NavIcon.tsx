@@ -42,7 +42,12 @@ export type NavIconName =
   | 'surveillance'
   | 'grid'
   | 'bag'
-  | 'services';
+  | 'services'
+  | 'devices'
+  | 'key'
+  | 'lock'
+  | 'history'
+  | 'hub';
 
 const ICONS: Record<NavIconName, ReactNode> = {
   dashboard: (
@@ -111,9 +116,9 @@ const ICONS: Record<NavIconName, ReactNode> = {
   ),
   contacts: (
     <>
-      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-      <circle cx="9" cy="7" r="4" />
-      <path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" />
+      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+      <circle cx="12" cy="7" r="4" />
+      <path d="M16.5 3.5 19 6l2.5-2.5" />
     </>
   ),
   medical: (
@@ -124,8 +129,10 @@ const ICONS: Record<NavIconName, ReactNode> = {
   ),
   incidents: (
     <>
-      <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" />
-      <circle cx="12" cy="12" r="3" />
+      <path d="M8 6h13M8 12h13M8 18h8" />
+      <circle cx="4" cy="6" r="1.2" fill="currentColor" stroke="none" />
+      <circle cx="4" cy="12" r="1.2" fill="currentColor" stroke="none" />
+      <path d="M3 17.2 4.2 18.5 6.4 16" />
     </>
   ),
   evidence: (
@@ -312,6 +319,37 @@ const ICONS: Record<NavIconName, ReactNode> = {
       <rect x="14" y="3" width="7" height="7" rx="1.5" />
       <rect x="3" y="14" width="7" height="7" rx="1.5" />
       <rect x="14" y="14" width="7" height="7" rx="1.5" />
+    </>
+  ),
+  devices: (
+    <>
+      <rect x="7" y="2" width="10" height="20" rx="2" />
+      <path d="M11 18h2" />
+    </>
+  ),
+  key: (
+    <>
+      <circle cx="8" cy="15" r="5" />
+      <path d="M12.5 12.5 21 4M17 4h4v4" />
+    </>
+  ),
+  lock: (
+    <>
+      <rect x="5" y="11" width="14" height="10" rx="2" />
+      <path d="M8 11V7a4 4 0 0 1 8 0v4" />
+    </>
+  ),
+  history: (
+    <>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 7v5l3 2" />
+    </>
+  ),
+  hub: (
+    <>
+      <circle cx="12" cy="12" r="2.4" />
+      <path d="M12 4v3.2M12 16.8V20M4 12h3.2M16.8 12H20" />
+      <path d="m6.4 6.4 2.3 2.3M15.3 15.3l2.3 2.3M17.6 6.4l-2.3 2.3M8.7 15.3l-2.3 2.3" />
     </>
   ),
 };

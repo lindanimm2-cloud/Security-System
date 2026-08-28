@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { CallActions, DispatchLineButton } from '@/components/calls/CallActions';
 import { OfficerSiteSurveillance } from '@/components/officer/OfficerSiteSurveillance';
+import { IncidentKernelPanels } from '@/components/incident/IncidentKernelPanels';
 import {
   formatDispatchPhase,
   officerTaskButtonClass,
@@ -150,6 +151,7 @@ export function OfficerActiveAssignment({
       </div>
 
       <OfficerSiteSurveillance incidentId={active.incident.id} />
+      <IncidentKernelPanels incidentId={active.incident.id} portal="officer" compact />
     </section>
   );
 }

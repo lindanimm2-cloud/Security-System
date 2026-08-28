@@ -673,7 +673,8 @@ export function InternalChat({
                     onClick={() => void dial('video', 'INTERNAL', callTarget)}
                   >
                     <VideoIcon />
-                    Video
+                    <span className="team-chat__call-btn-label">Video</span>
+                    <span className="team-chat__call-btn-short">Vid</span>
                   </button>
                   <button
                     type="button"
@@ -682,17 +683,20 @@ export function InternalChat({
                     onClick={() => void dial('audio', 'INTERNAL', callTarget)}
                   >
                     <PhoneIcon />
-                    Audio
+                    <span className="team-chat__call-btn-label">Audio</span>
+                    <span className="team-chat__call-btn-short">Talk</span>
                   </button>
                   {callTarget.phone && (
                     <button
                       type="button"
-                      className="team-chat__call-btn team-chat__call-btn--icon"
+                      className="team-chat__call-btn team-chat__call-btn--external"
                       disabled={!!callBusy}
-                      title="Phone"
+                      title="Phone call"
                       onClick={() => void dial('phone', 'EXTERNAL', callTarget)}
                     >
                       <PhoneIcon />
+                      <span className="team-chat__call-btn-label">Phone</span>
+                      <span className="team-chat__call-btn-short">Cell</span>
                     </button>
                   )}
                 </>

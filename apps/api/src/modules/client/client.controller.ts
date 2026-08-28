@@ -40,6 +40,11 @@ export class ClientController {
     return this.clientService.triggerPanic(user.id, user.tenantId, body?.silent ?? false);
   }
 
+  @Post('panic/cancel')
+  cancelPanic(@CurrentUser() user: AuthUser, @Body() body: { reason?: string }) {
+    return this.clientService.cancelOpenPanic(user.id, user.tenantId, body?.reason);
+  }
+
   @Post('theft')
   theft(
     @CurrentUser() user: AuthUser,
@@ -53,6 +58,19 @@ export class ClientController {
     },
   ) {
     return this.clientService.reportTheft(user.id, user.tenantId, body);
+  }
+
+  @Post('service-requests')
+  createServiceRequest(
+    @CurrentUser() user: AuthUser,
+    @Body() body: { kind?: string; details?: Record<string, string | number | boolean> },
+  ) {
+    return this.clientService.createServiceRequest(user.id, user.tenantId, body);
+  }
+
+  @Get('service-requests')
+  listServiceRequests(@CurrentUser() user: AuthUser) {
+    return this.clientService.listServiceRequests(user.id);
   }
 
   @Post('tracking')

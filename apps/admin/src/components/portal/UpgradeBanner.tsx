@@ -16,7 +16,7 @@ export function UpgradeBanner({
       <div>
         <strong>{title}</strong> is not on your plan. Add it for <strong>{price}/mo</strong> via secure PayFast checkout.
       </div>
-      <Link href={upgradeHref(addon)} className="btn-primary btn-sm">Upgrade</Link>
+      <Link href={upgradeHref(addon)} className="btn-secondary btn-sm">Upgrade</Link>
     </div>
   );
 }

@@ -13,6 +13,7 @@ import { SlidingSection } from '@/components/portal/SlidingSection';
 import { CctvLiveFeed } from '@/components/portal/CctvLiveFeed';
 import { PropertyRegisterForm } from '@/components/portal/PropertyRegisterForm';
 import { HoldToActivate } from '@/components/ops/EmergencyMode';
+import { OpsDialog } from '@/components/ops/OpsDialog';
 import { useSubscriptionAccess } from '@/hooks/useSubscriptionAccess';
 import { useApi } from '@/hooks/useApi';
 import { clientApi, type ApiResponse } from '@/lib/api-client';
@@ -73,6 +74,8 @@ export default function HomePage() {
 function HomeContent() {
   const [loadingId, setLoadingId] = useState<string | null>(null);
   const [showRegister, setShowRegister] = useState(false);
+  const [armMsg, setArmMsg] = useState('');
+  const [armMsgError, setArmMsgError] = useState(false);
   const { access, loading: accessLoading } = useSubscriptionAccess();
   const { data, loading, error, reload } = useApi(
     () => clientApi.get<ApiResponse<Site[]>>('/client/surveillance/sites'),
@@ -82,9 +85,15 @@ function HomeContent() {
   async function toggleAlarm(id: string, status: 'ARMED' | 'DISARMED') {
     if (!access?.home) return;
     setLoadingId(`${id}-${status}`);
+    setArmMsg('');
+    setArmMsgError(false);
     try {
       await clientApi.patch(`/client/properties/${id}/alarm`, { status });
       reload();
+      setArmMsg(status === 'DISARMED' ? 'Alarm disarmed.' : 'Away armed.');
+    } catch (e) {
+      setArmMsgError(true);
+      setArmMsg(e instanceof Error ? e.message : 'Could not update the alarm.');
     } finally {
       setLoadingId(null);
     }
@@ -92,9 +101,15 @@ function HomeContent() {
 
   async function homePanic(id: string) {
     setLoadingId(`${id}-panic`);
+    setArmMsg('');
+    setArmMsgError(false);
     try {
       await clientApi.post(`/client/properties/${id}/panic`);
       reload();
+      setArmMsg('Home panic sent — control room notified.');
+    } catch (e) {
+      setArmMsgError(true);
+      setArmMsg(e instanceof Error ? e.message : 'Could not send home panic.');
     } finally {
       setLoadingId(null);
     }
@@ -139,6 +154,20 @@ function HomeContent() {
       )}
       {hasHome && (
         <>
+            {showRegister && (
+              <OpsDialog
+                title="Register property"
+                subtitle="Submit your property for verification. Control room enables monitoring after confirmation."
+                onClose={() => setShowRegister(false)}
+              >
+                <PropertyRegisterForm
+                  onRegistered={() => {
+                    setShowRegister(false);
+                    reload();
+                  }}
+                />
+              </OpsDialog>
+            )}
           <SlidingSection
             title="Home arm state"
             subtitle={sites[0] ? alarmStatusLabel(sites[0].alarmStatus) : 'Register your property'}
@@ -155,50 +184,56 @@ function HomeContent() {
               <button
                 type="button"
                 className="btn-secondary btn-sm"
-                onClick={() => setShowRegister((v) => !v)}
+                onClick={() => setShowRegister(true)}
               >
-                {showRegister ? 'Close' : 'Register property'}
+                Register property
               </button>
             </div>
-            {showRegister && (
-              <div style={{ marginTop: '0.75rem' }}>
-                <PropertyRegisterForm
-                  compact
-                  onRegistered={() => {
-                    setShowRegister(false);
-                    reload();
-                  }}
-                />
-              </div>
-            )}
             {sites[0] ? (
-              <div className="queue-card__actions" style={{ marginTop: '0.65rem' }}>
-                <span className={`status-pill status-pill--${sites[0].alarmStatus.toLowerCase()}`}>
-                  {alarmStatusLabel(sites[0].alarmStatus)}
-                </span>
-                <button
-                  type="button"
-                  className="btn-primary btn-sm"
-                  disabled={!!loadingId}
-                  onClick={() =>
-                    void toggleAlarm(
-                      sites[0].id,
-                      isArmedStatus(sites[0].alarmStatus) ? 'DISARMED' : 'ARMED',
-                    )
-                  }
-                >
-                  {isArmedStatus(sites[0].alarmStatus) ? 'Disarm' : 'Away arm'}
-                </button>
-                <div style={{ flex: '1 1 12rem', minWidth: '10rem' }}>
+              <>
+                <div className="home-arm-bar">
+                  <span className={`home-arm-bar__status status-pill status-pill--${sites[0].alarmStatus.toLowerCase()}`}>
+                    {alarmStatusLabel(sites[0].alarmStatus)}
+                  </span>
+                  <button
+                    type="button"
+                    className={`home-arm-bar__btn ${isArmedStatus(sites[0].alarmStatus) ? 'btn-primary' : 'btn-secondary'} btn-sm`}
+                    disabled={!!loadingId}
+                    onClick={() =>
+                      void toggleAlarm(
+                        sites[0].id,
+                        isArmedStatus(sites[0].alarmStatus) ? 'DISARMED' : 'ARMED',
+                      )
+                    }
+                  >
+                    {loadingId ===
+                    `${sites[0].id}-${isArmedStatus(sites[0].alarmStatus) ? 'DISARMED' : 'ARMED'}` ? (
+                      <LoadingSpinner label="" size="sm" />
+                    ) : isArmedStatus(sites[0].alarmStatus) ? (
+                      'Disarm'
+                    ) : (
+                      'Away arm'
+                    )}
+                  </button>
                   <HoldToActivate
-                    label="Home panic"
+                    className="hold-activate--inline"
+                    label="Hold to panic"
                     holdLabel="Hold to panic…"
+                    holdMs={1200}
                     loading={loadingId === `${sites[0].id}-panic`}
                     disabled={!!loadingId}
                     onActivate={() => homePanic(sites[0].id)}
                   />
                 </div>
-              </div>
+                {armMsg ? (
+                  <p
+                    className={`home-arm-bar__feedback ${armMsgError ? 'home-arm-bar__feedback--err' : ''}`}
+                    role="status"
+                  >
+                    {armMsg}
+                  </p>
+                ) : null}
+              </>
             ) : (
               <p className="text-muted">
                 No property linked yet.{' '}
@@ -316,7 +351,9 @@ function HomeContent() {
             {sites.length === 0 ? (
               <div className="empty-state">
                 <p>No properties registered yet.</p>
-                <PropertyRegisterForm onRegistered={() => reload()} />
+                <button type="button" className="btn-primary btn-sm" onClick={() => setShowRegister(true)}>
+                  Register property
+                </button>
               </div>
             ) : (
               sites.map((p) => (
@@ -348,9 +385,9 @@ function HomeContent() {
                     </Link>
                     <button
                       type="button"
-                      className="btn-secondary btn-sm"
+                      className={`btn-sm ${isArmedStatus(p.alarmStatus) ? 'btn-primary' : 'btn-secondary'}`}
                       onClick={() =>
-                        toggleAlarm(p.id, isArmedStatus(p.alarmStatus) ? 'DISARMED' : 'ARMED')
+                        void toggleAlarm(p.id, isArmedStatus(p.alarmStatus) ? 'DISARMED' : 'ARMED')
                       }
                       disabled={!!loadingId}
                     >

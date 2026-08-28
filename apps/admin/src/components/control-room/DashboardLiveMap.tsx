@@ -9,6 +9,7 @@ import { useApi } from '@/hooks/useApi';
 import { adminApi, type ApiResponse } from '@/lib/api-client';
 import { CONTROL_ROOM_ROUTES } from '@/lib/control-room-routes';
 import { maskMapDataForScreenshot } from '@/lib/map-screenshot';
+import { shouldBackgroundPoll } from '@/lib/demo/is-demo-mode';
 
 const LiveMap = dynamic(() => import('@/components/maps/LiveMap'), {
   ssr: false,
@@ -36,6 +37,7 @@ export function DashboardLiveMap({ focusIncidentId, className = '' }: DashboardL
   }, [data]);
 
   useEffect(() => {
+    if (!shouldBackgroundPoll()) return;
     const id = window.setInterval(() => void reload({ silent: true }), 20000);
     return () => window.clearInterval(id);
   }, [reload]);
@@ -116,21 +118,7 @@ export function DashboardLiveMap({ focusIncidentId, className = '' }: DashboardL
   }
 
   return (
-    <div className={`dash-live-map ${className}`.trim()}>
-      <div className="dash-live-map__toolbar">
-        <div className="dash-live-map__live">
-          <span className="dash-live-map__pulse" aria-hidden />
-          Live field picture
-        </div>
-        <Link href={CONTROL_ROOM_ROUTES.map} className="btn-sm btn-sm--link dash-live-map__full">
-          Full map
-        </Link>
-        <div className="dash-live-map__counts">
-          <span>{incidents.length} incidents</span>
-          <span>{officers.length} officers</span>
-          <span>{users.length} users</span>
-        </div>
-      </div>
+    <div className={`dash-live-map dash-live-map--hero ${className}`.trim()}>
       <div className="dash-live-map__canvas">
         <LiveMap
           center={center}
@@ -139,6 +127,29 @@ export function DashboardLiveMap({ focusIncidentId, className = '' }: DashboardL
           incidents={incidents}
           flyTo={flyTo}
         />
+        <div className="dash-live-map__hud" aria-label="Live field status">
+          <div className="dash-live-map__live">
+            <span className="dash-live-map__pulse" aria-hidden />
+            Live
+          </div>
+          <div className="dash-live-map__counts">
+            <span>
+              <strong>{incidents.length}</strong> incidents
+            </span>
+            <span>
+              <strong>{officers.length}</strong> officers
+            </span>
+            <span>
+              <strong>{users.length}</strong> users
+            </span>
+          </div>
+        </div>
+        <Link href={CONTROL_ROOM_ROUTES.map} className="dash-live-map__full-btn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+            <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" />
+          </svg>
+          Full map
+        </Link>
       </div>
     </div>
   );

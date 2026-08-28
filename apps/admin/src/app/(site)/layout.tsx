@@ -6,6 +6,7 @@ import { SiteClientProvider } from '@/components/site/SiteClientProvider';
 import { SiteFooter } from '@/components/site/SiteFooter';
 import { SiteHeader } from '@/components/site/SiteHeader';
 import { SiteMobileBottomNav } from '@/components/site/SiteMobileBottomNav';
+import { SiteMotion } from '@/components/site/SiteMotion';
 import { StoreHelpDock } from '@/components/site/StoreHelpDock';
 
 const display = Barlow_Condensed({
@@ -41,6 +42,7 @@ export default function SiteLayout({
       <SiteClientProvider>
         <CartProvider>
           <SiteHeader />
+          <SiteMotion />
           <main className="nx-main">{children}</main>
           <SiteFooter />
           <CartDrawer />

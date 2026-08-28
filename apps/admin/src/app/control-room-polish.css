@@ -1,0 +1,1148 @@
+/* ============================================================
+   Control Room — Premium Visual Polish
+   Refines hierarchy, spacing, surfaces & micro-interactions
+   without altering application functionality.
+   ============================================================ */
+
+:root {
+  --cr-radius: 12px;
+  --cr-radius-sm: 10px;
+  --cr-radius-xs: 8px;
+  --cr-surface: rgba(255, 255, 255, 0.025);
+  --cr-surface-hover: rgba(255, 255, 255, 0.045);
+  --cr-surface-active: rgba(255, 255, 255, 0.06);
+  --cr-edge: rgba(255, 255, 255, 0.06);
+  --cr-edge-strong: rgba(255, 255, 255, 0.1);
+  --cr-shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
+  --cr-shadow-soft: 0 4px 20px rgba(0, 0, 0, 0.32);
+  --cr-blur: blur(18px) saturate(1.25);
+  --cr-transition: 0.18s cubic-bezier(0.4, 0, 0.2, 1);
+  --cr-btn-h: 2.125rem;
+  --cr-btn-h-sm: 1.875rem;
+}
+
+/* ── Ops board canvas ─────────────────────────────────────── */
+
+.dash-ops--ops-board {
+  gap: 0.65rem;
+}
+
+.dash-ops--ops-board .ops-board.ops-board--console {
+  gap: 0.65rem;
+}
+
+/* Soft surfaces instead of nested boxes */
+.ops-board--console .ops-board__queue,
+.ops-board--console .ops-board__detail,
+.ops-board--console .ops-board__avail,
+.ops-board--console .ops-board__vehicles,
+.ops-board--console .ops-board__cctv {
+  border: 1px solid var(--cr-edge);
+  border-radius: var(--cr-radius);
+  background:
+    linear-gradient(
+      165deg,
+      color-mix(in srgb, var(--surface-2) 92%, transparent),
+      color-mix(in srgb, var(--surface) 96%, transparent)
+    );
+  box-shadow: var(--cr-shadow-soft);
+}
+
+.ops-board--console .ops-board__center {
+  border: 0;
+  border-radius: var(--cr-radius);
+  background: transparent;
+  box-shadow: none;
+  gap: 0.55rem;
+}
+
+.ops-board--console .ops-board__map {
+  border-radius: var(--cr-radius);
+  overflow: hidden;
+  box-shadow: var(--cr-shadow);
+  border: 1px solid var(--cr-edge);
+}
+
+.ops-board__pane-head {
+  padding: 0.85rem 1rem 0.65rem;
+  border-bottom: 1px solid color-mix(in srgb, var(--cr-edge) 80%, transparent);
+}
+
+.ops-board__pane-head h2 {
+  font-size: 0.9rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+.ops-board__pane-head .text-muted {
+  font-size: 0.75rem;
+  font-weight: 400;
+}
+
+.ops-board__queue-list {
+  padding: 0.35rem 0.45rem 0.55rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+/* ── Command strip ────────────────────────────────────────── */
+
+.ops-strip {
+  padding: 0.55rem 0.85rem;
+  margin-bottom: 0;
+  border: 1px solid var(--cr-edge);
+  border-radius: var(--cr-radius-sm);
+  background: var(--cr-surface);
+  backdrop-filter: var(--cr-blur);
+  -webkit-backdrop-filter: var(--cr-blur);
+  box-shadow: none;
+}
+
+.ops-strip__brand strong {
+  font-size: 0.82rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+}
+
+.ops-strip__stats dd {
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+
+.ops-strip__stats dt {
+  font-weight: 600;
+}
+
+.ops-strip__filters {
+  border-radius: var(--cr-radius-xs);
+  border-color: var(--cr-edge);
+  background: color-mix(in srgb, var(--bg) 65%, transparent);
+  padding: 0.2rem;
+}
+
+.ops-strip__chip {
+  min-height: 1.85rem;
+  padding: 0.22rem 0.65rem;
+  border-radius: var(--cr-radius-xs);
+  font-size: 0.7rem;
+  font-weight: 600;
+  transition: background var(--cr-transition), color var(--cr-transition);
+}
+
+.ops-strip__chip--on {
+  background: var(--cr-surface-active);
+  box-shadow: inset 0 0 0 1px var(--cr-edge-strong);
+}
+
+/* ── Incident cards ───────────────────────────────────────── */
+
+.ops-inc {
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: var(--cr-radius-sm);
+  border-bottom: 0;
+  border-left: 0;
+  background: transparent;
+  transition:
+    background var(--cr-transition),
+    border-color var(--cr-transition),
+    box-shadow var(--cr-transition),
+    transform var(--cr-transition);
+}
+
+.ops-inc:hover {
+  background: var(--cr-surface-hover);
+}
+
+.ops-inc--on {
+  background: color-mix(in srgb, var(--accent) 7%, var(--cr-surface));
+  border-color: color-mix(in srgb, var(--accent) 28%, transparent);
+  box-shadow:
+    inset 3px 0 0 color-mix(in srgb, var(--accent) 70%, transparent),
+    0 4px 16px rgba(0, 0, 0, 0.2);
+}
+
+.ops-inc--panic {
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, #ef4444 10%, transparent),
+    transparent 62%
+  );
+}
+
+.ops-inc--panic.ops-inc--on {
+  border-color: color-mix(in srgb, #ef4444 35%, transparent);
+  box-shadow:
+    inset 3px 0 0 #ef4444,
+    0 0 24px color-mix(in srgb, #ef4444 12%, transparent);
+}
+
+.ops-inc__hit {
+  padding: 0.75rem 0.85rem 0.55rem;
+}
+
+.ops-inc__head {
+  margin-bottom: 0.4rem;
+  gap: 0.4rem 0.5rem;
+}
+
+.ops-inc__pri {
+  min-width: 2rem;
+  padding: 0.15rem 0.45rem;
+  border-radius: var(--cr-radius-xs);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  border: 0;
+}
+
+.ops-inc__pri--P1 {
+  background: color-mix(in srgb, #ef4444 22%, transparent);
+  color: #fecaca;
+  box-shadow: 0 0 12px color-mix(in srgb, #ef4444 18%, transparent);
+}
+
+.ops-inc__pri--P2 {
+  background: color-mix(in srgb, #fbbf24 18%, transparent);
+  color: #fde68a;
+}
+
+.ops-inc__pri--P3,
+.ops-inc__pri--P4 {
+  background: var(--cr-surface);
+  color: var(--muted);
+}
+
+.ops-inc__kind {
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.07em;
+}
+
+.ops-inc__state {
+  font-size: 0.65rem;
+  font-weight: 600;
+}
+
+.ops-inc__who {
+  font-size: 0.98rem;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.ops-inc__device {
+  font-weight: 500;
+  letter-spacing: 0.06em;
+}
+
+.ops-inc__where {
+  margin-top: 0.35rem;
+  font-size: 0.8rem;
+  font-weight: 400;
+  line-height: 1.4;
+}
+
+.ops-inc__where > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.72rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.ops-inc__where > span::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--status-live);
+  box-shadow: 0 0 6px color-mix(in srgb, var(--status-live) 60%, transparent);
+}
+
+.ops-inc__sla {
+  margin-top: 0.45rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+
+.ops-inc--sla .ops-inc__sla {
+  color: #fca5a5;
+  text-shadow: 0 0 12px color-mix(in srgb, #ef4444 25%, transparent);
+}
+
+.ops-inc__unit {
+  margin-top: 0.5rem;
+  padding-top: 0.45rem;
+  border-top: 1px solid var(--cr-edge);
+}
+
+.ops-inc__acts {
+  gap: 0.35rem;
+  margin: 0;
+  padding: 0.45rem 0.85rem 0.7rem;
+}
+
+.ops-inc__acts--secondary {
+  padding-top: 0;
+  border-top: 0;
+}
+
+.ops-inc__acts--secondary .ops-act--resolve {
+  margin-left: auto;
+  flex: 0 1 auto;
+  min-width: 2.75rem;
+}
+
+/* ── Action buttons ───────────────────────────────────────── */
+
+.ops-act {
+  min-height: var(--cr-btn-h-sm);
+  padding: 0.3rem 0.65rem;
+  border-radius: var(--cr-radius-xs);
+  border: 1px solid transparent;
+  background: var(--cr-surface);
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  transition:
+    background var(--cr-transition),
+    border-color var(--cr-transition),
+    color var(--cr-transition),
+    transform 0.14s ease,
+    box-shadow var(--cr-transition);
+}
+
+.ops-act:hover:not(:disabled) {
+  background: var(--cr-surface-active);
+  border-color: var(--cr-edge);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.22);
+}
+
+.ops-act svg {
+  width: 0.85rem;
+  height: 0.85rem;
+  opacity: 0.85;
+}
+
+.ops-act--dispatch {
+  border: 0;
+  background: linear-gradient(180deg, #f97316 0%, #c2410c 100%);
+  color: #fff;
+  font-weight: 600;
+  box-shadow: 0 4px 14px color-mix(in srgb, #ea580c 35%, transparent);
+}
+
+.ops-act--dispatch:hover:not(:disabled) {
+  background: linear-gradient(180deg, #fb923c 0%, #ea580c 100%);
+  border-color: transparent;
+  transform: translateY(-1px);
+}
+
+.ops-act--resolve {
+  border-color: color-mix(in srgb, #4ade80 25%, transparent);
+  background: color-mix(in srgb, #166534 35%, transparent);
+  color: #86efac;
+}
+
+.ops-act--resolve:hover:not(:disabled) {
+  background: color-mix(in srgb, #166534 50%, transparent);
+  border-color: color-mix(in srgb, #4ade80 40%, transparent);
+}
+
+.ops-act--danger {
+  border-color: color-mix(in srgb, #f87171 30%, transparent);
+  background: color-mix(in srgb, #7f1d1d 35%, transparent);
+  color: #fca5a5;
+}
+
+/* ── Map hero ─────────────────────────────────────────────── */
+
+.dash-live-map--hero {
+  position: relative;
+  min-height: 100%;
+  height: 100%;
+}
+
+.dash-live-map--hero .dash-live-map__canvas {
+  position: relative;
+  flex: 1;
+  min-height: 280px;
+  border-radius: inherit;
+  overflow: hidden;
+}
+
+.dash-live-map--hero .dash-live-map__toolbar {
+  display: none;
+}
+
+.dash-live-map__hud {
+  position: absolute;
+  top: 0.75rem;
+  left: 0.75rem;
+  z-index: 450;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.75rem;
+  padding: 0.45rem 0.7rem;
+  border-radius: var(--cr-radius-sm);
+  border: 1px solid var(--cr-edge);
+  background: rgba(0, 0, 0, 0.62);
+  backdrop-filter: var(--cr-blur);
+  -webkit-backdrop-filter: var(--cr-blur);
+  box-shadow: var(--cr-shadow-soft);
+  pointer-events: none;
+}
+
+.dash-live-map__hud .dash-live-map__live {
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+}
+
+.dash-live-map__hud .dash-live-map__counts {
+  font-size: 0.72rem;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.72);
+  gap: 0.85rem;
+}
+
+.dash-live-map__hud .dash-live-map__counts strong {
+  font-weight: 700;
+  color: #fff;
+  margin-right: 0.15rem;
+}
+
+.dash-live-map__full-btn {
+  position: absolute;
+  top: 0.75rem;
+  right: 0.75rem;
+  z-index: 450;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.42rem 0.8rem;
+  border-radius: var(--cr-radius-sm);
+  border: 1px solid var(--cr-edge-strong);
+  background: rgba(0, 0, 0, 0.62);
+  backdrop-filter: var(--cr-blur);
+  -webkit-backdrop-filter: var(--cr-blur);
+  color: #fff;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-decoration: none;
+  text-transform: uppercase;
+  box-shadow: var(--cr-shadow-soft);
+  transition:
+    background var(--cr-transition),
+    border-color var(--cr-transition),
+    transform var(--cr-transition);
+}
+
+.dash-live-map__full-btn:hover {
+  background: rgba(0, 0, 0, 0.78);
+  border-color: color-mix(in srgb, var(--accent) 35%, var(--cr-edge-strong));
+  transform: translateY(-1px);
+  color: #fff;
+}
+
+.dash-live-map__full-btn svg {
+  width: 0.9rem;
+  height: 0.9rem;
+  opacity: 0.9;
+}
+
+/* ── Command drawer (incident detail) ─────────────────────── */
+
+.ops-board__detail--command .ops-board__pane-head {
+  padding: 1rem 1rem 0.75rem;
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--accent) 4%, transparent),
+    transparent
+  );
+}
+
+.cmd-drawer__badges {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem;
+  margin-bottom: 0.35rem;
+}
+
+.cmd-drawer__pri {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.18rem 0.5rem;
+  border-radius: var(--cr-radius-xs);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+}
+
+.cmd-drawer__pri--P1 {
+  background: color-mix(in srgb, #ef4444 22%, transparent);
+  color: #fecaca;
+}
+
+.cmd-drawer__pri--P2 {
+  background: color-mix(in srgb, #fbbf24 18%, transparent);
+  color: #fde68a;
+}
+
+.cmd-drawer__pri--P3,
+.cmd-drawer__pri--P4 {
+  background: var(--cr-surface);
+  color: var(--muted);
+}
+
+.cmd-drawer__type {
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.cmd-drawer__client {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  line-height: 1.25;
+}
+
+.cmd-drawer__status {
+  display: inline-flex;
+  align-items: center;
+  margin-top: 0.35rem;
+  padding: 0.2rem 0.55rem;
+  border-radius: var(--cr-radius-xs);
+  background: var(--cr-surface);
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #fbbf24;
+}
+
+.ops-board__detail-body {
+  padding: 0.65rem 1rem 0.75rem;
+}
+
+.ops-board__detail-meta {
+  font-size: 0.8rem;
+  font-weight: 400;
+  line-height: 1.45;
+  margin-bottom: 0.75rem;
+}
+
+.ops-board__detail-foot {
+  gap: 0.4rem;
+  padding: 0.65rem 1rem 0.85rem;
+  border-top: 1px solid var(--cr-edge);
+  background: color-mix(in srgb, var(--bg) 40%, transparent);
+}
+
+.ops-board__detail-foot .ops-act--resolve {
+  grid-column: span 1;
+}
+
+/* Vertical incident lifecycle */
+.cr-lifecycle {
+  list-style: none;
+  margin: 0 0 0.85rem;
+  padding: 0.15rem 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.cr-lifecycle__step {
+  display: grid;
+  grid-template-columns: 1.1rem minmax(0, 1fr);
+  gap: 0.55rem;
+  align-items: start;
+  min-height: 1.65rem;
+}
+
+.cr-lifecycle__rail {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  height: 100%;
+  min-height: 1.35rem;
+}
+
+.cr-lifecycle__dot {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--muted) 50%, transparent);
+  flex-shrink: 0;
+  margin-top: 0.22rem;
+  transition: background var(--cr-transition), box-shadow var(--cr-transition);
+}
+
+.cr-lifecycle__line {
+  flex: 1;
+  width: 1px;
+  min-height: 0.55rem;
+  margin-top: 0.15rem;
+  background: color-mix(in srgb, var(--border) 75%, transparent);
+}
+
+.cr-lifecycle__label {
+  font-size: 0.68rem;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--muted) 80%, transparent);
+  padding: 0.12rem 0 0.35rem;
+  line-height: 1.2;
+  transition: color var(--cr-transition);
+}
+
+.cr-lifecycle__step--done .cr-lifecycle__dot {
+  background: var(--success);
+  box-shadow: 0 0 8px color-mix(in srgb, var(--success) 45%, transparent);
+}
+
+.cr-lifecycle__step--done .cr-lifecycle__label {
+  color: color-mix(in srgb, var(--success) 75%, var(--muted));
+  font-weight: 500;
+}
+
+.cr-lifecycle__step--current .cr-lifecycle__dot {
+  width: 0.62rem;
+  height: 0.62rem;
+  margin-top: 0.16rem;
+  background: var(--accent);
+  box-shadow: 0 0 12px color-mix(in srgb, var(--accent) 50%, transparent);
+}
+
+.cr-lifecycle__step--current .cr-lifecycle__label {
+  color: var(--text);
+  font-weight: 600;
+}
+
+/* Hide horizontal workflow when lifecycle is present */
+.ops-board__detail--command .workflow-steps--ops {
+  display: none;
+}
+
+/* ── Timeline activity feed ───────────────────────────────── */
+
+.incident-timeline__item {
+  grid-template-columns: 0.85rem minmax(0, 1fr);
+  gap: 0.65rem;
+}
+
+.incident-timeline__dot {
+  width: 0.5rem;
+  height: 0.5rem;
+  margin-top: 0.35rem;
+  background: color-mix(in srgb, var(--accent) 45%, var(--muted));
+  box-shadow: 0 0 8px color-mix(in srgb, var(--accent) 20%, transparent);
+}
+
+.incident-timeline__body {
+  gap: 0.12rem;
+  padding: 0.2rem 0 0.75rem;
+}
+
+.incident-timeline__time {
+  font-size: 0.72rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+  letter-spacing: 0.02em;
+}
+
+.incident-timeline__type {
+  font-size: 0.82rem;
+  font-weight: 500;
+  text-transform: none;
+  line-height: 1.35;
+}
+
+.incident-timeline__actor {
+  font-size: 0.72rem;
+  font-weight: 400;
+  color: var(--muted);
+}
+
+.incident-kernel-panels--compact h3 {
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 0.45rem;
+}
+
+.ops-board__detail .incident-kernel-panels {
+  border-top: 1px solid var(--cr-edge);
+  padding-top: 0.75rem;
+  gap: 0.85rem 1rem;
+}
+
+/* Responding resource cards */
+.responding-cards {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.responding-cards__item {
+  padding: 0.55rem 0.65rem;
+  border-radius: var(--cr-radius-xs);
+  background: var(--cr-surface);
+  border: 1px solid var(--cr-edge);
+}
+
+.responding-cards__unit {
+  display: block;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.responding-cards__meta {
+  display: block;
+  margin-top: 0.15rem;
+  font-size: 0.72rem;
+  font-weight: 500;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.responding-cards__status {
+  color: #fbbf24;
+}
+
+/* ── CCTV premium ─────────────────────────────────────────── */
+
+.ops-cctv {
+  padding: 0 0.75rem 0.75rem;
+  gap: 0.5rem;
+}
+
+.ops-board.ops-board--console .ops-cctv .cctv-feed--featured {
+  height: 148px;
+  min-height: 148px;
+  max-height: 148px;
+}
+
+.ops-cctv__tabs {
+  margin: 0 0.75rem 0.15rem;
+  border-radius: var(--cr-radius-xs);
+  border-color: var(--cr-edge);
+  background: var(--cr-surface);
+}
+
+.ops-cctv__tab {
+  font-weight: 600;
+  font-size: 0.68rem;
+  border-radius: 6px;
+}
+
+.cctv-feed {
+  border: 1px solid var(--cr-edge);
+  border-radius: var(--cr-radius-sm);
+  transition:
+    border-color var(--cr-transition),
+    box-shadow var(--cr-transition),
+    transform var(--cr-transition);
+}
+
+.cctv-feed-link:hover .cctv-feed,
+.cctv-feed:hover {
+  border-color: var(--cr-edge-strong);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+
+.cctv-feed--featured {
+  min-height: 200px;
+}
+
+.cctv-feed__overlay {
+  padding: 0.55rem 0.65rem;
+}
+
+.cctv-feed__rec {
+  font-weight: 600;
+}
+
+.cctv-feed__controls {
+  position: absolute;
+  right: 0.5rem;
+  bottom: 0.5rem;
+  display: flex;
+  gap: 0.3rem;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity var(--cr-transition);
+}
+
+.cctv-feed:hover .cctv-feed__controls,
+.cctv-feed-link:hover .cctv-feed__controls {
+  opacity: 1;
+}
+
+.cctv-feed__ctrl {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.65rem;
+  height: 1.65rem;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.cctv-feed__ctrl svg {
+  width: 0.85rem;
+  height: 0.85rem;
+}
+
+.cctv-feed__footer {
+  padding: 0.45rem 0.6rem 0.55rem;
+}
+
+.cctv-feed__footer strong {
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.cctv-feed__loc {
+  font-size: 0.7rem;
+  font-weight: 400;
+}
+
+/* ── Fleet strip ──────────────────────────────────────────── */
+
+.ops-fleet {
+  padding: 0.5rem 0.85rem 0.75rem;
+  gap: 0.5rem;
+}
+
+.ops-fleet__item {
+  padding: 0.65rem 0.7rem;
+  border-radius: var(--cr-radius-sm);
+  border: 1px solid var(--cr-edge);
+  background: var(--cr-surface);
+  gap: 0.2rem;
+  transition:
+    background var(--cr-transition),
+    border-color var(--cr-transition),
+    transform var(--cr-transition);
+}
+
+.ops-fleet__item:hover {
+  background: var(--cr-surface-hover);
+  border-color: var(--cr-edge-strong);
+  transform: translateY(-1px);
+}
+
+.ops-fleet__callsign {
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+}
+
+.ops-fleet__type {
+  font-size: 0.72rem;
+  font-weight: 400;
+  color: var(--muted);
+}
+
+.ops-fleet__status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-top: 0.2rem;
+  font-size: 0.65rem;
+  font-weight: 600;
+  font-style: normal;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.ops-fleet__status::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.ops-fleet__item--on_duty .ops-fleet__status,
+.ops-fleet__item--en_route .ops-fleet__status,
+.ops-fleet__item--deployed .ops-fleet__status,
+.ops-fleet__item--on_scene .ops-fleet__status {
+  color: #fbbf24;
+}
+
+.ops-fleet__item--available .ops-fleet__status {
+  color: var(--status-live);
+}
+
+/* ── Availability ─────────────────────────────────────────── */
+
+.ops-board__avail-list .officer-row--managed {
+  padding: 0.55rem 0.85rem;
+  border-bottom: 1px solid color-mix(in srgb, var(--cr-edge) 70%, transparent);
+  transition: background var(--cr-transition);
+}
+
+.ops-board__avail-list .officer-row--managed:hover {
+  background: var(--cr-surface-hover);
+}
+
+.ops-board__avail-list .officer-name {
+  font-weight: 600;
+  font-size: 0.85rem;
+}
+
+.ops-board__avail-list .officer-meta {
+  font-weight: 400;
+  font-size: 0.72rem;
+}
+
+/* ── Command dock (mobile nav) ────────────────────────────── */
+
+@media (max-width: 900px) {
+  .shell--admin .mobile-bottom-nav__pill {
+    border-radius: 18px;
+    padding: 0.5rem 0.4rem 0.45rem;
+    background: rgba(8, 8, 10, 0.82);
+    border-color: var(--cr-edge);
+    box-shadow:
+      0 20px 48px rgba(0, 0, 0, 0.55),
+      inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  }
+
+  .shell--admin .mobile-bottom-nav__item {
+    border-radius: 14px;
+    padding: 0.4rem 0.25rem;
+    transition: background var(--cr-transition), color var(--cr-transition);
+  }
+
+  .shell--admin .mobile-bottom-nav__item--active {
+    background: var(--cr-surface-active);
+    color: var(--text);
+  }
+
+  .shell--admin .mobile-bottom-nav__item--active .mobile-bottom-nav__icon-wrap {
+    background: color-mix(in srgb, var(--accent) 14%, transparent);
+    border-radius: 50%;
+    padding: 0.35rem;
+  }
+
+  .shell--admin .mobile-bottom-nav__label {
+    font-weight: 500;
+    font-size: 0.62rem;
+  }
+
+  .shell--admin .mobile-bottom-nav__item--active .mobile-bottom-nav__label {
+    font-weight: 600;
+  }
+}
+
+/* ── Control room pages (global shell polish) ─────────────── */
+
+.shell--admin .shell-content {
+  background: radial-gradient(
+    ellipse 120% 80% at 50% -20%,
+    color-mix(in srgb, var(--accent) 3%, transparent),
+    transparent 55%
+  );
+}
+
+.shell--admin .panel,
+.shell--admin .card,
+.shell--admin .card-panel {
+  border-color: var(--cr-edge);
+  border-radius: var(--cr-radius);
+  box-shadow: var(--cr-shadow-soft);
+}
+
+.shell--admin .panel-header h2,
+.shell--admin .card-panel h2 {
+  font-weight: 600;
+}
+
+/* ── Responsive ───────────────────────────────────────────── */
+
+@media (max-width: 1100px) {
+  .ops-board--console .ops-board__map {
+    min-height: 320px;
+  }
+
+  .dash-live-map--hero .dash-live-map__canvas {
+    min-height: 320px;
+  }
+}
+
+@media (max-width: 768px) {
+  .ops-board__queue-list {
+    padding: 0.35rem;
+  }
+
+  .ops-inc__acts {
+    padding-left: 0.75rem;
+    padding-right: 0.75rem;
+  }
+
+  .dash-live-map__hud {
+    top: 0.55rem;
+    left: 0.55rem;
+    max-width: calc(100% - 7rem);
+  }
+
+  .dash-live-map__full-btn {
+    top: 0.55rem;
+    right: 0.55rem;
+    padding: 0.38rem 0.65rem;
+    font-size: 0.65rem;
+  }
+}
+
+@media (min-width: 1441px) {
+  .ops-board.ops-board--console {
+    gap: 0.75rem;
+  }
+
+  .ops-board--console .ops-board__center:not(:has(.ops-board__cctv)) .ops-board__map {
+    min-height: min(56vh, 520px);
+  }
+
+  .ops-board.ops-board--console .ops-cctv .cctv-feed--featured {
+    height: 168px;
+    min-height: 168px;
+    max-height: 168px;
+  }
+}
+
+/* ── Map markers ──────────────────────────────────────────── */
+
+.dash-live-map .map-marker {
+  border-width: 2.5px;
+  box-shadow:
+    0 2px 10px rgba(0, 0, 0, 0.45),
+    0 0 0 2px rgba(0, 0, 0, 0.25);
+}
+
+.dash-live-map .map-marker--incident.incident--panic {
+  box-shadow:
+    0 0 0 4px color-mix(in srgb, #ef4444 28%, transparent),
+    0 4px 16px rgba(239, 68, 68, 0.45);
+}
+
+.dash-live-map .map-marker-wrap--pulse .map-marker--incident {
+  animation: cr-marker-pulse 1.8s ease-out infinite;
+}
+
+.dash-live-map .map-marker--officer {
+  box-shadow:
+    0 0 0 2px color-mix(in srgb, var(--success) 35%, transparent),
+    0 2px 10px rgba(0, 0, 0, 0.4);
+}
+
+@keyframes cr-marker-pulse {
+  0%,
+  100% {
+    box-shadow:
+      0 0 0 4px color-mix(in srgb, #ef4444 22%, transparent),
+      0 4px 14px rgba(239, 68, 68, 0.35);
+  }
+  50% {
+    box-shadow:
+      0 0 0 10px color-mix(in srgb, #ef4444 8%, transparent),
+      0 4px 20px rgba(239, 68, 68, 0.55);
+  }
+}
+
+/* ── Dispatch & list pages ────────────────────────────────── */
+
+.shell--admin .dispatch-card {
+  border-color: var(--cr-edge);
+  border-radius: var(--cr-radius);
+  background: var(--cr-surface);
+  box-shadow: var(--cr-shadow-soft);
+  transition:
+    border-color var(--cr-transition),
+    box-shadow var(--cr-transition),
+    transform var(--cr-transition);
+}
+
+.shell--admin .dispatch-card:hover {
+  border-color: var(--cr-edge-strong);
+  transform: translateY(-1px);
+}
+
+.shell--admin .command-incident-item {
+  border-radius: var(--cr-radius-sm);
+  margin-bottom: 0.35rem;
+  transition: background var(--cr-transition);
+}
+
+.shell--admin .command-incident-item--selected {
+  background: color-mix(in srgb, var(--accent) 7%, var(--cr-surface));
+  box-shadow: inset 3px 0 0 color-mix(in srgb, var(--accent) 65%, transparent);
+}
+
+.shell--admin .btn-sm {
+  min-height: var(--cr-btn-h-sm);
+  padding: 0.35rem 0.75rem;
+  border-radius: var(--cr-radius-xs);
+  font-weight: 600;
+  font-size: 0.78rem;
+  border-color: var(--cr-edge);
+  background: var(--cr-surface);
+  transition:
+    background var(--cr-transition),
+    border-color var(--cr-transition),
+    transform 0.14s ease;
+}
+
+.shell--admin .btn-sm:hover {
+  background: var(--cr-surface-active);
+  border-color: var(--cr-edge-strong);
+  transform: translateY(-1px);
+}
+
+.shell--admin .btn-primary {
+  border-radius: var(--cr-radius-sm);
+  font-weight: 600;
+}
+
+.shell--admin .btn-secondary {
+  border-radius: var(--cr-radius-sm);
+  border-color: var(--cr-edge);
+  background: var(--cr-surface);
+  font-weight: 600;
+}
+
+.shell--admin .table-wrap {
+  border-radius: var(--cr-radius-sm);
+  border-color: var(--cr-edge);
+}
+
+.shell--admin .list-search-bar input {
+  border-radius: var(--cr-radius-xs);
+  border-color: var(--cr-edge);
+}

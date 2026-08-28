@@ -4,6 +4,8 @@ import 'leaflet/dist/leaflet.css';
 
 import { useEffect, useMemo, useRef } from 'react';
 import { MapContainer, Marker, Popup, TileLayer, useMap } from 'react-leaflet';
+import { DispatchMenuButton } from '@/components/control-room/DispatchMenuButton';
+import { IncidentDetailsMenu } from '@/components/control-room/IncidentDetailsMenu';
 import { legacyIncidentIcon, officerIcon, userIcon } from './map-icons';
 import { spreadOverlappingMarkers } from './spread-overlapping-markers';
 
@@ -74,11 +76,15 @@ function FitBoundsOnLoad({
 
 export default function LiveMap({
   center,
-  users,
-  officers,
-  incidents,
+  users = [],
+  officers = [],
+  incidents = [],
   flyTo,
 }: LiveMapProps) {
+  const safeCenter = {
+    lat: Number.isFinite(center?.lat) ? center.lat : -29.8587,
+    lng: Number.isFinite(center?.lng) ? center.lng : 31.0218,
+  };
   const spreadPositions = useMemo(() => {
     const sources = [
       ...users.map((u) => ({ id: `user-${u.id}`, lat: u.lat, lng: u.lng })),
@@ -91,7 +97,7 @@ export default function LiveMap({
   return (
     <div className="leaflet-map-container">
       <MapContainer
-        center={[center.lat, center.lng]}
+        center={[safeCenter.lat, safeCenter.lng]}
         zoom={12}
         scrollWheelZoom
         className="leaflet-map"
@@ -157,9 +163,10 @@ export default function LiveMap({
               <span className="map-popup-tag map-popup-tag--incident">{i.status}</span>
               {i.address && <><br /><span>{i.address}</span></>}
               <br />
-              <a href={`/control-room/dispatch?incident=${i.id}`} className="map-popup-link">Dispatch</a>
-              {' · '}
-              <a href={`/control-room/incidents?id=${i.id}`} className="map-popup-link">Details</a>
+              <div className="map-popup-actions map-popup-actions--compact">
+                <DispatchMenuButton incidentId={i.id} />
+                <IncidentDetailsMenu incident={i} triggerClassName="btn-sm" />
+              </div>
             </Popup>
           </Marker>
           );

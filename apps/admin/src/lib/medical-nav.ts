@@ -11,10 +11,13 @@ export const MEDICAL_NAV: MedicalNavItem[] = [
   { href: '/medical', label: 'Queue', icon: 'emergency', exact: true },
   { href: '/medical/crew', label: 'Crew board', icon: 'fleet' },
   { href: '/medical/map', label: 'Ops map', icon: 'live-map' },
+  { href: '/medical/profile', label: 'My profile', icon: 'profile' },
+  { href: '/medical/settings', label: 'Settings', icon: 'account' },
 ];
 
 export const MEDICAL_MOBILE_NAV: Array<MedicalNavItem & { mobileLabel: string }> = [
   { href: '/medical', label: 'Queue', mobileLabel: 'Queue', icon: 'emergency', exact: true },
   { href: '/medical/crew', label: 'Crew board', mobileLabel: 'Crew', icon: 'fleet' },
   { href: '/medical/map', label: 'Ops map', mobileLabel: 'Map', icon: 'live-map' },
+  { href: '/medical/settings', label: 'Settings', mobileLabel: 'Settings', icon: 'account' },
 ];

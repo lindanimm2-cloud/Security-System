@@ -4,6 +4,8 @@ import Link from 'next/link';
 import { useApi } from '@/hooks/useApi';
 import { clientApi, type ApiResponse } from '@/lib/api-client';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
+import { billingDocToBrandedData } from '@/lib/billing-document-data';
+import { downloadBrandedDocument, openBrandedDocument } from '@/lib/branded-document';
 
 type BillingDocument = {
   id: string;
@@ -33,7 +35,7 @@ export function BillingDocuments() {
         </Link>
       </div>
       <p className="text-muted">
-        Download tax invoices, payment receipts, and monthly statements.
+        Branded tax invoices, payment receipts, and monthly statements with company letterhead.
       </p>
 
       {loading ? (
@@ -42,28 +44,44 @@ export function BillingDocuments() {
         <p className="text-muted">No documents yet — they appear after your first payment.</p>
       ) : (
         <ul className="billing-doc-list">
-          {docs.map((doc) => (
-            <li key={doc.id} className="billing-doc-list__item">
-              <div className="billing-doc-list__icon" aria-hidden>
-                {doc.type === 'INVOICE' ? 'INV' : doc.type === 'RECEIPT' ? 'RCP' : 'STM'}
-              </div>
-              <div className="billing-doc-list__body">
-                <strong>{doc.title}</strong>
-                <span className="text-muted">
-                  {doc.reference}
-                  {doc.periodLabel ? ` · ${doc.periodLabel}` : ''} · {doc.amountFormatted} ·{' '}
-                  {new Date(doc.issuedAt).toLocaleDateString()}
+          {docs.map((doc) => {
+            const branded = billingDocToBrandedData(doc);
+            return (
+              <li key={doc.id} className="billing-doc-list__item">
+                <span className={`billing-doc-list__type billing-doc-list__type--${doc.type.toLowerCase()}`}>
+                  {doc.type === 'INVOICE' ? 'INV' : doc.type === 'RECEIPT' ? 'RCP' : 'STM'}
                 </span>
-              </div>
-              <Link
-                href={doc.downloadUrl}
-                className="btn-sm btn-sm--link"
-                target={doc.downloadUrl.startsWith('http') ? '_blank' : undefined}
-              >
-                Download
-              </Link>
-            </li>
-          ))}
+                <div className="billing-doc-list__body">
+                  <strong>{doc.title}</strong>
+                  <p className="billing-doc-list__meta">
+                    <span>{doc.reference}</span>
+                    {doc.periodLabel ? <span>{doc.periodLabel}</span> : null}
+                    <span>{doc.amountFormatted}</span>
+                    <span>{new Date(doc.issuedAt).toLocaleDateString()}</span>
+                  </p>
+                </div>
+                <div className="billing-doc-list__actions">
+                  <Link href={doc.downloadUrl} className="btn-secondary btn-sm">
+                    Open
+                  </Link>
+                  <button
+                    type="button"
+                    className="btn-primary btn-sm"
+                    onClick={() => openBrandedDocument(branded, { autoPrint: true })}
+                  >
+                    Print PDF
+                  </button>
+                  <button
+                    type="button"
+                    className="btn-ghost btn-sm"
+                    onClick={() => downloadBrandedDocument(branded)}
+                  >
+                    Download
+                  </button>
+                </div>
+              </li>
+            );
+          })}
         </ul>
       )}
     </section>

@@ -4,18 +4,23 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { AuthSession, clearSession } from '@/lib/auth';
-import { mobileNavForRole, navForRole } from '@/lib/control-room-nav';
+import { mobileNavForRole, navForRole, canAccessControlRoomRoute } from '@/lib/control-room-nav';
 import { roleDisplayLabel } from '@/lib/role-labels';
+import { adminHomeForRole } from '@/lib/admin-home';
 import { NotificationCenter } from './control-room/NotificationCenter';
-import { BrandMark } from './BrandMark';
 import { NavClock } from './NavClock';
+import { BrandMark } from './BrandMark';
 import { NavIcon } from './nav/NavIcon';
 import { MobileBottomNav } from './nav/MobileBottomNav';
-import { MAP_SCREENSHOT_FROZEN_AT } from '@/lib/map-screenshot';
 import { ThemeToggle } from './ThemeToggle';
 import { adminApi, type ApiResponse } from '@/lib/api-client';
 import { useSidebarCollapsed } from '@/hooks/useSidebarCollapsed';
-import { SidebarCollapseButton, SignOutIcon } from './nav/SidebarCollapseButton';
+import { SidebarCollapseButton, SidebarWebsiteLink, SignOutIcon } from './nav/SidebarCollapseButton';
+import { FloatingSupportDock } from './FloatingSupportDock';
+import { useActionHandoff } from '@/hooks/useActionHandoff';
+import { navHrefIsActive } from '@/lib/nav-active';
+import { shouldBackgroundPoll } from '@/lib/demo/is-demo-mode';
+import { useCrSettings } from '@/hooks/useCrSettings';
 
 export function ControlRoomShell({
   session,
@@ -31,6 +36,12 @@ export function ControlRoomShell({
   const [menuOpen, setMenuOpen] = useState(false);
   const [criticalCount, setCriticalCount] = useState(0);
   const { collapsed, toggle } = useSidebarCollapsed();
+  const handoff = useActionHandoff();
+  const crSettings = useCrSettings();
+
+  useEffect(() => {
+    document.documentElement.classList.toggle('cr-compact-tables', crSettings.general.compactTables);
+  }, [crSettings.general.compactTables]);
 
   useEffect(() => {
     let cancelled = false;
@@ -46,6 +57,11 @@ export function ControlRoomShell({
       }
     }
     void poll();
+    if (!shouldBackgroundPoll()) {
+      return () => {
+        cancelled = true;
+      };
+    }
     const id = window.setInterval(() => void poll(), 20000);
     return () => {
       cancelled = true;
@@ -73,31 +89,49 @@ export function ControlRoomShell({
   }, []);
 
   function logout() {
-    clearSession('admin');
-    router.push('/login');
+    handoff.begin('sign-out', () => {
+      clearSession('admin');
+      router.push('/login');
+    });
   }
-
-  function isActive(href: string, exact?: boolean) {
-    if (exact) return pathname === href;
-    return pathname.startsWith(href);
-  }
-
-  const isLiveMap = pathname === '/control-room/map' || pathname.startsWith('/control-room/map/');
-  const screenshotClock = isLiveMap ? MAP_SCREENSHOT_FROZEN_AT : undefined;
 
   const navItems = navForRole(session.user.role);
+  const navHrefs = navItems.map((item) => item.href);
+  const homeHref = adminHomeForRole(session.user.role);
+  const brandProduct =
+    session.user.role === 'DEVELOPER' ? 'Developer' : undefined;
+
+  useEffect(() => {
+    if (!pathname?.startsWith('/control-room')) return;
+    if (canAccessControlRoomRoute(session.user.role, pathname)) return;
+    router.replace(homeHref);
+  }, [pathname, session.user.role, homeHref, router]);
+
+  function isActive(href: string, exact?: boolean) {
+    return navHrefIsActive(pathname, href, exact, navHrefs);
+  }
+
+  const hideSupportDock =
+    pathname === '/control-room' ||
+    pathname.includes('/documents') ||
+    pathname.includes('/chat') ||
+    pathname.includes('/incidents') ||
+    pathname.includes('/map');
+
   const mobileNavItems = mobileNavForRole(session.user.role).map((item) => ({
     href: item.href,
     label: item.mobileLabel,
     icon: item.icon,
     exact: item.exact,
     badge:
-      item.href === '/control-room/incidents' && criticalCount > 0
+      item.href === '/control-room' && criticalCount > 0
         ? criticalCount
         : undefined,
   }));
 
   return (
+    <>
+      {handoff.overlay}
     <div className="shell shell--admin shell--with-bottom-nav">
       <header className="mobile-shell-header mobile-shell-header--admin">
         <button
@@ -109,14 +143,20 @@ export function ControlRoomShell({
         >
           <span className={`menu-toggle-icon ${menuOpen ? 'menu-toggle-icon--open' : ''}`} />
         </button>
-        <BrandMark variant="control" compact />
+        <BrandMark
+          variant="control"
+          compact
+          href={homeHref}
+          productLabel={brandProduct}
+        />
+        <h1 className="mobile-shell-header__title">{title}</h1>
         <div className="mobile-topbar-actions">
-          <NavClock compact frozenAt={screenshotClock} />
-          <NotificationCenter />
-          <ThemeToggle className="theme-toggle--compact" />
+          <NavClock compact />
           <Link href="/control-room/map" className="badge badge--live badge--link badge--compact">
             LIVE
           </Link>
+          <NotificationCenter />
+          <ThemeToggle className="theme-toggle--compact" />
         </div>
       </header>
 
@@ -133,7 +173,13 @@ export function ControlRoomShell({
         className={`sidebar ${menuOpen ? 'sidebar--open' : ''} ${collapsed ? 'sidebar--collapsed' : ''}`}
       >
         <div className="sidebar-brand">
-          <BrandMark variant="control" compact={collapsed} showProduct={!collapsed} />
+          <BrandMark
+            variant="control"
+            compact={collapsed}
+            showProduct={!collapsed}
+            href={homeHref}
+            productLabel={brandProduct}
+          />
           <SidebarCollapseButton collapsed={collapsed} onClick={toggle} />
         </div>
         <nav className="sidebar-nav">
@@ -141,7 +187,7 @@ export function ControlRoomShell({
             <Link
               key={item.href}
               href={item.href}
-              title={item.label}
+              data-tip={item.label}
               aria-label={item.label}
               className={`sidebar-link ${isActive(item.href, item.exact) ? 'sidebar-link--active' : ''}`}
             >
@@ -169,6 +215,7 @@ export function ControlRoomShell({
             </div>
           </Link>
           <ThemeToggle className="theme-toggle--sidebar" />
+          <SidebarWebsiteLink />
           <button
             type="button"
             className="btn-ghost btn-ghost--full sidebar-signout"
@@ -188,22 +235,29 @@ export function ControlRoomShell({
             <BrandMark variant="control" compact showProduct={false} href={false} />
             <div>
               <h1>{title}</h1>
-              <p>4DS Solutions · Control Panel · {session.user.tenant?.name ?? 'Operations'}</p>
+              <p>4DS Security</p>
             </div>
           </div>
           <div className="topbar-actions">
-            <NavClock frozenAt={screenshotClock} />
-            <NotificationCenter />
-            <ThemeToggle className="theme-toggle--compact" />
+            <NavClock compact />
             <Link href="/control-room/map" className="badge badge--live badge--link">
               LIVE
             </Link>
+            <NotificationCenter />
+            <ThemeToggle className="theme-toggle--compact" />
           </div>
         </header>
         <main className="shell-content">{children}</main>
       </div>
 
-      <MobileBottomNav items={mobileNavItems} ariaLabel="Control Panel" />
+      {!hideSupportDock && (
+        <FloatingSupportDock chatHref="/control-room/chat" />
+      )}
+      <MobileBottomNav
+        items={mobileNavItems}
+        ariaLabel={session.user.role === 'DEVELOPER' ? 'Developer' : 'Control Panel'}
+      />
     </div>
+    </>
   );
 }

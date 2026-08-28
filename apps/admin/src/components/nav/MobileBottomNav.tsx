@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { NavIcon, type NavIconName } from '@/components/nav/NavIcon';
+import { navHrefIsActive } from '@/lib/nav-active';
 
 export type MobileBottomNavItem = {
   href?: string;
@@ -26,12 +27,11 @@ type MobileBottomNavProps = {
 function isItemActive(
   pathname: string,
   item: MobileBottomNavItem,
+  candidates: string[],
 ): boolean {
   if (typeof item.active === 'boolean') return item.active;
   if (!item.href) return false;
-  if (item.exact) return pathname === item.href;
-  if (item.href === '/') return pathname === '/';
-  return pathname === item.href || pathname.startsWith(`${item.href}/`);
+  return navHrefIsActive(pathname, item.href, item.exact, candidates);
 }
 
 export function MobileBottomNav({
@@ -43,6 +43,10 @@ export function MobileBottomNav({
 
   if (!items.length) return null;
 
+  const candidates = items
+    .map((item) => item.href)
+    .filter((href): href is string => Boolean(href));
+
   return (
     <nav
       className={`mobile-bottom-nav ${className}`.trim()}
@@ -50,7 +54,7 @@ export function MobileBottomNav({
     >
       <div className="mobile-bottom-nav__pill">
         {items.map((item) => {
-          const active = isItemActive(pathname, item);
+          const active = isItemActive(pathname, item, candidates);
           const classNames = [
             'mobile-bottom-nav__item',
             active ? 'mobile-bottom-nav__item--active' : '',
@@ -78,6 +82,7 @@ export function MobileBottomNav({
                 className={classNames}
                 onClick={item.onClick}
                 aria-current={active ? 'page' : undefined}
+                title={item.label}
               >
                 {content}
               </button>
@@ -92,6 +97,7 @@ export function MobileBottomNav({
               href={item.href}
               className={classNames}
               aria-current={active ? 'page' : undefined}
+              title={item.label}
             >
               {content}
             </Link>

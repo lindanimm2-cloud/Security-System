@@ -12,6 +12,7 @@ import {
   sortNotificationsForOps,
 } from '@/lib/alert-priority';
 import { getSession } from '@/lib/auth';
+import { useCrSettings } from '@/hooks/useCrSettings';
 import {
   DEMO_DEV_TICKET_EVENT,
   DEMO_ERROR_REPORTS_KEY,
@@ -47,6 +48,8 @@ function formatTime(iso: string) {
 }
 
 export function NotificationCenter() {
+  const crSettings = useCrSettings();
+  const bellEnabled = crSettings.notifications.bell;
   const { data, reload } = useApi(
     () => adminApi.get<ApiResponse<NotificationData>>('/control-room/notifications'),
     [],
@@ -116,6 +119,7 @@ export function NotificationCenter() {
     });
 
     socket.on('incident:created', () => reload());
+    socket.on('incident.created', () => reload());
     socket.on('notification:new', () => reload());
     socket.on('developer:error-report', () => reload());
 
@@ -276,10 +280,15 @@ export function NotificationCenter() {
     <div className="notification-center notification-center--control-room" ref={rootRef}>
       <button
         type="button"
-        className={`notification-bell ${criticalUnread.length > 0 ? 'notification-bell--critical' : ''}`}
-        onClick={() => setOpen((v) => !v)}
-        aria-label="Notifications"
+        className={`notification-bell ${criticalUnread.length > 0 ? 'notification-bell--critical' : ''} ${!bellEnabled ? 'notification-bell--muted' : ''}`}
+        onClick={() => {
+          if (!bellEnabled) return;
+          setOpen((v) => !v);
+        }}
+        aria-label={bellEnabled ? 'Notifications' : 'Notification bell disabled in settings'}
         aria-expanded={open}
+        title={bellEnabled ? 'Notifications' : 'Notification bell disabled in Settings → Notifications'}
+        disabled={!bellEnabled}
       >
         <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden>
           <path

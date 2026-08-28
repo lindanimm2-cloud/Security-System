@@ -34,19 +34,25 @@ export function DispatchMiniMenu({
       const rect = anchorRef.current!.getBoundingClientRect();
       const width = Math.min(360, window.innerWidth - 24);
       const left = Math.max(12, Math.min(rect.left, window.innerWidth - width - 12));
-      const maxHeight = Math.min(window.innerHeight * 0.7, 520);
-      const below = rect.bottom + 8;
-      const top =
-        below + Math.min(280, maxHeight) > window.innerHeight - 16
-          ? Math.max(12, window.innerHeight - maxHeight - 16)
-          : below;
+      const gap = 8;
+      const pad = 12;
+      const height = panelRef.current?.offsetHeight || Math.min(window.innerHeight * 0.45, 320);
+      const below = rect.bottom + gap;
+      const spaceBelow = window.innerHeight - pad - below;
+      const spaceAbove = rect.top - pad - gap;
+      const openAbove = height > spaceBelow && spaceAbove > spaceBelow;
+      const top = openAbove
+        ? Math.max(pad, rect.top - height - gap)
+        : below;
       setPosition({ top, left });
     }
 
     place();
+    const frame = window.requestAnimationFrame(place);
     window.addEventListener('resize', place);
     window.addEventListener('scroll', place, true);
     return () => {
+      window.cancelAnimationFrame(frame);
       window.removeEventListener('resize', place);
       window.removeEventListener('scroll', place, true);
     };

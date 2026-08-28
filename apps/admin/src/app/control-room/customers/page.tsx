@@ -14,7 +14,11 @@ import { adminApi, type ApiResponse } from '@/lib/api-client';
 import { CONTROL_ROOM_ROUTES, dispatchHref, mapHref } from '@/lib/control-room-routes';
 import { friendlyErrorMessage } from '@/lib/friendly-error';
 import { exportCsv } from '@/lib/export-csv';
+import { openBrandedTableReport } from '@/lib/branded-document';
 import { UiSelect } from '@/components/ui/UiSelect';
+import { ListSearch } from '@/components/ui/ListSearch';
+import { OpsDialog } from '@/components/ops/OpsDialog';
+import { matchesSearch } from '@/lib/list-search';
 
 type SubscriptionSummary = {
   planName: string;
@@ -146,6 +150,7 @@ function CustomersContent() {
   const [checkMsg, setCheckMsg] = useState('');
   const [newCode, setNewCode] = useState({ code: '', percentOff: '10', appliesTo: 'BOTH', description: '' });
   const [codeSaving, setCodeSaving] = useState(false);
+  const [showDiscountDialog, setShowDiscountDialog] = useState(false);
   const [codeMsg, setCodeMsg] = useState('');
   const [codeError, setCodeError] = useState('');
   const [inviteForm, setInviteForm] = useState({
@@ -156,6 +161,7 @@ function CustomersContent() {
   });
   const [inviteSaving, setInviteSaving] = useState(false);
   const [inviteError, setInviteError] = useState('');
+  const [showInviteDialog, setShowInviteDialog] = useState(false);
   const [createdInvite, setCreatedInvite] = useState<{
     name: string;
     code: string;
@@ -173,19 +179,21 @@ function CustomersContent() {
 
   const filtered = useMemo(() => {
     return customers.filter((c) => {
-      const q = search.trim().toLowerCase();
-      const matchesSearch =
-        !q ||
-        `${c.firstName} ${c.lastName}`.toLowerCase().includes(q) ||
-        c.email.toLowerCase().includes(q) ||
-        c.subscription?.memberId.toLowerCase().includes(q);
+      const matchesQuery = matchesSearch(
+        search,
+        c.firstName,
+        c.lastName,
+        c.email,
+        c.phone,
+        c.subscription?.memberId,
+      );
       const matchesTier =
         tierFilter === 'ALL' || c.subscription?.tierCode === tierFilter;
       const matchesStatus =
         statusFilter === 'ALL' ||
         c.subscription?.status === statusFilter ||
         (statusFilter === 'PAST_DUE' && c.subscription?.isOverdue);
-      return matchesSearch && matchesTier && matchesStatus;
+      return matchesQuery && matchesTier && matchesStatus;
     });
   }, [customers, search, tierFilter, statusFilter]);
 
@@ -222,6 +230,7 @@ function CustomersContent() {
         url,
       });
       setInviteForm({ firstName: '', lastName: '', email: '', phone: '' });
+      setShowInviteDialog(false);
       reload();
     } catch (err) {
       setInviteError(friendlyErrorMessage(err, 'save'));
@@ -264,6 +273,7 @@ function CustomersContent() {
       });
       setNewCode({ code: '', percentOff: '10', appliesTo: 'BOTH', description: '' });
       setCodeMsg('Discount code saved.');
+      setShowDiscountDialog(false);
       reloadCodes();
     } catch (err) {
       setCodeError(friendlyErrorMessage(err, 'save'));
@@ -295,173 +305,201 @@ function CustomersContent() {
           <Link href={CONTROL_ROOM_ROUTES.dispatch} className="btn-secondary">
             Dispatch
           </Link>
+          <button type="button" className="btn-ok" onClick={() => setShowInviteDialog(true)}>
+            Invite client
+          </button>
         </div>
       </div>
 
       {checkMsg && <div className="alert alert--success" role="status">{checkMsg}</div>}
 
-      <section className="card">
-        <h2>Invite premium / panic-app client</h2>
-        <p className="text-muted">
-          Owners, managers, admins, and sales create an invite code for homes,
-          stores, and work sites. The customer enters the code on the portal
-          before they can fill in panic-app details. Store shoppers stay on a
-          separate website account.
-        </p>
-        {inviteError && <ErrorAlert error={inviteError} />}
-        <form className="stack-form" onSubmit={invitePremiumClient}>
-          <div className="form-row-2">
-            <label>
-              First name
-              <input
-                required
-                value={inviteForm.firstName}
-                onChange={(e) =>
-                  setInviteForm({ ...inviteForm, firstName: e.target.value })
-                }
-              />
-            </label>
-            <label>
-              Last name
-              <input
-                required
-                value={inviteForm.lastName}
-                onChange={(e) =>
-                  setInviteForm({ ...inviteForm, lastName: e.target.value })
-                }
-              />
-            </label>
-          </div>
-          <div className="form-row-2">
-            <label>
-              Email
-              <input
-                type="email"
-                required
-                value={inviteForm.email}
-                onChange={(e) =>
-                  setInviteForm({ ...inviteForm, email: e.target.value })
-                }
-              />
-            </label>
-            <label>
-              Phone
-              <input
-                value={inviteForm.phone}
-                onChange={(e) =>
-                  setInviteForm({ ...inviteForm, phone: e.target.value })
-                }
-                placeholder="+27 …"
-              />
-            </label>
-          </div>
-          <button type="submit" className="btn-primary" disabled={inviteSaving}>
-            {inviteSaving ? 'Creating…' : 'Generate invite code'}
-          </button>
-        </form>
-      </section>
-
-      {createdInvite && (
-        <div className="modal-overlay" onClick={() => setCreatedInvite(null)}>
-          <div className="modal-card" onClick={(e) => e.stopPropagation()}>
-            <h3>Invite code ready</h3>
-            <p>
-              Give <strong>{createdInvite.name}</strong> this code to activate
-              the panic app:
-            </p>
-            <p
-              style={{
-                fontSize: '1.6rem',
-                fontWeight: 700,
-                letterSpacing: '0.1em',
-                margin: '0.75rem 0',
-              }}
-            >
-              {createdInvite.code}
-            </p>
-            <p className="text-muted" style={{ fontSize: '0.85rem' }}>
-              Link: {createdInvite.url}
-            </p>
-            <div className="btn-row" style={{ marginTop: '1rem' }}>
-              <button
-                type="button"
-                className="btn-primary"
-                onClick={() => {
-                  void navigator.clipboard.writeText(createdInvite.code);
-                }}
-              >
-                Copy code
+      {showInviteDialog && (
+        <OpsDialog
+          title="Invite premium / panic-app client"
+          subtitle="Generate an invite code for homes, stores, and work sites. The customer enters this code on the portal to activate the panic app."
+          onClose={() => setShowInviteDialog(false)}
+        >
+          {inviteError && <ErrorAlert error={inviteError} />}
+          <form className="stack-form" onSubmit={(e) => { void invitePremiumClient(e); }}>
+            <div className="form-row-2">
+              <label>
+                First name
+                <input
+                  required
+                  value={inviteForm.firstName}
+                  onChange={(e) =>
+                    setInviteForm({ ...inviteForm, firstName: e.target.value })
+                  }
+                />
+              </label>
+              <label>
+                Last name
+                <input
+                  required
+                  value={inviteForm.lastName}
+                  onChange={(e) =>
+                    setInviteForm({ ...inviteForm, lastName: e.target.value })
+                  }
+                />
+              </label>
+            </div>
+            <div className="form-row-2">
+              <label>
+                Email
+                <input
+                  type="email"
+                  required
+                  value={inviteForm.email}
+                  onChange={(e) =>
+                    setInviteForm({ ...inviteForm, email: e.target.value })
+                  }
+                />
+              </label>
+              <label>
+                Phone
+                <input
+                  value={inviteForm.phone}
+                  onChange={(e) =>
+                    setInviteForm({ ...inviteForm, phone: e.target.value })
+                  }
+                  placeholder="+27 …"
+                />
+              </label>
+            </div>
+            <div className="fleet-form__actions">
+              <button type="button" className="btn-ghost" onClick={() => setShowInviteDialog(false)}>
+                Cancel
               </button>
-              <button
-                type="button"
-                className="btn-secondary"
-                onClick={() => setCreatedInvite(null)}
-              >
-                Done
+              <button type="submit" className="btn-ok" disabled={inviteSaving}>
+                {inviteSaving ? 'Creating…' : 'Generate invite code'}
               </button>
             </div>
+          </form>
+        </OpsDialog>
+      )}
+
+      {createdInvite && (
+        <OpsDialog
+          title="Invite code ready"
+          subtitle={`Give ${createdInvite.name} this code to activate the panic app.`}
+          onClose={() => setCreatedInvite(null)}
+        >
+          <p
+            style={{
+              fontSize: '1.6rem',
+              fontWeight: 700,
+              letterSpacing: '0.1em',
+              margin: '0.5rem 0 1rem',
+              textAlign: 'center',
+            }}
+          >
+            {createdInvite.code}
+          </p>
+          <div className="invite-link-box__row" style={{ marginBottom: '0.75rem' }}>
+            <input readOnly value={createdInvite.url} onFocus={(e) => e.target.select()} />
+            <button
+              type="button"
+              className="btn-secondary btn-sm"
+              onClick={() => { void navigator.clipboard.writeText(createdInvite.url); }}
+            >
+              Copy link
+            </button>
           </div>
-        </div>
+          <div className="fleet-form__actions">
+            <button
+              type="button"
+              className="btn-primary"
+              onClick={() => { void navigator.clipboard.writeText(createdInvite.code); }}
+            >
+              Copy code
+            </button>
+            <button type="button" className="btn-ghost" onClick={() => setCreatedInvite(null)}>
+              Done
+            </button>
+          </div>
+        </OpsDialog>
+      )}
+
+      {showDiscountDialog && (
+        <OpsDialog
+          title="Create discount code"
+          subtitle="Promo codes stack on loyalty discounts (max 30% off)."
+          onClose={() => setShowDiscountDialog(false)}
+        >
+          {codeError && <ErrorAlert error={codeError} />}
+          <form className="stack-form" onSubmit={saveDiscountCode}>
+            <div className="form-row-2">
+              <label>
+                Code
+                <input
+                  value={newCode.code}
+                  onChange={(e) => setNewCode({ ...newCode, code: e.target.value.toUpperCase() })}
+                  placeholder="NEXUS10"
+                  required
+                />
+              </label>
+              <label>
+                Percent off
+                <input
+                  type="number"
+                  min={1}
+                  max={30}
+                  value={newCode.percentOff}
+                  onChange={(e) => setNewCode({ ...newCode, percentOff: e.target.value })}
+                  required
+                />
+              </label>
+            </div>
+            <div className="form-row-2">
+              <label>
+                Applies to
+                <UiSelect
+                  compact={false}
+                  ariaLabel="Applies to"
+                  value={newCode.appliesTo}
+                  onChange={(appliesTo) => setNewCode({ ...newCode, appliesTo })}
+                  options={[
+                    { value: 'BOTH', label: 'Subscription & store' },
+                    { value: 'SUBSCRIPTION', label: 'Subscription only' },
+                    { value: 'STORE', label: 'Store only' },
+                  ]}
+                />
+              </label>
+              <label>
+                Description
+                <input
+                  value={newCode.description}
+                  onChange={(e) => setNewCode({ ...newCode, description: e.target.value })}
+                  placeholder="Optional note"
+                />
+              </label>
+            </div>
+            <div className="fleet-form__actions">
+              <button type="button" className="btn-ghost" onClick={() => setShowDiscountDialog(false)}>
+                Cancel
+              </button>
+              <button type="submit" className="btn-secondary" disabled={codeSaving}>
+                {codeSaving ? 'Saving…' : 'Create / update code'}
+              </button>
+            </div>
+          </form>
+        </OpsDialog>
       )}
 
       <section className="card">
-        <h2>Discount codes</h2>
-        <p className="text-muted">
-          Promo codes stack on top of loyalty/CRM discounts (capped at 30%). Demo: NEXUS10 (both), GEAR15 (store).
-        </p>
+        <div className="card-header-row">
+          <div>
+            <h2 style={{ margin: 0 }}>Discount codes</h2>
+            <p className="text-muted" style={{ margin: '0.35rem 0 0' }}>
+              Promo codes stack on top of loyalty/CRM discounts (capped at 30%). Demo: NEXUS10 (both), GEAR15 (store).
+            </p>
+          </div>
+          <button type="button" className="btn-secondary btn-sm" onClick={() => setShowDiscountDialog(true)}>
+            + Create code
+          </button>
+        </div>
         {codeError && <ErrorAlert error={codeError} />}
         {codeMsg && <div className="alert alert--success">{codeMsg}</div>}
-        <form className="stack-form" onSubmit={saveDiscountCode} style={{ marginBottom: '1rem' }}>
-          <div className="form-row-2">
-            <label>
-              Code
-              <input
-                value={newCode.code}
-                onChange={(e) => setNewCode({ ...newCode, code: e.target.value.toUpperCase() })}
-                placeholder="NEXUS10"
-                required
-              />
-            </label>
-            <label>
-              Percent off
-              <input
-                type="number"
-                min={1}
-                max={30}
-                value={newCode.percentOff}
-                onChange={(e) => setNewCode({ ...newCode, percentOff: e.target.value })}
-                required
-              />
-            </label>
-          </div>
-          <div className="form-row-2">
-            <label>
-              Applies to
-              <UiSelect
-                compact={false}
-                ariaLabel="Applies to"
-                value={newCode.appliesTo}
-                onChange={(appliesTo) => setNewCode({ ...newCode, appliesTo })}
-                options={[
-                  { value: 'BOTH', label: 'Subscription & store' },
-                  { value: 'SUBSCRIPTION', label: 'Subscription only' },
-                  { value: 'STORE', label: 'Store only' },
-                ]}
-              />
-            </label>
-            <label>
-              Description
-              <input
-                value={newCode.description}
-                onChange={(e) => setNewCode({ ...newCode, description: e.target.value })}
-                placeholder="Optional note"
-              />
-            </label>
-          </div>
-          <button type="submit" className="btn-secondary" disabled={codeSaving}>
-            {codeSaving ? 'Saving…' : 'Create / update code'}
-          </button>
-        </form>
         {discountCodes.length > 0 && (
           <ul className="status-list">
             {discountCodes.map((c) => (
@@ -515,12 +553,16 @@ function CustomersContent() {
       )}
 
       <section className="card customers-toolbar">
-        <input
-          type="search"
-          placeholder="Search name, email, or member ID…"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
+        <div className="list-search-bar">
+          <ListSearch
+            value={search}
+            onChange={setSearch}
+            placeholder="Search name, email, or member ID…"
+            resultCount={filtered.length}
+            totalCount={customers.length}
+            id="customers-list-search"
+          />
+        </div>
         <UiSelect
           ariaLabel="Filter by tier"
           value={tierFilter}
@@ -548,6 +590,31 @@ function CustomersContent() {
           className="btn-secondary"
           disabled={filtered.length === 0}
           onClick={() =>
+            openBrandedTableReport({
+              title: 'Customer subscription register',
+              filenameStem: 'customers',
+              headers: ['Name', 'Email', 'Member ID', 'Plan', 'Status', 'Monthly', 'Valid until'],
+              rows: filtered.map((c) => [
+                `${c.firstName} ${c.lastName}`,
+                c.email,
+                c.subscription?.memberId ?? '',
+                c.subscription?.planName ?? '',
+                c.subscription?.status ?? '',
+                c.subscription?.priceFormatted ?? '',
+                c.subscription?.validUntil
+                  ? new Date(c.subscription.validUntil).toLocaleDateString()
+                  : '',
+              ]),
+            })
+          }
+        >
+          Print report
+        </button>
+        <button
+          type="button"
+          className="btn-secondary"
+          disabled={filtered.length === 0}
+          onClick={() =>
             exportCsv(
               'customers.csv',
               filtered.map((c) => ({
@@ -561,6 +628,7 @@ function CustomersContent() {
                   ? new Date(c.subscription.validUntil).toLocaleDateString()
                   : '',
               })),
+              { title: 'Customer subscription register' },
             )
           }
         >
@@ -822,11 +890,9 @@ function CustomerSubscriptionModal({
 
   if (loading) {
     return (
-      <div className="modal-overlay" onClick={onClose}>
-        <div className="modal-card modal-card--wide" onClick={(e) => e.stopPropagation()}>
-          <LoadingSpinner label="Loading subscription..." />
-        </div>
-      </div>
+      <OpsDialog title="Manage subscription" onClose={onClose} wide>
+        <LoadingSpinner label="Loading subscription..." />
+      </OpsDialog>
     );
   }
 
@@ -859,13 +925,13 @@ function CustomerSubscriptionModal({
   }
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-card modal-card--wide customer-sub-modal" onClick={(e) => e.stopPropagation()}>
-        <h3>Manage subscription — {customer.firstName} {customer.lastName}</h3>
-        <p className="text-muted">
-          {customer.email} · {roleLabel}
-          {sub.isOverdue ? ` · Overdue ${sub.daysPastDue ?? 0}d` : ''}
-        </p>
+    <OpsDialog
+      title={`Manage subscription — ${customer.firstName} ${customer.lastName}`}
+      subtitle={`${customer.email} · ${roleLabel}${sub.isOverdue ? ` · Overdue ${sub.daysPastDue ?? 0}d` : ''}`}
+      onClose={onClose}
+      wide
+    >
+      <div className="customer-sub-modal">
 
         {error && <ErrorAlert error={error} />}
 
@@ -1108,6 +1174,6 @@ function CustomerSubscriptionModal({
           </div>
         </form>
       </div>
-    </div>
+    </OpsDialog>
   );
 }

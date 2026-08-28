@@ -17,7 +17,7 @@ export function SiteMobileBottomNav() {
       active: drawerOpen,
     },
     { href: '/services', label: 'Services', icon: 'services' },
-    { href: '/account', label: 'Account', icon: 'profile' },
+    { href: '/account', label: 'Account', icon: 'account' },
   ];
 
   return (

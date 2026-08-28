@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { useCallsOptional } from '@/components/calls/CallProvider';
 import { friendlyErrorMessage } from '@/lib/friendly-error';
+import { CONTROL_ROOM_LINE } from '@/lib/control-room-line';
 import type { CallChannel } from '@/types/calls';
 
 type Props = {
@@ -15,6 +16,17 @@ type Props = {
   size?: 'sm' | 'lg';
   className?: string;
 };
+
+export function formatZaPhone(phone: string) {
+  const digits = phone.replace(/\D/g, '');
+  if (digits.startsWith('27') && digits.length >= 11) {
+    const rest = digits.slice(2);
+    if (rest.length === 9) {
+      return `+27 ${rest.slice(0, 2)} ${rest.slice(2, 5)} ${rest.slice(5)}`;
+    }
+  }
+  return phone;
+}
 
 function isDispatchContact(
   name: string,
@@ -67,12 +79,14 @@ export function EmergencyCallButton({
     }
   }
 
-  const label = dispatch ? 'Call control room' : linkedUserId ? 'In-app call' : 'Emergency call';
+  const label = dispatch ? 'Call Control Room' : 'Call';
 
   return (
     <button
       type="button"
-      className={`emergency-call-btn emergency-call-btn--${size} ${className}`.trim()}
+      className={`emergency-call-btn emergency-call-btn--${size} ${
+        dispatch ? 'emergency-call-btn--dispatch' : 'emergency-call-btn--quiet'
+      } ${className}`.trim()}
       disabled={busy}
       onClick={() => void handleCall()}
       title={dispatch ? 'Connect to 4DS control room' : `Call ${name}`}
@@ -90,25 +104,28 @@ export function EmergencyCallButton({
 }
 
 export function EmergencyDispatchCallCard({
-  phone,
-  name = '4DS Control Room',
+  phone = CONTROL_ROOM_LINE.phone,
+  name = CONTROL_ROOM_LINE.name,
 }: {
-  phone: string;
+  phone?: string;
   name?: string;
 }) {
   return (
-    <div className="emergency-call-card">
-      <div className="emergency-call-card__row">
-        <div className="emergency-call-card__icon" aria-hidden>
-          <PhoneIcon />
-        </div>
-        <div className="emergency-call-card__meta">
-          <strong>{name}</strong>
-          <span className="emergency-call-card__hint">Always connected · {phone}</span>
-        </div>
+    <section className="ec-dispatch" aria-label="4DS Control Room">
+      <div className="ec-dispatch__top">
+        <p className="ec-kicker">4DS Control Room</p>
+        <span className="ec-online">
+          <span className="ec-dot" aria-hidden />
+          Online · 24/7 response
+        </span>
       </div>
+      <h2>24/7 security response</h2>
+      <p className="ec-dispatch__phone">{formatZaPhone(phone)}</p>
       <EmergencyCallButton name={name} phone={phone} isDispatch size="lg" />
-    </div>
+      <p className="ec-dispatch__note">
+        Your contracted security response line. Available 24/7 for verified security emergencies.
+      </p>
+    </section>
   );
 }
 

@@ -11,6 +11,8 @@ type HoldToActivateProps = {
   loading?: boolean;
   className?: string;
   tone?: 'danger' | 'warn' | 'medical';
+  hideHint?: boolean;
+  keepLabel?: boolean;
   children?: ReactNode;
 };
 
@@ -24,6 +26,8 @@ export function HoldToActivate({
   loading,
   className = '',
   tone = 'danger',
+  hideHint = false,
+  keepLabel = false,
   children,
 }: HoldToActivateProps) {
   const [progress, setProgress] = useState(0);
@@ -72,7 +76,8 @@ export function HoldToActivate({
     rafRef.current = requestAnimationFrame(tick);
   }
 
-  const isCircle = className.includes('hold-activate--circle');
+  const isCircle =
+    className.includes('hold-activate--circle') || className.includes('panic-orbit-btn');
 
   return (
     <button
@@ -98,13 +103,19 @@ export function HoldToActivate({
         aria-hidden
       />
       <span className="hold-activate__label">
-        {loading ? 'Sending…' : holding ? holdLabel : (children ?? label)}
+        {loading
+          ? 'Sending…'
+          : holding && !keepLabel
+            ? `Release to cancel · ${Math.max(1, Math.ceil((1 - progress) * (holdMs / 1000)))}`
+            : (children ?? label)}
       </span>
-      {holding ? (
-        <span className="hold-activate__pct" aria-hidden>
-          {Math.round(progress * 100)}%
+      {hideHint ? null : holding ? (
+        <span className="hold-activate__pct" aria-live="polite">
+          {Math.max(1, Math.ceil((1 - progress) * (holdMs / 1000)))}
         </span>
-      ) : null}
+      ) : (
+        <span className="hold-activate__hint">{Math.round(holdMs / 1000)}s hold</span>
+      )}
     </button>
   );
 }

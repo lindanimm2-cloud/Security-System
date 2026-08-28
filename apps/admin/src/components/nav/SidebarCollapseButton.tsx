@@ -1,5 +1,7 @@
 'use client';
 
+import Link from 'next/link';
+
 export function SidebarCollapseButton({
   collapsed,
   onClick,
@@ -50,5 +52,34 @@ export function SignOutIcon() {
         strokeLinejoin="round"
       />
     </svg>
+  );
+}
+
+export function SidebarWebsiteLink() {
+  return (
+    <Link
+      href="/"
+      className="btn-ghost btn-ghost--full sidebar-signout sidebar-website"
+      title="Back to website"
+      aria-label="Back to website"
+    >
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
+        <path
+          d="M3 10.5L12 3l9 7.5"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+        <path
+          d="M5 9.5V21h14V9.5"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </svg>
+      <span>Website</span>
+    </Link>
   );
 }

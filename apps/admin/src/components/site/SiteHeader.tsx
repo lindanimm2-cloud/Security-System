@@ -3,7 +3,7 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { CartIcon } from '@/components/icons/CartIcon';
 import { useCart } from './CartProvider';
@@ -25,6 +25,14 @@ export function SiteHeader() {
   const { ready, session, fullName } = useSiteClient();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
+  const [scrolled, setScrolled] = useState(false);
+
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 12);
+    onScroll();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
 
   function onSearch(e: FormEvent) {
     e.preventDefault();
@@ -52,7 +60,7 @@ export function SiteHeader() {
         </div>
       </div>
 
-      <header className="nx-header">
+      <header className={`nx-header${scrolled ? ' nx-header--scrolled' : ''}`}>
         <div className="nx-header-inner">
           <Link href="/" className="nx-logo" onClick={() => setOpen(false)}>
             <Image

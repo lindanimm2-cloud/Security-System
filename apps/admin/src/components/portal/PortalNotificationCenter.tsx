@@ -29,6 +29,7 @@ export function PortalNotificationCenter() {
   );
   const [open, setOpen] = useState(false);
   const [filter, setFilter] = useState<ClientNotificationFilter>('ALL');
+  const [readIds, setReadIds] = useState<Set<string>>(new Set());
   const rootRef = useRef<HTMLDivElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const [mounted, setMounted] = useState(false);
@@ -38,31 +39,51 @@ export function PortalNotificationCenter() {
   }, []);
 
   const notifications = (data?.data?.notifications ?? []).map(enrichClientNotification);
-  const unreadCount = data?.data?.unreadCount ?? 0;
+  const unreadCount = notifications.filter((n) => !n.isRead && !readIds.has(n.id)).length;
   const filtered = filterClientNotifications(notifications, filter);
 
   const markRead = useCallback(
     async (id: string) => {
+      setReadIds((prev) => {
+        const next = new Set(prev);
+        next.add(id);
+        return next;
+      });
       try {
         await clientApi.patch(`/client/notifications/${id}/read`);
         window.dispatchEvent(new Event('4ds-notifications-changed'));
         void reload({ silent: true });
       } catch {
-        /* keep panel open so user can retry */
+        setReadIds((prev) => {
+          const next = new Set(prev);
+          next.delete(id);
+          return next;
+        });
       }
     },
     [reload],
   );
 
   const markAllRead = useCallback(async () => {
+    setReadIds((prev) => {
+      const next = new Set(prev);
+      for (const n of notifications) next.add(n.id);
+      return next;
+    });
     try {
       await clientApi.patch('/client/notifications/read-all');
       window.dispatchEvent(new Event('4ds-notifications-changed'));
       void reload({ silent: true });
     } catch {
-      /* keep panel open so user can retry */
+      setReadIds((prev) => {
+        const next = new Set(prev);
+        for (const n of notifications) {
+          if (!n.isRead) next.delete(n.id);
+        }
+        return next;
+      });
     }
-  }, [reload]);
+  }, [notifications, reload]);
 
   useEffect(() => {
     const session = getSession('client');
@@ -81,6 +102,12 @@ export function PortalNotificationCenter() {
     return () => {
       socket.disconnect();
     };
+  }, [reload]);
+
+  useEffect(() => {
+    const refresh = () => void reload({ silent: true });
+    window.addEventListener('4ds-notifications-changed', refresh);
+    return () => window.removeEventListener('4ds-notifications-changed', refresh);
   }, [reload]);
 
   useEffect(() => {
@@ -139,11 +166,12 @@ export function PortalNotificationCenter() {
             )}
             {filtered.map((n) => {
               const cat = n.category?.toLowerCase() ?? 'updates';
+              const read = n.isRead || readIds.has(n.id);
               return (
               <li
                 key={n.id}
                 className={`portal-notification-item portal-notification-item--cat-${cat} ${
-                  !n.isRead ? 'portal-notification-item--unread' : 'portal-notification-item--read'
+                  read ? 'portal-notification-item--read' : 'portal-notification-item--unread'
                 }`}
               >
                 <div className="portal-notification-item__head">
@@ -159,13 +187,13 @@ export function PortalNotificationCenter() {
                     href={n.href ?? '/portal/updates'}
                     className="portal-notification-btn portal-notification-btn--primary"
                     onClick={() => {
-                      if (!n.isRead) void markRead(n.id);
+                      if (!read) void markRead(n.id);
                       setOpen(false);
                     }}
                   >
                     View
                   </Link>
-                  {!n.isRead && (
+                  {!read && (
                     <button
                       type="button"
                       className="portal-notification-btn portal-notification-btn--secondary"

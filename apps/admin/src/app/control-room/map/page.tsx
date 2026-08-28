@@ -4,7 +4,7 @@ import { ErrorAlert } from '@/components/ErrorAlert';
 
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { io, Socket } from 'socket.io-client';
 import { CallActions, DispatchLineButton } from '@/components/calls/CallActions';
@@ -64,9 +64,10 @@ import { getSession } from '@/lib/auth';
 import { setActiveIncidentId } from '@/lib/dispatch-context';
 import { maskMapDataForScreenshot } from '@/lib/map-screenshot';
 import { DispatchMenuButton } from '@/components/control-room/DispatchMenuButton';
-import { CONTROL_ROOM_ROUTES, incidentHref } from '@/lib/control-room-routes';
+import { IncidentDetailsMenu } from '@/components/control-room/IncidentDetailsMenu';
+import { CONTROL_ROOM_ROUTES } from '@/lib/control-room-routes';
 import { getSocketUrl } from '@/lib/socket';
-import { isDemoMode } from '@/lib/demo/is-demo-mode';
+import { isDemoMode, shouldBackgroundPoll } from '@/lib/demo/is-demo-mode';
 
 const CommandCentreMap = dynamic(() => import('@/components/maps/CommandCentreMap'), {
   ssr: false,
@@ -74,7 +75,7 @@ const CommandCentreMap = dynamic(() => import('@/components/maps/CommandCentreMa
 });
 
 type PositionUpdate = {
-  entityType: 'client' | 'officer' | 'vehicle';
+  entityType: 'client' | 'officer' | 'vehicle' | 'fleet';
   id: string;
   lat: number;
   lng: number;
@@ -83,7 +84,9 @@ type PositionUpdate = {
 export default function MapPage() {
   return (
     <ControlRoomLayout title="Live Operations Map">
-      <MapContent />
+      <Suspense fallback={<LoadingSpinner label="Loading command centre map..." fullScreen />}>
+        <MapContent />
+      </Suspense>
     </ControlRoomLayout>
   );
 }
@@ -127,10 +130,20 @@ function MapContent() {
   }, []);
 
   useEffect(() => {
+    if (!mapData) return;
     const incidentParam = searchParams.get('incident');
-    if (incidentParam && mapData) {
+    if (incidentParam) {
       const incident = mapData.incidents.find((i) => i.id === incidentParam);
       if (incident) selectIncident(incident);
+      return;
+    }
+    const focus = searchParams.get('focus');
+    if (focus === 'users' && mapData.clients[0]) {
+      setFlyTo({ lat: mapData.clients[0].lat, lng: mapData.clients[0].lng, zoom: 14 });
+    } else if (focus === 'officers' && mapData.officers[0]) {
+      setFlyTo({ lat: mapData.officers[0].lat, lng: mapData.officers[0].lng, zoom: 14 });
+    } else if (focus === 'incidents' && mapData.incidents[0]) {
+      selectIncident(mapData.incidents[0]);
     }
   }, [searchParams, mapData, selectIncident]);
 
@@ -153,6 +166,10 @@ function MapContent() {
           );
         } else if (u.entityType === 'vehicle') {
           next.vehicles = prev.vehicles.map((v) =>
+            v.id === u.id ? { ...v, lat: u.lat, lng: u.lng } : v,
+          );
+        } else if (u.entityType === 'fleet') {
+          next.fleet = (prev.fleet ?? []).map((v) =>
             v.id === u.id ? { ...v, lat: u.lat, lng: u.lng } : v,
           );
         }
@@ -196,8 +213,7 @@ function MapContent() {
   useEffect(() => {
     if (isDemoMode()) {
       setLiveConnected(true);
-      const poll = setInterval(() => void reload({ silent: true }), 20000);
-      return () => clearInterval(poll);
+      return;
     }
 
     const session = getSession('admin');
@@ -213,13 +229,16 @@ function MapContent() {
     socket.on('connect', () => setLiveConnected(true));
     socket.on('disconnect', () => setLiveConnected(false));
     socket.on('incident:created', (incident: MapIncident) => handleIncidentCreated(incident));
+    socket.on('incident.created', (incident: MapIncident) => handleIncidentCreated(incident));
     socket.on('position:update', (updates: PositionUpdate[]) => queuePositionUpdates(updates));
 
-    const poll = setInterval(() => void reload({ silent: true }), 60000);
+    const poll = shouldBackgroundPoll()
+      ? setInterval(() => void reload({ silent: true }), 60000)
+      : null;
 
     return () => {
       socket.disconnect();
-      clearInterval(poll);
+      if (poll) clearInterval(poll);
       if (positionFlushRef.current) clearTimeout(positionFlushRef.current);
     };
   }, [handleIncidentCreated, queuePositionUpdates, reload]);
@@ -478,10 +497,10 @@ function MapContent() {
                   onClick={() => selectIncident(incident)}
                 >
                   <div className="command-incident-item__row">
-                    <span className={`incident-type incident-type--${incident.priority.toLowerCase()}`}>
-                      {incident.category.replace('_', ' ')}
+                    <span className={`incident-type incident-type--${(incident.priority ?? 'medium').toLowerCase()}`}>
+                      {(incident.category ?? incident.type ?? 'ALERT').replaceAll('_', ' ')}
                     </span>
-                    <span className="command-incident-status">{incident.status.replace('_', ' ')}</span>
+                    <span className="command-incident-status">{(incident.status ?? '').replaceAll('_', ' ')}</span>
                   </div>
                   <strong className="command-incident-item__name">{incident.name}</strong>
                   <span className="command-incident-item__meta text-muted">
@@ -494,7 +513,10 @@ function MapContent() {
                     incidentId={incident.id}
                     onAssigned={() => void reload({ silent: true })}
                   />
-                  <Link href={incidentHref(incident.id)} className="btn-sm btn-sm--link">Details</Link>
+                  <IncidentDetailsMenu
+                    incident={incident}
+                    onFocusMap={() => selectIncident(incident)}
+                  />
                   <CallActions
                     compact
                     target={{

@@ -8,6 +8,7 @@ import {
   setClockMode,
   type ClockDisplayMode,
 } from '@/lib/clock-preference';
+import { CR_SETTINGS_CHANGED_EVENT, loadCrSettings } from '@/lib/control-room-settings';
 import { formatScreenshotAliasDate } from '@/lib/map-screenshot';
 
 
@@ -20,12 +21,12 @@ type NavClockProps = {
   frozenAt?: Date;
 };
 
-function formatFuturistTime(date: Date, mode: ClockDisplayMode) {
+function formatFuturistTime(date: Date, mode: ClockDisplayMode, clock24h: boolean) {
   const opts: Intl.DateTimeFormatOptions = {
     hour: '2-digit',
     minute: '2-digit',
     second: '2-digit',
-    hour12: mode === 'standard',
+    hour12: !clock24h,
     timeZone: mode === 'utc' ? 'UTC' : undefined,
   };
   const parts = new Intl.DateTimeFormat('en-ZA', opts).formatToParts(date);
@@ -56,9 +57,11 @@ export function NavClock({
 }: NavClockProps) {
   const [mode, setMode] = useState<ClockDisplayMode>('futurist');
   const [now, setNow] = useState<Date | null>(null);
+  const [clock24h, setClock24h] = useState(true);
 
   useEffect(() => {
     setMode(getClockMode());
+    setClock24h(loadCrSettings().general.clock24h);
     if (frozenAt) {
       setNow(frozenAt);
       return;
@@ -67,6 +70,14 @@ export function NavClock({
     const id = setInterval(() => setNow(new Date()), 1000);
     return () => clearInterval(id);
   }, [frozenAt]);
+
+  useEffect(() => {
+    function syncClockPref() {
+      setClock24h(loadCrSettings().general.clock24h);
+    }
+    window.addEventListener(CR_SETTINGS_CHANGED_EVENT, syncClockPref);
+    return () => window.removeEventListener(CR_SETTINGS_CHANGED_EVENT, syncClockPref);
+  }, []);
 
   function cycleMode() {
     const next = nextClockMode(mode);
@@ -83,7 +94,7 @@ export function NavClock({
   }
 
   const useAliasDate = Boolean(frozenAt);
-  const { hour, minute, second, dayPeriod } = formatFuturistTime(now, mode);
+  const { hour, minute, second, dayPeriod } = formatFuturistTime(now, mode, clock24h);
   const dateLine = formatDateLine(now, mode, useAliasDate);
   const nextLabel = CLOCK_MODE_LABELS[nextClockMode(mode)];
 
@@ -92,7 +103,7 @@ export function NavClock({
       hour: '2-digit',
       minute: '2-digit',
       second: compact ? undefined : '2-digit',
-      hour12: true,
+      hour12: !clock24h,
       timeZone: mode === 'utc' ? 'UTC' : undefined,
     });
 

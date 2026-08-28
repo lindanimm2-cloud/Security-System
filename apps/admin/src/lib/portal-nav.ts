@@ -30,7 +30,12 @@ export const PORTAL_NAV: PortalNavSection[] = [
     icon: 'emergency',
     items: [
       { href: '/portal/protect', label: 'Protect', icon: 'emergency', requiresAccess: 'emergency' },
-      { href: '/portal/emergency', label: 'Emergency Hub', icon: 'emergency', requiresAccess: 'emergency' },
+      { href: '/portal/emergency', label: 'Emergency Hub', icon: 'hub', requiresAccess: 'emergency' },
+      { href: '/portal/security', label: 'Emergency Protection', icon: 'officers', requiresAccess: 'emergency' },
+      { href: '/portal/security/devices', label: 'Trusted Devices', icon: 'devices', requiresAccess: 'emergency' },
+      { href: '/portal/security/replace-device', label: 'Replace Primary', icon: 'devices', requiresAccess: 'emergency' },
+      { href: '/portal/security/emergency-access', label: 'Emergency Access', icon: 'key', requiresAccess: 'emergency' },
+      { href: '/portal/security/permissions', label: 'Permissions', icon: 'officers', requiresAccess: 'emergency' },
       { href: '/portal/contacts', label: 'Emergency Contacts', icon: 'contacts', requiresAccess: 'emergency' },
       { href: '/portal/medical', label: 'Medical', icon: 'medical', requiresAccess: 'medical' },
       { href: '/portal/incidents', label: 'Incident History', icon: 'incidents', requiresAccess: 'emergency' },
@@ -42,7 +47,7 @@ export const PORTAL_NAV: PortalNavSection[] = [
     icon: 'family',
     items: [
       { href: '/portal/family', label: 'Family Safety', icon: 'family', requiresAccess: 'family' },
-      { href: '/portal/family/chat', label: 'Family Chat', icon: 'dispatch-chat', requiresAccess: 'family' },
+      { href: '/portal/family/chat', label: 'Family Chat', icon: 'team-chat', requiresAccess: 'family' },
       { href: '/portal/safe-zones', label: 'Safe Zones', icon: 'safe-zones', requiresAccess: 'family' },
       { href: '/portal/location', label: 'Family Tracking', icon: 'location', requiresAccess: 'family' },
     ],
@@ -62,17 +67,23 @@ export const PORTAL_NAV: PortalNavSection[] = [
   {
     title: 'Personal',
     icon: 'personal',
-    items: [{ href: '/portal/personal', label: 'Personal Security', icon: 'personal', requiresAccess: 'personal' }],
+    items: [
+      { href: '/portal/personal', label: 'Personal Security', icon: 'personal', requiresAccess: 'personal' },
+      { href: '/portal/requests', label: 'Service Requests', icon: 'incidents', requiresAccess: 'personal' },
+    ],
   },
   {
     title: 'Account',
     icon: 'account',
     items: [
       { href: '/portal/subscription', label: 'Subscription', icon: 'subscription' },
-      { href: '/portal/billing', label: 'Billing & Documents', icon: 'subscription' },
+      { href: '/portal/billing', label: 'Billing & Documents', icon: 'documents' },
       { href: '/portal/subscription/upgrade', label: 'Upgrade Plan', icon: 'upgrade' },
       { href: '/portal/updates', label: 'Security Updates', icon: 'updates' },
       { href: '/portal/profile', label: 'Profile', icon: 'profile' },
+      { href: '/portal/settings', label: 'Settings', icon: 'account' },
+      { href: '/portal/security/activity', label: 'Security Activity', icon: 'history' },
+      { href: '/portal/security/lockdown', label: 'Account Protection', icon: 'lock' },
     ],
   },
 ];
@@ -116,7 +127,7 @@ export function portalPathRequiresAccess(pathname: string): keyof AccessMap | nu
     emergency: 'emergency',
     contacts: 'emergency',
     incidents: 'emergency',
-    evidence: 'emergency',
+    security: 'emergency',
     family: 'family',
     'safe-zones': 'family',
     location: 'family',
@@ -142,7 +153,7 @@ const PORTAL_MOBILE_PREFERRED: Array<{
   { href: '/portal/protect', mobileLabel: 'Protect', icon: 'emergency', requiresAccess: 'emergency' },
   { href: '/portal/family', mobileLabel: 'Family', icon: 'family', requiresAccess: 'family' },
   { href: '/portal/home', mobileLabel: 'Security', icon: 'safe-zones', requiresAccess: 'home' },
-  { href: '/portal/profile', mobileLabel: 'Account', icon: 'profile' },
+  { href: '/portal/settings', mobileLabel: 'Account', icon: 'account' },
 ];
 
 /** Floating mobile bottom bar — up to 5 primary portal destinations. */

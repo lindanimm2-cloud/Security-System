@@ -2,6 +2,7 @@ export const CONTROL_ROOM_ROUTES = {
   overview: '/control-room',
   map: '/control-room/map',
   incidents: '/control-room/incidents',
+  command: '/control-room/command',
   dispatch: '/control-room/dispatch',
   customers: '/control-room/customers',
   officers: '/control-room/officers',

@@ -3,9 +3,14 @@
 import { ErrorAlert } from '@/components/ErrorAlert';
 
 import Link from 'next/link';
+import { useState } from 'react';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { PortalLayout } from '@/components/portal/PortalLayout';
 import { UpgradeBanner } from '@/components/portal/UpgradeBanner';
+import {
+  FamilyProfilePopup,
+  type FamilyProfilePerson,
+} from '@/components/portal/FamilyProfilePopup';
 import { useSubscriptionAccess } from '@/hooks/useSubscriptionAccess';
 import { useApi } from '@/hooks/useApi';
 import { clientApi, type ApiResponse } from '@/lib/api-client';
@@ -15,14 +20,7 @@ type Family = {
   name: string;
   owner: string;
   familyMessagingEnabled?: boolean;
-  members: {
-    id: string;
-    name: string;
-    nickname: string | null;
-    trackingEnabled: boolean;
-    familyMessagingEnabled?: boolean;
-    lastLocationAt: string | null;
-  }[];
+  members: FamilyProfilePerson[];
 };
 
 export default function FamilyPage() {
@@ -35,10 +33,11 @@ export default function FamilyPage() {
 
 function FamilyContent() {
   const { access, loading: accessLoading } = useSubscriptionAccess();
-  const { data, loading, error , reload } = useApi(
+  const { data, loading, error, reload } = useApi(
     () => clientApi.get<ApiResponse<Family | null>>('/client/family'),
     [],
   );
+  const [selected, setSelected] = useState<FamilyProfilePerson | null>(null);
 
   if (loading || accessLoading) return <LoadingSpinner label="Loading family..." fullScreen />;
   if (error) return <ErrorAlert error={error} onRetry={reload} />;
@@ -58,7 +57,7 @@ function FamilyContent() {
         </div>
         <Link href="/portal/safe-zones" className="btn-secondary">Safe Zones</Link>
         <Link href="/portal/family/chat" className="btn-secondary">Family Chat</Link>
-        <Link href="/portal/family#add-member" className="btn-primary">Add family member</Link>
+        <Link href="/portal/family#add-member" className="btn-ghost btn-sm">+ Add member</Link>
       </div>
 
       <section className="portal-card mb-2">
@@ -72,35 +71,37 @@ function FamilyContent() {
           Status: {family.familyMessagingEnabled ? 'Enabled' : 'Disabled'} ·{' '}
           {family.members.filter((m) => m.familyMessagingEnabled).length} of {family.members.length} members active
         </p>
-        <Link href="/portal/family/chat" className="btn-primary">
+        <Link href="/portal/family/chat" className="btn-secondary">
           {family.familyMessagingEnabled ? 'Open family chat' : 'Enable family messaging'}
         </Link>
       </section>
       <div className="member-grid">
         {family.members.map((m) => (
-          <article key={m.id} className="member-card member-card--safety">
-            <div className="avatar avatar--admin">{m.name.split(' ').map((n) => n[0]).join('')}</div>
+          <button
+            key={m.id}
+            type="button"
+            className="member-card member-card--safety member-card--link"
+            onClick={() => setSelected(m)}
+          >
+            <div className="avatar avatar--admin">
+              {(m.nickname ?? m.name)
+                .split(' ')
+                .map((n) => n[0])
+                .join('')
+                .slice(0, 2)}
+            </div>
             <div>
               <strong>{m.nickname ?? m.name}</strong>
               <span className={`status-dot ${m.trackingEnabled ? 'status-dot--on' : ''}`}>
                 {m.trackingEnabled ? 'Protected · tracking on' : 'Tracking off'}
               </span>
-              {m.lastLocationAt && <span className="text-muted">Last seen: recently</span>}
-              <div className="queue-card__actions" style={{ marginTop: '0.55rem' }}>
-                <a className="btn-sm btn-primary" href="tel:+27820000000">
-                  Call
-                </a>
-                <Link href="/portal/family/chat" className="btn-sm">
-                  Message
-                </Link>
-                <Link href="/portal/location" className="btn-sm">
-                  Location
-                </Link>
-              </div>
+              {m.lastLocationAt ? <span className="text-muted">Last seen: recently</span> : null}
+              <span className="member-card__hint">View profile</span>
             </div>
-          </article>
+          </button>
         ))}
       </div>
+      {selected ? <FamilyProfilePopup person={selected} onClose={() => setSelected(null)} /> : null}
       <section id="add-member" className="portal-card profile-section page-section">
         <h2>Add family member</h2>
         <p className="text-muted">
@@ -110,8 +111,8 @@ function FamilyContent() {
           <Link href="/portal/emergency" className="btn-secondary">
             Emergency Hub
           </Link>
-          <Link href="/portal/contacts" className="btn-primary">
-            Add emergency contact
+          <Link href="/portal/contacts" className="btn-ghost">
+            + Add emergency contact
           </Link>
         </div>
       </section>

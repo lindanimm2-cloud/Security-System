@@ -6,13 +6,17 @@ import { useEffect, useState } from 'react';
 import { AuthSession, clearSession } from '@/lib/auth';
 import { NavIcon } from '@/components/nav/NavIcon';
 import { SUPERVISOR_MOBILE_NAV, SUPERVISOR_NAV } from '@/lib/supervisor-nav';
+import { navHrefIsActive } from '@/lib/nav-active';
 import { BrandMark } from './BrandMark';
 import { NavClock } from './NavClock';
 import { ThemeToggle } from './ThemeToggle';
 import { MobileBottomNav } from './nav/MobileBottomNav';
 import { useSidebarCollapsed } from '@/hooks/useSidebarCollapsed';
-import { SidebarCollapseButton, SignOutIcon } from './nav/SidebarCollapseButton';
+import { useActionHandoff } from '@/hooks/useActionHandoff';
+import { SidebarCollapseButton, SidebarWebsiteLink, SignOutIcon } from './nav/SidebarCollapseButton';
 import { roleDisplayLabel } from '@/lib/role-labels';
+import { FloatingSupportDock } from './FloatingSupportDock';
+import { ShellRouteActions } from './nav/ShellRouteActions';
 
 export function SupervisorShell({
   session,
@@ -27,20 +31,29 @@ export function SupervisorShell({
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
   const { collapsed, toggle } = useSidebarCollapsed();
+  const handoff = useActionHandoff();
 
   useEffect(() => setMenuOpen(false), [pathname]);
 
   function logout() {
-    clearSession('admin');
-    router.push('/login');
+    handoff.begin('sign-out', () => {
+      clearSession('admin');
+      router.push('/login');
+    });
   }
 
   function isActive(href: string, exact?: boolean) {
-    if (exact) return pathname === href;
-    return pathname.startsWith(href);
+    return navHrefIsActive(
+      pathname,
+      href,
+      exact,
+      SUPERVISOR_NAV.map((item) => item.href),
+    );
   }
 
   return (
+    <>
+      {handoff.overlay}
     <div className="shell shell--supervisor shell--with-bottom-nav">
       <header className="mobile-shell-header mobile-shell-header--officer">
         <button
@@ -53,7 +66,9 @@ export function SupervisorShell({
           <span className={`menu-toggle-icon ${menuOpen ? 'menu-toggle-icon--open' : ''}`} />
         </button>
         <BrandMark variant="officer" compact />
+        <h1 className="mobile-shell-header__title">{title ?? 'Supervisor'}</h1>
         <div className="mobile-topbar-actions">
+          <ShellRouteActions homeHref="/supervisor" compact />
           <NavClock compact />
           <ThemeToggle className="theme-toggle--compact" />
         </div>
@@ -73,7 +88,7 @@ export function SupervisorShell({
             <Link
               key={item.href}
               href={item.href}
-              title={item.label}
+              data-tip={item.label}
               className={`officer-sidebar-link ${isActive(item.href, item.exact) ? 'officer-sidebar-link--active' : ''}`}
             >
               <span className="sidebar-link__icon">
@@ -90,6 +105,7 @@ export function SupervisorShell({
           <span className="officer-sidebar-role sidebar-user-copy">
             {roleDisplayLabel(session.user.role)}
           </span>
+          <SidebarWebsiteLink />
           <button type="button" className="btn-ghost btn-ghost--full sidebar-signout" onClick={logout}>
             <SignOutIcon />
             <span>Sign out</span>
@@ -102,6 +118,7 @@ export function SupervisorShell({
           <header className="officer-topbar">
             <h1>{title}</h1>
             <div className="officer-topbar__actions">
+              <ShellRouteActions homeHref="/supervisor" />
               <NavClock compact />
               <ThemeToggle className="theme-toggle--compact" />
             </div>
@@ -109,6 +126,7 @@ export function SupervisorShell({
         )}
         <div className="officer-content">{children}</div>
       </main>
+      <FloatingSupportDock chatHref="/control-room/chat" callPhone="+27110000000" />
       <MobileBottomNav
         items={SUPERVISOR_MOBILE_NAV.map((item) => ({
           href: item.href,
@@ -119,5 +137,6 @@ export function SupervisorShell({
         ariaLabel="Supervisor"
       />
     </div>
+    </>
   );
 }

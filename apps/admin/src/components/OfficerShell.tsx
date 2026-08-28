@@ -6,6 +6,7 @@ import { useEffect, useState } from 'react';
 import { AuthSession, clearSession } from '@/lib/auth';
 import { NavIcon } from '@/components/nav/NavIcon';
 import { OFFICER_MOBILE_NAV, OFFICER_NAV } from '@/lib/officer-nav';
+import { navHrefIsActive } from '@/lib/nav-active';
 import { OfficerQuickRecordFab } from './officer/OfficerQuickRecordFab';
 import { BrandMark } from './BrandMark';
 import { NavClock } from './NavClock';
@@ -13,9 +14,13 @@ import { ThemeToggle } from './ThemeToggle';
 import { OfficerStatusBadge } from './officer/StatusBadges';
 import { useOfficerStatus } from './officer/OfficerStatusProvider';
 import { MobileBottomNav } from './nav/MobileBottomNav';
-import { officerApi, type ApiResponse } from '@/lib/api-client';
+import { fetchInternalChatUnreadCount } from '@/lib/internal-chat-api';
 import { useSidebarCollapsed } from '@/hooks/useSidebarCollapsed';
-import { SidebarCollapseButton, SignOutIcon } from './nav/SidebarCollapseButton';
+import { useActionHandoff } from '@/hooks/useActionHandoff';
+import { shouldBackgroundPoll } from '@/lib/demo/is-demo-mode';
+import { SidebarCollapseButton, SidebarWebsiteLink, SignOutIcon } from './nav/SidebarCollapseButton';
+import { FloatingSupportDock } from './FloatingSupportDock';
+import { ShellRouteActions } from './nav/ShellRouteActions';
 
 export function OfficerShell({
   session,
@@ -31,27 +36,26 @@ export function OfficerShell({
   const [menuOpen, setMenuOpen] = useState(false);
   const [needsYou, setNeedsYou] = useState(0);
   const { collapsed, toggle } = useSidebarCollapsed();
+  const handoff = useActionHandoff();
   const { status } = useOfficerStatus();
 
   useEffect(() => {
     let cancelled = false;
     async function poll() {
       try {
-        const res = await officerApi.get<ApiResponse<{ unread?: number }[] | { unreadCount?: number }>>(
-          '/officer/messages',
-        );
+        const unread = await fetchInternalChatUnreadCount('officer');
         if (cancelled) return;
-        const data = res.data;
-        if (Array.isArray(data)) {
-          setNeedsYou(data.filter((m) => (m as { unread?: boolean }).unread).length);
-        } else if (data && typeof data === 'object' && 'unreadCount' in data) {
-          setNeedsYou(Number((data as { unreadCount?: number }).unreadCount) || 0);
-        }
+        setNeedsYou(unread);
       } catch {
         /* keep last badge */
       }
     }
     void poll();
+    if (!shouldBackgroundPoll()) {
+      return () => {
+        cancelled = true;
+      };
+    }
     const id = window.setInterval(() => void poll(), 30000);
     return () => {
       cancelled = true;
@@ -78,16 +82,24 @@ export function OfficerShell({
   }, []);
 
   function logout() {
-    clearSession('officer');
-    router.push('/officer/login');
+    handoff.begin('sign-out', () => {
+      clearSession('officer');
+      router.push('/officer/login');
+    });
   }
 
   function isActive(href: string, exact?: boolean) {
-    if (exact) return pathname === href;
-    return pathname.startsWith(href);
+    return navHrefIsActive(
+      pathname,
+      href,
+      exact,
+      OFFICER_NAV.map((item) => item.href),
+    );
   }
 
   return (
+    <>
+      {handoff.overlay}
     <div className="shell shell--officer shell--with-bottom-nav">
       <header className="mobile-shell-header mobile-shell-header--officer">
         <button
@@ -100,7 +112,9 @@ export function OfficerShell({
           <span className={`menu-toggle-icon ${menuOpen ? 'menu-toggle-icon--open' : ''}`} />
         </button>
         <BrandMark variant="officer" compact />
+        <h1 className="mobile-shell-header__title">{title ?? 'Officer'}</h1>
         <div className="mobile-topbar-actions">
+          <ShellRouteActions homeHref="/officer" compact />
           <NavClock compact />
           <ThemeToggle className="theme-toggle--compact" />
         </div>
@@ -127,7 +141,7 @@ export function OfficerShell({
             <Link
               key={item.href}
               href={item.href}
-              title={item.label}
+              data-tip={item.label}
               aria-label={item.label}
               className={`officer-sidebar-link ${isActive(item.href, item.exact) ? 'officer-sidebar-link--active' : ''}`}
             >
@@ -143,6 +157,7 @@ export function OfficerShell({
             {session.user.firstName} {session.user.lastName}
           </div>
           <span className="officer-sidebar-role sidebar-user-copy">Field Officer</span>
+          <SidebarWebsiteLink />
           <button
             type="button"
             className="btn-ghost btn-ghost--full sidebar-signout"
@@ -161,6 +176,7 @@ export function OfficerShell({
           <header className="officer-topbar">
             <h1>{title}</h1>
             <div className="officer-topbar__actions">
+              <ShellRouteActions homeHref="/officer" />
               <NavClock compact />
               <ThemeToggle className="theme-toggle--compact" />
               <OfficerStatusBadge status={status} linkToProfile />
@@ -169,6 +185,7 @@ export function OfficerShell({
         )}
         <div className="officer-content">{children}</div>
       </main>
+      <FloatingSupportDock chatHref="/officer/messages" callPhone="+27110000000" />
       <OfficerQuickRecordFab />
       <MobileBottomNav
         items={OFFICER_MOBILE_NAV.map((item) => ({
@@ -186,5 +203,6 @@ export function OfficerShell({
         ariaLabel="Officer"
       />
     </div>
+    </>
   );
 }

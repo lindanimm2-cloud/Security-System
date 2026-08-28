@@ -2,11 +2,13 @@
 
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { useEffect } from 'react';
 import { ErrorAlert } from '@/components/ErrorAlert';
+import { BrandedDocumentFrame } from '@/components/documents/BrandedDocumentFrame';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { useApi } from '@/hooks/useApi';
 import { clientApi, type ApiResponse } from '@/lib/api-client';
+import { billingDocToBrandedData, paymentToReceiptDoc } from '@/lib/billing-document-data';
+import { downloadBrandedDocument, openBrandedDocument } from '@/lib/branded-document';
 
 type Payment = {
   reference: string;
@@ -31,11 +33,6 @@ export default function AccountReceiptPage() {
         : Promise.reject(new Error('Missing payment reference')),
     [reference],
   );
-
-  useEffect(() => {
-    document.body.classList.add('receipt-print-page');
-    return () => document.body.classList.remove('receipt-print-page');
-  }, []);
 
   if (!reference) {
     return (
@@ -62,67 +59,34 @@ export default function AccountReceiptPage() {
   }
 
   const payment = data!.data;
+  const branded = billingDocToBrandedData(paymentToReceiptDoc(payment));
 
   return (
-    <section className="nx-section nx-receipt">
-      <div className="nx-receipt-actions no-print">
-        <button
-          type="button"
-          className="nx-btn nx-btn--primary nx-btn--sm"
-          onClick={() => window.print()}
-        >
-          Print receipt
-        </button>
-        <Link href="/account" className="nx-btn nx-btn--ghost nx-btn--sm">
-          Back to account
-        </Link>
-      </div>
-
-      <article className="nx-receipt-card">
-        <header className="nx-receipt-header">
-          <p className="nx-eyebrow">4DS Nexus</p>
-          <h1>Payment receipt</h1>
-        </header>
-        <dl className="nx-receipt-dl">
-          <div>
-            <dt>Reference</dt>
-            <dd>{payment.reference}</dd>
-          </div>
-          <div>
-            <dt>Description</dt>
-            <dd>{payment.description}</dd>
-          </div>
-          <div>
-            <dt>Amount</dt>
-            <dd>
-              <strong>{payment.amountFormatted}</strong>
-            </dd>
-          </div>
-          <div>
-            <dt>Status</dt>
-            <dd>{payment.status}</dd>
-          </div>
-          <div>
-            <dt>Provider</dt>
-            <dd>{payment.provider}</dd>
-          </div>
-          {payment.kind && (
-            <div>
-              <dt>Type</dt>
-              <dd>
-                {payment.kind === 'MONTHLY' ? 'Monthly subscription' : 'Checkout'}
-              </dd>
-            </div>
-          )}
-          {payment.createdAt && (
-            <div>
-              <dt>Date</dt>
-              <dd>{new Date(payment.createdAt).toLocaleString()}</dd>
-            </div>
-          )}
-        </dl>
-        <p className="nx-muted nx-receipt-thanks">Thank you for your payment.</p>
-      </article>
+    <section className="nx-section">
+      <BrandedDocumentFrame
+        data={branded}
+        actions={
+          <>
+            <button
+              type="button"
+              className="nx-btn nx-btn--primary nx-btn--sm"
+              onClick={() => openBrandedDocument(branded, { autoPrint: true })}
+            >
+              Print / Save as PDF
+            </button>
+            <button
+              type="button"
+              className="nx-btn nx-btn--ghost nx-btn--sm"
+              onClick={() => downloadBrandedDocument(branded)}
+            >
+              Download template
+            </button>
+            <Link href="/account" className="nx-btn nx-btn--ghost nx-btn--sm">
+              Back to account
+            </Link>
+          </>
+        }
+      />
     </section>
   );
 }

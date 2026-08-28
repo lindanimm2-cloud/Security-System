@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { CompanyVehicleType, IncidentStatus, IncidentType } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
+import { IncidentKernelService } from '../incident-kernel/incident-kernel.service';
 
 const CREW_FROM_INCIDENT: Record<string, string> = {
   ACTIVE: 'ACCEPTED',
@@ -8,8 +9,8 @@ const CREW_FROM_INCIDENT: Record<string, string> = {
   EN_ROUTE: 'EN_ROUTE',
   ON_SCENE: 'ARRIVED',
   RESOLVED: 'HANDOVER',
-  CLOSED: 'HANDOVER',
-  CANCELLED: 'HANDOVER',
+  CLOSED: 'COMPLETED',
+  CANCELLED: 'COMPLETED',
 };
 
 const INCIDENT_FROM_CREW: Record<string, IncidentStatus> = {
@@ -19,18 +20,22 @@ const INCIDENT_FROM_CREW: Record<string, IncidentStatus> = {
   TRANSPORT: IncidentStatus.ON_SCENE,
   HOSPITAL: IncidentStatus.ON_SCENE,
   HANDOVER: IncidentStatus.RESOLVED,
+  COMPLETED: IncidentStatus.CLOSED,
 };
 
 @Injectable()
 export class MedicalService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly kernel: IncidentKernelService,
+  ) {}
 
   async getQueue(tenantId: string) {
     const incidents = await this.prisma.incident.findMany({
       where: {
         tenantId,
         type: IncidentType.MEDICAL,
-        status: { notIn: [IncidentStatus.CLOSED, IncidentStatus.CANCELLED] },
+        status: { notIn: [IncidentStatus.CANCELLED] },
       },
       include: { user: { select: { firstName: true, lastName: true } } },
       orderBy: { createdAt: 'desc' },
@@ -86,11 +91,18 @@ export class MedicalService {
           where: { id: incident.id },
           data: {
             status: nextStatus,
-            resolvedAt: nextStatus === IncidentStatus.RESOLVED ? new Date() : incident.resolvedAt,
+            resolvedAt:
+              nextStatus === IncidentStatus.RESOLVED || nextStatus === IncidentStatus.CLOSED
+                ? incident.resolvedAt ?? new Date()
+                : incident.resolvedAt,
           },
           include: { user: { select: { firstName: true, lastName: true } } },
         })
       : incident;
+
+    if (nextStatus) {
+      await this.kernel.recordStatusChange(tenantId, updated.id, nextStatus, 'medical');
+    }
 
     return {
       success: true,

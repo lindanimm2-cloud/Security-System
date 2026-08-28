@@ -56,7 +56,7 @@ function VehiclesContent() {
         { title: 'Live Tracking', description: 'View vehicle locations in real time when tracking is active.', status: 'Per vehicle', href: '/portal/vehicles#vehicles-list', action: 'Open vehicle profile', price: 'R 500/mo', requiresAccess: 'vehicle', requiresAddon: 'VEHICLE_RESPONSE' },
         { title: 'Theft Recovery Mode', description: 'Enhanced monitoring when a vehicle is stolen.', status: 'Ready', href: '/portal/vehicles#vehicles-list', action: 'Activate recovery', price: 'R 500/mo', requiresAccess: 'vehicle', requiresAddon: 'VEHICLE_RESPONSE' },
         { title: 'Geofencing', description: 'Alerts when vehicles enter or exit zones.', status: 'Active', href: '/portal/safe-zones', action: 'Manage zones', price: 'R 500/mo', requiresAccess: 'vehicle', requiresAddon: 'VEHICLE_RESPONSE' },
-        { title: 'Roadside Assistance', description: 'Request breakdown and roadside assistance.', href: '/portal/emergency', action: 'Request via emergency hub', requiresAccess: 'vehicle', requiresAddon: 'VEHICLE_RESPONSE', price: 'R 500/mo' },
+        { title: 'Roadside Assistance', description: 'Request breakdown and roadside assistance.', href: '/portal/requests/roadside', action: 'Request roadside help', requiresAccess: 'vehicle', requiresAddon: 'VEHICLE_RESPONSE', price: 'R 500/mo' },
         { title: 'Incident Reporting', description: 'Report accidents and vehicle-related incidents.', href: '/portal/theft', action: 'Report incident', requiresAccess: 'vehicle', requiresAddon: 'VEHICLE_RESPONSE', price: 'R 500/mo' },
       ]}
       access={access}

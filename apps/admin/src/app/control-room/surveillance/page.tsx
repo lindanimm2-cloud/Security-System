@@ -10,6 +10,8 @@ import { CctvLiveFeed, type CctvCamera } from '@/components/portal/CctvLiveFeed'
 import { useApi } from '@/hooks/useApi';
 import { adminApi, type ApiResponse } from '@/lib/api-client';
 import { CONTROL_ROOM_ROUTES } from '@/lib/control-room-routes';
+import { ListSearch } from '@/components/ui/ListSearch';
+import { matchesSearch } from '@/lib/list-search';
 
 type SitePreview = {
   id: string;
@@ -64,6 +66,8 @@ export default function SurveillancePage() {
   );
 }
 
+type KpiFilter = 'all' | 'events' | 'triggered' | 'offline' | 'cameras';
+
 function SurveillanceContent() {
   const { data, loading, error, reload } = useApi(
     () => adminApi.get<ApiResponse<Overview>>('/control-room/surveillance'),
@@ -75,10 +79,56 @@ function SurveillanceContent() {
   );
   const [tab, setTab] = useState<'sites' | 'dash'>('sites');
   const [focusKey, setFocusKey] = useState<string | null>(null);
+  const [kpiFilter, setKpiFilter] = useState<KpiFilter>('all');
+  const [search, setSearch] = useState('');
 
   const stats = data?.data?.stats;
-  const sites = data?.data?.sites ?? [];
+  const allSites = data?.data?.sites ?? [];
   const fleet = fleetData?.data ?? [];
+
+  // Filter sites by KPI selection
+  const kpiSites = useMemo(() => {
+    if (kpiFilter === 'all') return allSites;
+    if (kpiFilter === 'events') return allSites.filter((s) => (s.openEvents?.length ?? 0) > 0);
+    if (kpiFilter === 'triggered') return allSites.filter((s) => (s.openEvents?.length ?? 0) > 0);
+    if (kpiFilter === 'offline') return allSites.filter((s) => s.onlineCameras < s.cameraCount);
+    if (kpiFilter === 'cameras') return allSites.filter((s) => s.cameraCount > 0);
+    return allSites;
+  }, [allSites, kpiFilter]);
+
+  const sites = useMemo(
+    () =>
+      kpiSites.filter((s) =>
+        matchesSearch(
+          search,
+          s.name,
+          s.address,
+          s.client.name,
+          s.client.email,
+          ...(s.cameras ?? []).map((c) => c.name),
+        ),
+      ),
+    [kpiSites, search],
+  );
+
+  const filteredFleet = useMemo(
+    () =>
+      fleet.filter((v) =>
+        matchesSearch(
+          search,
+          v.callSign,
+          v.registration,
+          v.status,
+          ...(v.cameras ?? []).map((c) => c.name),
+        ),
+      ),
+    [fleet, search],
+  );
+
+  function toggleFilter(f: KpiFilter) {
+    setKpiFilter((prev) => (prev === f ? 'all' : f));
+    setFocusKey(null);
+  }
 
   const siteSources: WallSource[] = useMemo(
     () =>
@@ -95,7 +145,7 @@ function SurveillanceContent() {
 
   const dashSources: WallSource[] = useMemo(
     () =>
-      fleet
+      filteredFleet
         .filter((v) => (v.cameras?.length ?? 0) > 0)
         .map((v) => ({
           key: `dash-${v.id}`,
@@ -103,7 +153,7 @@ function SurveillanceContent() {
           href: CONTROL_ROOM_ROUTES.fleet,
           cameras: v.cameras ?? [],
         })),
-    [fleet],
+    [filteredFleet],
   );
 
   const sources = tab === 'dash' ? dashSources : siteSources;
@@ -114,18 +164,20 @@ function SurveillanceContent() {
 
   const events = useMemo(
     () =>
-      sites.flatMap((s) =>
+      allSites.flatMap((s) =>
         (s.openEvents ?? []).map((e) => ({
           ...e,
           siteName: s.name,
           href: `${CONTROL_ROOM_ROUTES.surveillance}/${s.id}`,
         })),
       ),
-    [sites],
+    [allSites],
   );
 
   if (loading) return <LoadingSpinner label="Opening camera viewer…" />;
   if (error || !data) return <ErrorAlert error={error ?? 'Failed to load'} onRetry={reload} />;
+
+  const isFiltered = kpiFilter !== 'all';
 
   return (
     <div className="cam-viewer">
@@ -140,10 +192,7 @@ function SurveillanceContent() {
               role="tab"
               className={`ops-cctv__tab ${tab === 'sites' ? 'ops-cctv__tab--on' : ''}`}
               aria-selected={tab === 'sites'}
-              onClick={() => {
-                setTab('sites');
-                setFocusKey(null);
-              }}
+              onClick={() => { setTab('sites'); setFocusKey(null); }}
             >
               Sites
             </button>
@@ -152,35 +201,112 @@ function SurveillanceContent() {
               role="tab"
               className={`ops-cctv__tab ${tab === 'dash' ? 'ops-cctv__tab--on' : ''}`}
               aria-selected={tab === 'dash'}
-              onClick={() => {
-                setTab('dash');
-                setFocusKey(null);
-              }}
+              onClick={() => { setTab('dash'); setFocusKey(null); }}
             >
               Dash cams
             </button>
           </div>
-          <button type="button" className="btn-secondary btn-sm" onClick={() => reload()}>
+          {isFiltered && (
+            <button
+              type="button"
+              className="btn-ghost btn-sm btn-ghost--active"
+              onClick={() => { setKpiFilter('all'); setFocusKey(null); }}
+            >
+              Show all
+            </button>
+          )}
+          <button type="button" className="btn-ghost btn-sm" onClick={() => reload()}>
             Refresh
           </button>
         </div>
       </div>
 
       <div className="cam-viewer__kpi">
-        <OpsKpi label="Sites" value={stats?.sites ?? 0} icon="sites" />
-        <OpsKpi label="Cameras" value={stats?.cameras ?? 0} icon="cameras" />
-        <OpsKpi label="Open events" value={stats?.openEvents ?? 0} icon="events" hot={(stats?.openEvents ?? 0) > 0} />
-        <OpsKpi label="Triggered" value={stats?.triggeredSites ?? 0} icon="critical" hot={(stats?.triggeredSites ?? 0) > 0} />
-        <OpsKpi label="Offline cams" value={stats?.offlineCameras ?? 0} icon="offline" hot={(stats?.offlineCameras ?? 0) > 0} />
+        <OpsKpi
+          label="Sites"
+          value={stats?.sites ?? 0}
+          icon="sites"
+          active={kpiFilter === 'cameras'}
+          onClick={() => toggleFilter('cameras')}
+        />
+        <OpsKpi
+          label="Cameras"
+          value={stats?.cameras ?? 0}
+          icon="cameras"
+          active={kpiFilter === 'cameras'}
+          onClick={() => toggleFilter('cameras')}
+        />
+        <OpsKpi
+          label="Open events"
+          value={stats?.openEvents ?? 0}
+          icon="events"
+          hot={(stats?.openEvents ?? 0) > 0}
+          active={kpiFilter === 'events'}
+          onClick={() => toggleFilter('events')}
+        />
+        <OpsKpi
+          label="Triggered"
+          value={stats?.triggeredSites ?? 0}
+          icon="critical"
+          hot={(stats?.triggeredSites ?? 0) > 0}
+          active={kpiFilter === 'triggered'}
+          onClick={() => toggleFilter('triggered')}
+        />
+        <OpsKpi
+          label="Offline cams"
+          value={stats?.offlineCameras ?? 0}
+          icon="offline"
+          hot={(stats?.offlineCameras ?? 0) > 0}
+          active={kpiFilter === 'offline'}
+          onClick={() => toggleFilter('offline')}
+        />
+      </div>
+
+      {isFiltered && (
+        <div className="surv-filter-bar">
+          <span className="surv-filter-bar__label">
+            Filtered: <strong>{kpiFilter}</strong> · {sites.length} site{sites.length !== 1 ? 's' : ''}
+          </span>
+          <button
+            type="button"
+            className="btn-ghost btn-sm"
+            onClick={() => { setKpiFilter('all'); setFocusKey(null); }}
+          >
+            ✕ Clear filter
+          </button>
+        </div>
+      )}
+
+      <div className="list-search-bar">
+        <ListSearch
+          value={search}
+          onChange={setSearch}
+          placeholder="Search sites, address, client, cameras…"
+          resultCount={tab === 'dash' ? dashSources.length : sites.length}
+          totalCount={tab === 'dash' ? fleet.length : kpiSites.length}
+          id="surveillance-list-search"
+        />
       </div>
 
       <div className="cam-viewer__stage">
         <section className="cam-viewer__wall" aria-label="Live camera wall">
           {!featured ? (
             <div className="dash-clear" style={{ padding: '1.25rem' }}>
-              <strong>{tab === 'dash' ? 'No dash cams' : 'No live cameras'}</strong>
+              <strong>
+                {isFiltered
+                  ? `No cameras match "${kpiFilter}" filter`
+                  : tab === 'dash' ? 'No dash cams' : 'No live cameras'}
+              </strong>
               <p className="text-muted">
-                {tab === 'dash'
+                {isFiltered ? (
+                  <button
+                    type="button"
+                    className="btn-ghost btn-sm"
+                    onClick={() => { setKpiFilter('all'); setFocusKey(null); }}
+                  >
+                    Show all sites
+                  </button>
+                ) : tab === 'dash'
                   ? 'Company vehicles will show dash-cam footage here.'
                   : 'Open a site after cameras are linked.'}
               </p>
@@ -203,9 +329,14 @@ function SurveillanceContent() {
 
         <aside className="cam-viewer__rail">
           <section>
-            <h2>Sources</h2>
+            <div className="cam-viewer__rail-head">
+              <h2>Sources</h2>
+              {isFiltered && sources.length > 0 && (
+                <span className="badge badge--info">{sources.length}</span>
+              )}
+            </div>
             {sources.length === 0 ? (
-              <p className="text-muted">No feeds in this view.</p>
+              <p className="text-muted" style={{ fontSize: '0.82rem' }}>No feeds match this filter.</p>
             ) : (
               <ul className="cam-viewer__sources">
                 {sources.map((s) => (
@@ -216,7 +347,7 @@ function SurveillanceContent() {
                       onClick={() => setFocusKey(s.key)}
                     >
                       <strong>{s.label}</strong>
-                      <span>{s.cameras.length} cams</span>
+                      <span>{s.cameras.length} cam{s.cameras.length !== 1 ? 's' : ''}</span>
                     </button>
                   </li>
                 ))}
@@ -227,7 +358,7 @@ function SurveillanceContent() {
           <section>
             <h2>Events</h2>
             {events.length === 0 ? (
-              <p className="text-muted">Board clear · no open alarm events.</p>
+              <p className="text-muted" style={{ fontSize: '0.82rem' }}>Board clear · no open alarm events.</p>
             ) : (
               <ul className="cam-viewer__events">
                 {events.slice(0, 8).map((e) => (
@@ -245,8 +376,8 @@ function SurveillanceContent() {
             )}
           </section>
 
-          {sites[0] ? (
-            <Link href={`${CONTROL_ROOM_ROUTES.surveillance}/${sites[0].id}`} className="btn-sm btn-primary">
+          {allSites[0] ? (
+            <Link href={`${CONTROL_ROOM_ROUTES.surveillance}/${allSites[0].id}`} className="btn-sm btn-primary">
               Open site
             </Link>
           ) : null}

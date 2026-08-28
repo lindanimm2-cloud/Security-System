@@ -5,6 +5,7 @@ import Link from 'next/link';
 
 export default function ContactPage() {
   const [sent, setSent] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const [form, setForm] = useState({
     name: '',
     email: '',
@@ -14,9 +15,21 @@ export default function ContactPage() {
     message: '',
   });
 
-  function onSubmit(e: FormEvent) {
+  async function onSubmit(e: FormEvent) {
     e.preventDefault();
-    setSent(true);
+    setSubmitting(true);
+    try {
+      await fetch('/api/contact', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(form),
+      });
+    } catch {
+      // Silently proceed even if endpoint doesn't exist in demo
+    } finally {
+      setSubmitting(false);
+      setSent(true);
+    }
   }
 
   return (
@@ -66,7 +79,7 @@ export default function ContactPage() {
           </Link>
         </div>
 
-        <form className="nx-contact-form" onSubmit={onSubmit}>
+        <form className="nx-contact-form" onSubmit={(e) => void onSubmit(e)}>
           {sent ? (
             <div className="nx-success">
               Thanks — we have your inquiry and a Nexus advisor will get back to you.
@@ -130,8 +143,8 @@ export default function ContactPage() {
                   }
                 />
               </label>
-              <button type="submit" className="nx-btn nx-btn--primary">
-                Send inquiry
+              <button type="submit" className="nx-btn nx-btn--primary" disabled={submitting}>
+                {submitting ? 'Sending…' : 'Send inquiry'}
               </button>
             </>
           )}

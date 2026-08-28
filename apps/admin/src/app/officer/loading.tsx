@@ -5,8 +5,13 @@ export default function OfficerLoading() {
     <LoadingSpinner
       brand
       fullScreen
+      action="open-portal"
       label="Loading officer app…"
-      hint="Syncing assignments and status."
+      hints={[
+        'Syncing assignments and status.',
+        'System updates underway…',
+        'Checking your shift queue.',
+      ]}
     />
   );
 }

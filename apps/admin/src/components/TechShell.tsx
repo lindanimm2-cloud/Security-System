@@ -6,6 +6,7 @@ import { useEffect, useState } from 'react';
 import { AuthSession, clearSession } from '@/lib/auth';
 import { NavIcon } from '@/components/nav/NavIcon';
 import { TECH_MOBILE_NAV, TECH_NAV } from '@/lib/tech-nav';
+import { navHrefIsActive } from '@/lib/nav-active';
 import { BrandMark } from './BrandMark';
 import { NavClock } from './NavClock';
 import { ThemeToggle } from './ThemeToggle';
@@ -13,7 +14,10 @@ import { roleDisplayLabel } from '@/lib/role-labels';
 import { MobileBottomNav } from './nav/MobileBottomNav';
 import { techApi, type ApiResponse } from '@/lib/api-client';
 import { useSidebarCollapsed } from '@/hooks/useSidebarCollapsed';
-import { SidebarCollapseButton, SignOutIcon } from './nav/SidebarCollapseButton';
+import { useActionHandoff } from '@/hooks/useActionHandoff';
+import { shouldBackgroundPoll } from '@/lib/demo/is-demo-mode';
+import { SidebarCollapseButton, SidebarWebsiteLink, SignOutIcon } from './nav/SidebarCollapseButton';
+import { ShellRouteActions } from './nav/ShellRouteActions';
 
 export function TechShell({
   session,
@@ -29,6 +33,7 @@ export function TechShell({
   const [menuOpen, setMenuOpen] = useState(false);
   const [activeJobs, setActiveJobs] = useState(0);
   const { collapsed, toggle } = useSidebarCollapsed();
+  const handoff = useActionHandoff();
 
   useEffect(() => {
     let cancelled = false;
@@ -45,6 +50,11 @@ export function TechShell({
       }
     }
     void poll();
+    if (!shouldBackgroundPoll()) {
+      return () => {
+        cancelled = true;
+      };
+    }
     const id = window.setInterval(() => void poll(), 30000);
     return () => {
       cancelled = true;
@@ -71,16 +81,24 @@ export function TechShell({
   }, []);
 
   function logout() {
-    clearSession('technician');
-    router.push('/tech/login');
+    handoff.begin('sign-out', () => {
+      clearSession('technician');
+      router.push('/tech/login');
+    });
   }
 
   function isActive(href: string, exact?: boolean) {
-    if (exact) return pathname === href;
-    return pathname.startsWith(href);
+    return navHrefIsActive(
+      pathname,
+      href,
+      exact,
+      TECH_NAV.map((item) => item.href),
+    );
   }
 
   return (
+    <>
+      {handoff.overlay}
     <div className="shell shell--officer shell--with-bottom-nav">
       <header className="mobile-shell-header mobile-shell-header--officer">
         <button
@@ -93,7 +111,9 @@ export function TechShell({
           <span className={`menu-toggle-icon ${menuOpen ? 'menu-toggle-icon--open' : ''}`} />
         </button>
         <BrandMark variant="officer" compact />
+        <h1 className="mobile-shell-header__title">{title ?? 'Install Tech'}</h1>
         <div className="mobile-topbar-actions">
+          <ShellRouteActions homeHref="/tech" compact />
           <NavClock compact />
           <ThemeToggle className="theme-toggle--compact" />
         </div>
@@ -120,7 +140,7 @@ export function TechShell({
             <Link
               key={item.href}
               href={item.href}
-              title={item.label}
+              title={collapsed ? item.label : undefined}
               aria-label={item.label}
               className={`officer-sidebar-link ${isActive(item.href, item.exact) ? 'officer-sidebar-link--active' : ''}`}
             >
@@ -138,6 +158,7 @@ export function TechShell({
           <span className="officer-sidebar-role sidebar-user-copy">
             {session.user.jobTitle || roleDisplayLabel(session.user.role)}
           </span>
+          <SidebarWebsiteLink />
           <button
             type="button"
             className="btn-ghost btn-ghost--full sidebar-signout"
@@ -161,23 +182,24 @@ export function TechShell({
             </div>
           </div>
           <div className="topbar-actions">
+            <ShellRouteActions homeHref="/tech" />
             <NavClock />
             <ThemeToggle className="theme-toggle--compact" />
           </div>
         </header>
         <main className="shell-content">{children}</main>
       </div>
-
       <MobileBottomNav
         items={TECH_MOBILE_NAV.map((item) => ({
           href: item.href,
           label: item.mobileLabel,
           icon: item.icon,
           exact: item.exact,
-          badge: item.href === '/tech' && activeJobs > 0 ? activeJobs : undefined,
+          badge: item.href === '/tech/jobs' && activeJobs > 0 ? activeJobs : undefined,
         }))}
         ariaLabel="Technician"
       />
     </div>
+    </>
   );
 }

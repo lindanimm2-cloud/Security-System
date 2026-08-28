@@ -15,6 +15,7 @@ import {
   fileTypeIcon,
   type DocumentCategoryKey,
 } from '@/lib/document-categories';
+import { OpsDialog } from '@/components/ops/OpsDialog';
 import { incidentHref } from '@/lib/control-room-routes';
 import { resolveMediaUrl } from '@/lib/media-url';
 import { UiSelect } from '@/components/ui/UiSelect';
@@ -26,12 +27,22 @@ type FolderNode = {
   icon: string | null;
   parentId: string | null;
   documentCount: number;
+  updatedAt?: string;
   children: FolderNode[];
+};
+
+type LibraryFolder = {
+  id: string;
+  name: string;
+  parentId: string | null;
+  documentCount: number;
+  icon?: string | null;
+  updatedAt?: string;
 };
 
 type Library = {
   folderTree: FolderNode[];
-  folders: { id: string; name: string; parentId: string | null; documentCount: number }[];
+  folders: LibraryFolder[];
   categories: { category: string; count: number }[];
   stats: { totalDocuments: number; pinned: number; folderCount: number };
 };
@@ -91,10 +102,11 @@ function DocumentsContent() {
   const [showUpload, setShowUpload] = useState(false);
   const [showNewFolder, setShowNewFolder] = useState(false);
   const [linkDocId, setLinkDocId] = useState<string | null>(null);
+  const [deleteConfirmDoc, setDeleteConfirmDoc] = useState<DocumentItem | null>(null);
 
   useEffect(() => {
-    if (folderParam) setFolderId(folderParam);
-    if (categoryParam) setCategory(categoryParam);
+    setFolderId(folderParam);
+    setCategory(categoryParam);
   }, [folderParam, categoryParam]);
 
   const { data: libraryData, reload: reloadLibrary } = useApi(
@@ -142,9 +154,14 @@ function DocumentsContent() {
     refresh();
   }
 
-  async function deleteDocument(doc: DocumentItem) {
-    if (!window.confirm(`Delete “${doc.title}”? This cannot be undone.`)) return;
-    await adminApi.delete(`/control-room/documents/${doc.id}`);
+  function deleteDocument(doc: DocumentItem) {
+    setDeleteConfirmDoc(doc);
+  }
+
+  async function confirmDelete() {
+    if (!deleteConfirmDoc) return;
+    await adminApi.delete(`/control-room/documents/${deleteConfirmDoc.id}`);
+    setDeleteConfirmDoc(null);
     refresh();
   }
 
@@ -157,12 +174,19 @@ function DocumentsContent() {
   if (!library && loading) return <LoadingSpinner label="Loading documents..." fullScreen />;
   if (error) return <ErrorAlert error={error} onRetry={refresh} />;
 
+  const folders = library?.folders ?? [];
+  const selectedFolder = folders.find((f) => f.id === folderId) ?? null;
+  const showFolderGrid = !folderId && !search.trim();
+
   return (
     <div className="documents-hub">
-      <div className="documents-hub__header">
+      <header className="documents-hub__header">
         <div>
-          <p className="text-muted">
-            {library?.stats.totalDocuments ?? 0} files · {library?.stats.folderCount ?? 0} folders
+          <h1 className="documents-hub__title">Documents</h1>
+          <p className="documents-hub__meta">
+            {library?.stats.totalDocuments ?? 0} document
+            {(library?.stats.totalDocuments ?? 0) === 1 ? '' : 's'} · {library?.stats.folderCount ?? 0} folder
+            {(library?.stats.folderCount ?? 0) === 1 ? '' : 's'}
             {incidentFilter && (
               <>
                 {' · '}
@@ -174,14 +198,14 @@ function DocumentsContent() {
           </p>
         </div>
         <div className="documents-hub__actions">
-          <button type="button" className="btn-secondary" onClick={() => setShowNewFolder((v) => !v)}>
-            New folder
+          <button type="button" className="btn-secondary" onClick={() => setShowNewFolder(true)}>
+            + New folder
           </button>
-          <button type="button" className="btn-primary" onClick={() => setShowUpload((v) => !v)}>
-            Add document
+          <button type="button" className="btn-action" onClick={() => setShowUpload(true)}>
+            + Add document
           </button>
         </div>
-      </div>
+      </header>
 
       {incidentFilter && (
         <div className="alert alert--info documents-incident-banner">
@@ -191,183 +215,246 @@ function DocumentsContent() {
       )}
 
       {showNewFolder && (
-        <NewFolderForm
-          folders={library?.folders ?? []}
-          onSuccess={() => {
-            setShowNewFolder(false);
-            refresh();
-          }}
-        />
+        <OpsDialog title="New folder" subtitle="Keep SOPs, evidence, and reports grouped." onClose={() => setShowNewFolder(false)}>
+          <NewFolderForm
+            folders={library?.folders ?? []}
+            onSuccess={() => {
+              setShowNewFolder(false);
+              refresh();
+            }}
+          />
+        </OpsDialog>
       )}
 
       {showUpload && (
-        <UploadDocumentForm
-          folders={library?.folders ?? []}
-          incidents={incidentsData?.data ?? []}
-          defaultIncidentId={incidentFilter}
-          defaultFolderId={folderId}
-          onSuccess={() => {
-            setShowUpload(false);
-            refresh();
-          }}
-        />
+        <OpsDialog title="Add document" subtitle="Register a file in the ops library." onClose={() => setShowUpload(false)} wide>
+          <UploadDocumentForm
+            folders={library?.folders ?? []}
+            incidents={incidentsData?.data ?? []}
+            defaultIncidentId={incidentFilter}
+            defaultFolderId={folderId}
+            onSuccess={() => {
+              setShowUpload(false);
+              refresh();
+            }}
+          />
+        </OpsDialog>
       )}
 
-      <div className="documents-hub__body">
-        <aside className="documents-sidebar">
-          <div className="documents-sidebar__section">
+      <div className="documents-toolbar">
+        <label className="documents-search">
+          <span className="documents-search__icon" aria-hidden>
+            ⌕
+          </span>
+          <input
+            type="search"
+            placeholder="Search documents, tags, filenames..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </label>
+      </div>
+
+      <div className="documents-layout">
+      <nav className="documents-filters" aria-label="Document categories">
+        <button
+          type="button"
+          className={`documents-chip ${!folderId && !category ? 'documents-chip--on' : ''}`}
+          onClick={clearFilters}
+        >
+          All
+          <span>{library?.stats.totalDocuments ?? 0}</span>
+        </button>
+        <button
+          type="button"
+          className={`documents-chip ${category === 'PINNED' ? 'documents-chip--on' : ''}`}
+          onClick={() => {
+            setFolderId(null);
+            setCategory('PINNED');
+          }}
+        >
+          Pinned
+          <span>{library?.stats.pinned ?? 0}</span>
+        </button>
+        {Object.entries(DOCUMENT_CATEGORIES).map(([key, label]) => {
+          const count = library?.categories.find((c) => c.category === key)?.count ?? 0;
+          return (
             <button
+              key={key}
               type="button"
-              className={`documents-tree-item ${!folderId && !category ? 'documents-tree-item--active' : ''}`}
-              onClick={clearFilters}
-            >
-              <span>📁</span> All documents
-              <span className="documents-tree-count">{library?.stats.totalDocuments}</span>
-            </button>
-            <button
-              type="button"
-              className={`documents-tree-item ${category === 'PINNED' ? 'documents-tree-item--active' : ''}`}
+              className={`documents-chip ${category === key ? 'documents-chip--on' : ''}`}
               onClick={() => {
                 setFolderId(null);
-                setCategory('PINNED');
+                setCategory(key);
               }}
             >
-              <span>📌</span> Pinned
-              <span className="documents-tree-count">{library?.stats.pinned}</span>
+              {CATEGORY_ICONS[key as DocumentCategoryKey]} {label}
+              <span>{count}</span>
+            </button>
+          );
+        })}
+        {(folderId || category || search) && (
+          <button type="button" className="documents-chip documents-chip--clear" onClick={clearFilters}>
+            Clear
+          </button>
+        )}
+      </nav>
+
+      <div className="documents-main">
+      {showFolderGrid && folders.length > 0 && (
+        <section className="documents-section">
+          <h2 className="documents-section__title">Folders</h2>
+          <div className="documents-folder-grid">
+            {folders.map((folder) => (
+              <button
+                key={folder.id}
+                type="button"
+                className="documents-folder-card"
+                onClick={() => {
+                  setCategory(null);
+                  setFolderId(folder.id);
+                }}
+              >
+                <span className="documents-folder-card__icon" aria-hidden>
+                  {folderGlyph(folder.icon)}
+                </span>
+                <span className="documents-folder-card__name">{folder.name}</span>
+                <span className="documents-folder-card__count">
+                  {folder.documentCount} document{folder.documentCount === 1 ? '' : 's'}
+                </span>
+                <span className="documents-folder-card__meta">
+                  {formatUpdated(folder.updatedAt)}
+                  <span className="documents-folder-card__open">Open →</span>
+                </span>
+              </button>
+            ))}
+          </div>
+        </section>
+      )}
+
+      <section className="documents-section">
+        <div className="documents-section__head">
+          <h2 className="documents-section__title">
+            {selectedFolder
+              ? selectedFolder.name
+              : category === 'PINNED'
+                ? 'Pinned documents'
+                : category
+                  ? DOCUMENT_CATEGORIES[category as DocumentCategoryKey] ?? 'Documents'
+                  : 'Recent documents'}
+          </h2>
+          {selectedFolder && (
+            <button type="button" className="btn-ghost" onClick={() => setFolderId(null)}>
+              All folders
+            </button>
+          )}
+        </div>
+
+        {loading ? (
+          <LoadingSpinner label="Loading files..." />
+        ) : documents.filter((d) => category !== 'PINNED' || d.isPinned).length === 0 ? (
+          <div className="empty-state">
+            No documents match your filters.{' '}
+            <button type="button" className="btn-sm btn-secondary" onClick={() => setShowUpload(true)}>
+              Add one
             </button>
           </div>
-
-          <div className="documents-sidebar__section">
-            <h3>Folders</h3>
-            <FolderTree
-              nodes={library?.folderTree ?? []}
-              activeId={folderId}
-              onSelect={(id) => {
-                setCategory(null);
-                setFolderId(id);
-              }}
-            />
-          </div>
-
-          <div className="documents-sidebar__section">
-            <h3>Categories</h3>
-            {Object.entries(DOCUMENT_CATEGORIES).map(([key, label]) => {
-              const count = library?.categories.find((c) => c.category === key)?.count ?? 0;
-              return (
-                <button
-                  key={key}
-                  type="button"
-                  className={`documents-tree-item ${category === key ? 'documents-tree-item--active' : ''}`}
-                  onClick={() => {
-                    setFolderId(null);
-                    setCategory(key);
-                  }}
-                >
-                  <span>{CATEGORY_ICONS[key as DocumentCategoryKey]}</span>
-                  {label}
-                  <span className="documents-tree-count">{count}</span>
-                </button>
-              );
-            })}
-          </div>
-        </aside>
-
-        <main className="documents-main">
-          <div className="documents-toolbar">
-            <input
-              type="search"
-              className="command-search"
-              placeholder="Search documents, tags, filenames..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
-            {(folderId || category || search) && (
-              <button type="button" className="btn-ghost" onClick={clearFilters}>
-                Clear filters
-              </button>
-            )}
-          </div>
-
-          {loading ? (
-            <LoadingSpinner label="Loading files..." />
-          ) : documents.length === 0 ? (
-            <div className="empty-state">
-              No documents match your filters.{' '}
-              <button type="button" className="interactive-text" onClick={() => setShowUpload(true)}>
-                Add one
-              </button>
-            </div>
-          ) : (
-            <div className="documents-grid">
-              {documents
-                .filter((d) => category !== 'PINNED' || d.isPinned)
-                .map((doc) => (
-                  <article key={doc.id} className={`document-card ${doc.isPinned ? 'document-card--pinned' : ''}`}>
-                    <div className="document-card__icon">{fileTypeIcon(doc.fileType)}</div>
-                    <div className="document-card__body">
-                      <div className="document-card__top">
-                        <h3>{doc.title}</h3>
-                        {doc.isPinned && <span className="document-pin">Pinned</span>}
-                      </div>
-                      <p className="document-card__meta">
-                        {DOCUMENT_CATEGORIES[doc.category]} · {doc.fileName}
+        ) : (
+          <div className="documents-list">
+            {documents
+              .filter((d) => category !== 'PINNED' || d.isPinned)
+              .map((doc) => (
+                <article key={doc.id} className={`document-card ${doc.isPinned ? 'document-card--pinned' : ''}`}>
+                  <div className="document-card__icon">{fileTypeIcon(doc.fileType)}</div>
+                  <div className="document-card__body">
+                    <div className="document-card__top">
+                      <h3>{doc.title}</h3>
+                    </div>
+                    <p className="document-card__meta">
+                      {DOCUMENT_CATEGORIES[doc.category]}
+                      {doc.folder ? ` · ${doc.folder.name}` : ''}
+                    </p>
+                    {doc.description && <p className="document-card__desc">{doc.description}</p>}
+                    <dl className="document-card__facts">
+                      {doc.incident && (
+                        <>
+                          <dt>Incident</dt>
+                          <dd>
+                            {doc.incident.type}
+                            {doc.incident.address ? ` — ${doc.incident.address}` : ''}
+                          </dd>
+                        </>
+                      )}
+                      {doc.uploadedBy && (
+                        <>
+                          <dt>Added by</dt>
+                          <dd>{doc.uploadedBy}</dd>
+                        </>
+                      )}
+                      <dt>File</dt>
+                      <dd>
+                        {doc.fileName}
                         {doc.fileSizeKb ? ` · ${doc.fileSizeKb} KB` : ''}
-                      </p>
-                      {doc.description && (
-                        <p className="document-card__desc">{doc.description}</p>
-                      )}
-                      {doc.folder && (
-                        <span className="document-tag">📁 {doc.folder.name}</span>
-                      )}
+                      </dd>
+                      <dt>Added</dt>
+                      <dd>{formatAdded(doc.createdAt)}</dd>
+                    </dl>
+                    <div className="document-tags">
+                      {doc.isPinned && <span className="document-tag document-tag--pin">Pinned</span>}
                       {doc.incident && (
                         <Link
                           href={`/control-room/documents?incident=${doc.incident.id}`}
-                          className="document-tag document-tag--incident"
+                          className="document-tag"
                         >
-                          🔗 {doc.incident.type} — {doc.incident.address ?? 'Incident'}
+                          {doc.incident.type}
                         </Link>
                       )}
-                      {doc.tags.length > 0 && (
-                        <div className="document-tags">
-                          {doc.tags.map((t) => (
-                            <span key={t} className="document-tag">{t}</span>
-                          ))}
-                        </div>
-                      )}
+                      {doc.tags.map((t) => (
+                        <span key={t} className="document-tag">
+                          {t}
+                        </span>
+                      ))}
                     </div>
-                    <div className="document-card__actions">
-                      <a href={resolveMediaUrl(doc.fileUrl) ?? '#'} className="btn-sm btn-sm--link" target="_blank" rel="noopener noreferrer">
-                        Open
-                      </a>
-                      {doc.incident ? (
-                        <Link href={incidentHref(doc.incident.id)} className="btn-sm btn-sm--link">
-                          Incident
-                        </Link>
-                      ) : (
-                        <button
-                          type="button"
-                          className="btn-sm btn-sm--link"
-                          onClick={() => setLinkDocId(doc.id)}
-                        >
-                          Link incident
-                        </button>
-                      )}
-                      <button type="button" className="btn-sm" onClick={() => togglePin(doc)}>
-                        {doc.isPinned ? 'Unpin' : 'Pin'}
-                      </button>
+                  </div>
+                  <div className="document-card__actions">
+                    <a
+                      href={resolveMediaUrl(doc.fileUrl) ?? '#'}
+                      className="document-card__open"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      Open document →
+                    </a>
+                    {doc.incident ? (
+                      <Link href={incidentHref(doc.incident.id)} className="btn-sm btn-sm--link">
+                        Incident
+                      </Link>
+                    ) : (
                       <button
                         type="button"
-                        className="btn-sm btn-sm--danger"
-                        onClick={() => void deleteDocument(doc)}
+                        className="btn-sm btn-sm--link"
+                        onClick={() => setLinkDocId(doc.id)}
                       >
-                        Delete
+                        Link incident
                       </button>
-                    </div>
-                  </article>
-                ))}
-            </div>
-          )}
-        </main>
+                    )}
+                    <button type="button" className="btn-sm" onClick={() => togglePin(doc)}>
+                      {doc.isPinned ? 'Unpin' : 'Pin'}
+                    </button>
+                    <button
+                      type="button"
+                      className="btn-sm btn-sm--danger"
+                      onClick={() => void deleteDocument(doc)}
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </article>
+              ))}
+          </div>
+        )}
+      </section>
+      </div>
       </div>
 
       {linkDocId && (
@@ -377,41 +464,51 @@ function DocumentsContent() {
           onClose={() => setLinkDocId(null)}
         />
       )}
+
+      {deleteConfirmDoc && (
+        <OpsDialog
+          title="Delete document"
+          subtitle={`"${deleteConfirmDoc.title}" will be permanently removed. This cannot be undone.`}
+          onClose={() => setDeleteConfirmDoc(null)}
+        >
+          <div className="fleet-form__actions">
+            <button type="button" className="btn-ghost" onClick={() => setDeleteConfirmDoc(null)}>
+              Cancel
+            </button>
+            <button type="button" className="btn-danger" onClick={() => void confirmDelete()}>
+              Delete
+            </button>
+          </div>
+        </OpsDialog>
+      )}
     </div>
   );
 }
 
-function FolderTree({
-  nodes,
-  activeId,
-  onSelect,
-  depth = 0,
-}: {
-  nodes: FolderNode[];
-  activeId: string | null;
-  onSelect: (id: string) => void;
-  depth?: number;
-}) {
-  return (
-    <ul className="documents-folder-tree" style={{ paddingLeft: depth ? '0.75rem' : 0 }}>
-      {nodes.map((node) => (
-        <li key={node.id}>
-          <button
-            type="button"
-            className={`documents-tree-item ${activeId === node.id ? 'documents-tree-item--active' : ''}`}
-            onClick={() => onSelect(node.id)}
-          >
-            <span>📂</span>
-            {node.name}
-            <span className="documents-tree-count">{node.documentCount}</span>
-          </button>
-          {node.children.length > 0 && (
-            <FolderTree nodes={node.children} activeId={activeId} onSelect={onSelect} depth={depth + 1} />
-          )}
-        </li>
-      ))}
-    </ul>
-  );
+function folderGlyph(icon: string | null | undefined) {
+  if (icon && icon !== 'folder' && icon.length <= 4) return icon;
+  return '📁';
+}
+
+function formatUpdated(iso?: string) {
+  if (!iso) return 'Updated recently';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return 'Updated recently';
+  const diff = Date.now() - d.getTime();
+  const mins = Math.max(0, Math.round(diff / 60000));
+  if (mins < 60) return mins <= 1 ? 'Updated just now' : `Updated ${mins}m ago`;
+  const hours = Math.round(mins / 60);
+  if (hours < 24) return hours === 1 ? 'Updated 1 hour ago' : `Updated ${hours} hours ago`;
+  const days = Math.round(hours / 24);
+  if (days === 1) return 'Updated yesterday';
+  if (days < 7) return `Updated ${days} days ago`;
+  return `Updated ${d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}`;
+}
+
+function formatAdded(iso: string) {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '—';
+  return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
 function NewFolderForm({
@@ -443,32 +540,29 @@ function NewFolderForm({
   }
 
   return (
-    <form className="portal-card documents-form" onSubmit={submit}>
-      <h2>Create folder</h2>
-      <div className="incident-report-form__grid">
-        <label className="incident-report-form__full">
-          Folder name
-          <input value={name} onChange={(e) => setName(e.target.value)} required />
-        </label>
-        <label>
-          Parent folder
-          <UiSelect
-            compact={false}
-            ariaLabel="Parent folder"
-            value={parentId}
-            onChange={setParentId}
-            options={[
-              { value: '', label: 'Root level' },
-              ...folders.map((f) => ({ value: f.id, label: f.name })),
-            ]}
-          />
-        </label>
-        <label className="incident-report-form__full">
-          Description
-          <input value={description} onChange={(e) => setDescription(e.target.value)} />
-        </label>
-      </div>
-      <button type="submit" className="btn-primary" disabled={submitting}>
+    <form className="stack-form documents-form" onSubmit={submit}>
+      <label className="form-field">
+        <span>Folder name</span>
+        <input value={name} onChange={(e) => setName(e.target.value)} required />
+      </label>
+      <label className="form-field">
+        <span>Parent folder</span>
+        <UiSelect
+          compact={false}
+          ariaLabel="Parent folder"
+          value={parentId}
+          onChange={setParentId}
+          options={[
+            { value: '', label: 'Root level' },
+            ...folders.map((f) => ({ value: f.id, label: f.name })),
+          ]}
+        />
+      </label>
+      <label className="form-field">
+        <span>Description</span>
+        <input value={description} onChange={(e) => setDescription(e.target.value)} />
+      </label>
+      <button type="submit" className="btn-primary btn-primary--full" disabled={submitting}>
         {submitting ? 'Creating…' : 'Create folder'}
       </button>
     </form>
@@ -532,30 +626,29 @@ function UploadDocumentForm({
   }
 
   return (
-    <form className="portal-card documents-form" onSubmit={submit}>
-      <h2>Add document</h2>
+    <form className="stack-form documents-form" onSubmit={submit}>
       <p className="text-muted">
         Choose a file to register in the library (metadata and an open link).
         Files stay available to ops from this desk.
       </p>
-      <div className="incident-report-form__grid">
-        <label className="incident-report-form__full">
-          File
+      <div className="form-grid">
+        <label className="form-field form-field--full">
+          <span>File</span>
           <input
             type="file"
             onChange={(e) => onFilePicked(e.target.files?.[0] ?? null)}
           />
         </label>
-        <label className="incident-report-form__full">
-          Title
+        <label className="form-field form-field--full">
+          <span>Title</span>
           <input value={title} onChange={(e) => setTitle(e.target.value)} required />
         </label>
-        <label>
-          Filename
+        <label className="form-field">
+          <span>Filename</span>
           <input value={fileName} onChange={(e) => setFileName(e.target.value)} placeholder="report.pdf" required />
         </label>
-        <label>
-          File type
+        <label className="form-field">
+          <span>File type</span>
           <UiSelect
             compact={false}
             ariaLabel="File type"
@@ -572,8 +665,8 @@ function UploadDocumentForm({
             ]}
           />
         </label>
-        <label>
-          Category
+        <label className="form-field">
+          <span>Category</span>
           <UiSelect
             compact={false}
             ariaLabel="Category"
@@ -585,8 +678,8 @@ function UploadDocumentForm({
             }))}
           />
         </label>
-        <label>
-          Folder
+        <label className="form-field">
+          <span>Folder</span>
           <UiSelect
             compact={false}
             ariaLabel="Folder"
@@ -598,8 +691,8 @@ function UploadDocumentForm({
             ]}
           />
         </label>
-        <label>
-          Link to incident
+        <label className="form-field form-field--full">
+          <span>Link to incident</span>
           <UiSelect
             compact={false}
             ariaLabel="Link to incident"
@@ -615,16 +708,16 @@ function UploadDocumentForm({
             ]}
           />
         </label>
-        <label className="incident-report-form__full">
-          Description
+        <label className="form-field form-field--full">
+          <span>Description</span>
           <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={2} />
         </label>
-        <label className="incident-report-form__full">
-          Tags (comma-separated)
+        <label className="form-field form-field--full">
+          <span>Tags (comma-separated)</span>
           <input value={tags} onChange={(e) => setTags(e.target.value)} placeholder="evidence, cctv, 2026" />
         </label>
       </div>
-      <button type="submit" className="btn-primary" disabled={submitting}>
+      <button type="submit" className="btn-primary btn-primary--full" disabled={submitting}>
         {submitting ? 'Saving…' : 'Save document'}
       </button>
     </form>
@@ -641,24 +734,26 @@ function LinkIncidentModal({
   onClose: () => void;
 }) {
   return (
-    <div className="documents-modal-overlay" onClick={onClose} role="presentation">
-      <div className="documents-modal" onClick={(e) => e.stopPropagation()} role="dialog">
-        <h2>Link to incident</h2>
-        <ul className="documents-link-list">
-          {incidents.map((i) => (
-            <li key={i.id}>
-              <button type="button" className="documents-link-item" onClick={() => onLink(i.id)}>
-                <strong>{i.type} — {i.client}</strong>
-                <span>{i.address ?? 'No address'} · {i.status}</span>
-                {i.documentCount > 0 && (
-                  <span className="text-muted">{i.documentCount} doc(s) linked</span>
-                )}
-              </button>
-            </li>
-          ))}
-        </ul>
+    <OpsDialog title="Link to incident" subtitle="Select an active incident to attach this document to." onClose={onClose}>
+      <ul className="documents-link-list">
+        {incidents.length === 0 && (
+          <li><p className="text-muted">No active incidents found.</p></li>
+        )}
+        {incidents.map((i) => (
+          <li key={i.id}>
+            <button type="button" className="documents-link-item" onClick={() => onLink(i.id)}>
+              <strong>{i.type} — {i.client}</strong>
+              <span>{i.address ?? 'No address'} · {i.status}</span>
+              {i.documentCount > 0 && (
+                <span className="text-muted">{i.documentCount} doc(s) linked</span>
+              )}
+            </button>
+          </li>
+        ))}
+      </ul>
+      <div className="fleet-form__actions" style={{ marginTop: '0.75rem' }}>
         <button type="button" className="btn-ghost" onClick={onClose}>Cancel</button>
       </div>
-    </div>
+    </OpsDialog>
   );
 }

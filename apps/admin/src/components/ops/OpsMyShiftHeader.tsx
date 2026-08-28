@@ -3,7 +3,7 @@
 type Chip = {
   id: string;
   label: string;
-  count: number;
+  count: number | string;
   tone?: 'urgent' | 'warn' | 'ok' | 'neutral';
 };
 
@@ -13,12 +13,14 @@ export function OpsMyShiftHeader({
   chips,
   activeChip,
   onChip,
+  urgent = false,
 }: {
   title: string;
   subtitle: string;
   chips: Chip[];
   activeChip: string;
   onChip: (id: string) => void;
+  urgent?: boolean;
 }) {
   const today = new Date().toLocaleDateString('en-ZA', {
     weekday: 'long',
@@ -28,10 +30,12 @@ export function OpsMyShiftHeader({
   });
 
   return (
-    <header className="ops-shift">
+    <header className={`ops-shift ${urgent ? 'ops-shift--urgent' : ''}`}>
       <p className="ops-shift__date">{today}</p>
-      <h1 className="ops-shift__title">{title}</h1>
-      <p className="ops-shift__sub">{subtitle}</p>
+      <div className="ops-shift__intro">
+        <h1 className="ops-shift__title">{title}</h1>
+        <p className={`ops-shift__sub ${urgent ? 'ops-shift__sub--alert' : ''}`}>{subtitle}</p>
+      </div>
       <div className="ops-shift__chips" role="tablist" aria-label="Filter priorities">
         {chips.map((c) => (
           <button
@@ -44,8 +48,8 @@ export function OpsMyShiftHeader({
             }`}
             onClick={() => onChip(c.id)}
           >
+            <span className="ops-shift__chip-label">{c.label}</span>
             <strong>{c.count}</strong>
-            <span>{c.label}</span>
           </button>
         ))}
       </div>

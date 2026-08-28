@@ -2,11 +2,13 @@
 
 import Link from 'next/link';
 import { CallActions } from '@/components/calls/CallActions';
+import { IncidentDetailsMenu } from '@/components/control-room/IncidentDetailsMenu';
 import { QuickDispatchPanel } from '@/components/control-room/QuickDispatchPanel';
 import { isAwaitingDispatch } from '@/lib/incident-status';
 import type { MapClient, MapFleetVehicle, MapIncident, MapOfficer, MapProperty, MapVehicle } from './map-types';
-import { customerHref, incidentHref } from '@/lib/control-room-routes';
+import { customerHref } from '@/lib/control-room-routes';
 import { SubscriptionBadge } from '@/components/control-room/SubscriptionBadge';
+import { fleetTeamLabel } from '@/lib/fleet-teams';
 
 function formatTime(iso: string | null | undefined) {
   if (!iso) return '—';
@@ -156,7 +158,7 @@ export function FleetVehiclePopup({ vehicle }: { vehicle: MapFleetVehicle }) {
     <div className="map-popup-panel map-popup-panel--fleet">
       <div className="map-popup-panel__header">
         <strong>{vehicle.callSign}</strong>
-        <span className="map-popup-tag map-popup-tag--fleet">{vehicle.vehicleType.replace('_', ' ')}</span>
+        <span className="map-popup-tag map-popup-tag--fleet">{fleetTeamLabel(vehicle.vehicleType, vehicle.teamName)}</span>
       </div>
       <dl className="map-popup-dl">
         <dt>Registration</dt>
@@ -271,7 +273,7 @@ export function IncidentPopup({
         showDetailsLink={false}
       />
       <div className="map-popup-actions map-popup-actions--compact">
-        <Link href={incidentHref(incident.id)} className="map-popup-link">Details</Link>
+        <IncidentDetailsMenu incident={incident} triggerClassName="btn-sm" />
         <CallActions
           compact
           target={{

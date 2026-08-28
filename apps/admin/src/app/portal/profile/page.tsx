@@ -5,12 +5,15 @@ import { ErrorAlert } from '@/components/ErrorAlert';
 import Link from 'next/link';
 import { FormEvent, useEffect, useState } from 'react';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
+import { OpsDialog } from '@/components/ops/OpsDialog';
+import { UserAvatar } from '@/components/ui/UserAvatar';
 import {
   type LoyaltySummary,
 } from '@/components/loyalty/LoyaltySummaryCard';
 import { ThemeSettings } from '@/components/ThemeSettings';
 import { PortalPermissionsSection } from '@/components/portal/PortalPermissions';
 import { PortalLayout } from '@/components/portal/PortalLayout';
+import { FamilyProfilePopup, type FamilyProfilePerson } from '@/components/portal/FamilyProfilePopup';
 import { useApi } from '@/hooks/useApi';
 import { clientApi, type ApiResponse } from '@/lib/api-client';
 
@@ -31,13 +34,7 @@ type Family = {
   id: string;
   name: string;
   owner: string;
-  members: {
-    id: string;
-    name: string;
-    nickname: string | null;
-    trackingEnabled: boolean;
-    lastLocationAt: string | null;
-  }[];
+  members: FamilyProfilePerson[];
 };
 
 type Subscription = {
@@ -64,6 +61,7 @@ function ProfileContent() {
   const [saveMsg, setSaveMsg] = useState('');
   const [phone, setPhone] = useState('');
   const [tracking, setTracking] = useState(true);
+  const [selectedFamily, setSelectedFamily] = useState<FamilyProfilePerson | null>(null);
 
   const { data, loading, error, reload } = useApi(
     () => clientApi.get<ApiResponse<Profile>>('/client/profile'),
@@ -126,15 +124,9 @@ function ProfileContent() {
           <h1>Profile</h1>
           <p className="text-muted">Your account, family, and protection settings.</p>
         </div>
-        {!editing ? (
-          <button type="button" className="btn-secondary" onClick={() => setEditing(true)}>
-            Edit profile
-          </button>
-        ) : (
-          <button type="button" className="btn-ghost" onClick={cancelEdit}>
-            Cancel
-          </button>
-        )}
+        <button type="button" className="btn-secondary" onClick={() => setEditing(true)}>
+          Edit profile
+        </button>
       </div>
 
       {saveMsg && (
@@ -145,11 +137,8 @@ function ProfileContent() {
 
       <section className="profile-hero portal-card">
         <div className="profile-hero-main">
-          <div className="profile-avatar profile-avatar--lg">
-            {p.firstName[0]}
-            {p.lastName[0]}
-          </div>
-          <div>
+          <UserAvatar firstName={p.firstName} lastName={p.lastName} size="lg" />
+          <div className="profile-hero-copy">
             <h2 className="profile-hero-name">{fullName}</h2>
             <p className="text-muted">{p.email}</p>
             <div className="profile-hero-badges">
@@ -177,6 +166,9 @@ function ProfileContent() {
           <div className="profile-hero-meta">
             <span className="text-muted">Plan</span>
             <strong>{subscription.planName ?? subscription.tierName}</strong>
+            <Link href="/portal/subscription" className="link-sm">
+              Manage plan
+            </Link>
           </div>
         )}
       </section>
@@ -231,79 +223,39 @@ function ProfileContent() {
       )}
 
       <div className="profile-layout">
-        {!editing ? (
-          <section className="portal-card profile-section">
-            <div className="card-header-row">
-              <h2>Saved profile</h2>
-              <button type="button" className="link-sm profile-inline-edit" onClick={() => setEditing(true)}>
-                Edit
-              </button>
-            </div>
-            <dl className="profile-summary-grid">
-              <ProfileField label="Full name" value={fullName} />
-              <ProfileField label="Email" value={p.email} />
-              <ProfileField label="Phone" value={p.phone ?? 'Not set'} />
-              <ProfileField label="Organization" value={p.tenant.name} />
-              <ProfileField
-                label="GPS tracking"
-                value={p.trackingEnabled ? 'Enabled' : 'Disabled'}
-              />
-              <ProfileField
-                label="Member since"
-                value={new Date(p.createdAt).toLocaleDateString(undefined, {
-                  year: 'numeric',
-                  month: 'long',
-                  day: 'numeric',
-                })}
-              />
-              {subscription && (
-                <ProfileField label="Member ID" value={subscription.memberId} full />
-              )}
-            </dl>
-          </section>
-        ) : (
-          <section className="portal-card profile-section">
-            <h2>Edit profile</h2>
-            <form className="profile-edit-form" onSubmit={handleSave}>
-              <label className="form-field">
-                <span>Full name</span>
-                <input value={fullName} disabled />
-              </label>
-              <label className="form-field">
-                <span>Email</span>
-                <input value={p.email} disabled />
-              </label>
-              <label className="form-field">
-                <span>Phone</span>
-                <input
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  placeholder="+27 82 000 0000"
-                />
-              </label>
-              <label className="form-field">
-                <span>Organization</span>
-                <input value={p.tenant.name} disabled />
-              </label>
-              <label className="checkbox-label profile-checkbox">
-                <input
-                  type="checkbox"
-                  checked={tracking}
-                  onChange={(e) => setTracking(e.target.checked)}
-                />
-                Enable GPS tracking
-              </label>
-              <div className="profile-form-actions">
-                <button type="button" className="btn-ghost" onClick={cancelEdit}>
-                  Cancel
-                </button>
-                <button type="submit" className="btn-primary" disabled={saving}>
-                  {saving ? <LoadingSpinner label="" size="sm" /> : 'Save changes'}
-                </button>
-              </div>
-            </form>
-          </section>
-        )}
+        <section className="portal-card profile-section">
+          <div className="card-header-row">
+            <h2>Saved profile</h2>
+            <button type="button" className="link-sm profile-inline-edit" onClick={() => setEditing(true)}>
+              Edit
+            </button>
+          </div>
+          <dl className="profile-summary-grid">
+            <ProfileField label="Full name" value={fullName} />
+            <ProfileField label="Email" value={p.email} />
+            <ProfileField label="Phone" value={p.phone ?? 'Not set'} />
+            <ProfileField label="Organization" value={p.tenant.name} />
+            <ProfileField
+              label="GPS tracking"
+              value={p.trackingEnabled ? 'Enabled' : 'Disabled'}
+            />
+            <ProfileField
+              label="Member since"
+              value={
+                p.createdAt
+                  ? new Date(p.createdAt).toLocaleDateString(undefined, {
+                      year: 'numeric',
+                      month: 'long',
+                      day: 'numeric',
+                    })
+                  : '—'
+              }
+            />
+            {subscription && (
+              <ProfileField label="Member ID" value={subscription.memberId} full />
+            )}
+          </dl>
+        </section>
 
         <section className="portal-card profile-section">
           <div className="card-header-row">
@@ -316,9 +268,13 @@ function ProfileContent() {
             <ul className="profile-family-list">
               {family.members.map((m) => (
                 <li key={m.id} className="profile-family-item">
-                  <Link href="/portal/family" className="profile-family-link">
+                  <button
+                    type="button"
+                    className="profile-family-link"
+                    onClick={() => setSelectedFamily(m)}
+                  >
                     <div className="avatar avatar--admin">
-                      {m.name
+                      {(m.nickname ?? m.name)
                         .split(' ')
                         .map((n) => n[0])
                         .join('')
@@ -328,10 +284,14 @@ function ProfileContent() {
                       <strong>{m.nickname ?? m.name}</strong>
                       <span className="text-muted">{m.name}</span>
                     </div>
-                  </Link>
-                  <span className={`status-dot ${m.trackingEnabled ? 'status-dot--on' : ''}`}>
+                  </button>
+                  <button
+                    type="button"
+                    className={`status-dot ${m.trackingEnabled ? 'status-dot--on' : ''}`}
+                    onClick={() => setSelectedFamily(m)}
+                  >
                     {m.trackingEnabled ? 'Tracking' : 'Offline'}
-                  </span>
+                  </button>
                 </li>
               ))}
             </ul>
@@ -364,6 +324,21 @@ function ProfileContent() {
               <span className="profile-link-label">Emergency contacts</span>
               <span className="text-muted">People to notify</span>
             </Link>
+            <Link href="/portal/security/devices" className="profile-link-card">
+              <span className="profile-link-icon">📱</span>
+              <span className="profile-link-label">Trusted devices</span>
+              <span className="text-muted">Primary, lock, mark lost</span>
+            </Link>
+            <Link href="/portal/security/lockdown" className="profile-link-card">
+              <span className="profile-link-icon">🔒</span>
+              <span className="profile-link-label">Lockdown</span>
+              <span className="text-muted">Revoke sessions</span>
+            </Link>
+            <Link href="/portal/security/activity" className="profile-link-card">
+              <span className="profile-link-icon">📋</span>
+              <span className="profile-link-label">Security activity</span>
+              <span className="text-muted">Audited events</span>
+            </Link>
             <Link href="/portal/subscription" className="profile-link-card">
               <span className="profile-link-icon">🛡️</span>
               <span className="profile-link-label">Subscription</span>
@@ -394,6 +369,55 @@ function ProfileContent() {
           </div>
         </section>
       </div>
+      {editing && (
+        <OpsDialog
+          title="Edit profile"
+          subtitle="Update your contact details and tracking preferences."
+          onClose={cancelEdit}
+        >
+          <form className="profile-edit-form" onSubmit={handleSave}>
+            <label className="form-field">
+              <span>Full name</span>
+              <input value={fullName} disabled />
+            </label>
+            <label className="form-field">
+              <span>Email</span>
+              <input value={p.email} disabled />
+            </label>
+            <label className="form-field">
+              <span>Phone</span>
+              <input
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                placeholder="+27 82 000 0000"
+              />
+            </label>
+            <label className="form-field">
+              <span>Organization</span>
+              <input value={p.tenant.name} disabled />
+            </label>
+            <label className="checkbox-label profile-checkbox">
+              <input
+                type="checkbox"
+                checked={tracking}
+                onChange={(e) => setTracking(e.target.checked)}
+              />
+              Enable GPS tracking
+            </label>
+            <div className="profile-form-actions">
+              <button type="button" className="btn-ghost" onClick={cancelEdit}>
+                Cancel
+              </button>
+              <button type="submit" className="btn-primary" disabled={saving}>
+                {saving ? <LoadingSpinner label="" size="sm" /> : 'Save changes'}
+              </button>
+            </div>
+          </form>
+        </OpsDialog>
+      )}
+      {selectedFamily ? (
+        <FamilyProfilePopup person={selectedFamily} onClose={() => setSelectedFamily(null)} />
+      ) : null}
     </div>
   );
 }

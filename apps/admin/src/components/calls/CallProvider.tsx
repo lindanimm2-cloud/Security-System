@@ -15,6 +15,7 @@ import { getSocketUrl } from '@/lib/socket';
 import { isExternalCallChannel, whatsappCallHref, telHref } from '@/lib/call-utils';
 import type { ApiResponse } from '@/lib/api-client';
 import { adminApi, clientApi, officerApi } from '@/lib/api-client';
+import { shouldBackgroundPoll } from '@/lib/demo/is-demo-mode';
 import type { CallChannel, CallSession, CallTarget } from '@/types/calls';
 
 type IncomingCall = CallSession & { recipientUserId?: string };
@@ -98,14 +99,17 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (!portal) return;
-    const id = window.setInterval(() => void loadActive(portal), 4000);
+    const currentPortal = portal;
+    const id = shouldBackgroundPoll()
+      ? window.setInterval(() => void loadActive(currentPortal), 4000)
+      : null;
     function onDemoCall() {
-      void loadActive(portal);
+      void loadActive(currentPortal);
     }
     window.addEventListener('4ds-demo-call', onDemoCall);
     window.addEventListener('storage', onDemoCall);
     return () => {
-      window.clearInterval(id);
+      window.clearInterval(id ?? undefined);
       window.removeEventListener('4ds-demo-call', onDemoCall);
       window.removeEventListener('storage', onDemoCall);
     };

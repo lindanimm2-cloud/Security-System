@@ -3,20 +3,14 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useState } from 'react';
+import { getSession } from '@/lib/auth';
 import { isSignInRequiredMessage } from '@/lib/friendly-error';
 import { reportErrorToDeveloper } from '@/lib/error-report';
+import { isLoginPath, loginPathFor } from '@/lib/login-path';
 import {
   resolveStaffSession,
   submitDeveloperErrorReport,
 } from '@/lib/developer-notify';
-
-function loginPathFor(pathname: string | null): string {
-  if (!pathname) return '/login';
-  if (pathname.startsWith('/portal')) return '/portal/login';
-  if (pathname.startsWith('/officer')) return '/officer/login';
-  if (pathname.startsWith('/tech')) return '/tech/login';
-  return '/login';
-}
 
 function isRetryableMessage(message: string): boolean {
   const n = message.trim().toLowerCase();
@@ -54,10 +48,17 @@ export function ErrorAlert({
   const text = (error ?? message)?.trim();
   if (!text) return null;
 
-  const needsSignIn = isSignInRequiredMessage(text);
+  const onLogin = isLoginPath(pathname);
+  const needsSignIn =
+    isSignInRequiredMessage(text) || isSignInRequiredMessage(notifyMsg);
   const canRetry = !needsSignIn && (Boolean(onRetry) || isRetryableMessage(text));
   const staff = resolveStaffSession(pathname);
-  const canNotify = !needsSignIn;
+  const signedIn = Boolean(staff || getSession('client'));
+  const canNotify = !needsSignIn && !onLogin && signedIn;
+
+  const displayText = isSignInRequiredMessage(text)
+    ? 'Please sign in to continue.'
+    : text;
 
   const classes = [
     'alert',
@@ -95,13 +96,20 @@ export function ErrorAlert({
           portal: staff.portal,
           accessToken: staff.session.accessToken,
         });
+        setNotifyMsg('Developer notified');
       } else {
-        await reportErrorToDeveloper({
+        const result = await reportErrorToDeveloper({
           message: text!,
           path: pathname ?? undefined,
         });
+        if (result.channel === 'clipboard') {
+          setNotifyMsg('Copied error details. Sign in if you want them attached to your account.');
+        } else if (result.channel === 'skipped') {
+          setNotifyMsg('');
+        } else {
+          setNotifyMsg('Developer notified');
+        }
       }
-      setNotifyMsg('Developer notified');
     } catch (err) {
       setNotifyMsg(err instanceof Error ? err.message : 'Notify failed');
     } finally {
@@ -111,9 +119,9 @@ export function ErrorAlert({
 
   return (
     <div className={classes} role="alert">
-      <span className="alert__message">{text}</span>
+      <span className="alert__message">{displayText}</span>
       <span className="alert__actions">
-        {needsSignIn && (
+        {needsSignIn && !onLogin && (
           <Link href={loginPathFor(pathname)} className="btn-primary btn-sm alert__action">
             Sign in
           </Link>
@@ -139,13 +147,15 @@ export function ErrorAlert({
             onClick={() => void handleRetry()}
             disabled={retrying}
           >
-            {retrying ? 'Refreshing…' : 'Refresh'}
+            {retrying ? 'Refreshing…' : onRetry ? 'Retry' : 'Refresh'}
           </button>
         )}
       </span>
-      {notifyMsg && notifyMsg !== 'Developer notified' && (
-        <span className="alert__notify-status text-muted">{notifyMsg}</span>
-      )}
+      {notifyMsg &&
+        notifyMsg !== 'Developer notified' &&
+        !isSignInRequiredMessage(notifyMsg) && (
+          <span className="alert__notify-status text-muted">{notifyMsg}</span>
+        )}
     </div>
   );
 }

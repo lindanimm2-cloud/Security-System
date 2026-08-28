@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import {
   ErrorReportStatus,
   IncidentPriority,
@@ -17,6 +17,7 @@ import { LoyaltyService } from '../client/loyalty.service';
 import { SubscriptionService } from '../client/subscription.service';
 import { RealtimeGateway } from '../realtime/realtime.gateway';
 import { FleetService } from './fleet.service';
+import { IncidentKernelService } from '../incident-kernel/incident-kernel.service';
 import {
   OFFICER_AVAILABLE_MARKER_PREFIX,
   parseOfficerIdFromVolunteerNote,
@@ -50,6 +51,7 @@ export class ControlRoomService {
     private readonly fleet: FleetService,
     private readonly subscriptions: SubscriptionService,
     private readonly loyalty: LoyaltyService,
+    private readonly kernel: IncidentKernelService,
   ) {}
 
   async getDashboard(tenantId: string) {
@@ -75,13 +77,13 @@ export class ControlRoomService {
       this.prisma.officer.count({ where: { tenantId, status: 'AVAILABLE', isActive: true } }),
       this.prisma.dispatch.findMany({
         where: { tenantId, status: { notIn: ['COMPLETED', 'CANCELLED'] } },
-        include: { officer: true, incident: { include: { user: true } } },
+        include: { officer: true, companyVehicle: true, incident: { include: { user: true } } },
       }),
       this.prisma.incident.findMany({
         where: { tenantId, status: { notIn: ['RESOLVED', 'CLOSED', 'CANCELLED'] } },
         orderBy: { createdAt: 'desc' },
         take: 10,
-        include: { user: true, dispatches: { include: { officer: true } } },
+        include: { user: true, dispatches: { include: { officer: true, companyVehicle: true } } },
       }),
     ]);
 
@@ -165,7 +167,7 @@ export class ControlRoomService {
         where: { tenantId, status: { notIn: ['RESOLVED', 'CLOSED', 'CANCELLED'] } },
         include: {
           user: true,
-          dispatches: { include: { officer: true }, orderBy: { createdAt: 'desc' }, take: 1 },
+          dispatches: { include: { officer: true, companyVehicle: true }, orderBy: { createdAt: 'desc' }, take: 1 },
         },
         orderBy: { createdAt: 'desc' },
       }),
@@ -425,12 +427,12 @@ export class ControlRoomService {
       category: this.notificationCategoryFromType(n.type, n.title, n.body),
       title: n.title,
       body: n.body,
-      priority: this.notificationPriority(n.type, n.title),
+      priority: this.storedNotificationPriority(n.priority, n.type, n.title),
       isRead: n.isRead,
       createdAt: n.createdAt.toISOString(),
-      link: this.notificationLink(n.type, n.title, n.body, tenantId),
-      entityType: this.notificationEntityType(n.type),
-      entityId: null as string | null,
+      link: n.deepLink ?? this.notificationLink(n.type, n.title, n.body, tenantId),
+      entityType: n.incidentId ? ('incident' as const) : this.notificationEntityType(n.type),
+      entityId: n.incidentId ?? null,
     }));
 
     const ticketFeed = errorReports.map((r) => {
@@ -508,7 +510,7 @@ export class ControlRoomService {
       orderBy: { createdAt: 'desc' },
       include: {
         user: true,
-        dispatches: { include: { officer: true } },
+        dispatches: { include: { officer: true, companyVehicle: true } },
         notes: { orderBy: { createdAt: 'desc' }, take: 1 },
       },
     });
@@ -527,7 +529,7 @@ export class ControlRoomService {
       where: { id, tenantId },
       include: {
         user: true,
-        dispatches: { include: { officer: true }, orderBy: { createdAt: 'desc' } },
+        dispatches: { include: { officer: true, companyVehicle: true }, orderBy: { createdAt: 'desc' } },
         notes: { orderBy: { createdAt: 'desc' } },
         media: { orderBy: { createdAt: 'desc' } },
       },
@@ -551,7 +553,7 @@ export class ControlRoomService {
         dispatches: incident.dispatches.map((d) => ({
           id: d.id,
           status: d.status,
-          officer: `${d.officer.firstName} ${d.officer.lastName}`,
+          officer: d.officer ? `${d.officer.firstName} ${d.officer.lastName}` : (d.companyVehicle?.callSign ?? 'Unit'),
           createdAt: d.createdAt.toISOString(),
         })),
         media: incident.media.map((m) => ({
@@ -591,21 +593,21 @@ export class ControlRoomService {
     const lat = body.lat ?? (client.lastKnownLat ? Number(client.lastKnownLat) : -29.8587);
     const lng = body.lng ?? (client.lastKnownLng ? Number(client.lastKnownLng) : 31.0218);
 
-    const incident = await this.prisma.incident.create({
-      data: {
-        tenantId,
-        userId: client.id,
-        type: body.type,
-        status: IncidentStatus.ACTIVE,
-        priority: body.priority ?? IncidentPriority.HIGH,
-        title: body.title ?? `${body.type.replace('_', ' ')} Report`,
-        description: body.description,
-        lat,
-        lng,
-        address: body.address ?? 'Durban metro',
-        isSilent: body.isSilent ?? false,
-      },
-      include: { user: true },
+    const incident = await this.kernel.createFromEmergency({
+      tenantId,
+      userId: client.id,
+      type: body.type,
+      title: body.title ?? `${body.type.replace('_', ' ')} Report`,
+      description: body.description,
+      lat,
+      lng,
+      address: body.address ?? 'Durban metro',
+      isSilent: body.isSilent ?? false,
+      priority: body.priority ?? IncidentPriority.HIGH,
+      source: 'control-room',
+      actorUserId: undefined,
+      kind: 'manual',
+      autoDispatch: false,
     });
 
     await this.prisma.incidentNote.create({
@@ -617,8 +619,7 @@ export class ControlRoomService {
         content: body.description,
       },
     });
-
-    this.emitMapIncident(tenantId, incident);
+    await this.kernel.recordNoteEvent(tenantId, incident.id, 'control-room', null, body.description);
 
     return { success: true, data: this.formatIncident(incident) };
   }
@@ -651,6 +652,7 @@ export class ControlRoomService {
         body: `${author.name} added a field report.`,
       },
     });
+    await this.kernel.recordNoteEvent(tenantId, incidentId, 'control-room', null, content);
 
     return {
       success: true,
@@ -669,6 +671,7 @@ export class ControlRoomService {
       where: { tenantId, status: { notIn: ['COMPLETED', 'CANCELLED'] } },
       include: {
         officer: true,
+        companyVehicle: true,
         incident: {
           include: { user: true, notes: { take: 1, orderBy: { createdAt: 'desc' } } },
         },
@@ -681,11 +684,17 @@ export class ControlRoomService {
         id: d.id,
         status: d.status,
         createdAt: d.createdAt.toISOString(),
-        officer: {
-          id: d.officer.id,
-          name: `${d.officer.firstName} ${d.officer.lastName}`,
-          status: d.officer.status,
-        },
+        officer: d.officer
+          ? {
+              id: d.officer.id,
+              name: `${d.officer.firstName} ${d.officer.lastName}`,
+              status: d.officer.status,
+            }
+          : {
+              id: d.companyVehicle?.id ?? d.id,
+              name: d.companyVehicle?.callSign ?? 'Unit',
+              status: d.status,
+            },
         incident: {
           id: d.incident.id,
           type: d.incident.type,
@@ -708,8 +717,9 @@ export class ControlRoomService {
         status,
         resolvedAt: ['RESOLVED', 'CLOSED'].includes(status) ? new Date() : null,
       },
-      include: { user: true, dispatches: { include: { officer: true } } },
+      include: { user: true, dispatches: { include: { officer: true, companyVehicle: true } } },
     });
+    await this.kernel.recordStatusChange(tenantId, id, status, 'control-room');
     return { success: true, data: this.formatIncident(updated) };
   }
 
@@ -846,12 +856,18 @@ export class ControlRoomService {
       orderBy: { firstName: 'asc' },
     });
     const crewIndex = await this.fleet.getCrewIndex(tenantId);
+    const users = await this.prisma.user.findMany({
+      where: { tenantId, email: { in: officers.map((o) => o.email) } },
+      select: { email: true, avatarUrl: true },
+    });
+    const avatarByEmail = new Map(users.map((u) => [u.email, u.avatarUrl]));
     return {
       success: true,
       data: officers.map((o) => {
         const vehicle = crewIndex.get(o.id);
         return {
           ...o,
+          avatarUrl: avatarByEmail.get(o.email) ?? null,
           vehicle: vehicle
             ? {
                 id: vehicle.vehicleId,
@@ -866,8 +882,128 @@ export class ControlRoomService {
     };
   }
 
+  async createOfficer(
+    tenantId: string,
+    body: { firstName?: string; lastName?: string; zone?: string; avatarUrl?: string | null },
+  ) {
+    const firstName = String(body.firstName ?? '').trim();
+    const lastName = String(body.lastName ?? '').trim();
+    if (!firstName || !lastName) {
+      throw new BadRequestException('First and last name are required');
+    }
+    const slug = `${firstName}.${lastName}`.toLowerCase().replace(/[^a-z0-9]+/g, '.');
+    const email = `${slug}.${randomInt(1000, 9999)}@4ds.local`;
+    const avatarUrl = typeof body.avatarUrl === 'string' && body.avatarUrl.trim() ? body.avatarUrl.trim() : null;
+    const officer = await this.prisma.officer.create({
+      data: {
+        tenantId,
+        email,
+        firstName,
+        lastName,
+        zone: String(body.zone ?? '').trim() || null,
+        status: 'AVAILABLE',
+      },
+    });
+    const passwordHash = await bcrypt.hash(randomBytes(18).toString('hex'), 10);
+    try {
+      await this.prisma.user.create({
+        data: {
+          tenantId,
+          email,
+          passwordHash,
+          firstName,
+          lastName,
+          role: 'OFFICER',
+          status: 'ACTIVE',
+          avatarUrl,
+        },
+      });
+    } catch {
+      /* Officer record is enough if a matching login already exists. */
+    }
+    return { success: true, data: { ...officer, avatarUrl } };
+  }
+
+  async updateOfficerProfile(
+    tenantId: string,
+    id: string,
+    body: { firstName?: string; lastName?: string; zone?: string; avatarUrl?: string | null },
+  ) {
+    const officer = await this.prisma.officer.findFirst({ where: { id, tenantId } });
+    if (!officer) throw new NotFoundException('Officer not found');
+    const firstName =
+      typeof body.firstName === 'string' && body.firstName.trim() ? body.firstName.trim() : officer.firstName;
+    const lastName =
+      typeof body.lastName === 'string' && body.lastName.trim() ? body.lastName.trim() : officer.lastName;
+    const zone = typeof body.zone === 'string' ? body.zone.trim() || null : officer.zone;
+    const updated = await this.prisma.officer.update({
+      where: { id },
+      data: { firstName, lastName, zone },
+    });
+    const user = await this.prisma.user.findFirst({ where: { tenantId, email: officer.email } });
+    let avatarUrl = user?.avatarUrl ?? null;
+    if (user) {
+      const next = await this.prisma.user.update({
+        where: { id: user.id },
+        data: {
+          firstName,
+          lastName,
+          ...(body.avatarUrl !== undefined && { avatarUrl: body.avatarUrl }),
+        },
+      });
+      avatarUrl = next.avatarUrl;
+    } else if (body.avatarUrl) {
+      const passwordHash = await bcrypt.hash(randomBytes(18).toString('hex'), 10);
+      await this.prisma.user.create({
+        data: {
+          tenantId,
+          email: officer.email,
+          passwordHash,
+          firstName,
+          lastName,
+          role: 'OFFICER',
+          status: 'ACTIVE',
+          avatarUrl: body.avatarUrl,
+        },
+      });
+      avatarUrl = body.avatarUrl;
+    }
+    return { success: true, data: { ...updated, avatarUrl } };
+  }
+
   listFleet(tenantId: string) {
     return this.fleet.listFleet(tenantId);
+  }
+
+  createFleetVehicle(
+    tenantId: string,
+    body: {
+      callSign?: string;
+      registration?: string;
+      make?: string;
+      model?: string;
+      color?: string;
+      vehicleType?: string;
+      teamName?: string;
+    },
+  ) {
+    return this.fleet.createVehicle(tenantId, body);
+  }
+
+  updateFleetVehicle(
+    tenantId: string,
+    vehicleId: string,
+    body: {
+      callSign?: string;
+      registration?: string;
+      make?: string;
+      model?: string;
+      color?: string;
+      vehicleType?: string;
+      teamName?: string;
+    },
+  ) {
+    return this.fleet.updateVehicle(tenantId, vehicleId, body);
   }
 
   setFleetCrew(
@@ -932,6 +1068,15 @@ export class ControlRoomService {
     await this.validateBranchAndTeams(tenantId, body.branchId, body.teamIds);
 
     const isClientRole = body.role === 'USER' || body.role === 'FAMILY_MEMBER';
+    if (
+      body.password?.trim() &&
+      !isClientRole &&
+      !this.canManageUserPasswords(actor.role)
+    ) {
+      throw new ForbiddenException(
+        'Only owners, developers, and tenant admins can set staff passwords',
+      );
+    }
     const passwordSource =
       body.password?.trim() ||
       (isClientRole ? randomBytes(24).toString('hex') : null);
@@ -1046,6 +1191,17 @@ export class ControlRoomService {
     }
 
     await this.validateBranchAndTeams(tenantId, body.branchId, body.teamIds);
+
+    if (body.password?.trim()) {
+      if (!this.canManageUserPasswords(actor.role)) {
+        throw new ForbiddenException(
+          'Only owners, developers, and tenant admins can change user passwords',
+        );
+      }
+      if (body.password.trim().length < 8) {
+        throw new BadRequestException('Password must be at least 8 characters');
+      }
+    }
 
     const passwordHash = body.password ? await bcrypt.hash(body.password, 10) : undefined;
     const nextRole = body.role ?? user.role;
@@ -1382,7 +1538,7 @@ export class ControlRoomService {
         user: true,
         dispatches: {
           where: { status: { notIn: ['COMPLETED', 'CANCELLED'] } },
-          include: { officer: true },
+          include: { officer: true, companyVehicle: true },
           take: 1,
         },
       },
@@ -1515,10 +1671,10 @@ export class ControlRoomService {
           address: incident.address,
           client: `${incident.user.firstName} ${incident.user.lastName}`,
         },
-        canDispatch: !activeDispatch && incident.status === 'ACTIVE',
-        assignedOfficer: activeDispatch
+        canDispatch: !['RESOLVED', 'CLOSED', 'CANCELLED'].includes(incident.status),
+        assignedOfficer: activeDispatch?.officer
           ? `${activeDispatch.officer.firstName} ${activeDispatch.officer.lastName}`
-          : null,
+          : activeDispatch?.companyVehicle?.callSign ?? null,
         availableCount: ranked.filter((o) => o.available).length,
         officers: ranked,
         volunteers,
@@ -1675,34 +1831,12 @@ export class ControlRoomService {
 
     if (!officer) throw new NotFoundException('No available officers');
 
-    const dispatch = await this.prisma.dispatch.create({
-      data: { tenantId, incidentId, officerId: officer.id, status: 'ASSIGNED' },
-      include: { officer: true, incident: { include: { user: true } } },
+    const dispatch = await this.kernel.assignResource({
+      tenantId,
+      incidentId,
+      officerId: officer.id,
+      source: 'control-room',
     });
-
-    await this.prisma.incident.update({
-      where: { id: incidentId },
-      data: { status: 'DISPATCHED' },
-    });
-    await this.prisma.officer.update({
-      where: { id: officer.id },
-      data: { status: 'EN_ROUTE' },
-    });
-
-    const officerUser = await this.prisma.user.findFirst({
-      where: { tenantId, email: officer.email },
-    });
-    if (officerUser) {
-      await this.prisma.notification.create({
-        data: {
-          tenantId,
-          userId: officerUser.id,
-          type: NotificationType.DISPATCH_ASSIGNED,
-          title: 'New dispatch assignment',
-          body: `${incident.type} — ${incident.user.firstName} ${incident.user.lastName}`,
-        },
-      });
-    }
 
     const assignLabel = officerId ? 'Manually assigned' : 'Auto-assigned';
     await this.prisma.incidentNote.create({
@@ -1715,7 +1849,12 @@ export class ControlRoomService {
       },
     });
 
-    return { success: true, data: dispatch };
+    const full = await this.prisma.dispatch.findUnique({
+      where: { id: dispatch.id },
+      include: { officer: true, incident: { include: { user: true } } },
+    });
+
+    return { success: true, data: full };
   }
 
   async getAnalytics(tenantId: string) {
@@ -1794,9 +1933,29 @@ export class ControlRoomService {
     priority: string;
     address: string | null;
     createdAt: Date;
-    user: { firstName: string; lastName: string };
-    dispatches?: { officer: { firstName: string; lastName: string } }[];
+    lat?: unknown;
+    lng?: unknown;
+    isSilent?: boolean;
+    ackedAt?: Date | null;
+    user: { firstName: string; lastName: string; phone?: string | null };
+    dispatches?: {
+      status?: string;
+      officer: { firstName: string; lastName: string } | null;
+      companyVehicle?: { callSign: string | null } | null;
+    }[];
   }) {
+    const officer = incident.dispatches?.[0]?.officer
+      ? `${incident.dispatches[0].officer.firstName} ${incident.dispatches[0].officer.lastName}`
+      : null;
+    const unit = incident.dispatches?.[0]?.companyVehicle?.callSign ?? null;
+    const elapsedSec = Math.floor((Date.now() - incident.createdAt.getTime()) / 1000);
+    const slaTargetSec =
+      incident.priority === 'CRITICAL' ? 180 : incident.priority === 'HIGH' ? 300 : 600;
+    const gpsAvailable =
+      incident.lat != null &&
+      incident.lng != null &&
+      Number.isFinite(Number(incident.lat)) &&
+      Number.isFinite(Number(incident.lng));
     return {
       id: incident.id,
       type: incident.type,
@@ -1805,9 +1964,16 @@ export class ControlRoomService {
       user: `${incident.user.firstName} ${incident.user.lastName.charAt(0)}.`,
       location: incident.address ?? 'Unknown',
       time: this.timeAgo(incident.createdAt),
-      officer: incident.dispatches?.[0]
-        ? `${incident.dispatches[0].officer.firstName} ${incident.dispatches[0].officer.lastName}`
-        : null,
+      createdAt: incident.createdAt.toISOString(),
+      officer,
+      unit,
+      etaDueAt: officer ? new Date(Date.now() + 4 * 60_000 + 32_000).toISOString() : null,
+      userPhone: incident.user.phone ?? null,
+      gpsAvailable,
+      slaTargetSec,
+      slaBreached: elapsedSec > slaTargetSec,
+      isSilent: Boolean(incident.isSilent),
+      ackedAt: incident.ackedAt?.toISOString() ?? null,
     };
   }
 
@@ -1958,6 +2124,18 @@ export class ControlRoomService {
     return 'SYSTEM';
   }
 
+  private storedNotificationPriority(
+    stored: string | null | undefined,
+    type: string,
+    title: string,
+  ): 'low' | 'medium' | 'high' | 'critical' {
+    if (stored === 'P0') return 'critical';
+    if (stored === 'P1') return 'high';
+    if (stored === 'P2') return 'medium';
+    if (stored === 'P3') return 'low';
+    return this.notificationPriority(type, title);
+  }
+
   private notificationPriority(type: string, title: string) {
     const t = title.toLowerCase();
     if (type === 'PANIC_ALERT' || t.includes('panic')) return 'critical';
@@ -2025,5 +2203,14 @@ export class ControlRoomService {
     }
     if (text.includes('alarm') || text.includes('property')) return '/control-room/map?focus=properties';
     return '/control-room';
+  }
+
+  private canManageUserPasswords(role: UserRole): boolean {
+    return (
+      role === 'OWNER' ||
+      role === 'SUPER_ADMIN' ||
+      role === 'DEVELOPER' ||
+      role === 'TENANT_ADMIN'
+    );
   }
 }

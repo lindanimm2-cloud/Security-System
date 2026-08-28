@@ -7,7 +7,7 @@ import { useState } from 'react';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { PortalLayout } from '@/components/portal/PortalLayout';
 import { useApi } from '@/hooks/useApi';
-import { EmergencyCallButton } from '@/components/portal/EmergencyCallButton';
+import { EmergencyCallButton, formatZaPhone } from '@/components/portal/EmergencyCallButton';
 import { useCallsOptional } from '@/components/calls/CallProvider';
 import { HomeAlarmControl } from '@/components/portal/HomeAlarmControl';
 import { clientApi, type ApiResponse } from '@/lib/api-client';
@@ -23,9 +23,14 @@ import {
   ProtectionStatusCard,
 } from '@/components/ops/EmergencyMode';
 import { DashboardLiveCctv } from '@/components/portal/DashboardLiveCctv';
+import { IncidentTimeline } from '@/components/incident/IncidentTimeline';
 import { SlideCarousel, SlideCarouselCard } from '@/components/portal/SlideCarousel';
 import { SlidingSection } from '@/components/portal/SlidingSection';
 import { protectionStatusTone } from '@/lib/portal-priority';
+import { FamilyProfilePopup, type FamilyProfilePerson } from '@/components/portal/FamilyProfilePopup';
+import { EmergencyProtectionBanner } from '@/components/security/EmergencyProtectionBanner';
+import { CONTROL_ROOM_LINE } from '@/lib/control-room-line';
+import { alarmStatusLabel } from '@/lib/sa-alarm';
 
 type Overview = {
   user: { firstName: string; trackingEnabled: boolean; address: string | null };
@@ -34,10 +39,17 @@ type Overview = {
   subscription: { planName: string; status: string; memberId: string } | null;
   vehicles: { id: string; registration: string; make: string; model: string; theftRecovery: boolean }[];
   properties: { id: string; name: string; alarmStatus: string; alarmLinked: boolean }[];
-  family: { id: string; name: string; trackingEnabled: boolean }[];
+  family: { id: string; name: string; trackingEnabled: boolean; phone?: string }[];
   contacts: { id: string; name: string; phone: string; relationship: string | null; priority: number }[];
   recentIncidents: { id: string; type: string; status: string; title: string; isSilent: boolean; time: string }[];
   recentActivity: { title: string; detail: string; time: string }[];
+  liveResponse?: {
+    id: string;
+    publicRef: string;
+    type: string;
+    status: string;
+    events: { id: string; type: string; source: string; createdAt: string; kind: 'event' | 'note'; payload?: Record<string, unknown> }[];
+  } | null;
   medicalComplete: boolean;
   safeZoneCount: number;
 };
@@ -74,6 +86,7 @@ function OverviewDashboard() {
   const [fireLoading, setFireLoading] = useState(false);
   const [alertMsg, setAlertMsg] = useState('');
   const [filter, setFilter] = useState('all');
+  const [selectedFamily, setSelectedFamily] = useState<FamilyProfilePerson | null>(null);
   const undo = useUndoToast();
   const { data, loading, error, reload } = useApi(
     () => clientApi.get<ApiResponse<Overview>>('/client/overview'),
@@ -104,7 +117,7 @@ function OverviewDashboard() {
     setAlertMsg('');
     try {
       await clientApi.post('/client/panic', { silent });
-      setAlertMsg(silent ? 'Silent alert sent discreetly.' : 'Panic alert sent. Dispatch notified.');
+      setAlertMsg(silent ? 'Silent alert sent discreetly.' : 'Panic alert sent. Control room notified.');
       undo.show(silent ? 'Silent alert sent' : 'Panic alert sent', async () => {
         await clientApi.post('/client/panic/cancel');
         void reload();
@@ -143,13 +156,8 @@ function OverviewDashboard() {
   }
 
   async function callDispatch() {
-    const phone =
-      contactsPayload?.meta?.dispatchLine?.phone ??
-      data?.data?.contacts?.find((c) =>
-        `${c.name} ${c.relationship ?? ''}`.toLowerCase().includes('dispatch'),
-      )?.phone ??
-      '+27110000000';
-    const name = contactsPayload?.meta?.dispatchLine?.name ?? '4DS Control Room';
+    const phone = contactsPayload?.meta?.dispatchLine?.phone ?? CONTROL_ROOM_LINE.phone;
+    const name = contactsPayload?.meta?.dispatchLine?.name ?? CONTROL_ROOM_LINE.name;
     if (calls?.portal) {
       try {
         await calls.startCall('DISPATCH_LINE', {
@@ -175,6 +183,10 @@ function OverviewDashboard() {
     isDispatch?: boolean;
   };
   const contacts: ContactRow[] = contactsPayload?.data ?? d.contacts;
+  const personalContacts = contacts.filter((c) => {
+    const text = `${c.name} ${c.relationship ?? ''}`.toLowerCase();
+    return !c.isDispatch && !text.includes('dispatch') && !text.includes('4ds');
+  });
   const activeIncidents = d.recentIncidents.filter((i) =>
     ['OPEN', 'ACTIVE', 'DISPATCHED', 'IN_PROGRESS', 'RESPONDING'].includes(
       i.status.toUpperCase(),
@@ -189,7 +201,8 @@ function OverviewDashboard() {
   });
 
   return (
-    <>
+    <div className="portal-dash">
+      <div className="portal-dash__stage">
       {(hasAlert || alertMsg.includes('Panic') || alertMsg.includes('Medical') || alertMsg.includes('Fire')) && (
         <EmergencyModeBanner
           title={activeIncidents[0]?.title ?? 'Emergency active'}
@@ -208,7 +221,7 @@ function OverviewDashboard() {
                 className="emergency-mode__btn emergency-mode__btn--call"
                 onClick={() => void callDispatch()}
               >
-                Call dispatch
+                Call Control Room
               </button>
             </>
           }
@@ -216,68 +229,91 @@ function OverviewDashboard() {
       )}
 
       {access?.emergency !== false && (
-        <section className="panic-section" aria-label="Emergency controls">
+        <section className="panic-section panic-tray" aria-label="Emergency controls">
           <HoldToActivate
             label="Panic"
-            holdLabel="Sending panic…"
+            holdLabel="Keep holding…"
+            holdMs={3000}
+            hideHint
+            keepLabel
             loading={panicLoading}
             disabled={silentLoading || medicalLoading || fireLoading}
-            className="hold-activate--circle"
+            className="hold-activate--circle panic-knob"
             onActivate={() => handlePanic(false)}
-          />
-          <p className="panic-note">Hold to confirm · Dispatch notified instantly</p>
+          >
+            <span className="panic-knob__title">Panic</span>
+            <span className="panic-knob__sub">Hold 3 seconds</span>
+          </HoldToActivate>
+          <p className="panic-note">Release to cancel</p>
 
           <div className="panic-orbit">
-            <button
-              type="button"
-              className="panic-orbit-btn panic-orbit-btn--silent"
-              onClick={() => handlePanic(true)}
-              disabled={panicLoading || silentLoading || medicalLoading || fireLoading}
+            <HoldToActivate
+              label="Silent Panic. Hold 2 seconds to notify control room discreetly."
+              holdMs={2000}
+              tone="warn"
+              hideHint
+              keepLabel
+              className="panic-orbit-btn panic-orbit-btn--silent panic-knob"
+              loading={silentLoading}
+              disabled={panicLoading || medicalLoading || fireLoading}
+              onActivate={() => handlePanic(true)}
             >
-              {silentLoading ? '…' : (
-                <>
-                  <span className="panic-orbit-btn__glyph">S</span>
-                  <span className="panic-orbit-btn__label">Silent Panic</span>
-                </>
-              )}
-            </button>
+              <span className="panic-knob__kicker">Hold 2s</span>
+              <span className="panic-knob__title">Silent</span>
+            </HoldToActivate>
             {access?.medical !== false && (
               <button
                 type="button"
-                className="panic-orbit-btn panic-orbit-btn--medical"
+                className="panic-orbit-btn panic-orbit-btn--medical panic-knob"
                 onClick={handleMedicalEmergency}
                 disabled={panicLoading || silentLoading || medicalLoading || fireLoading}
               >
                 {medicalLoading ? '…' : (
                   <>
-                    <span className="panic-orbit-btn__glyph">+</span>
-                    <span className="panic-orbit-btn__label">Medical Emergency</span>
+                    <span className="panic-knob__kicker">Hold 2s</span>
+                    <span className="panic-knob__title">Medical</span>
                   </>
                 )}
               </button>
             )}
             <button
               type="button"
-              className="panic-orbit-btn panic-orbit-btn--fire"
+              className="panic-orbit-btn panic-orbit-btn--fire panic-knob"
               onClick={handleFireEmergency}
               disabled={panicLoading || silentLoading || medicalLoading || fireLoading}
             >
               {fireLoading ? '…' : (
                 <>
-                  <span className="panic-orbit-btn__glyph">F</span>
-                  <span className="panic-orbit-btn__label">Fire Emergency</span>
+                  <span className="panic-knob__kicker">Hold 2s</span>
+                  <span className="panic-knob__title">Fire</span>
                 </>
               )}
             </button>
-            <Link href="/portal/emergency" className="panic-orbit-btn panic-orbit-btn--hub">
-              <span className="panic-orbit-btn__glyph">◎</span>
-              <span className="panic-orbit-btn__label">Emergency Hub</span>
+            <Link href="/portal/emergency" className="panic-orbit-btn panic-orbit-btn--hub panic-knob">
+              <span className="panic-knob__kicker">Open</span>
+              <span className="panic-knob__title">Hub</span>
             </Link>
           </div>
         </section>
       )}
 
-      <DashboardLiveCctv />
+      <HomeAlarmControl
+        variant="dashboard"
+        properties={d.properties}
+        hasAccess={!!access?.home}
+        onUpdated={reload}
+        feeds={<DashboardLiveCctv embedded />}
+      />
+
+      {d.liveResponse ? (
+        <section className="portal-card incident-live-response">
+          <p className="dash-ops__eyebrow">Live response</p>
+          <h2>
+            {d.liveResponse.publicRef} · {d.liveResponse.status.replace(/_/g, ' ')}
+          </h2>
+          <IncidentTimeline items={d.liveResponse.events} compact />
+        </section>
+      ) : null}
 
       {alertMsg ? (
         <div className="alert alert--success ops-quick-feedback" role="status">
@@ -285,26 +321,32 @@ function OverviewDashboard() {
         </div>
       ) : null}
 
-      <ProtectionStatusCard
-        tone={tone}
-        title={
-          tone === 'emergency'
-            ? 'Emergency active'
-            : tone === 'attention'
-              ? 'Attention required'
-              : 'You are protected'
-        }
-        lines={[
-          primaryAlarm
-            ? `Home security · ${primaryAlarm.alarmStatus}`
-            : 'Home security ready',
-          `${d.stats.familyCount} family connected`,
-          `Last check · just now`,
-        ]}
-      />
+      <div className="portal-status-dock">
+        <ProtectionStatusCard
+          tone={tone}
+          title={
+            tone === 'emergency'
+              ? 'Emergency active'
+              : tone === 'attention'
+                ? 'Attention required'
+                : 'You are protected'
+          }
+          lines={[
+            primaryAlarm
+              ? `Home security · ${primaryAlarm.alarmStatus}`
+              : 'Home security ready',
+            `${d.stats.familyCount} family connected`,
+            `Last check · just now`,
+          ]}
+        />
+        <EmergencyProtectionBanner />
+      </div>
+      </div>
 
+      <div className="portal-brief">
       <OpsMyShiftHeader
         title={`Hello, ${d.user.firstName}`}
+        urgent={hasAlert}
         subtitle={
           hasAlert
             ? `${d.stats.activeIncidents} active · action needed`
@@ -313,7 +355,7 @@ function OverviewDashboard() {
         chips={[
           {
             id: 'all',
-            label: 'Board',
+            label: 'Overview',
             count:
               d.stats.activeIncidents +
               d.stats.unreadNotifications +
@@ -328,8 +370,13 @@ function OverviewDashboard() {
           {
             id: 'alarm',
             label: 'Alarm',
-            count: primaryAlarm ? 1 : 0,
-            tone: primaryAlarm?.alarmStatus === 'ARMED' ? 'ok' : 'warn',
+            count: primaryAlarm ? alarmStatusLabel(primaryAlarm.alarmStatus).replace(' armed', '') : '—',
+            tone:
+              primaryAlarm?.alarmStatus === 'TRIGGERED'
+                ? 'urgent'
+                : primaryAlarm && ['ARMED', 'STAY', 'NIGHT'].includes(primaryAlarm.alarmStatus)
+                  ? 'ok'
+                  : 'warn',
           },
           {
             id: 'messages',
@@ -354,10 +401,11 @@ function OverviewDashboard() {
 
       {(filter === 'all' || filter === 'urgent') && (
       <SlideCarousel
-        title="Status board"
-        subtitle="Swipe · tap a card to act"
+        title="Coverage"
+        subtitle="Tap a card to open"
         seeAllHref="/portal/incidents"
-        seeAllLabel="Incidents"
+        seeAllLabel="All incidents"
+        className="slide-carousel--brief"
       >
         <SlideCarouselCard
           title="Incidents"
@@ -392,8 +440,8 @@ function OverviewDashboard() {
               : 'muted'
           }
         >
-          <strong className="slide-carousel__stat">
-            {primaryAlarm ? primaryAlarm.alarmStatus.replace(/_/g, ' ') : '—'}
+          <strong className="slide-carousel__stat slide-carousel__stat--sm">
+            {primaryAlarm ? alarmStatusLabel(primaryAlarm.alarmStatus) : '—'}
           </strong>
           <p className="text-muted">
             {primaryAlarm
@@ -403,7 +451,7 @@ function OverviewDashboard() {
                 : 'Upgrade for home security'}
           </p>
         </SlideCarouselCard>
-        <SlideCarouselCard title="Family" href="/portal/family" tone="muted">
+        <SlideCarouselCard title="Family" href="/portal/family" tone={d.stats.familyCount > 0 ? 'ok' : 'muted'}>
           <strong className="slide-carousel__stat">{d.stats.familyCount}</strong>
           <p className="text-muted">
             {d.family.filter((m) => m.trackingEnabled).length} tracking · {d.safeZoneCount} safe zones
@@ -426,6 +474,7 @@ function OverviewDashboard() {
         ) : null}
       </SlideCarousel>
       )}
+      </div>
 
       <SlideCarousel
         title="Your services"
@@ -480,13 +529,6 @@ function OverviewDashboard() {
         viewAllHref="/portal/updates"
       />
 
-      <HomeAlarmControl
-        variant="dashboard"
-        properties={d.properties}
-        hasAccess={!!access?.home}
-        onUpdated={reload}
-      />
-
       {(hasAlert || activeIncidents.length > 0) && (
         <section className="portal-card portal-card--accent">
           <div className="card-header-row">
@@ -523,7 +565,7 @@ function OverviewDashboard() {
         storageKey="portal-dashboard-details"
       >
       <div className="overview-grid">
-        <section className="portal-card portal-card--accent">
+        <section className="portal-card">
           <div className="card-header-row">
             <Link href="/portal/contacts" className="card-title-link">
               <h2>Emergency Contacts</h2>
@@ -533,14 +575,14 @@ function OverviewDashboard() {
             </Link>
           </div>
           <ul className="contact-list">
-            {contacts.map((c) => (
+            {personalContacts.map((c) => (
               <li key={c.id}>
                 <Link href="/portal/contacts" className="contact-row contact-row--link">
-                  <span className="contact-priority">{c.priority}</span>
+                  <span className="ec-pri">{`P${c.priority || 1}`}</span>
                   <div>
                     <div className="contact-name">{c.name}</div>
                     <div className="contact-meta">
-                      {c.relationship} · {c.phone}
+                      {c.relationship} · {formatZaPhone(c.phone)}
                     </div>
                   </div>
                 </Link>
@@ -575,15 +617,36 @@ function OverviewDashboard() {
             ) : (
               d.family.map((m) => (
                 <li key={m.id} className="status-list-item">
-                  <Link href="/portal/location" className="status-list-link">
+                  <button
+                    type="button"
+                    className="status-list-link"
+                    onClick={() =>
+                      setSelectedFamily({
+                        id: m.id,
+                        name: m.name,
+                        trackingEnabled: m.trackingEnabled,
+                        phone: m.phone,
+                        userId: m.id,
+                      })
+                    }
+                  >
                     {m.name}
-                  </Link>
-                  <Link
-                    href="/portal/location"
+                  </button>
+                  <button
+                    type="button"
                     className={`status-dot status-dot--link ${m.trackingEnabled ? 'status-dot--on' : ''}`}
+                    onClick={() =>
+                      setSelectedFamily({
+                        id: m.id,
+                        name: m.name,
+                        trackingEnabled: m.trackingEnabled,
+                        phone: m.phone,
+                        userId: m.id,
+                      })
+                    }
                   >
                     {m.trackingEnabled ? 'Tracking on' : 'Offline'}
-                  </Link>
+                  </button>
                 </li>
               ))
             )}
@@ -774,7 +837,10 @@ function OverviewDashboard() {
         </section>
       </div>
       </SlidingSection>
+      {selectedFamily ? (
+        <FamilyProfilePopup person={selectedFamily} onClose={() => setSelectedFamily(null)} />
+      ) : null}
       <OpsUndoToast toast={undo.toast} onDismiss={undo.clear} />
-    </>
+    </div>
   );
 }

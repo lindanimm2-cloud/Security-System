@@ -6,13 +6,17 @@ import { useEffect, useState } from 'react';
 import { AuthSession, clearSession } from '@/lib/auth';
 import { NavIcon } from '@/components/nav/NavIcon';
 import { MEDICAL_MOBILE_NAV, MEDICAL_NAV } from '@/lib/medical-nav';
+import { navHrefIsActive } from '@/lib/nav-active';
 import { BrandMark } from './BrandMark';
 import { NavClock } from './NavClock';
 import { ThemeToggle } from './ThemeToggle';
 import { MobileBottomNav } from './nav/MobileBottomNav';
 import { useSidebarCollapsed } from '@/hooks/useSidebarCollapsed';
-import { SidebarCollapseButton, SignOutIcon } from './nav/SidebarCollapseButton';
+import { useActionHandoff } from '@/hooks/useActionHandoff';
+import { SidebarCollapseButton, SidebarWebsiteLink, SignOutIcon } from './nav/SidebarCollapseButton';
 import { roleDisplayLabel } from '@/lib/role-labels';
+import { FloatingSupportDock } from './FloatingSupportDock';
+import { ShellRouteActions } from './nav/ShellRouteActions';
 
 export function MedicalShell({
   session,
@@ -27,20 +31,29 @@ export function MedicalShell({
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
   const { collapsed, toggle } = useSidebarCollapsed();
+  const handoff = useActionHandoff();
 
   useEffect(() => setMenuOpen(false), [pathname]);
 
   function logout() {
-    clearSession('admin');
-    router.push('/login');
+    handoff.begin('sign-out', () => {
+      clearSession('admin');
+      router.push('/login');
+    });
   }
 
   function isActive(href: string, exact?: boolean) {
-    if (exact) return pathname === href;
-    return pathname.startsWith(href);
+    return navHrefIsActive(
+      pathname,
+      href,
+      exact,
+      MEDICAL_NAV.map((item) => item.href),
+    );
   }
 
   return (
+    <>
+      {handoff.overlay}
     <div className="shell shell--medical shell--with-bottom-nav">
       <header className="mobile-shell-header mobile-shell-header--admin">
         <button
@@ -53,7 +66,9 @@ export function MedicalShell({
           <span className={`menu-toggle-icon ${menuOpen ? 'menu-toggle-icon--open' : ''}`} />
         </button>
         <BrandMark variant="medical" compact />
+        <h1 className="mobile-shell-header__title">{title ?? 'Medical'}</h1>
         <div className="mobile-topbar-actions">
+          <ShellRouteActions homeHref="/medical" compact />
           <NavClock compact />
           <ThemeToggle className="theme-toggle--compact" />
         </div>
@@ -73,7 +88,7 @@ export function MedicalShell({
             <Link
               key={item.href}
               href={item.href}
-              title={item.label}
+              data-tip={item.label}
               className={`sidebar-link ${isActive(item.href, item.exact) ? 'sidebar-link--active' : ''}`}
             >
               <span className="sidebar-link__icon">
@@ -96,6 +111,7 @@ export function MedicalShell({
               <div className="sidebar-user-role">{roleDisplayLabel(session.user.role)}</div>
             </div>
           </div>
+          <SidebarWebsiteLink />
           <button type="button" className="btn-ghost btn-ghost--full sidebar-signout" onClick={logout}>
             <SignOutIcon />
             <span>Sign out</span>
@@ -113,12 +129,14 @@ export function MedicalShell({
             </div>
           </div>
           <div className="topbar-actions">
+            <ShellRouteActions homeHref="/medical" />
             <NavClock />
             <ThemeToggle className="theme-toggle--compact" />
           </div>
         </header>
         <main className="shell-content">{children}</main>
       </div>
+      <FloatingSupportDock chatHref="/control-room/chat" callPhone="+27110000000" />
       <MobileBottomNav
         items={MEDICAL_MOBILE_NAV.map((item) => ({
           href: item.href,
@@ -129,5 +147,6 @@ export function MedicalShell({
         ariaLabel="Medical"
       />
     </div>
+    </>
   );
 }

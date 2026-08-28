@@ -2,13 +2,20 @@
 
 import { ErrorAlert } from '@/components/ErrorAlert';
 
-import { ChangeEvent, FormEvent, useRef, useState } from 'react';
+import { ChangeEvent, FormEvent, useMemo, useRef, useState } from 'react';
 import { ControlRoomLayout } from '@/components/control-room/ControlRoomLayout';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { useApi } from '@/hooks/useApi';
 import { adminApi, type ApiResponse } from '@/lib/api-client';
 import { friendlyErrorMessage } from '@/lib/friendly-error';
 import { UiSelect } from '@/components/ui/UiSelect';
+import { OpsDialog } from '@/components/ops/OpsDialog';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { ListSearch } from '@/components/ui/ListSearch';
+import { UserAvatar } from '@/components/ui/UserAvatar';
+import { getSession } from '@/lib/auth';
+import { canManageUserPasswords, validateNewPassword } from '@/lib/password-access';
+import { matchesSearch } from '@/lib/list-search';
 
 type TeamMember = {
   user: { id: string; firstName: string; lastName: string; role: string };
@@ -128,6 +135,9 @@ export default function TeamsPage() {
 }
 
 function TeamsContent() {
+  const session = getSession('admin');
+  const actorRole = session?.user?.role ?? '';
+  const canSetPasswords = canManageUserPasswords(actorRole);
   const { data: branchesData, loading: branchesLoading, error: branchesError, reload: reloadBranches } =
     useApi(() => adminApi.get<ApiResponse<Branch[]>>('/control-room/branches'), []);
   const { data: usersData, loading: usersLoading, error: usersError, reload: reloadUsers } =
@@ -137,6 +147,8 @@ function TeamsContent() {
   const [branchCode, setBranchCode] = useState('');
   const [teamName, setTeamName] = useState('');
   const [teamBranchId, setTeamBranchId] = useState('');
+  const [showBranchDialog, setShowBranchDialog] = useState(false);
+  const [showTeamDialog, setShowTeamDialog] = useState(false);
   const [userForm, setUserForm] = useState<UserFormState | null>(null);
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState('');
@@ -146,9 +158,29 @@ function TeamsContent() {
     code: string;
   } | null>(null);
   const [inviteCopied, setInviteCopied] = useState(false);
+  const [search, setSearch] = useState('');
 
   const branches = branchesData?.data ?? [];
   const users = usersData?.data ?? [];
+  const filteredUsers = useMemo(
+    () =>
+      users.filter((u) =>
+        matchesSearch(
+          search,
+          u.firstName,
+          u.lastName,
+          u.email,
+          u.phone,
+          u.role,
+          ROLE_LABELS[u.role as keyof typeof ROLE_LABELS],
+          u.jobTitle,
+          u.branch?.name,
+          u.branch?.code,
+          ...u.teams.map((t) => t.name),
+        ),
+      ),
+    [users, search],
+  );
 
   function openCreateUser() {
     setFormError('');
@@ -200,6 +232,7 @@ function TeamsContent() {
       });
       setBranchName('');
       setBranchCode('');
+      setShowBranchDialog(false);
       reloadBranches();
     } finally {
       setSaving(false);
@@ -216,6 +249,7 @@ function TeamsContent() {
         branchId: teamBranchId,
       });
       setTeamName('');
+      setShowTeamDialog(false);
       reloadBranches();
     } finally {
       setSaving(false);
@@ -241,9 +275,22 @@ function TeamsContent() {
       };
 
       if (userForm.id) {
+        if (userForm.password.trim()) {
+          if (!canSetPasswords) {
+            setFormError('You do not have permission to change passwords.');
+            return;
+          }
+          const passwordError = validateNewPassword(userForm.password);
+          if (passwordError) {
+            setFormError(passwordError);
+            return;
+          }
+        }
         await adminApi.patch(`/control-room/users/${userForm.id}`, {
           ...payload,
-          ...(userForm.password.trim() ? { password: userForm.password } : {}),
+          ...(canSetPasswords && userForm.password.trim()
+            ? { password: userForm.password.trim() }
+            : {}),
         });
         setUserForm(null);
         setCreatedInvite(null);
@@ -252,16 +299,25 @@ function TeamsContent() {
           setFormError('Email is required for new users.');
           return;
         }
-        if (!isClientRole && !userForm.password.trim()) {
-          setFormError('Email and password are required for new users.');
-          return;
+        if (!isClientRole) {
+          if (!canSetPasswords) {
+            setFormError('Only owners, developers, and tenant admins can create staff logins.');
+            return;
+          }
+          const passwordError = validateNewPassword(userForm.password);
+          if (passwordError) {
+            setFormError(passwordError);
+            return;
+          }
         }
         const res = await adminApi.post<
           ApiResponse<ManagedUser & { inviteToken?: string | null; inviteUrl?: string | null }>
         >('/control-room/users', {
           ...payload,
           email: userForm.email.trim(),
-          ...(userForm.password.trim() ? { password: userForm.password } : {}),
+          ...(canSetPasswords && userForm.password.trim()
+            ? { password: userForm.password.trim() }
+            : {}),
         });
 
         const invitePath = res.data?.inviteUrl;
@@ -328,33 +384,22 @@ function TeamsContent() {
             Create users, upload profile photos, and assign roles, positions, branches, and teams
           </p>
         </div>
-        <button type="button" className="btn-primary" onClick={openCreateUser}>
-          Create User
-        </button>
+        <div className="page-header__actions">
+          <button type="button" className="btn-ghost" onClick={() => setShowBranchDialog(true)}>
+            Add branch
+          </button>
+          <button type="button" className="btn-secondary" onClick={() => setShowTeamDialog(true)}>
+            Add team
+          </button>
+          <button type="button" className="btn-primary" onClick={openCreateUser}>
+            Create User
+          </button>
+        </div>
       </div>
 
       <div className="teams-grid">
-        <section className="card teams-card">
+        <section className="card teams-card teams-card--wide">
           <h2>Branches</h2>
-          <form className="inline-form" onSubmit={createBranch}>
-            <input
-              value={branchName}
-              onChange={(e) => setBranchName(e.target.value)}
-              placeholder="Branch name"
-              disabled={saving}
-            />
-            <input
-              value={branchCode}
-              onChange={(e) => setBranchCode(e.target.value)}
-              placeholder="Code (e.g. DBN)"
-              disabled={saving}
-              maxLength={6}
-            />
-            <button type="submit" className="btn-primary btn-sm" disabled={saving}>
-              Add Branch
-            </button>
-          </form>
-
           <div className="branch-list">
             {branches.map((b) => (
               <div key={b.id} className="branch-item">
@@ -380,46 +425,25 @@ function TeamsContent() {
             ))}
           </div>
         </section>
-
-        <section className="card teams-card">
-          <h2>Create Team</h2>
-          <form className="stack-form" onSubmit={createTeam}>
-            <label>
-              Branch
-              <UiSelect
-                compact={false}
-                ariaLabel="Team branch"
-                value={teamBranchId}
-                onChange={setTeamBranchId}
-                disabled={saving}
-                options={[
-                  { value: '', label: 'Select branch' },
-                  ...branches.map((b) => ({
-                    value: b.id,
-                    label: b.name,
-                    meta: b.code,
-                  })),
-                ]}
-              />
-            </label>
-            <label>
-              Team name
-              <input
-                value={teamName}
-                onChange={(e) => setTeamName(e.target.value)}
-                placeholder="e.g. Alpha Response"
-                disabled={saving}
-              />
-            </label>
-            <button type="submit" className="btn-primary" disabled={saving || !teamBranchId}>
-              Create Team
-            </button>
-          </form>
-        </section>
       </div>
 
       <section className="card teams-card teams-card--wide">
         <h2>User Management</h2>
+        <div className="list-search-bar">
+          <ListSearch
+            value={search}
+            onChange={setSearch}
+            placeholder="Search name, email, role, team…"
+            resultCount={filteredUsers.length}
+            totalCount={users.length}
+          />
+        </div>
+        {filteredUsers.length === 0 ? (
+          <EmptyState
+            title={search.trim() ? 'No matches' : 'No users'}
+            body={search.trim() ? 'Try another name, email, role, or team.' : 'Create a user to get started.'}
+          />
+        ) : (
         <div className="table-wrap">
           <table className="data-table">
             <thead>
@@ -436,7 +460,7 @@ function TeamsContent() {
               </tr>
             </thead>
             <tbody>
-              {users.map((u) => (
+              {filteredUsers.map((u) => (
                 <tr key={u.id}>
                   <td>
                     <UserAvatar
@@ -467,7 +491,95 @@ function TeamsContent() {
             </tbody>
           </table>
         </div>
+        )}
       </section>
+
+      {showBranchDialog && (
+        <OpsDialog
+          title="Add branch"
+          subtitle="A branch groups officers, vehicles, and teams by location."
+          onClose={() => setShowBranchDialog(false)}
+        >
+          <form className="stack-form" onSubmit={createBranch}>
+            <label>
+              Branch name
+              <input
+                value={branchName}
+                onChange={(e) => setBranchName(e.target.value)}
+                placeholder="Durban North"
+                disabled={saving}
+                required
+              />
+            </label>
+            <label>
+              Code
+              <input
+                value={branchCode}
+                onChange={(e) => setBranchCode(e.target.value)}
+                placeholder="DBN"
+                disabled={saving}
+                maxLength={6}
+                required
+              />
+            </label>
+            <div className="fleet-form__actions">
+              <button type="button" className="btn-ghost" onClick={() => setShowBranchDialog(false)}>
+                Cancel
+              </button>
+              <button type="submit" className="btn-ok" disabled={saving}>
+                {saving ? 'Saving…' : 'Add branch'}
+              </button>
+            </div>
+          </form>
+        </OpsDialog>
+      )}
+
+      {showTeamDialog && (
+        <OpsDialog
+          title="Add team"
+          subtitle="Name the operations group — Alpha Response, Medical, Night Patrol."
+          onClose={() => setShowTeamDialog(false)}
+        >
+          <form className="stack-form" onSubmit={createTeam}>
+            <label>
+              Branch
+              <UiSelect
+                compact={false}
+                ariaLabel="Team branch"
+                value={teamBranchId}
+                onChange={setTeamBranchId}
+                disabled={saving}
+                options={[
+                  { value: '', label: 'Select branch' },
+                  ...branches.map((b) => ({
+                    value: b.id,
+                    label: b.name,
+                    meta: b.code,
+                  })),
+                ]}
+              />
+            </label>
+            <label>
+              Team name
+              <input
+                value={teamName}
+                onChange={(e) => setTeamName(e.target.value)}
+                placeholder="e.g. Alpha Response"
+                disabled={saving}
+                required
+              />
+            </label>
+            <div className="fleet-form__actions">
+              <button type="button" className="btn-ghost" onClick={() => setShowTeamDialog(false)}>
+                Cancel
+              </button>
+              <button type="submit" className="btn-ok" disabled={saving || !teamBranchId}>
+                {saving ? 'Saving…' : 'Add team'}
+              </button>
+            </div>
+          </form>
+        </OpsDialog>
+      )}
 
       {userForm && (
         <UserFormModal
@@ -475,6 +587,7 @@ function TeamsContent() {
           branches={branches}
           saving={saving}
           error={formError}
+          canSetPasswords={canSetPasswords}
           onChange={(next) => {
             const roleChanged = next.role !== userForm.role;
             if (!userForm.id && roleChanged) {
@@ -494,72 +607,44 @@ function TeamsContent() {
       )}
 
       {createdInvite && (
-        <div className="modal-overlay" onClick={() => setCreatedInvite(null)}>
-          <div className="modal-card" onClick={(e) => e.stopPropagation()}>
-            <h3>Premium client invite ready</h3>
-            <div className="invite-link-box">
-              <h4>{createdInvite.name}</h4>
-              <p>
-                Share this invite code so they can activate the panic app. They
-                cannot sign in until registration is complete.
-              </p>
-              {createdInvite.code && (
-                <div className="invite-link-box__row" style={{ marginBottom: '0.75rem' }}>
-                  <input
-                    readOnly
-                    value={createdInvite.code}
-                    onFocus={(e) => e.target.select()}
-                    style={{ fontWeight: 700, letterSpacing: '0.08em', fontSize: '1.1rem' }}
-                  />
-                  <button type="button" className="btn-primary btn-sm" onClick={copyInviteLink}>
-                    {inviteCopied ? 'Copied' : 'Copy code'}
-                  </button>
-                </div>
-              )}
-              <p className="text-muted" style={{ fontSize: '0.85rem' }}>
-                Or share the full registration link:
-              </p>
-              <div className="invite-link-box__row">
-                <input readOnly value={createdInvite.url} onFocus={(e) => e.target.select()} />
-                <button type="button" className="btn-secondary btn-sm" onClick={copyInviteUrl}>
-                  Copy link
+        <OpsDialog
+          title="Premium client invite ready"
+          subtitle={`Share the code below with ${createdInvite.name} to activate the panic app.`}
+          onClose={() => setCreatedInvite(null)}
+        >
+          <div className="invite-link-box">
+            {createdInvite.code && (
+              <div className="invite-link-box__row" style={{ marginBottom: '0.75rem' }}>
+                <input
+                  readOnly
+                  value={createdInvite.code}
+                  onFocus={(e) => e.target.select()}
+                  style={{ fontWeight: 700, letterSpacing: '0.08em', fontSize: '1.1rem' }}
+                />
+                <button type="button" className="btn-primary btn-sm" onClick={copyInviteLink}>
+                  {inviteCopied ? 'Copied' : 'Copy code'}
                 </button>
               </div>
-            </div>
-            <div className="btn-row" style={{ marginTop: '1rem' }}>
-              <button type="button" className="btn-primary" onClick={() => setCreatedInvite(null)}>
-                Done
+            )}
+            <p className="text-muted" style={{ fontSize: '0.85rem', marginBottom: '0.5rem' }}>
+              Or share the full registration link:
+            </p>
+            <div className="invite-link-box__row">
+              <input readOnly value={createdInvite.url} onFocus={(e) => e.target.select()} />
+              <button type="button" className="btn-secondary btn-sm" onClick={copyInviteUrl}>
+                Copy link
               </button>
             </div>
           </div>
-        </div>
+          <div className="fleet-form__actions" style={{ marginTop: '1rem' }}>
+            <button type="button" className="btn-ok" onClick={() => setCreatedInvite(null)}>
+              Done
+            </button>
+          </div>
+        </OpsDialog>
       )}
     </div>
   );
-}
-
-function UserAvatar({
-  firstName,
-  lastName,
-  avatarUrl,
-  size = 'md',
-}: {
-  firstName: string;
-  lastName: string;
-  avatarUrl: string | null;
-  size?: 'sm' | 'md' | 'lg';
-}) {
-  const initials = `${firstName[0] ?? ''}${lastName[0] ?? ''}`.toUpperCase();
-  if (avatarUrl) {
-    return (
-      <img
-        src={avatarUrl}
-        alt={`${firstName} ${lastName}`}
-        className={`user-avatar user-avatar--${size}`}
-      />
-    );
-  }
-  return <div className={`user-avatar user-avatar--${size} user-avatar--initials`}>{initials}</div>;
 }
 
 function UserFormModal({
@@ -567,6 +652,7 @@ function UserFormModal({
   branches,
   saving,
   error,
+  canSetPasswords,
   onChange,
   onClose,
   onSave,
@@ -576,6 +662,7 @@ function UserFormModal({
   branches: Branch[];
   saving: boolean;
   error: string;
+  canSetPasswords: boolean;
   onChange: (form: UserFormState) => void;
   onClose: () => void;
   onSave: () => void;
@@ -607,10 +694,12 @@ function UserFormModal({
   }
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-card modal-card--wide" onClick={(e) => e.stopPropagation()}>
-        <h3>{isEdit ? `Edit ${form.firstName} ${form.lastName}` : 'Create User'}</h3>
-
+    <OpsDialog
+      title={isEdit ? `Edit ${form.firstName} ${form.lastName}` : 'Create User'}
+      subtitle={isEdit ? 'Update this user\'s details and access.' : 'Create a new staff or client account.'}
+      onClose={onClose}
+      wide
+    >
         {error && <ErrorAlert error={error} />}
 
         <div className="user-form-avatar-row">
@@ -675,26 +764,34 @@ function UserFormModal({
             />
           </label>
 
-          <label>
-            {isEdit
-              ? 'New password (leave blank to keep)'
-              : isClientRole
-                ? 'Temporary password (optional)'
-                : 'Password'}
-            <input
-              type="password"
-              value={form.password}
-              onChange={(e) => onChange({ ...form, password: e.target.value })}
-              placeholder={
-                isEdit
-                  ? 'Optional'
-                  : isClientRole
-                    ? 'Leave blank — client sets via invite'
-                    : 'Required'
-              }
-              required={!isEdit && !isClientRole}
-            />
-          </label>
+          {canSetPasswords ? (
+            <label>
+              {isEdit
+                ? 'New password (leave blank to keep)'
+                : isClientRole
+                  ? 'Temporary password (optional)'
+                  : 'Password'}
+              <input
+                type="password"
+                value={form.password}
+                onChange={(e) => onChange({ ...form, password: e.target.value })}
+                placeholder={
+                  isEdit
+                    ? 'Optional — min 8 characters'
+                    : isClientRole
+                      ? 'Leave blank — client sets via invite'
+                      : 'Required — min 8 characters'
+                }
+                required={!isEdit && !isClientRole}
+                minLength={8}
+                autoComplete="new-password"
+              />
+            </label>
+          ) : isEdit ? (
+            <p className="text-muted" style={{ margin: 0, fontSize: '0.85rem' }}>
+              Password resets require Owner or Developer access.
+            </p>
+          ) : null}
           {!isEdit && isClientRole && (
             <p className="text-muted" style={{ margin: '-0.35rem 0 0', fontSize: '0.85rem' }}>
               Creates a premium protection client and generates an invite code
@@ -829,7 +926,6 @@ function UserFormModal({
             </button>
           </div>
         </div>
-      </div>
-    </div>
+    </OpsDialog>
   );
 }

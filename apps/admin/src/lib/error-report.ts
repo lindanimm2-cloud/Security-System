@@ -1,6 +1,8 @@
 import { clientApi } from './api-client';
 import { getSession, type AuthPortal } from './auth';
 import { resolveStaffSession, submitDeveloperErrorReport } from './developer-notify';
+import { REPORT_NEEDS_SIGN_IN_MESSAGE } from './friendly-error';
+import { isLoginPath } from './login-path';
 
 export type ErrorReportPayload = {
   message: string;
@@ -21,10 +23,20 @@ function buildContext(input: ErrorReportPayload): string {
   }).slice(0, 2000);
 }
 
+async function copyReportToClipboard(input: ErrorReportPayload): Promise<void> {
+  const lines = [
+    input.message,
+    input.path ? `Path: ${input.path}` : '',
+    input.digest ? `Ref: ${input.digest}` : '',
+    input.stack?.slice(0, 800) ?? '',
+  ].filter(Boolean);
+  await navigator.clipboard.writeText(lines.join('\n\n'));
+}
+
 /** Send technical error details to the developer desk (client portal or staff CRM). */
 export async function reportErrorToDeveloper(
   input: ErrorReportPayload,
-): Promise<{ channel: AuthPortal | 'client' }> {
+): Promise<{ channel: AuthPortal | 'client' | 'clipboard' | 'skipped' }> {
   const context = buildContext(input);
   const userAgent = typeof navigator !== 'undefined' ? navigator.userAgent : undefined;
 
@@ -51,7 +63,19 @@ export async function reportErrorToDeveloper(
     return { channel: staff.portal };
   }
 
-  throw new Error('Sign in so we can attach your report to your account.');
+  // Login screens must stay usable — never throw an auth wall over the form.
+  if (isLoginPath(input.path)) {
+    return { channel: 'skipped' };
+  }
+
+  try {
+    await copyReportToClipboard(input);
+    return { channel: 'clipboard' };
+  } catch {
+    const err = new Error(REPORT_NEEDS_SIGN_IN_MESSAGE);
+    err.name = 'ReportNeedsSignInError';
+    throw err;
+  }
 }
 
 export function errorReference(error: Error & { digest?: string }): string {

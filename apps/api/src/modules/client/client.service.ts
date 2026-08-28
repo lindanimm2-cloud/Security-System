@@ -3,14 +3,16 @@ import {
   AlarmStatus,
   ConversationType,
   IncidentPriority,
-  IncidentStatus,
   IncidentType,
   NotificationType,
   CompanyVehicleType,
-  CompanyVehicleStatus,
+  PanicSource,
+  UserRole,
 } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
 import { RealtimeGateway } from '../realtime/realtime.gateway';
+import { IncidentKernelService } from '../incident-kernel/incident-kernel.service';
+import { DeviceSecurityService } from '../device-security/device-security.service';
 import { hasCategoryAccess } from './plans.catalog';
 
 @Injectable()
@@ -18,6 +20,8 @@ export class ClientService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly realtime: RealtimeGateway,
+    private readonly kernel: IncidentKernelService,
+    private readonly deviceSecurity: DeviceSecurityService,
   ) {}
 
   async getDashboard(userId: string, tenantId: string) {
@@ -157,69 +161,30 @@ export class ClientService {
           isSilent: i.isSilent,
           time: this.timeAgo(i.createdAt),
         })),
+        liveResponse: await this.compactLiveResponse(userId, tenantId),
       },
     };
   }
 
   async triggerPanic(userId: string, tenantId: string, silent = false) {
-    const user = await this.prisma.user.findUnique({ where: { id: userId } });
-    const lat = user?.lastKnownLat ?? -29.8587;
-    const lng = user?.lastKnownLng ?? 31.0218;
+    return this.deviceSecurity.activatePanic(
+      { id: userId, tenantId, role: UserRole.USER },
+      { source: PanicSource.APP_PANIC, silent },
+    );
+  }
 
-    const incident = await this.prisma.incident.create({
-      data: {
-        tenantId,
+  async cancelOpenPanic(userId: string, tenantId: string, reason?: string) {
+    const open = await this.prisma.panicEvent.findFirst({
+      where: {
         userId,
-        type: IncidentType.PANIC,
-        status: IncidentStatus.ACTIVE,
-        priority: IncidentPriority.CRITICAL,
-        title: silent ? 'Silent Alert' : 'Panic Alert',
-        isSilent: silent,
-        lat,
-        lng,
-        address: 'Morningside, Durban',
-      },
-      include: { user: true },
-    });
-
-    await this.prisma.notification.create({
-      data: {
         tenantId,
-        userId,
-        type: NotificationType.PANIC_ALERT,
-        title: silent ? 'Silent alert sent' : 'Panic alert sent',
-        body: silent
-          ? 'Control room notified discreetly. No visible alert on device.'
-          : 'Dispatch has been notified. Help is on the way.',
+        isTest: false,
+        workflowStatus: { in: ['NEW', 'ACKNOWLEDGED', 'CONTACTING_CLIENT', 'DISPATCHED', 'RESPONDING', 'ON_SCENE', 'ESCALATED'] },
       },
+      orderBy: { createdAt: 'desc' },
     });
-
-    const officer = await this.prisma.officer.findFirst({
-      where: { tenantId, status: 'AVAILABLE', isActive: true },
-    });
-
-    if (officer) {
-      await this.prisma.dispatch.create({
-        data: {
-          tenantId,
-          incidentId: incident.id,
-          officerId: officer.id,
-          status: 'ASSIGNED',
-        },
-      });
-      await this.prisma.incident.update({
-        where: { id: incident.id },
-        data: { status: IncidentStatus.DISPATCHED },
-      });
-      await this.prisma.officer.update({
-        where: { id: officer.id },
-        data: { status: 'EN_ROUTE' },
-      });
-    }
-
-    this.emitMapIncident(tenantId, incident);
-
-    return { success: true, data: incident };
+    if (!open) return { success: true, data: { cancelled: false } };
+    return this.deviceSecurity.cancelPanic({ id: userId, tenantId, role: UserRole.USER }, open.id, reason);
   }
 
   async reportTheft(
@@ -234,39 +199,108 @@ export class ClientService {
     },
   ) {
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
-    const incident = await this.prisma.incident.create({
-      data: {
-        tenantId,
-        userId,
-        type: IncidentType.THEFT,
-        status: IncidentStatus.ACTIVE,
-        priority: IncidentPriority.HIGH,
-        title: 'Theft Report',
-        description: body.description,
-        lat: user?.lastKnownLat ?? -29.8587,
-        lng: user?.lastKnownLng ?? 28.0567,
-        address: 'Berea, Durban',
-        vehicleMake: body.vehicleMake,
-        vehicleModel: body.vehicleModel,
-        vehicleColor: body.vehicleColor,
-        vehiclePlate: body.vehiclePlate,
-      },
-      include: { user: true },
+    const vehicle = body.vehiclePlate
+      ? await this.prisma.vehicle.findFirst({
+          where: { userId, registration: { equals: body.vehiclePlate, mode: 'insensitive' } },
+        })
+      : await this.prisma.vehicle.findFirst({ where: { userId }, orderBy: { updatedAt: 'desc' } });
+    const incident = await this.kernel.createFromEmergency({
+      tenantId,
+      userId,
+      type: IncidentType.THEFT,
+      title: 'Theft Report',
+      description: body.description,
+      lat: Number(user?.lastKnownLat ?? -29.8587),
+      lng: Number(user?.lastKnownLng ?? 28.0567),
+      address: 'Berea, Durban',
+      priority: IncidentPriority.HIGH,
+      vehicleId: vehicle?.id,
+      vehicleMake: body.vehicleMake,
+      vehicleModel: body.vehicleModel,
+      vehicleColor: body.vehicleColor,
+      vehiclePlate: body.vehiclePlate,
+      source: 'portal',
+      actorUserId: userId,
+      kind: 'theft',
+      autoDispatch: false,
     });
-
-    await this.prisma.notification.create({
-      data: {
-        tenantId,
-        userId,
-        type: NotificationType.THEFT_ALERT,
-        title: 'Theft reported',
-        body: 'Your theft report has been logged. Recovery mode activated.',
-      },
-    });
-
-    this.emitMapIncident(tenantId, incident);
-
     return { success: true, data: incident };
+  }
+
+  async createServiceRequest(
+    userId: string,
+    tenantId: string,
+    body: { kind?: string; details?: Record<string, string | number | boolean> },
+  ) {
+    const kind = String(body.kind ?? 'escort');
+    const details = body.details ?? {};
+    const titles: Record<string, string> = {
+      'check-in': 'Check-in timer',
+      journey: 'Journey monitoring',
+      escort: 'Escort request',
+      wellness: 'Wellness check',
+      roadside: 'Roadside assistance',
+      'share-location': 'Live location sharing',
+    };
+    const title = titles[kind] ?? 'Service request';
+    const from = String(details.fromLocation ?? details.location ?? '');
+    const to = String(details.toLocation ?? '');
+    const address = to ? `${from} → ${to}` : from || 'Client requested location';
+    const lines = Object.entries(details)
+      .filter(([, value]) => value !== '' && value !== false)
+      .map(([key, value]) => `${key}: ${String(value)}`);
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    const incident = await this.kernel.createFromEmergency({
+      tenantId,
+      userId,
+      type: IncidentType.OTHER,
+      title,
+      description: lines.join('\n'),
+      lat: Number(user?.lastKnownLat ?? -29.8587),
+      lng: Number(user?.lastKnownLng ?? 31.0218),
+      address,
+      priority: kind === 'escort' || kind === 'roadside' ? IncidentPriority.HIGH : IncidentPriority.MEDIUM,
+      vehiclePlate: typeof details.vehiclePlate === 'string' ? details.vehiclePlate : undefined,
+      source: 'portal',
+      actorUserId: userId,
+      kind: 'service-request',
+      autoDispatch: false,
+    });
+    return { success: true, data: { id: incident.id, publicRef: incident.publicRef, title } };
+  }
+
+  async listServiceRequests(userId: string) {
+    const rows = await this.prisma.incident.findMany({
+      where: {
+        userId,
+        type: IncidentType.OTHER,
+        title: {
+          in: [
+            'Check-in timer',
+            'Journey monitoring',
+            'Escort request',
+            'Wellness check',
+            'Roadside assistance',
+            'Live location sharing',
+            'Service request',
+          ],
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 30,
+    });
+    return {
+      success: true,
+      data: rows.map((row) => ({
+        id: row.id,
+        publicRef: row.publicRef,
+        kind: row.title ?? 'request',
+        title: row.title ?? 'Service request',
+        status: row.status,
+        whenLabel: this.timeAgo(row.createdAt),
+        summary: (row.description ?? row.address ?? '').split('\n')[0] || row.publicRef,
+      })),
+    };
   }
 
   async updateLocation(userId: string, lat: number, lng: number) {
@@ -1058,20 +1092,21 @@ export class ClientService {
     const property = await this.prisma.property.findFirst({ where: { id: propertyId, userId } });
     if (!property) throw new NotFoundException('Property not found');
 
-    const incident = await this.prisma.incident.create({
-      data: {
-        tenantId,
-        userId,
-        type: IncidentType.PANIC,
-        status: IncidentStatus.ACTIVE,
-        priority: IncidentPriority.CRITICAL,
-        title: `Home Panic — ${property.name}`,
-        description: property.address,
-        lat: -29.8587,
-        lng: 31.0218,
-        address: property.address,
-      },
-      include: { user: true },
+    const incident = await this.kernel.createFromEmergency({
+      tenantId,
+      userId,
+      type: IncidentType.PANIC,
+      title: `Home Panic — ${property.name}`,
+      description: property.address,
+      lat: Number(property.lat ?? -29.8587),
+      lng: Number(property.lng ?? 31.0218),
+      address: property.address,
+      priority: IncidentPriority.CRITICAL,
+      propertyId,
+      source: 'portal',
+      actorUserId: userId,
+      kind: 'home-panic',
+      autoDispatch: true,
     });
 
     await this.prisma.property.update({
@@ -1079,17 +1114,6 @@ export class ClientService {
       data: { alarmStatus: AlarmStatus.TRIGGERED },
     });
 
-    await this.prisma.notification.create({
-      data: {
-        tenantId,
-        userId,
-        type: NotificationType.PANIC_ALERT,
-        title: 'Home panic activated',
-        body: `Emergency response dispatched for ${property.name}. Interior cameras unlocked for responders.`,
-      },
-    });
-
-    this.emitMapIncident(tenantId, incident);
     return { success: true, data: incident };
   }
 
@@ -1126,6 +1150,8 @@ export class ClientService {
       medications?: string;
       chronicConditions?: string;
       emergencyNotes?: string;
+      doctorContact?: string;
+      ambulancePreference?: string;
     },
   ) {
     const profile = await this.prisma.medicalProfile.upsert({
@@ -1142,163 +1168,46 @@ export class ClientService {
   async requestMedicalEmergency(userId: string, tenantId: string) {
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
     const medical = await this.prisma.medicalProfile.findUnique({ where: { userId } });
-    const lat = user?.lastKnownLat ?? -29.8587;
-    const lng = user?.lastKnownLng ?? 31.0218;
-
-    const incident = await this.prisma.incident.create({
-      data: {
-        tenantId,
-        userId,
-        type: IncidentType.MEDICAL,
-        status: IncidentStatus.ACTIVE,
-        priority: IncidentPriority.CRITICAL,
-        title: 'Medical Emergency — Ambulance Requested',
-        description: medical
-          ? `Ambulance requested. Blood type: ${medical.bloodType ?? 'Unknown'}. Allergies: ${medical.allergies ?? 'None recorded'}. Medications: ${medical.medications ?? 'None recorded'}.`
-          : 'Ambulance assistance requested. Medical profile not yet on file.',
-        lat,
-        lng,
-        address: user?.lastKnownLat ? 'Last known location' : 'Morningside, Durban',
-      },
-      include: { user: true },
+    const incident = await this.kernel.createFromEmergency({
+      tenantId,
+      userId,
+      type: IncidentType.MEDICAL,
+      title: 'Medical Emergency — Ambulance Requested',
+      description: medical
+        ? `Ambulance requested. Blood type: ${medical.bloodType ?? 'Unknown'}. Allergies: ${medical.allergies ?? 'None recorded'}. Medications: ${medical.medications ?? 'None recorded'}.`
+        : 'Ambulance assistance requested. Medical profile not yet on file.',
+      lat: Number(user?.lastKnownLat ?? -29.8587),
+      lng: Number(user?.lastKnownLng ?? 31.0218),
+      address: user?.lastKnownLat ? 'Last known location' : 'Morningside, Durban',
+      priority: IncidentPriority.CRITICAL,
+      source: 'portal',
+      actorUserId: userId,
+      kind: 'medical',
+      autoDispatch: true,
+      preferredVehicleType: CompanyVehicleType.MEDICAL,
     });
-
-    await this.prisma.notification.create({
-      data: {
-        tenantId,
-        userId,
-        type: NotificationType.INCIDENT_UPDATE,
-        title: 'Ambulance requested',
-        body: 'Medical emergency dispatched. Ambulance and nearest response unit notified.',
-      },
-    });
-
-    const ambulance = await this.prisma.companyVehicle.findFirst({
-      where: {
-        tenantId,
-        vehicleType: CompanyVehicleType.MEDICAL,
-        status: { in: [CompanyVehicleStatus.AVAILABLE, CompanyVehicleStatus.DEPLOYED] },
-      },
-      include: { crew: true },
-      orderBy: { status: 'asc' },
-    });
-
-    const officer =
-      ambulance?.crew[0]?.officerId
-        ? await this.prisma.officer.findFirst({
-            where: { id: ambulance.crew[0].officerId, tenantId, isActive: true },
-          })
-        : await this.prisma.officer.findFirst({
-            where: { tenantId, status: 'AVAILABLE', isActive: true },
-            orderBy: { avgResponseSec: 'asc' },
-          });
-
-    if (officer) {
-      await this.prisma.dispatch.create({
-        data: {
-          tenantId,
-          incidentId: incident.id,
-          officerId: officer.id,
-          status: 'ASSIGNED',
-        },
-      });
-      await this.prisma.incident.update({
-        where: { id: incident.id },
-        data: { status: IncidentStatus.DISPATCHED },
-      });
-      await this.prisma.officer.update({
-        where: { id: officer.id },
-        data: { status: 'EN_ROUTE' },
-      });
-      if (ambulance) {
-        await this.prisma.companyVehicle.update({
-          where: { id: ambulance.id },
-          data: { status: CompanyVehicleStatus.EN_ROUTE },
-        });
-      }
-    }
-
-    this.emitMapIncident(tenantId, incident);
     return { success: true, data: incident };
   }
 
   async requestFireEmergency(userId: string, tenantId: string) {
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
-    const lat = user?.lastKnownLat ?? -29.8587;
-    const lng = user?.lastKnownLng ?? 31.0218;
-
-    const incident = await this.prisma.incident.create({
-      data: {
-        tenantId,
-        userId,
-        type: IncidentType.FIRE,
-        status: IncidentStatus.ACTIVE,
-        priority: IncidentPriority.CRITICAL,
-        title: 'Fire Emergency — Fire Response Requested',
-        description:
-          'Client-reported fire. Dispatch fire response unit and nearest armed response for perimeter support.',
-        lat,
-        lng,
-        address: user?.lastKnownLat ? 'Last known location' : 'Morningside, Durban',
-      },
-      include: { user: true },
+    const incident = await this.kernel.createFromEmergency({
+      tenantId,
+      userId,
+      type: IncidentType.FIRE,
+      title: 'Fire Emergency — Fire Response Requested',
+      description:
+        'Client-reported fire. Dispatch fire response unit and nearest armed response for perimeter support.',
+      lat: Number(user?.lastKnownLat ?? -29.8587),
+      lng: Number(user?.lastKnownLng ?? 31.0218),
+      address: user?.lastKnownLat ? 'Last known location' : 'Morningside, Durban',
+      priority: IncidentPriority.CRITICAL,
+      source: 'portal',
+      actorUserId: userId,
+      kind: 'fire',
+      autoDispatch: true,
+      preferredVehicleType: CompanyVehicleType.FIRE_TRUCK,
     });
-
-    await this.prisma.notification.create({
-      data: {
-        tenantId,
-        userId,
-        type: NotificationType.INCIDENT_UPDATE,
-        title: 'Fire response requested',
-        body: 'Fire emergency dispatched. Fire unit and nearest response team notified.',
-      },
-    });
-
-    const fireUnit = await this.prisma.companyVehicle.findFirst({
-      where: {
-        tenantId,
-        vehicleType: CompanyVehicleType.FIRE_TRUCK,
-        status: { in: [CompanyVehicleStatus.AVAILABLE, CompanyVehicleStatus.DEPLOYED] },
-      },
-      include: { crew: true },
-    });
-
-    const officer =
-      fireUnit?.crew[0]?.officerId
-        ? await this.prisma.officer.findFirst({
-            where: { id: fireUnit.crew[0].officerId, tenantId, isActive: true },
-          })
-        : await this.prisma.officer.findFirst({
-            where: { tenantId, status: 'AVAILABLE', isActive: true },
-            orderBy: { avgResponseSec: 'asc' },
-          });
-
-    if (officer) {
-      await this.prisma.dispatch.create({
-        data: {
-          tenantId,
-          incidentId: incident.id,
-          officerId: officer.id,
-          status: 'ASSIGNED',
-        },
-      });
-      await this.prisma.incident.update({
-        where: { id: incident.id },
-        data: { status: IncidentStatus.DISPATCHED },
-      });
-      await this.prisma.officer.update({
-        where: { id: officer.id },
-        data: { status: 'EN_ROUTE' },
-      });
-      if (fireUnit) {
-        await this.prisma.companyVehicle.update({
-          where: { id: fireUnit.id },
-          data: { status: CompanyVehicleStatus.EN_ROUTE },
-        });
-      }
-    }
-
-    this.emitMapIncident(tenantId, incident);
     return { success: true, data: incident };
   }
 
@@ -1337,6 +1246,7 @@ export class ClientService {
     NotificationType.SYSTEM,
     NotificationType.MESSAGE,
     NotificationType.BILLING,
+    NotificationType.DEVICE_SECURITY,
   ];
 
   private dedupeClientNotifications<
@@ -1367,6 +1277,8 @@ export class ClientService {
       case NotificationType.SYSTEM:
         if (/subscription|plan|billing|payment/i.test(title)) return '/portal/subscription';
         return '/portal/updates';
+      case NotificationType.DEVICE_SECURITY:
+        return '/portal/security/activity';
       default:
         return '/portal/updates';
     }
@@ -1578,6 +1490,25 @@ export class ClientService {
     }
 
     return items.slice(0, 4);
+  }
+
+  private async compactLiveResponse(userId: string, tenantId: string) {
+    const incident = await this.prisma.incident.findFirst({
+      where: { userId, status: { notIn: ['RESOLVED', 'CLOSED', 'CANCELLED'] } },
+      orderBy: { createdAt: 'desc' },
+    });
+    if (!incident) return null;
+    const timeline = await this.kernel.getTimeline(tenantId, incident.id, {
+      id: userId,
+      role: UserRole.USER,
+    });
+    return {
+      id: incident.id,
+      publicRef: incident.publicRef,
+      type: incident.type,
+      status: incident.status,
+      events: timeline.data.slice(-3),
+    };
   }
 
   private emitMapIncident(

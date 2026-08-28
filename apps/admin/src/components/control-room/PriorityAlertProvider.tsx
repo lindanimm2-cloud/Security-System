@@ -58,25 +58,26 @@ export function PriorityAlertProvider({ children }: { children: React.ReactNode 
     const eventId = alert.incidentId
       ? `incident:${alert.incidentId}:${alert.tier}`
       : `alert:${alert.id}`;
+    const forced = Boolean(alert.force);
 
     if (alert.tier === 'critical') {
-      if (!shouldAnnounce(eventId, 30_000)) return;
-      markAnnounced(eventId);
+      if (!forced && !shouldAnnounce(eventId, 30_000)) return;
+      if (!forced) markAnnounced(eventId);
       setCriticalQueue((prev) => {
         if (alert.incidentId && prev.some((item) => item.incidentId === alert.incidentId)) {
           return prev;
         }
-        return [alert, ...prev];
+        return [alert, ...prev.filter((item) => item.id !== alert.id)];
       });
       return;
     }
 
-    // Quiet mode: non-critical stay badge/digest only — no interrupt toasts
-    if (isOpsQuietMode()) return;
+    // Quiet mode: non-critical stay badge/digest only — unless forced (test previews).
+    if (!forced && isOpsQuietMode()) return;
 
-    if (alert.tier === 'high') {
-      if (!shouldAnnounce(eventId)) return;
-      markAnnounced(eventId);
+    if (alert.tier === 'high' || (forced && alert.tier === 'normal')) {
+      if (!forced && !shouldAnnounce(eventId)) return;
+      if (!forced) markAnnounced(eventId);
       setHighToasts((prev) => {
         const next = [alert, ...prev.filter((item) => item.id !== alert.id)];
         return next.slice(0, MAX_HIGH_TOASTS);
@@ -137,7 +138,7 @@ export function PriorityAlertProvider({ children }: { children: React.ReactNode 
 
     socket.on('developer:error-report', (payload: Record<string, unknown>) => {
       const role = getSession('admin')?.user.role;
-      if (role && !['DEVELOPER', 'OWNER', 'SUPER_ADMIN'].includes(role)) return;
+      if (role && role !== 'DEVELOPER') return;
       const alert = looseNotificationToAlert({
         ...payload,
         type: 'ERROR_REPORT',
@@ -147,6 +148,22 @@ export function PriorityAlertProvider({ children }: { children: React.ReactNode 
 
     socket.on('incident:created', (payload: Parameters<typeof incidentSocketToAlert>[0]) => {
       const alert = incidentSocketToAlert(payload);
+      if (alert) pushAlert(alert);
+    });
+    socket.on('incident.created', (payload: Parameters<typeof incidentSocketToAlert>[0] & Record<string, unknown>) => {
+      // Event-bus wrappers lack map fields; the incident:created alias already drives the P0 UI.
+      if (!payload?.name && payload?.type === 'incident.created') return;
+      const nested = (payload.payload ?? {}) as Record<string, unknown>;
+      const alert = incidentSocketToAlert({
+        id: String(payload.incidentId ?? payload.id ?? ''),
+        type: String(nested.type ?? payload.type ?? 'OTHER'),
+        priority: String(payload.priority ?? 'HIGH'),
+        status: String(payload.status ?? 'ACTIVE'),
+        name: String(payload.name ?? 'Incident'),
+        address: (payload.address as string | null) ?? null,
+        isSilent: Boolean(payload.isSilent ?? nested.silent),
+        createdAt: payload.createdAt,
+      });
       if (alert) pushAlert(alert);
     });
 
@@ -164,7 +181,7 @@ export function PriorityAlertProvider({ children }: { children: React.ReactNode 
       reporter?: { name?: string };
     }) {
       const role = getSession('admin')?.user.role;
-      if (role && !['DEVELOPER', 'OWNER', 'SUPER_ADMIN'].includes(role)) return;
+      if (role && role !== 'DEVELOPER') return;
       if (report.status && report.status !== 'OPEN') return;
       if (report.createdAt && Date.now() - new Date(report.createdAt).getTime() > 12_000) return;
       pushAlert({

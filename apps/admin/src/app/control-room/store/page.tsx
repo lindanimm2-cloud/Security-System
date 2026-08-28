@@ -1,6 +1,6 @@
 'use client';
 
-import { FormEvent, useState } from 'react';
+import { FormEvent, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { ControlRoomLayout } from '@/components/control-room/ControlRoomLayout';
 import { ErrorAlert } from '@/components/ErrorAlert';
@@ -8,7 +8,17 @@ import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { useApi } from '@/hooks/useApi';
 import { adminApi, type ApiResponse } from '@/lib/api-client';
 import { exportCsv } from '@/lib/export-csv';
+import { openBrandedTableReport } from '@/lib/branded-document';
 import { UiSelect } from '@/components/ui/UiSelect';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { ListSearch } from '@/components/ui/ListSearch';
+import { PageTabs } from '@/components/ui/PageTabs';
+import { InsightList } from '@/components/ui/InsightList';
+import { ChartCard } from '@/components/ui/charts/ChartCard';
+import { DonutChart } from '@/components/ui/charts/DonutChart';
+import { HorizontalBars } from '@/components/ui/charts/HorizontalBars';
+import { OpsDialog } from '@/components/ops/OpsDialog';
+import { matchesSearch } from '@/lib/list-search';
 
 type Overview = {
   stats: {
@@ -140,6 +150,8 @@ function StoreCrmContent() {
   const [tab, setTab] = useState<'overview' | 'products' | 'orders'>('overview');
   const [formError, setFormError] = useState('');
   const [saving, setSaving] = useState(false);
+  const [formOpen, setFormOpen] = useState(false);
+  const [search, setSearch] = useState('');
   const [form, setForm] = useState({
     id: '',
     sku: '',
@@ -155,6 +167,19 @@ function StoreCrmContent() {
   });
 
   const products = productsRes?.data ?? [];
+  const orders = ordersRes?.data ?? [];
+  const filteredProducts = useMemo(
+    () =>
+      products.filter((p) => matchesSearch(search, p.name, p.sku, p.category, p.description)),
+    [products, search],
+  );
+  const filteredOrders = useMemo(
+    () =>
+      orders.filter((o) =>
+        matchesSearch(search, o.orderNumber, o.customerName, o.status, o.id),
+      ),
+    [orders, search],
+  );
 
   function editProduct(p: Product) {
     setForm({
@@ -171,6 +196,19 @@ function StoreCrmContent() {
       requiresLicense: p.requiresLicense,
     });
     setTab('products');
+    setFormOpen(true);
+  }
+
+  function openCreateForm() {
+    resetForm();
+    setTab('products');
+    setFormOpen(true);
+  }
+
+  function closeFormDialog() {
+    resetForm();
+    setFormOpen(false);
+    setFormError('');
   }
 
   function resetForm() {
@@ -207,7 +245,7 @@ function StoreCrmContent() {
         isActive: form.isActive,
         requiresLicense: form.requiresLicense,
       });
-      resetForm();
+      closeFormDialog();
       reloadProducts();
       reloadOverview();
     } catch (err) {
@@ -243,18 +281,28 @@ function StoreCrmContent() {
         </div>
       </div>
 
-      <div className="store-filters" style={{ marginBottom: '1rem' }}>
-        {(['overview', 'products', 'orders'] as const).map((t) => (
-          <button
-            key={t}
-            type="button"
-            className={`chip ${tab === t ? 'chip--active' : ''}`}
-            onClick={() => setTab(t)}
-          >
-            {t === 'overview' ? 'Overview' : t === 'products' ? 'Catalog' : 'Orders'}
-          </button>
-        ))}
-      </div>
+      <PageTabs
+        tabs={[
+          { id: 'overview', label: 'Overview' },
+          { id: 'products', label: 'Catalog' },
+          { id: 'orders', label: 'Orders' },
+        ]}
+        active={tab}
+        onChange={(id) => setTab(id as typeof tab)}
+      />
+
+      {(tab === 'products' || tab === 'orders') && (
+        <div className="list-search-bar">
+          <ListSearch
+            value={search}
+            onChange={setSearch}
+            placeholder={tab === 'products' ? 'Search name, SKU, category…' : 'Search order, customer…'}
+            resultCount={tab === 'products' ? filteredProducts.length : filteredOrders.length}
+            totalCount={tab === 'products' ? products.length : orders.length}
+            id="store-list-search"
+          />
+        </div>
+      )}
 
       {tab === 'overview' && (
         <>
@@ -262,7 +310,7 @@ function StoreCrmContent() {
           {overviewError && (
             <ErrorAlert message={overviewError} onRetry={reloadOverview} />
           )}
-          {stats && (
+          {stats && overview?.data && (
             <>
               <div className="stats-grid">
                 <div className="stat-card">
@@ -291,19 +339,99 @@ function StoreCrmContent() {
                 </div>
               </div>
 
-              <div className="card-panel" style={{ marginTop: '1.25rem' }}>
-                <h2>Low stock alerts</h2>
-                {overview.data.lowStock.length === 0 ? (
-                  <p className="text-muted">Stock levels look healthy.</p>
-                ) : (
-                  <ul>
-                    {overview.data.lowStock.map((p) => (
-                      <li key={p.id}>
-                        {p.name} ({p.sku}) — {p.stock} left
-                      </li>
-                    ))}
-                  </ul>
-                )}
+              <div className="ds-overview-grid">
+                <ChartCard
+                  className="ds-overview-grid__span-7"
+                  title="Inventory health"
+                  subtitle="Low-stock units by category"
+                >
+                  {overview.data.lowStock.length === 0 ? (
+                    <p className="text-muted" style={{ margin: 0 }}>
+                      All monitored SKUs are above reorder thresholds.
+                    </p>
+                  ) : (
+                    <HorizontalBars
+                      compact
+                      items={Object.entries(
+                        overview.data.lowStock.reduce<Record<string, number>>((acc, item) => {
+                          const key = item.category.replace(/_/g, ' ');
+                          acc[key] = (acc[key] ?? 0) + 1;
+                          return acc;
+                        }, {}),
+                      ).map(([label, value]) => ({
+                        label,
+                        value,
+                        tone: value >= 2 ? ('danger' as const) : ('warning' as const),
+                      }))}
+                    />
+                  )}
+                </ChartCard>
+
+                <div className="card-panel ds-overview-grid__span-5">
+                  <h2>Low stock alerts</h2>
+                  <InsightList
+                    emptyTitle="Stock levels look healthy"
+                    emptyBody="No SKUs are below the reorder threshold."
+                    items={overview.data.lowStock.map((p) => ({
+                      id: p.id,
+                      title: p.name,
+                      detail: p.sku,
+                      meta: `${p.stock} left`,
+                      tone: p.stock <= 2 ? 'danger' : 'warning',
+                    }))}
+                  />
+                </div>
+
+                <ChartCard
+                  className="ds-overview-grid__span-5"
+                  title="Order mix"
+                  subtitle="Recent store orders by status"
+                >
+                  <DonutChart
+                    centerLabel="Orders"
+                    centerValue={overview.data.recentOrders.length}
+                    slices={Object.entries(
+                      overview.data.recentOrders.reduce<Record<string, number>>((acc, order) => {
+                        acc[order.status] = (acc[order.status] ?? 0) + 1;
+                        return acc;
+                      }, {}),
+                    ).map(([label, value], index) => ({
+                      label,
+                      value,
+                      tone: (['accent', 'success', 'warning', 'neutral', 'danger'] as const)[index % 5],
+                    }))}
+                  />
+                </ChartCard>
+
+                <div className="card-panel ds-overview-grid__span-7">
+                  <h2>Recent orders</h2>
+                  {overview.data.recentOrders.length === 0 ? (
+                    <EmptyState title="No recent orders" body="Store orders will appear here." />
+                  ) : (
+                    <div className="table-wrap">
+                      <table className="ds-mini-table">
+                        <thead>
+                          <tr>
+                            <th>Order</th>
+                            <th>Customer</th>
+                            <th>Total</th>
+                            <th>Status</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {overview.data.recentOrders.slice(0, 6).map((order) => (
+                            <tr key={order.id}>
+                              <td>{order.orderNumber}</td>
+                              <td>{order.customerName}</td>
+                              <td>{order.totalFormatted}</td>
+                              <td>{order.status}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
               </div>
             </>
           )}
@@ -311,134 +439,23 @@ function StoreCrmContent() {
       )}
 
       {tab === 'products' && (
-        <div className="split-panels">
-          <div className="card-panel">
-            <h2>{form.id ? 'Edit product' : 'Add product'}</h2>
-            {formError && <ErrorAlert message={formError} />}
-            <form className="stack-form" onSubmit={saveProduct}>
-              <label>
-                SKU
-                <input
-                  required
-                  value={form.sku}
-                  onChange={(e) => setForm({ ...form, sku: e.target.value })}
-                />
-              </label>
-              <label>
-                Name
-                <input
-                  required
-                  value={form.name}
-                  onChange={(e) => setForm({ ...form, name: e.target.value })}
-                />
-              </label>
-              <label>
-                Description
-                <textarea
-                  required
-                  rows={3}
-                  value={form.description}
-                  onChange={(e) =>
-                    setForm({ ...form, description: e.target.value })
-                  }
-                />
-              </label>
-              <label>
-                Category
-                <UiSelect
-                  compact={false}
-                  ariaLabel="Product category"
-                  value={form.category}
-                  onChange={(category) => setForm({ ...form, category })}
-                  options={CATEGORIES.map((c) => ({ value: c, label: c }))}
-                />
-              </label>
-              <label>
-                Price (cents)
-                <input
-                  type="number"
-                  min={0}
-                  required
-                  value={form.priceCents}
-                  onChange={(e) =>
-                    setForm({ ...form, priceCents: Number(e.target.value) })
-                  }
-                />
-              </label>
-              <label>
-                Stock
-                <input
-                  type="number"
-                  min={0}
-                  required
-                  value={form.stock}
-                  onChange={(e) =>
-                    setForm({ ...form, stock: Number(e.target.value) })
-                  }
-                />
-              </label>
-              <label>
-                Emoji icon
-                <input
-                  value={form.imageEmoji}
-                  onChange={(e) =>
-                    setForm({ ...form, imageEmoji: e.target.value })
-                  }
-                />
-              </label>
-              <label className="checkbox-row">
-                <input
-                  type="checkbox"
-                  checked={form.featured}
-                  onChange={(e) =>
-                    setForm({ ...form, featured: e.target.checked })
-                  }
-                />
-                Featured
-              </label>
-              <label className="checkbox-row">
-                <input
-                  type="checkbox"
-                  checked={form.requiresLicense}
-                  onChange={(e) =>
-                    setForm({ ...form, requiresLicense: e.target.checked })
-                  }
-                />
-                Requires licence
-              </label>
-              <label className="checkbox-row">
-                <input
-                  type="checkbox"
-                  checked={form.isActive}
-                  onChange={(e) =>
-                    setForm({ ...form, isActive: e.target.checked })
-                  }
-                />
-                Active
-              </label>
-              <div style={{ display: 'flex', gap: '0.5rem' }}>
-                <button type="submit" className="btn-primary" disabled={saving}>
-                  {saving ? 'Saving...' : form.id ? 'Update' : 'Create'}
-                </button>
-                {form.id && (
-                  <button
-                    type="button"
-                    className="btn-secondary"
-                    onClick={resetForm}
-                  >
-                    Cancel
-                  </button>
-                )}
-              </div>
-            </form>
-          </div>
-
-          <div className="card-panel">
-            <h2>Catalog ({products.length})</h2>
+        <div className="card-panel page-section">
+            <div className="card-header-row card-header-row--panel">
+              <h2>Catalog ({filteredProducts.length})</h2>
+              <button type="button" className="btn-primary btn-sm" onClick={openCreateForm}>
+                + Add product
+              </button>
+            </div>
             {productsLoading && <LoadingSpinner label="Loading products..." />}
             {productsError && (
               <ErrorAlert message={productsError} onRetry={reloadProducts} />
             )}
+            {filteredProducts.length === 0 && !productsLoading ? (
+              <EmptyState
+                title={search.trim() ? 'No matches' : 'No products'}
+                body={search.trim() ? 'Try another name, SKU, or category.' : 'Add a product to the catalog.'}
+              />
+            ) : (
             <div className="table-wrap">
               <table className="data-table">
                 <thead>
@@ -451,7 +468,7 @@ function StoreCrmContent() {
                   </tr>
                 </thead>
                 <tbody>
-                  {products.map((p) => (
+                  {filteredProducts.map((p) => (
                     <tr key={p.id}>
                       <td>
                         {p.imageEmoji} {p.name}
@@ -478,7 +495,7 @@ function StoreCrmContent() {
                 </tbody>
               </table>
             </div>
-          </div>
+            )}
         </div>
       )}
 
@@ -486,26 +503,56 @@ function StoreCrmContent() {
         <div className="card-panel">
           <div className="panel-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
             <h2 style={{ margin: 0 }}>Store orders</h2>
-            <button
-              type="button"
-              className="btn-secondary"
-              disabled={(ordersRes?.data ?? []).length === 0}
-              onClick={() =>
-                exportCsv(
-                  'store-orders.csv',
-                  (ordersRes?.data ?? []).map((o) => ({
-                    orderNumber: o.orderNumber,
-                    customer: o.customerName,
-                    total: o.totalFormatted,
-                    status: o.status,
-                    createdAt: o.createdAt ? new Date(o.createdAt).toLocaleString() : '',
-                  })),
-                )
-              }
-            >
-              Export CSV
-            </button>
+            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+              <button
+                type="button"
+                className="btn-secondary"
+                disabled={filteredOrders.length === 0}
+                onClick={() =>
+                  openBrandedTableReport({
+                    title: 'Store orders register',
+                    filenameStem: 'store-orders',
+                    headers: ['Order', 'Customer', 'Total', 'Status', 'Created'],
+                    rows: filteredOrders.map((o) => [
+                      o.orderNumber,
+                      o.customerName,
+                      o.totalFormatted,
+                      o.status,
+                      o.createdAt ? new Date(o.createdAt).toLocaleString() : '',
+                    ]),
+                  })
+                }
+              >
+                Print report
+              </button>
+              <button
+                type="button"
+                className="btn-secondary"
+                disabled={filteredOrders.length === 0}
+                onClick={() =>
+                  exportCsv(
+                    'store-orders.csv',
+                    filteredOrders.map((o) => ({
+                      orderNumber: o.orderNumber,
+                      customer: o.customerName,
+                      total: o.totalFormatted,
+                      status: o.status,
+                      createdAt: o.createdAt ? new Date(o.createdAt).toLocaleString() : '',
+                    })),
+                    { title: 'Store orders register' },
+                  )
+                }
+              >
+                Export CSV
+              </button>
+            </div>
           </div>
+          {filteredOrders.length === 0 ? (
+            <EmptyState
+              title={search.trim() ? 'No matches' : 'No orders'}
+              body={search.trim() ? 'Try another order number or customer.' : 'Store orders will appear here.'}
+            />
+          ) : (
           <div className="table-wrap">
             <table className="data-table">
               <thead>
@@ -517,7 +564,7 @@ function StoreCrmContent() {
                 </tr>
               </thead>
               <tbody>
-                {(ordersRes?.data ?? []).map((o) => (
+                {filteredOrders.map((o) => (
                   <tr key={o.id}>
                     <td>{o.orderNumber}</td>
                     <td>{o.customerName}</td>
@@ -535,7 +582,129 @@ function StoreCrmContent() {
               </tbody>
             </table>
           </div>
+          )}
         </div>
+      )}
+
+      {formOpen && (
+        <OpsDialog
+          title={form.id ? 'Edit product' : 'Add product'}
+          subtitle="Catalog item for the gear store and install quotes."
+          onClose={closeFormDialog}
+          wide
+        >
+          {formError && <ErrorAlert message={formError} />}
+          <form className="stack-form" onSubmit={saveProduct}>
+            <label>
+              SKU
+              <input
+                required
+                value={form.sku}
+                onChange={(e) => setForm({ ...form, sku: e.target.value })}
+              />
+            </label>
+            <label>
+              Name
+              <input
+                required
+                value={form.name}
+                onChange={(e) => setForm({ ...form, name: e.target.value })}
+              />
+            </label>
+            <label>
+              Description
+              <textarea
+                required
+                rows={3}
+                value={form.description}
+                onChange={(e) =>
+                  setForm({ ...form, description: e.target.value })
+                }
+              />
+            </label>
+            <label>
+              Category
+              <UiSelect
+                compact={false}
+                ariaLabel="Product category"
+                value={form.category}
+                onChange={(category) => setForm({ ...form, category })}
+                options={CATEGORIES.map((c) => ({ value: c, label: c }))}
+              />
+            </label>
+            <label>
+              Price (cents)
+              <input
+                type="number"
+                min={0}
+                required
+                value={form.priceCents}
+                onChange={(e) =>
+                  setForm({ ...form, priceCents: Number(e.target.value) })
+                }
+              />
+            </label>
+            <label>
+              Stock
+              <input
+                type="number"
+                min={0}
+                required
+                value={form.stock}
+                onChange={(e) =>
+                  setForm({ ...form, stock: Number(e.target.value) })
+                }
+              />
+            </label>
+            <label>
+              Emoji icon
+              <input
+                value={form.imageEmoji}
+                onChange={(e) =>
+                  setForm({ ...form, imageEmoji: e.target.value })
+                }
+              />
+            </label>
+            <label className="checkbox-row">
+              <input
+                type="checkbox"
+                checked={form.featured}
+                onChange={(e) =>
+                  setForm({ ...form, featured: e.target.checked })
+                }
+              />
+              Featured
+            </label>
+            <label className="checkbox-row">
+              <input
+                type="checkbox"
+                checked={form.requiresLicense}
+                onChange={(e) =>
+                  setForm({ ...form, requiresLicense: e.target.checked })
+                }
+              />
+              Requires licence
+            </label>
+            <label className="checkbox-row">
+              <input
+                type="checkbox"
+                checked={form.isActive}
+                onChange={(e) =>
+                  setForm({ ...form, isActive: e.target.checked })
+                }
+              />
+              Active
+            </label>
+            <div className="fleet-form__actions">
+              <button type="button" className="btn-ghost" onClick={closeFormDialog}>
+                Cancel
+              </button>
+              <button type="submit" className="btn-primary" disabled={saving}>
+                {saving ? 'Saving...' : form.id ? 'Update' : 'Create'}
+              </button>
+            </div>
+          </form>
+        </OpsDialog>
       )}
     </div>
   );

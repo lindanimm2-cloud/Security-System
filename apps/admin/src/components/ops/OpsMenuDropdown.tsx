@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 
@@ -9,6 +10,7 @@ export type OpsMenuItem = {
   onClick?: () => void;
   href?: string;
   active?: boolean;
+  disabled?: boolean;
   tone?: 'default' | 'danger' | 'ok';
   meta?: string;
   description?: string;
@@ -20,6 +22,7 @@ type OpsMenuDropdownProps = {
   label: string;
   items: OpsMenuItem[];
   className?: string;
+  triggerClassName?: string;
   align?: 'left' | 'right';
   summary?: string;
   compact?: boolean;
@@ -27,6 +30,7 @@ type OpsMenuDropdownProps = {
   disabled?: boolean;
   leading?: ReactNode;
   showCount?: boolean;
+  hideCaret?: boolean;
 };
 
 /** Compact enterprise dropdown — panel is portaled so mobile cards cannot clip it. */
@@ -34,6 +38,7 @@ export function OpsMenuDropdown({
   label,
   items,
   className = '',
+  triggerClassName = '',
   align = 'left',
   summary,
   compact = false,
@@ -41,10 +46,11 @@ export function OpsMenuDropdown({
   disabled = false,
   leading,
   showCount = false,
+  hideCaret = false,
 }: OpsMenuDropdownProps) {
   const [open, setOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
-  const [pos, setPos] = useState({ top: 0, left: 0, width: 260 });
+  const [pos, setPos] = useState({ top: 0, left: 0, width: 260, maxHeight: 320, ready: false });
   const rootRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
@@ -58,30 +64,51 @@ export function OpsMenuDropdown({
     if (!open || !triggerRef.current) return;
 
     function place() {
-      const rect = triggerRef.current!.getBoundingClientRect();
+      const trigger = triggerRef.current;
+      if (!trigger) return;
+      const rect = trigger.getBoundingClientRect();
       const width = Math.min(
-        Math.max(rect.width, 240),
+        Math.max(rect.width, 280),
         window.innerWidth - 24,
       );
       let left = align === 'right' ? rect.right - width : rect.left;
       left = Math.max(12, Math.min(left, window.innerWidth - width - 12));
-      const estimatedHeight = Math.min(window.innerHeight * 0.5, 380);
-      const below = rect.bottom + 6;
-      const top =
-        below + estimatedHeight > window.innerHeight - 12
-          ? Math.max(12, rect.top - estimatedHeight - 6)
-          : below;
-      setPos({ top, left, width });
+
+      const gap = 6;
+      const topSafe = 12;
+      const bottomSafe =
+        12 + (window.matchMedia('(max-width: 900px)').matches ? 88 : 0);
+      const measured = panelRef.current?.offsetHeight ?? 0;
+      const estimated = Math.min(16 + items.length * 48, 360);
+      const height = measured > 8 ? measured : estimated;
+      const below = rect.bottom + gap;
+      const spaceBelow = window.innerHeight - bottomSafe - below;
+      const spaceAbove = rect.top - topSafe - gap;
+      const openAbove = spaceBelow < Math.min(height, 160) && spaceAbove > spaceBelow;
+
+      let top = below;
+      let maxHeight = Math.max(120, spaceBelow);
+      if (openAbove) {
+        maxHeight = Math.max(120, spaceAbove);
+        const used = Math.min(height, maxHeight);
+        top = Math.max(topSafe, rect.top - used - gap);
+      } else {
+        maxHeight = Math.max(120, spaceBelow);
+      }
+
+      setPos({ top, left, width, maxHeight, ready: true });
     }
 
     place();
+    const frame = window.requestAnimationFrame(place);
     window.addEventListener('resize', place);
     window.addEventListener('scroll', place, true);
     return () => {
+      window.cancelAnimationFrame(frame);
       window.removeEventListener('resize', place);
       window.removeEventListener('scroll', place, true);
     };
-  }, [open, align]);
+  }, [open, align, items.length]);
 
   useEffect(() => {
     if (!open) return;
@@ -114,6 +141,8 @@ export function OpsMenuDropdown({
     const classNameItem = [
       'ops-menu__item',
       item.active ? 'ops-menu__item--active' : '',
+      item.disabled ? 'ops-menu__item--disabled' : '',
+      item.disabled && !item.onClick && !item.href ? 'ops-menu__item--heading' : '',
       item.tone === 'danger' ? 'ops-menu__item--danger' : '',
       item.tone === 'ok' ? 'ops-menu__item--ok' : '',
       item.className ?? '',
@@ -136,16 +165,30 @@ export function OpsMenuDropdown({
     );
 
     if (item.href) {
+      const external =
+        item.href.startsWith('http') ||
+        item.href.startsWith('tel:') ||
+        item.href.startsWith('mailto:');
+      const onNavigate = () => setOpen(false);
+      if (external) {
+        return (
+          <a
+            key={item.id}
+            href={item.href}
+            className={classNameItem}
+            role="menuitem"
+            target={item.href.startsWith('http') ? '_blank' : undefined}
+            rel={item.href.startsWith('http') ? 'noopener noreferrer' : undefined}
+            onClick={onNavigate}
+          >
+            {body}
+          </a>
+        );
+      }
       return (
-        <a
-          key={item.id}
-          href={item.href}
-          className={classNameItem}
-          role="menuitem"
-          onClick={() => setOpen(false)}
-        >
+        <Link key={item.id} href={item.href} className={classNameItem} role="menuitem" onClick={onNavigate}>
           {body}
-        </a>
+        </Link>
       );
     }
 
@@ -155,7 +198,9 @@ export function OpsMenuDropdown({
         type="button"
         className={classNameItem}
         role="menuitem"
+        disabled={item.disabled}
         onClick={() => {
+          if (item.disabled) return;
           item.onClick?.();
           setOpen(false);
         }}
@@ -173,13 +218,25 @@ export function OpsMenuDropdown({
       <button
         ref={triggerRef}
         type="button"
-        className="ops-menu__trigger"
+        className={`ops-menu__trigger ${triggerClassName}`.trim()}
         aria-haspopup="menu"
         aria-expanded={open}
         aria-controls={menuId}
         aria-label={ariaLabel}
         disabled={disabled}
-        onClick={() => setOpen((v) => !v)}
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          const rect = e.currentTarget.getBoundingClientRect();
+          setPos({
+            top: rect.bottom + 6,
+            left: rect.left,
+            width: Math.min(Math.max(rect.width, 280), window.innerWidth - 24),
+            maxHeight: Math.max(120, window.innerHeight - rect.bottom - 24),
+            ready: false,
+          });
+          setOpen((v) => !v);
+        }}
       >
         {leading ? <span className="ops-menu__leading">{leading}</span> : null}
         <span className="ops-menu__label">{label}</span>
@@ -187,7 +244,7 @@ export function OpsMenuDropdown({
         {showCount && activeCount > 0 ? (
           <span className="ops-menu__count">{activeCount}</span>
         ) : null}
-        <span className="ops-menu__caret" aria-hidden />
+        {hideCaret ? null : <span className="ops-menu__caret" aria-hidden />}
       </button>
       {mounted && open
         ? createPortal(
@@ -203,7 +260,15 @@ export function OpsMenuDropdown({
                 id={menuId}
                 className={`ops-menu__panel ops-menu__panel--fixed ops-menu__panel--${align}`}
                 role="menu"
-                style={{ top: pos.top, left: pos.left, width: pos.width }}
+                style={{
+                  position: 'fixed',
+                  top: pos.top,
+                  left: pos.left,
+                  width: pos.width,
+                  maxHeight: pos.maxHeight,
+                  opacity: pos.ready ? 1 : 0,
+                  pointerEvents: pos.ready ? 'auto' : 'none',
+                }}
               >
                 {items.map(renderItem)}
               </div>

@@ -18,6 +18,8 @@ export const CONTROL_ROOM_NAV: ControlRoomNavItem[] = [
   { href: '/control-room/surveillance', label: 'CCTV', icon: 'surveillance' },
   { href: '/control-room/fleet', label: 'Vehicles', icon: 'fleet' },
   { href: '/control-room/incidents', label: 'Incidents', icon: 'incidents' },
+  { href: '/control-room/command', label: 'Command Hub', icon: 'hub' },
+  { href: '/control-room/device-security', label: 'Device Security', icon: 'devices' },
   { href: '/control-room/dispatch', label: 'Dispatch', icon: 'dispatch' },
   { href: '/control-room/customers', label: 'Customers', icon: 'customers' },
   {
@@ -46,13 +48,34 @@ export const CONTROL_ROOM_NAV: ControlRoomNavItem[] = [
     href: '/control-room/developer',
     label: 'Developer',
     icon: 'report',
-    roles: ['DEVELOPER', 'OWNER', 'SUPER_ADMIN'],
+    roles: ['DEVELOPER'],
   },
   { href: '/control-room/teams', label: 'Teams & Users', icon: 'teams' },
   { href: '/control-room/analytics', label: 'Analytics', icon: 'analytics' },
-  { href: '/control-room/settings', label: 'Settings', icon: 'profile' },
+  { href: '/control-room/settings', label: 'Ops settings', icon: 'grid' },
+  { href: '/control-room/my-settings', label: 'Settings', icon: 'account' },
   { href: '/control-room/profile', label: 'My profile', icon: 'profile' },
 ];
+
+export function canAccessControlRoomRoute(role: string, href: string): boolean {
+  const path = href.split('?')[0].replace(/\/$/, '') || '/';
+  const allowed = navForRole(role);
+  if (
+    allowed.some((item) => {
+      if (item.href === '/control-room') return path === '/control-room';
+      return path === item.href || path.startsWith(`${item.href}/`);
+    })
+  ) {
+    return true;
+  }
+  // Customer / CCTV detail deep-links used from ops screens
+  if (path.startsWith('/control-room/sites/')) {
+    return allowed.some(
+      (item) => item.href === '/control-room/customers' || item.href === '/control-room/surveillance',
+    );
+  }
+  return false;
+}
 
 export function navForRole(role: string): ControlRoomNavItem[] {
   if (role === 'SALES') {
@@ -63,6 +86,7 @@ export function navForRole(role: string): ControlRoomNavItem[] {
       '/control-room/installs',
       '/control-room/chat',
       '/control-room/profile',
+      '/control-room/my-settings',
       '/control-room/settings',
     ]);
     return CONTROL_ROOM_NAV.filter((item) => salesHrefs.has(item.href));
@@ -75,10 +99,13 @@ export function navForRole(role: string): ControlRoomNavItem[] {
       '/control-room/surveillance',
       '/control-room/fleet',
       '/control-room/incidents',
+      '/control-room/command',
+      '/control-room/device-security',
       '/control-room/dispatch',
       '/control-room/communications',
       '/control-room/chat',
       '/control-room/profile',
+      '/control-room/my-settings',
       '/control-room/settings',
     ]);
     return CONTROL_ROOM_NAV.filter((item) => hrefs.has(item.href));
@@ -92,6 +119,7 @@ export function navForRole(role: string): ControlRoomNavItem[] {
       '/control-room/store',
       '/control-room/sales',
       '/control-room/analytics',
+      '/control-room/my-settings',
       '/control-room/profile',
       '/control-room/settings',
     ];
@@ -107,8 +135,14 @@ export function navForRole(role: string): ControlRoomNavItem[] {
       '/control-room/surveillance',
       '/control-room/fleet',
       '/control-room/incidents',
+      '/control-room/command',
+      '/control-room/device-security',
     ];
-    const rest = CONTROL_ROOM_NAV.filter((item) => !first.includes(item.href));
+    const rest = CONTROL_ROOM_NAV.filter(
+      (item) =>
+        !first.includes(item.href) &&
+        (!item.roles || item.roles.includes(role)),
+    );
     return [
       ...first
         .map((href) => CONTROL_ROOM_NAV.find((item) => item.href === href))
@@ -117,14 +151,33 @@ export function navForRole(role: string): ControlRoomNavItem[] {
     ];
   }
 
-  if (role === 'DEVELOPER' || role === 'SUPER_ADMIN') {
-    const first = CONTROL_ROOM_NAV.filter((item) => item.href === '/control-room/developer');
-    const rest = CONTROL_ROOM_NAV.filter(
-      (item) =>
-        item.href !== '/control-room/developer' &&
-        (!item.roles || item.roles.includes(role)),
-    );
-    return [...first, ...rest];
+  /** Developer: desk first, then full ops visibility (no teams / sales admin). */
+  if (role === 'DEVELOPER') {
+    const order = [
+      '/control-room/developer',
+      '/control-room',
+      '/control-room/map',
+      '/control-room/surveillance',
+      '/control-room/fleet',
+      '/control-room/incidents',
+      '/control-room/command',
+      '/control-room/device-security',
+      '/control-room/dispatch',
+      '/control-room/customers',
+      '/control-room/store',
+      '/control-room/installs',
+      '/control-room/officers',
+      '/control-room/documents',
+      '/control-room/communications',
+      '/control-room/chat',
+      '/control-room/analytics',
+      '/control-room/my-settings',
+      '/control-room/profile',
+      '/control-room/settings',
+    ];
+    return order
+      .map((href) => CONTROL_ROOM_NAV.find((item) => item.href === href))
+      .filter((item): item is ControlRoomNavItem => Boolean(item));
   }
 
   return CONTROL_ROOM_NAV.filter(
@@ -134,16 +187,18 @@ export function navForRole(role: string): ControlRoomNavItem[] {
 
 /** Short labels for the floating mobile bottom bar (max 5). */
 const MOBILE_LABELS: Record<string, string> = {
-  '/control-room': 'Home',
+  '/control-room': 'Ops',
+  '/control-room/developer': 'Desk',
   '/control-room/map': 'Map',
   '/control-room/surveillance': 'CCTV',
   '/control-room/fleet': 'Fleet',
   '/control-room/customers': 'Clients',
-  '/control-room/incidents': 'Ops',
+  '/control-room/incidents': 'File',
   '/control-room/sales': 'Sales',
   '/control-room/installs': 'Jobs',
-  '/control-room/settings': 'Settings',
-  '/control-room/profile': 'Account',
+  '/control-room/settings': 'Ops',
+  '/control-room/my-settings': 'Settings',
+  '/control-room/profile': 'More',
 };
 
 const MOBILE_PREFERRED: Record<string, string[]> = {
@@ -152,20 +207,20 @@ const MOBILE_PREFERRED: Record<string, string[]> = {
     '/control-room/customers',
     '/control-room/sales',
     '/control-room/installs',
-    '/control-room/profile',
+    '/control-room/my-settings',
   ],
   DEFAULT: [
     '/control-room',
     '/control-room/map',
     '/control-room/surveillance',
     '/control-room/fleet',
-    '/control-room/profile',
+    '/control-room/my-settings',
   ],
   DEVELOPER: [
     '/control-room/developer',
+    '/control-room',
     '/control-room/map',
     '/control-room/surveillance',
-    '/control-room/fleet',
     '/control-room/profile',
   ],
 };
@@ -185,10 +240,10 @@ export function mobileNavForRole(role: string): ControlRoomMobileNavItem[] {
         ...item,
         mobileLabel: MOBILE_LABELS[href] ?? item.label,
         icon:
-          href === '/control-room'
-            ? ('home' as const)
+          href === '/control-room' && role !== 'DEVELOPER'
+            ? ('incidents' as const)
             : href === '/control-room/profile'
-              ? ('profile' as const)
+              ? ('grid' as const)
               : href === '/control-room/settings'
                 ? ('profile' as const)
                 : item.icon,

@@ -13,6 +13,9 @@ export enum UserRole {
   DEVELOPER = 'DEVELOPER',
   MEDICAL_DISPATCHER = 'MEDICAL_DISPATCHER',
   MEDICAL_CREW = 'MEDICAL_CREW',
+  FIRE_DISPATCHER = 'FIRE_DISPATCHER',
+  FIRE_CREW = 'FIRE_CREW',
+  FIRE_SUPERVISOR = 'FIRE_SUPERVISOR',
 }
 
 export enum ProductCategory {
@@ -73,4 +76,19 @@ export enum IncidentStatus {
   RESOLVED = 'RESOLVED',
   CLOSED = 'CLOSED',
   CANCELLED = 'CANCELLED',
+}
+
+export enum IncidentClassification {
+  SECURITY = 'SECURITY',
+  MEDICAL = 'MEDICAL',
+  FIRE = 'FIRE',
+  ACCIDENT = 'ACCIDENT',
+  THEFT = 'THEFT',
+  OTHER = 'OTHER',
+}
+
+export enum ResponseAgency {
+  SECURITY = 'SECURITY',
+  MEDICAL = 'MEDICAL',
+  FIRE = 'FIRE',
 }

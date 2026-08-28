@@ -124,37 +124,36 @@ export function LoyaltySummaryCard({
           aria-valuenow={loyalty.progressPercent}
           aria-valuemin={0}
           aria-valuemax={100}
-          style={{
-            marginTop: '0.75rem',
-            height: 6,
-            borderRadius: 999,
-            background: 'rgba(128,128,128,0.2)',
-            overflow: 'hidden',
-          }}
         >
-          <div
-            style={{
-              width: `${loyalty.progressPercent}%`,
-              height: '100%',
-              background: 'var(--accent, #c45c26)',
-            }}
-          />
+          <div className="loyalty-progress__fill" style={{ width: `${loyalty.progressPercent}%` }} />
         </div>
       )}
 
       {showPromo && (
-        <form
-          onSubmit={applyPromo}
-          style={{ marginTop: '1rem', display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}
-        >
-          <input
-            value={promoCode}
-            onChange={(e) => setPromoCode(e.target.value.toUpperCase())}
-            placeholder="Promo code (e.g. NEXUS10)"
-            aria-label="Promo code"
-            style={{ flex: '1 1 10rem' }}
-          />
-          <button type="submit" className={variant === 'site' ? 'nx-btn nx-btn--outline' : 'btn-secondary'} disabled={busy || !promoCode.trim()}>
+        <form className="loyalty-promo" onSubmit={applyPromo}>
+          <label className="loyalty-promo__well">
+            <span className="loyalty-promo__glyph" aria-hidden>
+              %
+            </span>
+            <input
+              className="loyalty-promo__input"
+              value={promoCode}
+              onChange={(e) => setPromoCode(e.target.value.toUpperCase())}
+              placeholder="Promo code"
+              aria-label="Promo code"
+              autoComplete="off"
+              spellCheck={false}
+            />
+          </label>
+          <button
+            type="submit"
+            className={
+              variant === 'site'
+                ? 'nx-btn nx-btn--outline loyalty-promo__apply'
+                : 'btn-secondary loyalty-promo__apply'
+            }
+            disabled={busy || !promoCode.trim()}
+          >
             {busy ? '…' : 'Apply'}
           </button>
           {loyalty.activePromoCode && (
@@ -164,11 +163,14 @@ export function LoyaltySummaryCard({
               disabled={busy}
               onClick={() => void clearPromo()}
             >
-              Clear promo
+              Clear
             </button>
           )}
         </form>
       )}
+      {showPromo && !loyalty.activePromoCode ? (
+        <p className="loyalty-promo__hint">e.g. NEXUS10 · stacks with loyalty</p>
+      ) : null}
       {msg && (
         <p className={variant === 'site' ? 'nx-success' : 'text-muted'} style={{ marginTop: '0.5rem' }}>
           {msg}

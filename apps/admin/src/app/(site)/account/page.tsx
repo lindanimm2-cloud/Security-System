@@ -15,6 +15,8 @@ import { useSiteClient } from '@/components/site/SiteClientProvider';
 import { canUseClientSessionForPortal } from '@/lib/auth';
 import { clientApi, type ApiResponse } from '@/lib/api-client';
 import { friendlyErrorMessage } from '@/lib/friendly-error';
+import { OpsDialog } from '@/components/ops/OpsDialog';
+import { useActionHandoff } from '@/hooks/useActionHandoff';
 
 type AccountPanel = 'home' | 'subscription' | 'services';
 
@@ -95,6 +97,7 @@ function AccountPageInner() {
   const { ready, session, profile, fullName, signIn, signOut, refresh } =
     useSiteClient();
   const { cartCount, setDrawerOpen } = useCart();
+  const handoff = useActionHandoff();
   const [panel, setPanel] = useState<AccountPanel>('home');
   const [authMode, setAuthMode] = useState<SiteAuthMode>(
     searchParams.get('mode') === 'register' ? 'register' : 'signin',
@@ -219,12 +222,14 @@ function AccountPageInner() {
   }
 
   function handleSignOut() {
-    signOut();
-    setEditingProfile(false);
-    setProfileMsg('');
-    setProfileError('');
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-    router.replace('/account');
+    handoff.begin('sign-out', () => {
+      signOut();
+      setEditingProfile(false);
+      setProfileMsg('');
+      setProfileError('');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      router.replace('/account');
+    });
   }
 
   function startEditProfile() {
@@ -306,9 +311,17 @@ function AccountPageInner() {
 
   if (!ready) {
     return (
-      <section className="nx-section">
-        <LoadingSpinner label="Loading account…" />
-      </section>
+      <LoadingSpinner
+        brand
+        fullScreen
+        action="session-check"
+        label="Loading your account…"
+        hints={[
+          'Checking your shop session.',
+          'System updates underway…',
+          'Pulling orders and cover details.',
+        ]}
+      />
     );
   }
 
@@ -396,6 +409,7 @@ function AccountPageInner() {
 
   return (
     <>
+      {handoff.overlay}
       <section className="nx-page-hero nx-page-hero--rich">
         <div className="nx-page-hero-inner">
           <p className="nx-eyebrow">Account</p>
@@ -616,88 +630,56 @@ function AccountPageInner() {
               <h2>
                 {isProtectionClient ? 'Client profile' : 'Store profile'}
               </h2>
-              {!editingProfile ? (
-                <>
-                  <dl className="nx-account-dl">
-                    <div>
-                      <dt>Name</dt>
-                      <dd>{fullName}</dd>
-                    </div>
-                    <div>
-                      <dt>Email</dt>
-                      <dd>{profile?.email ?? session.user.email}</dd>
-                    </div>
-                    <div>
-                      <dt>Phone</dt>
-                      <dd>{profile?.phone || 'Not set'}</dd>
-                    </div>
-                    <div>
-                      <dt>Account type</dt>
-                      <dd>
-                        {isProtectionClient
-                          ? 'Protection client'
-                          : 'Store shopper (guest / website account)'}
-                      </dd>
-                    </div>
-                  </dl>
-                  {profileMsg && <p className="nx-success">{profileMsg}</p>}
-                  <div className="nx-section-cta">
-                    {isProtectionClient && (
-                      <button
-                        type="button"
-                        className="nx-btn nx-btn--primary"
-                        onClick={openPortal}
-                      >
-                        {canUseClientSessionForPortal()
-                          ? 'Open protection portal'
-                          : 'Sign in to protection portal'}
-                      </button>
-                    )}
-                    <button
-                      type="button"
-                      className="nx-btn nx-btn--outline"
-                      onClick={startEditProfile}
-                    >
-                      Edit profile
-                    </button>
-                    <button
-                      type="button"
-                      className="nx-btn nx-btn--ghost"
-                      onClick={handleSignOut}
-                    >
-                      Sign out
-                    </button>
-                  </div>
-                </>
-              ) : (
-                <form className="nx-account-form" onSubmit={saveProfile}>
-                  <label>
-                    Phone
-                    <input
-                      type="tel"
-                      value={phoneDraft}
-                      onChange={(e) => setPhoneDraft(e.target.value)}
-                    />
-                  </label>
-                  {profileError && <ErrorAlert error={profileError} />}
-                  <div className="nx-section-cta">
-                    <button
-                      type="submit"
-                      className="nx-btn nx-btn--primary"
-                      disabled={savingProfile}
-                    >
-                      {savingProfile ? 'Saving…' : 'Save profile'}
-                    </button>
-                    <button
-                      type="button"
-                      className="nx-btn nx-btn--ghost"
-                      onClick={() => setEditingProfile(false)}
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                </form>
-              )}
+              <dl className="nx-account-dl">
+                <div>
+                  <dt>Name</dt>
+                  <dd>{fullName}</dd>
+                </div>
+                <div>
+                  <dt>Email</dt>
+                  <dd>{profile?.email ?? session.user.email}</dd>
+                </div>
+                <div>
+                  <dt>Phone</dt>
+                  <dd>{profile?.phone || 'Not set'}</dd>
+                </div>
+                <div>
+                  <dt>Account type</dt>
+                  <dd>
+                    {isProtectionClient
+                      ? 'Protection client'
+                      : 'Store shopper (guest / website account)'}
+                  </dd>
+                </div>
+              </dl>
+              {profileMsg && <p className="nx-success">{profileMsg}</p>}
+              <div className="nx-section-cta">
+                {isProtectionClient && (
+                  <button
+                    type="button"
+                    className="nx-btn nx-btn--primary"
+                    onClick={openPortal}
+                  >
+                    {canUseClientSessionForPortal()
+                      ? 'Open protection portal'
+                      : 'Sign in to protection portal'}
+                  </button>
+                )}
+                <button
+                  type="button"
+                  className="nx-btn nx-btn--outline"
+                  onClick={startEditProfile}
+                >
+                  Edit profile
+                </button>
+                <button
+                  type="button"
+                  className="nx-btn nx-btn--ghost"
+                  onClick={handleSignOut}
+                >
+                  Sign out
+                </button>
+              </div>
             </div>
 
             <div className="nx-account-card">
@@ -815,6 +797,41 @@ function AccountPageInner() {
           </div>
         )}
       </section>
+      {editingProfile && (
+        <OpsDialog
+          title="Edit profile"
+          subtitle="Update the phone number on this account."
+          onClose={() => setEditingProfile(false)}
+        >
+          <form className="nx-account-form" onSubmit={saveProfile}>
+            <label>
+              Phone
+              <input
+                type="tel"
+                value={phoneDraft}
+                onChange={(e) => setPhoneDraft(e.target.value)}
+              />
+            </label>
+            {profileError && <ErrorAlert error={profileError} />}
+            <div className="nx-section-cta">
+              <button
+                type="submit"
+                className="nx-btn nx-btn--primary"
+                disabled={savingProfile}
+              >
+                {savingProfile ? 'Saving…' : 'Save profile'}
+              </button>
+              <button
+                type="button"
+                className="nx-btn nx-btn--ghost"
+                onClick={() => setEditingProfile(false)}
+              >
+                Cancel
+              </button>
+            </div>
+          </form>
+        </OpsDialog>
+      )}
     </>
   );
 }

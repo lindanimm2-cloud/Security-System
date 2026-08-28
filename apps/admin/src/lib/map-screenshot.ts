@@ -31,30 +31,36 @@ function clientAlias(membershipNumber: string | null | undefined, index: number)
 }
 
 export function maskMapDataForScreenshot(data: MapCommandData): MapCommandData {
+  const clientsIn = data.clients ?? [];
+  const officersIn = data.officers ?? [];
+  const incidentsIn = data.incidents ?? [];
+  const vehiclesIn = data.vehicles ?? [];
+  const propertiesIn = data.properties ?? [];
+
   const clientNameToAlias = new Map(
-    data.clients.map((c, i) => [c.name, clientAlias(c.membershipNumber, i)]),
+    clientsIn.map((c, i) => [c.name, clientAlias(c.membershipNumber, i)]),
   );
   const clientIdToAlias = new Map(
-    data.clients.map((c, i) => [c.id, clientAlias(c.membershipNumber, i)]),
+    clientsIn.map((c, i) => [c.id, clientAlias(c.membershipNumber, i)]),
   );
 
-  const officerNameToUnit = new Map(data.officers.map((o) => [o.name, o.unitNumber]));
-  const officerIdToUnit = new Map(data.officers.map((o) => [o.id, o.unitNumber]));
+  const officerNameToUnit = new Map(officersIn.map((o) => [o.name, o.unitNumber]));
+  const officerIdToUnit = new Map(officersIn.map((o) => [o.id, o.unitNumber]));
 
-  const clients = data.clients.map((c, i) => ({
+  const clients = clientsIn.map((c, i) => ({
     ...c,
     name: clientAlias(c.membershipNumber, i),
     membershipNumber: c.membershipNumber ? screenshotId(c.membershipNumber) : null,
     validUntil: c.validUntil ? screenshotId(c.validUntil) : null,
     phone: maskPhone(),
-    emergencyContacts: c.emergencyContacts.map((ec, j) => ({
+    emergencyContacts: (c.emergencyContacts ?? []).map((ec, j) => ({
       name: `Contact ${j + 1}`,
       phone: maskPhone(),
     })),
     updatedAt: FROZEN_ISO,
   }));
 
-  const officers = data.officers.map((o) => ({
+  const officers = officersIn.map((o) => ({
     ...o,
     name: o.unitNumber,
     avatarUrl: null,
@@ -65,7 +71,7 @@ export function maskMapDataForScreenshot(data: MapCommandData): MapCommandData {
     })),
   }));
 
-  const incidents = data.incidents.map((inc, i) => ({
+  const incidents = incidentsIn.map((inc, i) => ({
     ...inc,
     name:
       (inc.clientUserId && clientIdToAlias.get(inc.clientUserId)) ||
@@ -77,7 +83,7 @@ export function maskMapDataForScreenshot(data: MapCommandData): MapCommandData {
     createdAt: FROZEN_ISO,
   }));
 
-  const vehicles = data.vehicles.map((v) => ({
+  const vehicles = vehiclesIn.map((v) => ({
     ...v,
     owner: clientNameToAlias.get(v.owner) ?? 'Client vehicle',
     updatedAt: FROZEN_ISO,
@@ -92,7 +98,7 @@ export function maskMapDataForScreenshot(data: MapCommandData): MapCommandData {
     updatedAt: FROZEN_ISO,
   }));
 
-  const properties = data.properties.map((p, i) => ({
+  const properties = propertiesIn.map((p, i) => ({
     ...p,
     name: p.name.startsWith('Home') || p.name.startsWith('Property') ? `Property ${i + 1}` : p.name,
     owner: clientNameToAlias.get(p.owner) ?? 'Subscriber',

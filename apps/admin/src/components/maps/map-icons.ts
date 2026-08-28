@@ -81,7 +81,7 @@ const PROPERTY_GLYPH: Record<PropertyType, { glyph: string; cls: string }> = {
 };
 
 const INCIDENT_GLYPH: Record<IncidentCategory, { glyph: string; cls: string; size: number }> = {
-  PANIC: { glyph: '!', cls: 'incident--panic', size: 38 },
+  PANIC: { glyph: '!', cls: 'incident--panic', size: 42 },
   SILENT_PANIC: { glyph: 'SP', cls: 'incident--silent', size: 34 },
   THEFT_RECOVERY: { glyph: 'TR', cls: 'incident--theft', size: 34 },
   MEDICAL: { glyph: '+', cls: 'incident--medical', size: 34 },
@@ -93,8 +93,8 @@ const INCIDENT_GLYPH: Record<IncidentCategory, { glyph: string; cls: string; siz
   COMMUNITY: { glyph: 'CA', cls: 'incident--community', size: 32 },
 };
 
-export function clientIcon(type: ClientType) {
-  const { glyph, cls } = CLIENT_GLYPH[type];
+export function clientIcon(type: ClientType | string) {
+  const { glyph, cls } = CLIENT_GLYPH[(type as ClientType)] ?? CLIENT_GLYPH.STANDARD;
   return divIcon(
     `<div class="map-marker map-marker--client ${cls}">${glyph}</div>`,
     `map-marker-wrap--client ${cls}`,
@@ -114,8 +114,8 @@ export function officerIcon(type: OfficerType | string, avatarUrl?: string | nul
   );
 }
 
-export function vehicleIcon(type: VehicleType) {
-  const { glyph, cls } = VEHICLE_GLYPH[type];
+export function vehicleIcon(type: VehicleType | string) {
+  const { glyph, cls } = VEHICLE_GLYPH[(type as VehicleType)] ?? VEHICLE_GLYPH.CLIENT;
   return divIcon(
     `<div class="map-marker map-marker--vehicle ${cls}">${glyph}</div>`,
     `map-marker-wrap--vehicle ${cls}`,
@@ -149,8 +149,8 @@ export function fleetIcon(vehicleType: string, crewCount: number) {
   );
 }
 
-export function propertyIcon(type: PropertyType) {
-  const { glyph, cls } = PROPERTY_GLYPH[type];
+export function propertyIcon(type: PropertyType | string) {
+  const { glyph, cls } = PROPERTY_GLYPH[(type as PropertyType)] ?? PROPERTY_GLYPH.REGISTERED_HOME;
   return divIcon(
     `<div class="map-marker map-marker--property ${cls}">${glyph}</div>`,
     `map-marker-wrap--property ${cls}`,
@@ -159,8 +159,8 @@ export function propertyIcon(type: PropertyType) {
   );
 }
 
-export function incidentIcon(category: IncidentCategory) {
-  const { glyph, cls, size } = INCIDENT_GLYPH[category];
+export function incidentIcon(category: IncidentCategory | string) {
+  const { glyph, cls, size } = INCIDENT_GLYPH[(category as IncidentCategory)] ?? INCIDENT_GLYPH.SUSPICIOUS;
   const pulse = category === 'PANIC' || category === 'SILENT_PANIC' || category === 'THEFT_RECOVERY';
   return divIcon(
     `<div class="map-marker map-marker--incident ${cls}">${glyph}</div>`,

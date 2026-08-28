@@ -253,7 +253,12 @@ export default function CommandCentreMap({
   onSelectIncident,
   onDispatchAssigned,
 }: CommandCentreMapProps) {
-  const followIncident = data.incidents.find((i) => i.id === followIncidentId) ?? null;
+  const clients = data.clients ?? [];
+  const officers = data.officers ?? [];
+  const vehicles = data.vehicles ?? [];
+  const properties = data.properties ?? [];
+  const mapIncidents = data.incidents ?? [];
+  const followIncident = mapIncidents.find((i) => i.id === followIncidentId) ?? null;
   const [overlapAnchor, setOverlapAnchor] = useState<L.LatLng | null>(null);
   const [overlapPins, setOverlapPins] = useState<OverlapPinOption[]>([]);
   const popupOpenersRef = useRef<Map<string, () => void>>(new Map());
@@ -269,7 +274,7 @@ export default function CommandCentreMap({
     };
 
     if (visibility.clients) {
-      data.clients.forEach((c) => {
+      clients.forEach((c) => {
         const pinId = `client-${c.id}`;
         const groupKey = overlapGroupKey(c.lat, c.lng);
         addSpread(pinId, c.lat, c.lng);
@@ -288,7 +293,7 @@ export default function CommandCentreMap({
     }
 
     if (visibility.officers) {
-      data.officers.forEach((o) => {
+      officers.forEach((o) => {
         const pinId = `officer-${o.id}`;
         const groupKey = overlapGroupKey(o.lat, o.lng);
         addSpread(pinId, o.lat, o.lng);
@@ -326,7 +331,7 @@ export default function CommandCentreMap({
     }
 
     if (visibility.vehicles) {
-      data.vehicles
+      vehicles
         .filter((v) => v.vehicleType !== 'STOLEN')
         .forEach((v) => {
           const pinId = `vehicle-${v.id}`;
@@ -347,7 +352,7 @@ export default function CommandCentreMap({
     }
 
     if (visibility.properties) {
-      data.properties.forEach((p) => {
+      properties.forEach((p) => {
         const pinId = `property-${p.id}`;
         const groupKey = overlapGroupKey(p.lat, p.lng);
         addSpread(pinId, p.lat, p.lng);
@@ -366,7 +371,7 @@ export default function CommandCentreMap({
     }
 
     if (visibility.incidents) {
-      data.incidents.forEach((incident) => {
+      mapIncidents.forEach((incident) => {
         const pinId = `incident-${incident.id}`;
         const groupKey = overlapGroupKey(incident.lat, incident.lng);
         addSpread(pinId, incident.lat, incident.lng);
@@ -385,7 +390,7 @@ export default function CommandCentreMap({
     }
 
     if (visibility.vehicles) {
-      data.vehicles
+      vehicles
         .filter((v) => v.vehicleType === 'STOLEN')
         .forEach((v) => {
           const pinId = `stolen-${v.id}`;
@@ -411,7 +416,7 @@ export default function CommandCentreMap({
       incidentPins: incidents,
       stolenPins: stolen,
     };
-  }, [data, visibility]);
+  }, [clients, officers, vehicles, properties, mapIncidents, data.fleet, visibility]);
 
   const spreadPositions = useMemo(
     () => spreadOverlappingMarkers(spreadSources),
@@ -464,12 +469,12 @@ export default function CommandCentreMap({
     return pts;
   }, [spreadSources, spreadPositions]);
 
-  const stolenVehicles = data.vehicles.filter((v) => v.vehicleType === 'STOLEN');
+  const stolenVehicles = vehicles.filter((v) => v.vehicleType === 'STOLEN');
 
   return (
     <div className="command-map-container">
       <MapContainer
-        center={[data.center.lat, data.center.lng]}
+        center={[data.center?.lat ?? -29.8587, data.center?.lng ?? 31.0218]}
         zoom={12}
         scrollWheelZoom
         zoomControl={false}
@@ -502,8 +507,8 @@ export default function CommandCentreMap({
         />
 
         {visibility.trails &&
-          data.incidents.map((incident) => {
-            if (incident.trail.length < 2) return null;
+          mapIncidents.map((incident) => {
+            if ((incident.trail?.length ?? 0) < 2) return null;
             const active =
               incident.category === 'THEFT_RECOVERY' ||
               incident.category === 'PANIC' ||
@@ -529,7 +534,7 @@ export default function CommandCentreMap({
           })}
 
         {visibility.incidents &&
-          data.incidents.map((incident) => {
+          mapIncidents.map((incident) => {
             const pinId = `incident-${incident.id}`;
             const pin = incidentPins.find((p) => p.pinId === pinId);
             if (!pin) return null;

@@ -6,18 +6,19 @@ import { useApi } from '@/hooks/useApi';
 import { clientApi, type ApiResponse } from '@/lib/api-client';
 import { friendlyErrorMessage } from '@/lib/friendly-error';
 import { HoldToActivate } from '@/components/ops/EmergencyMode';
+import { CONTROL_ROOM_LINE } from '@/lib/control-room-line';
 
 type DispatchMeta = {
   meta?: { dispatchLine: { name: string; phone: string } };
 };
 
-const DEFAULT_DISPATCH = { name: '4DS Dispatch', phone: '+27110000000' };
+const DEFAULT_DISPATCH = CONTROL_ROOM_LINE;
 
 export function MiniCallSafetyBar({
   variant = 'floating',
   onStatus,
 }: {
-  variant?: 'floating' | 'inline';
+  variant?: 'floating' | 'inline' | 'docked';
   onStatus?: (message: string) => void;
 }) {
   const calls = useCallsOptional();
@@ -59,22 +60,30 @@ export function MiniCallSafetyBar({
 
   return (
     <div
-      className={`silent-call-fab ${variant === 'inline' ? 'silent-call-fab--inline' : 'silent-call-fab--floating'}`}
+      className={`silent-call-fab ${
+        variant === 'inline'
+          ? 'silent-call-fab--inline'
+          : variant === 'docked'
+            ? 'silent-call-fab--docked'
+            : 'silent-call-fab--floating'
+      }`}
     >
       <HoldToActivate
-        label="Silent call"
+        label="Silent Panic. Hold for 2 seconds to notify dispatch discreetly."
         holdLabel="Hold"
-        holdMs={1200}
+        holdMs={2000}
         tone="warn"
         className="silent-call-fab__btn"
         disabled={callBusy}
         loading={callBusy}
+        hideHint
+        keepLabel
         onActivate={() => startSilentCall()}
       >
         <span className="silent-call-fab__icon" aria-hidden>
           <MutePhoneIcon />
         </span>
-        <span className="silent-call-fab__text">{callBusy ? '…' : 'Silent'}</span>
+        <span className="silent-call-fab__text">{callBusy ? '…' : 'Silent Panic'}</span>
       </HoldToActivate>
     </div>
   );

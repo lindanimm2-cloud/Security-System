@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { adminApi, clientApi } from '@/lib/api-client';
-import { sensorStatusLabel, sensorTypeLabel } from '@/lib/sa-alarm';
+import { sensorStatusLabel, sensorStatusTone, sensorTypeLabel } from '@/lib/sa-alarm';
 
 export type SensorRow = {
   id: string;
@@ -87,22 +87,22 @@ export function SensorZonePanel({
             key={s.id}
             className={`sensor-tile sensor-tile--${s.status.toLowerCase()} ${s.bypassed ? 'sensor-tile--bypassed' : ''}`}
           >
-            <div className="sensor-tile__top">
+            <div className="sensor-tile__id">
               <span className="sensor-tile__zone">Z{s.zoneNumber}</span>
-              <span className={`status-pill status-pill--${s.status.toLowerCase()}`}>
-                {sensorStatusLabel(s.status)}
+              <span className={`status-pill status-pill--${sensorStatusTone(s.status, s.bypassed)}`}>
+                {s.bypassed ? 'Bypassed' : sensorStatusLabel(s.status)}
               </span>
             </div>
-            <strong className="sensor-tile__name">{s.name}</strong>
-            <p className="sensor-tile__meta">
-              {sensorTypeLabel(s.sensorType)}
-              {s.isPerimeter ? ' · Perimeter' : ''}
-              {s.is24Hour ? ' · 24hr' : ''}
-            </p>
-            <p className="sensor-tile__meta">{s.locationLabel}</p>
-            {s.cidCode && (
-              <p className="sensor-tile__cid">CID {s.cidCode}{s.vendor ? ` · ${s.vendor}` : ''}</p>
-            )}
+            <div className="sensor-tile__body">
+              <strong className="sensor-tile__name">{s.name}</strong>
+              <p className="sensor-tile__meta">
+                {sensorTypeLabel(s.sensorType)}
+                {s.locationLabel ? ` · ${s.locationLabel}` : ''}
+                {s.isPerimeter ? ' · Perimeter' : ''}
+                {s.is24Hour ? ' · 24hr' : ''}
+                {s.cidCode ? ` · CID ${s.cidCode}` : ''}
+              </p>
+            </div>
             <div className="sensor-tile__actions">
               {canBypass && !s.is24Hour && (
                 <button

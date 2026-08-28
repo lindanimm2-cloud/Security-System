@@ -2,6 +2,8 @@ import { BadRequestException, ForbiddenException, Injectable, NotFoundException 
 import { CallChannel, CallStatus, UserRole } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
 import { RealtimeGateway } from '../realtime/realtime.gateway';
+import { PlatformEvent } from '../incident-kernel/incident-events';
+import { IncidentKernelService } from '../incident-kernel/incident-kernel.service';
 import { canContactDeveloper, isDeveloper } from '../../common/developer-access';
 
 type CallUser = {
@@ -39,6 +41,7 @@ export class CallsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly realtime: RealtimeGateway,
+    private readonly kernel: IncidentKernelService,
   ) {}
 
   private formatCall(session: Awaited<ReturnType<typeof this.loadCall>>) {
@@ -95,6 +98,26 @@ export class CallsService {
 
   private emitCallEvent(tenantId: string, event: string, payload: Record<string, unknown>) {
     this.realtime.emitCallEvent(tenantId, event, payload);
+    const platform =
+      event === 'call:started' || event === 'call:incoming'
+        ? 'call.started'
+        : event === 'call:ended'
+          ? 'call.ended'
+          : null;
+    if (platform) {
+      const incidentId = typeof payload.incidentId === 'string' ? payload.incidentId : null;
+      if (incidentId) {
+        void this.kernel.recordEvent({
+          tenantId,
+          incidentId,
+          type: platform === 'call.started' ? PlatformEvent.CALL_STARTED : PlatformEvent.CALL_ENDED,
+          source: 'system',
+          payload: { ...payload, callEvent: event },
+        });
+      } else {
+        this.realtime.emitPlatformEvent(tenantId, platform, { ...payload, callEvent: event });
+      }
+    }
   }
 
   async getDirectory(tenantId: string, viewerRole?: UserRole) {

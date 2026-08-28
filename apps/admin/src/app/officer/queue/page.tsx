@@ -16,6 +16,7 @@ import {
   primaryTaskAction,
 } from '@/lib/officer-task-theme';
 import { officerApi, type ApiResponse } from '@/lib/api-client';
+import { shouldBackgroundPoll } from '@/lib/demo/is-demo-mode';
 import { friendlyErrorMessage } from '@/lib/friendly-error';
 
 type QueueData = {
@@ -78,6 +79,7 @@ function QueueContent() {
   const undo = useUndoToast();
 
   useEffect(() => {
+    if (!shouldBackgroundPoll()) return;
     const id = window.setInterval(() => void reload({ silent: true }), 20000);
     return () => window.clearInterval(id);
   }, [reload]);

@@ -16,6 +16,8 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
+import { IncidentKernelService } from '../incident-kernel/incident-kernel.service';
+import { PlatformEvent } from '../incident-kernel/incident-events';
 
 const DURBAN = { lat: -29.8587, lng: 31.0218 };
 
@@ -68,7 +70,10 @@ const SENSOR_CID: Partial<Record<SensorType, { code: string; event: AlarmEventTy
 
 @Injectable()
 export class SurveillanceService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly kernel: IncidentKernelService,
+  ) {}
 
   private async resolveInteriorUnlock(property: {
     id: string;
@@ -785,6 +790,15 @@ export class SurveillanceService {
       },
     });
 
+    await this.kernel.recordEvent({
+      tenantId,
+      incidentId: updated.incidentId,
+      type: PlatformEvent.ALARM_ACKNOWLEDGED,
+      source: 'control-room',
+      actorUserId,
+      payload: { alarmEventId: eventId },
+    });
+
     return { success: true, data: this.formatEvent(updated) };
   }
 
@@ -839,23 +853,26 @@ export class SurveillanceService {
     });
     if (!event) throw new NotFoundException('Alarm event not found');
 
-    const incident = await this.prisma.incident.create({
-      data: {
-        tenantId,
-        userId: event.property.userId,
-        type: IncidentType.ALARM,
-        status: 'ACTIVE',
-        priority: event.severity,
-        title: event.title,
-        description:
-          event.description ??
-          `Surveillance alarm at ${event.property.name}${event.camera ? ` · ${event.camera.name}` : ''}${
-            event.sensor ? ` · Zone ${event.sensor.zoneNumber}` : ''
-          }`,
-        address: event.property.address,
-        lat: event.property.lat ?? DURBAN.lat,
-        lng: event.property.lng ?? DURBAN.lng,
-      },
+    const incident = await this.kernel.createFromEmergency({
+      tenantId,
+      userId: event.property.userId,
+      type: IncidentType.ALARM,
+      title: event.title,
+      description:
+        event.description ??
+        `Surveillance alarm at ${event.property.name}${event.camera ? ` · ${event.camera.name}` : ''}${
+          event.sensor ? ` · Zone ${event.sensor.zoneNumber}` : ''
+        }`,
+      lat: Number(event.property.lat ?? DURBAN.lat),
+      lng: Number(event.property.lng ?? DURBAN.lng),
+      address: event.property.address,
+      priority: event.severity,
+      propertyId: event.propertyId,
+      source: 'control-room',
+      actorUserId,
+      kind: 'alarm',
+      autoDispatch: true,
+      alarmEventId: eventId,
     });
 
     const updated = await this.prisma.alarmEvent.update({

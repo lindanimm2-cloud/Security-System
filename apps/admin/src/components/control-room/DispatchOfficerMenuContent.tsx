@@ -106,6 +106,7 @@ export function DispatchOfficerMenuContent({
   }
 
   const dispatchOptions = options;
+  const alreadyAssigned = Boolean(dispatchOptions.assignedOfficer);
 
   if (!dispatchOptions.canDispatch) {
     return (
@@ -122,7 +123,7 @@ export function DispatchOfficerMenuContent({
 
   function renderOfficerRow(
     o: (typeof dispatchOptions.officers)[0],
-    assignLabel = 'Assign',
+    assignLabel = alreadyAssigned ? 'Reassign' : 'Assign',
   ) {
     const unit = officerUnitLabel(o);
     return (
@@ -167,9 +168,21 @@ export function DispatchOfficerMenuContent({
           disabled={assigning !== null}
           onClick={() => runAssign()}
         >
-          {assigning === 'auto' ? <LoadingSpinner label="" size="sm" /> : 'Auto'}
+          {assigning === 'auto' ? (
+            <LoadingSpinner label="" size="sm" />
+          ) : alreadyAssigned ? (
+            'Reassign nearest'
+          ) : (
+            'Auto'
+          )}
         </button>
       </div>
+
+      {alreadyAssigned && (
+        <p className="dispatch-mini-menu__status">
+          Currently assigned to {dispatchOptions.assignedOfficer}. Choose another unit to reassign.
+        </p>
+      )}
 
       {dispatchOptions.volunteers?.length > 0 && (
         <>

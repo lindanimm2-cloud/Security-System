@@ -658,6 +658,7 @@ async function main() {
     data: {
       tenantId: tenant.id,
       userId: client.id,
+      publicRef: 'NX-0001',
       type: IncidentType.PANIC,
       status: IncidentStatus.RESOLVED,
       priority: IncidentPriority.CRITICAL,
@@ -701,11 +702,11 @@ async function main() {
 
   await prisma.incident.createMany({
     data: [
-      { tenantId: tenant.id, userId: client.id, type: IncidentType.THEFT, status: IncidentStatus.ACTIVE, priority: IncidentPriority.HIGH, title: 'Vehicle Theft', lat: DURBAN.berea.lat, lng: DURBAN.berea.lng, address: `${DURBAN.berea.label}, Durban`, vehicleMake: 'Toyota', vehicleModel: 'Hilux', vehicleColor: 'White', vehiclePlate: 'ND 458 DB' },
-      { tenantId: tenant.id, userId: client.id, type: IncidentType.MEDICAL, status: IncidentStatus.ACTIVE, priority: IncidentPriority.MEDIUM, title: 'Medical Assistance', lat: DURBAN.westville.lat, lng: DURBAN.westville.lng, address: `${DURBAN.westville.label}, Durban` },
-      { tenantId: tenant.id, userId: client.id, type: IncidentType.THEFT, status: IncidentStatus.ACTIVE, priority: IncidentPriority.HIGH, title: 'Vehicle Recovery', lat: DURBAN.pinetown.lat, lng: DURBAN.pinetown.lng, address: `${DURBAN.pinetown.label}, Durban`, vehicleMake: 'VW', vehicleModel: 'Polo', vehicleColor: 'Silver', vehiclePlate: 'ND 902 DB' },
-      { tenantId: tenant.id, userId: client.id, type: IncidentType.ASSAULT, status: IncidentStatus.ACTIVE, priority: IncidentPriority.CRITICAL, title: 'Assault Report', lat: DURBAN.floridaRd.lat, lng: DURBAN.floridaRd.lng, address: `${DURBAN.floridaRd.label}, Durban` },
-      { tenantId: tenant.id, userId: client.id, type: IncidentType.OTHER, status: IncidentStatus.EN_ROUTE, priority: IncidentPriority.LOW, title: 'Suspicious Activity', lat: DURBAN.umhlanga.lat, lng: DURBAN.umhlanga.lng, address: `${DURBAN.umhlanga.label}, Durban` },
+      { tenantId: tenant.id, userId: client.id, publicRef: 'NX-0002', type: IncidentType.THEFT, status: IncidentStatus.ACTIVE, priority: IncidentPriority.HIGH, title: 'Vehicle Theft', lat: DURBAN.berea.lat, lng: DURBAN.berea.lng, address: `${DURBAN.berea.label}, Durban`, vehicleMake: 'Toyota', vehicleModel: 'Hilux', vehicleColor: 'White', vehiclePlate: 'ND 458 DB' },
+      { tenantId: tenant.id, userId: client.id, publicRef: 'NX-0003', type: IncidentType.MEDICAL, status: IncidentStatus.ACTIVE, priority: IncidentPriority.MEDIUM, title: 'Medical Assistance', lat: DURBAN.westville.lat, lng: DURBAN.westville.lng, address: `${DURBAN.westville.label}, Durban` },
+      { tenantId: tenant.id, userId: client.id, publicRef: 'NX-0004', type: IncidentType.THEFT, status: IncidentStatus.ACTIVE, priority: IncidentPriority.HIGH, title: 'Vehicle Recovery', lat: DURBAN.pinetown.lat, lng: DURBAN.pinetown.lng, address: `${DURBAN.pinetown.label}, Durban`, vehicleMake: 'VW', vehicleModel: 'Polo', vehicleColor: 'Silver', vehiclePlate: 'ND 902 DB' },
+      { tenantId: tenant.id, userId: client.id, publicRef: 'NX-0005', type: IncidentType.ASSAULT, status: IncidentStatus.ACTIVE, priority: IncidentPriority.CRITICAL, title: 'Assault Report', lat: DURBAN.floridaRd.lat, lng: DURBAN.floridaRd.lng, address: `${DURBAN.floridaRd.label}, Durban` },
+      { tenantId: tenant.id, userId: client.id, publicRef: 'NX-0006', type: IncidentType.OTHER, status: IncidentStatus.EN_ROUTE, priority: IncidentPriority.LOW, title: 'Suspicious Activity', lat: DURBAN.umhlanga.lat, lng: DURBAN.umhlanga.lng, address: `${DURBAN.umhlanga.label}, Durban` },
     ],
   });
 
@@ -724,6 +725,104 @@ async function main() {
       medications: 'Metformin 500mg daily',
       chronicConditions: 'Type 2 Diabetes',
       emergencyNotes: 'Insulin stored in fridge. Contact James if unresponsive.',
+      doctorContact: 'Dr Naidoo · +27 31 555 0199',
+      ambulancePreference: 'Netcare 911',
+    },
+  });
+
+  await prisma.trustedDevice.deleteMany({ where: { userId: client.id } });
+  await prisma.clientSecuritySettings.deleteMany({ where: { userId: client.id } });
+  await prisma.securityConsent.deleteMany({ where: { userId: client.id } });
+  await prisma.trustedDevice.createMany({
+    data: [
+      {
+        id: '00000000-0000-4000-8000-00000000d001',
+        tenantId: tenant.id,
+        userId: client.id,
+        publicId: 'SEC-DEVICE-S24ULTRA01',
+        name: 'Samsung Galaxy S24 Ultra',
+        deviceType: 'mobile',
+        osName: 'Android',
+        osVersion: '15',
+        appVersion: '4.2.1',
+        status: 'TRUSTED',
+        isPrimary: true,
+        nativeSos: 'NOT_AVAILABLE',
+        nativeSosNote:
+          "Your device's native Emergency SOS operates independently from this application. This web application cannot intercept protected OS-level Emergency SOS events.",
+        lastActiveAt: new Date(),
+        lastAuthAt: new Date(),
+        updatedAt: new Date(),
+      },
+      {
+        id: '00000000-0000-4000-8000-00000000d002',
+        tenantId: tenant.id,
+        userId: client.id,
+        publicId: 'SEC-DEVICE-IPHONE1501',
+        name: 'iPhone 15',
+        deviceType: 'mobile',
+        osName: 'iOS',
+        osVersion: '17.5',
+        appVersion: '4.2.1',
+        status: 'TRUSTED',
+        isPrimary: false,
+        nativeSos: 'NOT_AVAILABLE',
+        nativeSosNote:
+          "Apple's Emergency SOS is controlled by iOS. Some Emergency SOS actions may operate independently from this application.",
+        lastActiveAt: new Date(Date.now() - 36e5),
+        lastAuthAt: new Date(Date.now() - 36e5),
+        updatedAt: new Date(),
+      },
+      {
+        id: '00000000-0000-4000-8000-00000000d003',
+        tenantId: tenant.id,
+        userId: client.id,
+        publicId: 'SEC-DEVICE-CHROMEWIN1',
+        name: 'Chrome / Windows',
+        deviceType: 'desktop',
+        osName: 'Windows',
+        osVersion: '11',
+        appVersion: '4.2.1',
+        status: 'TEMPORARY',
+        isPrimary: false,
+        nativeSos: 'NOT_AVAILABLE',
+        lastActiveAt: new Date(Date.now() - 7200000),
+        updatedAt: new Date(),
+      },
+      {
+        id: '00000000-0000-4000-8000-00000000d004',
+        tenantId: tenant.id,
+        userId: client.id,
+        publicId: 'SEC-DEVICE-UNKNOWN01',
+        name: 'Unknown device',
+        deviceType: 'unknown',
+        osName: 'Unknown',
+        status: 'BLOCKED',
+        isPrimary: false,
+        nativeSos: 'NOT_AVAILABLE',
+        revokedAt: new Date(Date.now() - 86400000),
+        updatedAt: new Date(),
+      },
+    ],
+  });
+  await prisma.clientSecuritySettings.create({
+    data: {
+      userId: client.id,
+      trackingMode: 'EMERGENCY_ONLY',
+      panicHoldMs: 3000,
+      emergencySessionMinutes: 10,
+      panicTestedAt: new Date(),
+      emergencySetupCompletedAt: new Date(),
+    },
+  });
+  await prisma.securityConsent.create({
+    data: {
+      tenantId: tenant.id,
+      userId: client.id,
+      kind: 'EMERGENCY_SOS',
+      version: '2026-08-18',
+      policyVersion: '1.0',
+      accepted: true,
     },
   });
 

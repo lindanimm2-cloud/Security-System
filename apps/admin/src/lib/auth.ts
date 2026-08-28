@@ -1,5 +1,6 @@
-import { demoLogin, demoRegisterSession, getDemoInvite } from './demo/users';
+import { DEMO_PASSWORD, demoLogin, demoRegisterSession, getDemoInvite } from './demo/users';
 import { isDemoMode } from './demo/is-demo-mode';
+import { setActionKind } from './action-status';
 
 export type AuthUser = {
   id: string;
@@ -312,6 +313,7 @@ export async function oauthClientSignIn(
         firstName: payload.firstName ?? 'OAuth',
         lastName: payload.lastName ?? 'User',
         phone: payload.phone,
+        password: DEMO_PASSWORD,
       }),
       authSource,
     } as AuthSession;
@@ -358,6 +360,7 @@ export async function completeClientRegistration(
         firstName: payload.firstName ?? 'Invite',
         lastName: payload.lastName ?? 'Client',
         phone: payload.phone,
+        password: payload.password,
       }),
       authSource: 'portal' as const,
     } as AuthSession;
@@ -427,6 +430,7 @@ export function clearSession(portal: AuthPortal) {
 export function logoutIfUnauthorized(portal: AuthPortal, status: number) {
   if (status !== 401) return false;
   if (isDemoMode()) return false;
+  setActionKind('session-expired');
   clearSession(portal);
   return true;
 }

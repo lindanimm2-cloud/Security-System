@@ -55,14 +55,16 @@ export function PendingVerificationsPanel() {
       <ul className="billing-doc-list">
         {items.map((v) => (
           <li key={v.id} className="billing-doc-list__item">
-            <div className="billing-doc-list__icon" aria-hidden>
+            <span className={`billing-doc-list__type billing-doc-list__type--${v.type === 'PROPERTY' ? 'property' : 'debit'}`}>
               {v.type === 'PROPERTY' ? 'PRP' : 'DBT'}
-            </div>
+            </span>
             <div className="billing-doc-list__body">
               <strong>{v.summary}</strong>
-              <span className="text-muted">
-                {v.clientName} · {v.clientEmail} · {new Date(v.createdAt).toLocaleString()}
-              </span>
+              <p className="billing-doc-list__meta">
+                <span>{v.clientName}</span>
+                <span>{v.clientEmail}</span>
+                <span>{new Date(v.createdAt).toLocaleString()}</span>
+              </p>
             </div>
             <button
               type="button"

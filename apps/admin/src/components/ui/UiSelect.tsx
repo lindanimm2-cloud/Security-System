@@ -6,6 +6,8 @@ type UiSelectOption = {
   value: string;
   label: string;
   meta?: string;
+  description?: string;
+  disabled?: boolean;
 };
 
 type UiSelectProps = {
@@ -43,8 +45,10 @@ export function UiSelect({
         id: o.value,
         label: o.label,
         meta: o.meta,
+        description: o.description,
+        disabled: o.disabled,
         active: o.value === value,
-        onClick: () => onChange(o.value),
+        onClick: o.disabled ? undefined : () => onChange(o.value),
       }))}
     />
   );

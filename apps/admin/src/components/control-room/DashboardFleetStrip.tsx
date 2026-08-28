@@ -5,13 +5,16 @@ import { useEffect } from 'react';
 import { CctvLiveFeed, type CctvCamera } from '@/components/portal/CctvLiveFeed';
 import { useApi } from '@/hooks/useApi';
 import { adminApi, type ApiResponse } from '@/lib/api-client';
+import { shouldBackgroundPoll } from '@/lib/demo/is-demo-mode';
 import { CONTROL_ROOM_ROUTES } from '@/lib/control-room-routes';
+import { fleetTeamLabel } from '@/lib/fleet-teams';
 
 type FleetVehicle = {
   id: string;
   callSign: string;
   registration: string;
   vehicleType: string;
+  teamName?: string | null;
   status: string;
   crewCount?: number;
   cameras?: CctvCamera[];
@@ -24,6 +27,7 @@ export function DashboardFleetStrip() {
   );
 
   useEffect(() => {
+    if (!shouldBackgroundPoll()) return;
     const id = window.setInterval(() => void reload({ silent: true }), 15000);
     return () => window.clearInterval(id);
   }, [reload]);
@@ -35,7 +39,7 @@ export function DashboardFleetStrip() {
       <div className="panel-header ops-board__pane-head">
         <div>
           <h2>Vehicles</h2>
-          <p className="text-muted">Fleet units · dash cam and status</p>
+          <p className="text-muted">Fleet units · status strip</p>
         </div>
         <Link href={CONTROL_ROOM_ROUTES.fleet} className="link-sm">
           Fleet
@@ -55,11 +59,11 @@ export function DashboardFleetStrip() {
             return (
               <li key={v.id} className={`ops-fleet__item ops-fleet__item--${v.status.toLowerCase()}`}>
                 {cam ? (
-                  <CctvLiveFeed camera={cam} href={CONTROL_ROOM_ROUTES.fleet} />
+                  <CctvLiveFeed camera={cam} href={CONTROL_ROOM_ROUTES.fleet} compact />
                 ) : null}
-                <strong>{v.callSign}</strong>
-                <span>{v.vehicleType.replace(/_/g, ' ')}</span>
-                <em>{v.status.replace(/_/g, ' ')}</em>
+                <strong className="ops-fleet__callsign">{v.callSign}</strong>
+                <span className="ops-fleet__type">{fleetTeamLabel(v.vehicleType, v.teamName)}</span>
+                <em className="ops-fleet__status">{v.status.replace(/_/g, ' ')}</em>
               </li>
             );
           })}

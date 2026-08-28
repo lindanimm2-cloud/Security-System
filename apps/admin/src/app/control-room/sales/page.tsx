@@ -1,6 +1,6 @@
 'use client';
 
-import { FormEvent, useState } from 'react';
+import { FormEvent, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { ControlRoomLayout } from '@/components/control-room/ControlRoomLayout';
 import { ErrorAlert } from '@/components/ErrorAlert';
@@ -10,6 +10,10 @@ import { adminApi, type ApiResponse } from '@/lib/api-client';
 import { getSession } from '@/lib/auth';
 import { CONTROL_ROOM_ROUTES } from '@/lib/control-room-routes';
 import { UiSelect } from '@/components/ui/UiSelect';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { ListSearch } from '@/components/ui/ListSearch';
+import { OpsDialog } from '@/components/ops/OpsDialog';
+import { matchesSearch } from '@/lib/list-search';
 
 type Lead = {
   id: string;
@@ -86,6 +90,8 @@ function SalesCrmContent() {
 
   const [formError, setFormError] = useState('');
   const [saving, setSaving] = useState(false);
+  const [formOpen, setFormOpen] = useState(false);
+  const [search, setSearch] = useState('');
   const [form, setForm] = useState({
     id: '',
     companyName: '',
@@ -118,6 +124,18 @@ function SalesCrmContent() {
         : '',
       ownerUserId: lead.ownerUserId ?? session?.user.id ?? '',
     });
+    setFormOpen(true);
+  }
+
+  function openCreateForm() {
+    resetForm();
+    setFormOpen(true);
+  }
+
+  function closeFormDialog() {
+    resetForm();
+    setFormOpen(false);
+    setFormError('');
   }
 
   function resetForm() {
@@ -156,7 +174,7 @@ function SalesCrmContent() {
         nextFollowUp: form.nextFollowUp || null,
         ownerUserId: form.ownerUserId || null,
       });
-      resetForm();
+      closeFormDialog();
       reload();
     } catch (err) {
       setFormError(err instanceof Error ? err.message : 'Save failed');
@@ -164,6 +182,32 @@ function SalesCrmContent() {
       setSaving(false);
     }
   }
+
+  const dash = data?.data;
+  const filteredLeads = useMemo(
+    () =>
+      (dash?.leads ?? []).filter((lead) =>
+        matchesSearch(
+          search,
+          lead.contactName,
+          lead.companyName,
+          lead.contactEmail,
+          lead.contactPhone,
+          lead.interest,
+          lead.ownerName,
+          lead.status,
+          lead.source,
+        ),
+      ),
+    [dash?.leads, search],
+  );
+  const filteredOrders = useMemo(
+    () =>
+      (dash?.recentOrders ?? []).filter((o) =>
+        matchesSearch(search, o.orderNumber, o.customerName, o.status, o.id),
+      ),
+    [dash?.recentOrders, search],
+  );
 
   if (loading) return <LoadingSpinner label="Loading sales CRM..." />;
   if (error || !data?.data) {
@@ -227,9 +271,101 @@ function SalesCrmContent() {
         ))}
       </div>
 
-      <div className="split-panels" style={{ marginTop: '1.25rem' }}>
-        <div className="card-panel">
-          <h2>{form.id ? 'Edit lead' : 'New lead'}</h2>
+      <div className="card-panel page-section">
+          <div className="card-header-row card-header-row--panel">
+            <h2>Pipeline ({filteredLeads.length})</h2>
+            <button type="button" className="btn-primary btn-sm" onClick={openCreateForm}>
+              + New lead
+            </button>
+          </div>
+          <div className="list-search-bar">
+            <ListSearch
+              value={search}
+              onChange={setSearch}
+              placeholder="Search leads, company, orders…"
+              resultCount={filteredLeads.length + filteredOrders.length}
+              totalCount={leads.length + recentOrders.length}
+            />
+          </div>
+          {filteredLeads.length === 0 ? (
+            <EmptyState
+              title={search.trim() ? 'No matches' : 'No leads'}
+              body={search.trim() ? 'Try another name, company, or interest.' : 'Create a lead to start the pipeline.'}
+            />
+          ) : (
+          <div className="table-wrap">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>Lead</th>
+                  <th>Status</th>
+                  <th>Value</th>
+                  <th>Owner</th>
+                  <th />
+                </tr>
+              </thead>
+              <tbody>
+                {filteredLeads.map((lead) => (
+                  <tr key={lead.id}>
+                    <td>
+                      <div>{lead.contactName}</div>
+                      <div className="text-muted" style={{ fontSize: '0.85rem' }}>
+                        {lead.companyName ?? lead.interest ?? lead.source}
+                      </div>
+                    </td>
+                    <td>
+                      <span className="badge">{lead.status}</span>
+                    </td>
+                    <td>{lead.estimatedFormatted ?? '—'}</td>
+                    <td>{lead.ownerName}</td>
+                    <td>
+                      <button
+                        type="button"
+                        className="btn-ghost"
+                        onClick={() => editLead(lead)}
+                      >
+                        Edit
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          )}
+
+          <h3 className="card-panel__subsection">Recent store orders</h3>
+          {filteredOrders.length === 0 ? (
+            <p className="text-muted">{search.trim() ? 'No matching orders.' : 'No recent orders.'}</p>
+          ) : (
+          <ul className="ds-insight-list">
+            {filteredOrders.map((o) => (
+              <li key={o.id} className="ds-insight-row">
+                <div className="ds-insight-row__copy">
+                  <strong>{o.orderNumber}</strong>
+                  <span>{o.customerName}</span>
+                </div>
+                <div className="ds-insight-row__meta" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <span>{o.totalFormatted}</span>
+                  <span className="badge">{o.status}</span>
+                </div>
+              </li>
+            ))}
+          </ul>
+          )}
+      </div>
+
+      {formOpen && (
+        <OpsDialog
+          title={form.id ? 'Edit lead' : 'New lead'}
+          subtitle={
+            form.id
+              ? 'Update pipeline details and follow-up.'
+              : 'Add a gear store or security package lead.'
+          }
+          onClose={closeFormDialog}
+          wide
+        >
           {formError && <ErrorAlert message={formError} />}
           <form className="stack-form" onSubmit={saveLead}>
             <label>
@@ -336,76 +472,17 @@ function SalesCrmContent() {
                 onChange={(e) => setForm({ ...form, notes: e.target.value })}
               />
             </label>
-            <div style={{ display: 'flex', gap: '0.5rem' }}>
+            <div className="fleet-form__actions">
+              <button type="button" className="btn-ghost" onClick={closeFormDialog}>
+                Cancel
+              </button>
               <button type="submit" className="btn-primary" disabled={saving}>
                 {saving ? 'Saving...' : form.id ? 'Update lead' : 'Create lead'}
               </button>
-              {form.id && (
-                <button
-                  type="button"
-                  className="btn-secondary"
-                  onClick={resetForm}
-                >
-                  Cancel
-                </button>
-              )}
             </div>
           </form>
-        </div>
-
-        <div className="card-panel">
-          <h2>Pipeline ({leads.length})</h2>
-          <div className="table-wrap">
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th>Lead</th>
-                  <th>Status</th>
-                  <th>Value</th>
-                  <th>Owner</th>
-                  <th />
-                </tr>
-              </thead>
-              <tbody>
-                {leads.map((lead) => (
-                  <tr key={lead.id}>
-                    <td>
-                      <div>{lead.contactName}</div>
-                      <div className="text-muted" style={{ fontSize: '0.85rem' }}>
-                        {lead.companyName ?? lead.interest ?? lead.source}
-                      </div>
-                    </td>
-                    <td>
-                      <span className="badge">{lead.status}</span>
-                    </td>
-                    <td>{lead.estimatedFormatted ?? '—'}</td>
-                    <td>{lead.ownerName}</td>
-                    <td>
-                      <button
-                        type="button"
-                        className="btn-ghost"
-                        onClick={() => editLead(lead)}
-                      >
-                        Edit
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          <h2 style={{ marginTop: '1.5rem' }}>Recent store orders</h2>
-          <ul>
-            {recentOrders.map((o) => (
-              <li key={o.id}>
-                {o.orderNumber} — {o.customerName} — {o.totalFormatted}{' '}
-                <span className="badge">{o.status}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
-      </div>
+        </OpsDialog>
+      )}
     </div>
   );
 }

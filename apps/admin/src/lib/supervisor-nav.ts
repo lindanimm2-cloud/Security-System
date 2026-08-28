@@ -14,6 +14,8 @@ export const SUPERVISOR_NAV: SupervisorNavItem[] = [
   { href: '/supervisor/patrol', label: 'Patrol', icon: 'safe-zones' },
   { href: '/supervisor/performance', label: 'Performance', icon: 'analytics' },
   { href: '/control-room', label: 'Control room', icon: 'dispatch' },
+  { href: '/supervisor/profile', label: 'My profile', icon: 'profile' },
+  { href: '/supervisor/settings', label: 'Settings', icon: 'account' },
 ];
 
 export const SUPERVISOR_MOBILE_NAV: Array<SupervisorNavItem & { mobileLabel: string }> = [
@@ -21,5 +23,5 @@ export const SUPERVISOR_MOBILE_NAV: Array<SupervisorNavItem & { mobileLabel: str
   { href: '/supervisor/map', label: 'Officer map', mobileLabel: 'Map', icon: 'live-map' },
   { href: '/supervisor/shifts', label: 'Shifts', mobileLabel: 'Shifts', icon: 'officers' },
   { href: '/supervisor/patrol', label: 'Patrol', mobileLabel: 'Patrol', icon: 'safe-zones' },
-  { href: '/supervisor/performance', label: 'Performance', mobileLabel: 'Index', icon: 'analytics' },
+  { href: '/supervisor/settings', label: 'Settings', mobileLabel: 'Settings', icon: 'account' },
 ];
