@@ -1,0 +1,456 @@
+/* ============================================================
+   Mobile + Light Mode Polish
+   Fixes overlap, clipping, contrast, and theme consistency.
+   ============================================================ */
+
+/* ── Light mode: control-room tokens ─────────────────────── */
+
+html[data-theme='light'] {
+  --cr-surface: rgba(255, 255, 255, 0.72);
+  --cr-surface-hover: rgba(255, 255, 255, 0.88);
+  --cr-surface-active: rgba(255, 255, 255, 0.96);
+  --cr-edge: rgba(92, 104, 120, 0.16);
+  --cr-edge-strong: rgba(92, 104, 120, 0.24);
+  --cr-shadow: 8px 8px 18px rgba(92, 104, 120, 0.18);
+  --cr-shadow-soft: 4px 4px 12px rgba(92, 104, 120, 0.14);
+}
+
+html[data-theme='light'] .dash-live-map__hud,
+html[data-theme='light'] .dash-live-map__full-btn {
+  background: color-mix(in srgb, var(--surface) 92%, transparent);
+  border-color: var(--cr-edge-strong);
+  color: var(--text);
+  box-shadow: var(--neu-raised-sm);
+}
+
+html[data-theme='light'] .dash-live-map__hud .dash-live-map__counts {
+  color: var(--muted);
+}
+
+html[data-theme='light'] .dash-live-map__hud .dash-live-map__counts strong {
+  color: var(--text);
+}
+
+html[data-theme='light'] .ops-inc__pri--P1 {
+  color: #b91c1c;
+  border-color: rgba(185, 28, 28, 0.35);
+  background: rgba(185, 28, 28, 0.08);
+}
+
+html[data-theme='light'] .ops-inc__pri--P2 {
+  color: #92400e;
+  border-color: rgba(180, 83, 9, 0.35);
+  background: rgba(180, 83, 9, 0.08);
+}
+
+html[data-theme='light'] .ops-inc--panic .ops-inc__kind {
+  color: #b91c1c;
+}
+
+html[data-theme='light'] .ops-inc--panic .ops-inc__who {
+  color: var(--text);
+}
+
+html[data-theme='light'] .ops-inc__state--dispatched,
+html[data-theme='light'] .ops-inc__state--en-route {
+  color: #92400e;
+}
+
+html[data-theme='light'] .ops-inc--sla .ops-inc__sla {
+  color: #b91c1c;
+}
+
+html[data-theme='light'] .ops-act--resolve {
+  background: rgba(22, 163, 74, 0.1);
+  border-color: rgba(22, 163, 74, 0.28);
+  color: #15803d;
+}
+
+html[data-theme='light'] .ops-act--warn {
+  color: #92400e;
+}
+
+html[data-theme='light'] .ops-strip__chip--on {
+  background: var(--surface);
+  box-shadow: var(--neu-inset);
+}
+
+html[data-theme='light'] .eye-lens {
+  --eye-ink: #eef1f5;
+  --eye-slate: #ffffff;
+  --eye-edge: rgba(92, 104, 120, 0.18);
+  --eye-fog: #2a3340;
+  background: color-mix(in srgb, var(--surface) 94%, transparent);
+  border-color: var(--cr-edge-strong);
+  box-shadow: var(--neu-raised);
+}
+
+html[data-theme='light'] .alert-toast {
+  background: var(--surface);
+  border-color: var(--border);
+  box-shadow: var(--neu-raised);
+  color: var(--text);
+}
+
+html[data-theme='light'] .support-fab,
+html[data-theme='light'] .support-fab-dock .support-fab {
+  background: var(--surface);
+  border-color: var(--border);
+  box-shadow: var(--neu-raised-sm);
+  color: var(--text);
+}
+
+html[data-theme='light'] .support-fab:hover {
+  background: var(--surface-2);
+  border-color: var(--cr-edge-strong);
+}
+
+html[data-theme='light'] .text-muted,
+html[data-theme='light'] .ops-board__pane-head .text-muted {
+  color: var(--muted);
+}
+
+html[data-theme='light'] .shell--admin .mobile-bottom-nav__item--active {
+  color: var(--accent-text);
+}
+
+html[data-theme='light'] .shell--admin .mobile-bottom-nav__item--active .mobile-bottom-nav__icon-wrap {
+  background: var(--accent-soft);
+}
+
+/* ── Ops board mobile tabs ───────────────────────────────── */
+
+.ops-mobile-tabs {
+  display: none;
+}
+
+@media (max-width: 900px) {
+  .ops-mobile-tabs {
+    display: flex;
+    gap: 0.35rem;
+    padding: 0.25rem;
+    margin-bottom: 0.35rem;
+    border-radius: 12px;
+    border: 1px solid var(--cr-edge);
+    background: color-mix(in srgb, var(--surface) 88%, transparent);
+    box-shadow: var(--cr-shadow-soft);
+  }
+
+  html[data-theme='light'] .ops-mobile-tabs {
+    background: var(--surface);
+    box-shadow: var(--neu-raised-sm);
+  }
+
+  .ops-mobile-tabs__btn {
+    flex: 1;
+    min-height: 2.25rem;
+    border: 0;
+    border-radius: 9px;
+    background: transparent;
+    color: var(--muted);
+    font-size: 0.78rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
+  }
+
+  .ops-mobile-tabs__btn--on {
+    background: var(--cr-surface-active);
+    color: var(--text);
+    box-shadow: inset 0 0 0 1px var(--cr-edge);
+  }
+
+  html[data-theme='light'] .ops-mobile-tabs__btn--on {
+    background: var(--surface-2);
+    box-shadow: var(--neu-inset);
+  }
+
+  .ops-mobile-tabs__btn:focus-visible {
+    outline: 2px solid var(--accent-soft);
+    outline-offset: 1px;
+  }
+
+  /* Single-pane mobile ops board */
+  .ops-board--console[data-mobile-pane='queue'] .ops-board__center,
+  .ops-board--console[data-mobile-pane='queue'] .ops-board__detail,
+  .ops-board--console[data-mobile-pane='queue'] .ops-board__vehicles,
+  .ops-board--console[data-mobile-pane='queue'] .ops-board__avail {
+    display: none !important;
+  }
+
+  .ops-board--console[data-mobile-pane='map'] .ops-board__queue,
+  .ops-board--console[data-mobile-pane='map'] .ops-board__detail,
+  .ops-board--console[data-mobile-pane='map'] .ops-board__vehicles,
+  .ops-board--console[data-mobile-pane='map'] .ops-board__avail {
+    display: none !important;
+  }
+
+  .ops-board--console[data-mobile-pane='detail'] .ops-board__queue,
+  .ops-board--console[data-mobile-pane='detail'] .ops-board__center,
+  .ops-board--console[data-mobile-pane='detail'] .ops-board__vehicles,
+  .ops-board--console[data-mobile-pane='detail'] .ops-board__avail {
+    display: none !important;
+  }
+
+  .ops-board--console[data-mobile-pane='more'] .ops-board__queue,
+  .ops-board--console[data-mobile-pane='more'] .ops-board__center,
+  .ops-board--console[data-mobile-pane='more'] .ops-board__detail {
+    display: none !important;
+  }
+
+  .ops-board--console {
+    grid-template-columns: 1fr !important;
+    gap: 0.5rem;
+  }
+
+  .ops-board--console .ops-board__queue,
+  .ops-board--console .ops-board__center,
+  .ops-board--console .ops-board__detail,
+  .ops-board--console .ops-board__vehicles,
+  .ops-board--console .ops-board__avail {
+    grid-column: 1 !important;
+    grid-row: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+  }
+
+  .ops-board--console .ops-board__queue-list {
+    max-height: none !important;
+    overflow: visible !important;
+  }
+
+  .ops-board--console .ops-board__center {
+    max-height: none !important;
+  }
+
+  .ops-board--console[data-mobile-pane='map'] .ops-board__map {
+    min-height: min(52vh, 420px);
+  }
+
+  .ops-board--console[data-mobile-pane='detail'] .ops-board__detail-body {
+    max-height: none;
+    overflow: visible;
+  }
+
+  /* Eye lens: move above bottom nav, don't cover queue cards */
+  .shell--admin:has(.dash-ops--ops-board) .eye-lens-dock--bottom:not(.eye-lens-dock--placed),
+  .shell--admin:has(.dash-ops--ops-board) .eye-lens-dock:not(.eye-lens-dock--top):not(.eye-lens-dock--placed) {
+    top: auto;
+    bottom: calc(var(--ops-nav-height, 4.25rem) + 0.55rem + env(safe-area-inset-bottom, 0px));
+    left: 50%;
+    right: auto;
+    transform: translateX(-50%);
+    width: min(360px, calc(100vw - 1.3rem));
+    z-index: 135;
+  }
+
+  .shell--admin:has(.dash-ops--ops-board) .eye-lens-dock--mini:not(.eye-lens-dock--placed) {
+    transform: translateX(-50%);
+  }
+
+  .shell--admin:has(.dash-ops--ops-board) .shell-content {
+    padding-bottom: calc(var(--ops-nav-height, 4.25rem) + 4.5rem + env(safe-area-inset-bottom, 0px)) !important;
+  }
+
+  .dash-ops--ops-board .ops-strip {
+    flex-wrap: wrap;
+    gap: 0.45rem;
+  }
+
+  .dash-ops--ops-board .ops-strip__stats {
+    flex: 1 1 100%;
+    justify-content: space-between;
+  }
+
+  .dash-ops--ops-board .ops-strip__filters {
+    flex: 1 1 100%;
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 0.15rem;
+    scrollbar-width: none;
+  }
+
+  .dash-ops--ops-board .ops-strip__filters::-webkit-scrollbar {
+    display: none;
+  }
+
+  .dash-ops--ops-board .ops-strip__owner {
+    flex: 1 1 100%;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+  }
+
+  .ops-inc__acts {
+    flex-wrap: wrap;
+  }
+
+  .ops-board__detail-foot {
+    position: sticky;
+    bottom: 0;
+    z-index: 2;
+    background: color-mix(in srgb, var(--surface) 94%, transparent);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    padding-top: 0.5rem;
+    margin-top: 0.35rem;
+    border-top: 1px solid var(--cr-edge);
+  }
+
+  html[data-theme='light'] .ops-board__detail-foot {
+    background: color-mix(in srgb, var(--surface) 96%, transparent);
+  }
+}
+
+/* ── Admin mobile bottom nav: theme-aware ────────────────── */
+
+@media (max-width: 900px) {
+  .shell--admin .mobile-bottom-nav__pill {
+    background: color-mix(in srgb, var(--surface) 88%, transparent);
+    border-color: var(--cr-edge);
+    box-shadow: var(--cr-shadow-soft);
+    backdrop-filter: blur(18px) saturate(1.2);
+    -webkit-backdrop-filter: blur(18px) saturate(1.2);
+  }
+
+  html[data-theme='light'] .shell--admin .mobile-bottom-nav__pill {
+    background: rgba(255, 255, 255, 0.94);
+    border-color: var(--border);
+    box-shadow: var(--neu-raised);
+  }
+
+  html[data-theme='dark'] .shell--admin .mobile-bottom-nav__pill {
+    background: rgba(8, 8, 10, 0.88);
+    box-shadow:
+      0 20px 48px rgba(0, 0, 0, 0.55),
+      inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  }
+
+  .shell--admin .mobile-bottom-nav__item--active {
+    background: var(--cr-surface-active);
+    color: var(--text);
+  }
+
+  html[data-theme='light'] .shell--admin .mobile-bottom-nav__item--active {
+    background: var(--surface-2);
+  }
+}
+
+/* ── Global mobile shell polish ──────────────────────────── */
+
+@media (max-width: 900px) {
+  .shell--with-bottom-nav .shell-content {
+    padding-bottom: calc(var(--ops-nav-height, 4.25rem) + 1rem + env(safe-area-inset-bottom, 0px));
+  }
+
+  .page-content,
+  .page-section {
+    min-width: 0;
+    overflow-x: clip;
+  }
+
+  .mobile-shell-header--admin {
+    gap: 0.35rem;
+  }
+
+  .mobile-shell-header__title {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .ds-page-head {
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .card-header-row,
+  .card-header-row--panel {
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .psim-hub__tabs {
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+
+  .psim-hub__tabs::-webkit-scrollbar {
+    display: none;
+  }
+
+  .psim-hub__tab {
+    flex: 0 0 auto;
+    white-space: nowrap;
+  }
+
+  .settings-hub__layout {
+    grid-template-columns: 1fr;
+  }
+
+  .settings-hub__sections {
+    min-width: 0;
+  }
+
+  .table-wrap {
+    margin-left: -0.25rem;
+    margin-right: -0.25rem;
+    padding-left: 0.25rem;
+    padding-right: 0.25rem;
+  }
+
+  .alert-toast-stack {
+    bottom: calc(var(--ops-nav-height, 4.25rem) + 0.75rem + env(safe-area-inset-bottom, 0px));
+    left: 0.65rem;
+    right: 0.65rem;
+    width: auto;
+    max-width: none;
+  }
+}
+
+@media (max-width: 1100px) {
+  .shell--admin:has(.dash-ops--ops-board) .shell-content {
+    padding-bottom: calc(var(--ops-nav-height, 4.25rem) + 1rem + env(safe-area-inset-bottom, 0px));
+  }
+}
+
+/* ── Light mode: portal / officer / tech shells ──────────── */
+
+html[data-theme='light'] .portal-card,
+html[data-theme='light'] .feature-hub__tile,
+html[data-theme='light'] .ds-job,
+html[data-theme='light'] .ds-metric,
+html[data-theme='light'] .settings-hub__section,
+html[data-theme='light'] .psim-card,
+html[data-theme='light'] .psim-feed__row {
+  color: var(--text);
+}
+
+html[data-theme='light'] .ds-status--warning .ds-status__label {
+  color: #92400e;
+}
+
+html[data-theme='light'] .ds-status--danger .ds-status__label {
+  color: #b91c1c;
+}
+
+html[data-theme='light'] .ds-status--success .ds-status__label {
+  color: #15803d;
+}
+
+html[data-theme='light'] .ds-status--active .ds-status__label {
+  color: var(--accent-text);
+}
+
+html[data-theme='light'] .btn-sm,
+html[data-theme='light'] .btn-secondary {
+  color: var(--text);
+}
+
+html[data-theme='light'] .link-sm {
+  color: var(--accent-text);
+}

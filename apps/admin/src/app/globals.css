@@ -28546,7 +28546,7 @@ select optgroup {
 
   .shell--admin:has(.dash-ops--ops-board) .shell-content {
     overflow: visible;
-    padding-bottom: calc(var(--ops-nav-height, 64px) + 0.75rem);
+    padding-bottom: calc(var(--ops-nav-height, 4.25rem) + 1rem + env(safe-area-inset-bottom, 0px));
   }
 
   .dash-ops--ops-board {
@@ -30129,6 +30129,40 @@ html[data-theme='light'] body,
   background: var(--surface);
 }
 
+[data-theme='light'] .panic-neu {
+  --panic-neu-bg: #e8eaee;
+  --panic-neu-well: #dfe2e8;
+  --panic-neu-knob: #eceef2;
+  --panic-neu-knob-hi: #f8f9fb;
+  --panic-neu-knob-lo: #d8dce3;
+  --panic-neu-icon: rgba(55, 62, 72, 0.88);
+  --panic-neu-well-inset:
+    inset 6px 6px 14px rgba(0, 0, 0, 0.12),
+    inset -5px -5px 12px rgba(255, 255, 255, 0.85);
+  --panic-neu-knob-raised:
+    5px 5px 12px rgba(0, 0, 0, 0.14),
+    -4px -4px 10px rgba(255, 255, 255, 0.92),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  --panic-neu-knob-pressed:
+    inset 5px 5px 12px rgba(0, 0, 0, 0.14),
+    inset -3px -3px 8px rgba(255, 255, 255, 0.65);
+}
+
+[data-theme='light'] .panic-neu .panic-note {
+  color: var(--muted);
+}
+
+[data-theme='light'] .panic-neu__legend span {
+  color: var(--muted);
+}
+
+[data-theme='light'] .panic-neu__indicator {
+  background: rgba(0, 0, 0, 0.08);
+  box-shadow:
+    inset 0 1px 2px rgba(0, 0, 0, 0.12),
+    0 1px 0 rgba(255, 255, 255, 0.65);
+}
+
 [data-theme='light'] .panic-tray {
   background: transparent;
   box-shadow: none;
@@ -30151,6 +30185,7 @@ html[data-theme='light'] body,
 }
 
 [data-theme='light'] .mobile-bottom-nav__pill,
+[data-theme='light'] .support-fab-dock,
 [data-theme='light'] .floating-support-dock,
 [data-theme='light'] .ops-quick,
 [data-theme='light'] .notification-panel,

@@ -73,12 +73,15 @@ export default function ControlRoomPage() {
   );
 }
 
+type MobileOpsPane = 'queue' | 'map' | 'detail' | 'more';
+
 function OverviewContent() {
   const { data, loading, error, reload } = useApi(
     () => adminApi.get<ApiResponse<Dashboard>>('/control-room/dashboard'),
     [],
   );
   const [focusIncidentId, setFocusIncidentId] = useState<string | null>(null);
+  const [mobilePane, setMobilePane] = useState<MobileOpsPane>('queue');
   const [timelineNote, setTimelineNote] = useState('');
   const [resolveBusyId, setResolveBusyId] = useState<string | null>(null);
   const [queueFilter, setQueueFilter] = useState<OpsQueueFilter>('all');
@@ -126,6 +129,13 @@ function OverviewContent() {
   const focus =
     prioritizedIncidents.find((i) => i.id === focusIncidentId) ?? prioritizedIncidents[0] ?? null;
   const focusIdx = mapIncidentStatusToTimelineIndex(focus?.status, focus?.priority);
+
+  function selectIncident(id: string) {
+    setFocusIncidentId(id);
+    if (typeof window !== 'undefined' && window.matchMedia('(max-width: 900px)').matches) {
+      setMobilePane('detail');
+    }
+  }
 
   async function softTimeline(step: string) {
     if (!focus) return;
@@ -202,7 +212,38 @@ function OverviewContent() {
         </div>
       )}
 
-      <div className="ops-board ops-board--console">
+      <nav className="ops-mobile-tabs" aria-label="Ops board views">
+        <button
+          type="button"
+          className={`ops-mobile-tabs__btn ${mobilePane === 'queue' ? 'ops-mobile-tabs__btn--on' : ''}`}
+          onClick={() => setMobilePane('queue')}
+        >
+          Queue ({filteredIncidents.length})
+        </button>
+        <button
+          type="button"
+          className={`ops-mobile-tabs__btn ${mobilePane === 'map' ? 'ops-mobile-tabs__btn--on' : ''}`}
+          onClick={() => setMobilePane('map')}
+        >
+          Map
+        </button>
+        <button
+          type="button"
+          className={`ops-mobile-tabs__btn ${mobilePane === 'detail' ? 'ops-mobile-tabs__btn--on' : ''}`}
+          onClick={() => setMobilePane('detail')}
+        >
+          Detail
+        </button>
+        <button
+          type="button"
+          className={`ops-mobile-tabs__btn ${mobilePane === 'more' ? 'ops-mobile-tabs__btn--on' : ''}`}
+          onClick={() => setMobilePane('more')}
+        >
+          Units
+        </button>
+      </nav>
+
+      <div className="ops-board ops-board--console" data-mobile-pane={mobilePane}>
         <aside className="ops-board__queue" aria-label="Incident queue">
           <div className="ops-board__pane-head">
             <h2>Incidents</h2>
@@ -225,7 +266,7 @@ function OverviewContent() {
                   canCctv={canAccess(CONTROL_ROOM_ROUTES.surveillance)}
                   canMap={canAccess(CONTROL_ROOM_ROUTES.map)}
                   resolveBusy={resolveBusyId === i.id}
-                  onSelect={() => setFocusIncidentId(i.id)}
+                  onSelect={() => selectIncident(i.id)}
                   onResolve={() => void resolveIncident(false, i.id)}
                   onAssigned={() => void reload({ silent: true })}
                 />

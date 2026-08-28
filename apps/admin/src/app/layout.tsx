@@ -5,6 +5,7 @@ import { TabSessionBoot } from '@/components/TabSessionBoot';
 import './globals.css';
 import './control-room-polish.css';
 import './psim-hub.css';
+import './mobile-light-polish.css';
 
 export const metadata: Metadata = {
   title: {
