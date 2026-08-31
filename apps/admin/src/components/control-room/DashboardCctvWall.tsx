@@ -159,7 +159,7 @@ export function DashboardCctvWall() {
 
   const siteOnline = hotSite ? `${hotSite.onlineCameras}/${hotSite.cameraCount}` : '0/0';
   const dashOnline = dashCameras.filter((c) => {
-    const s = c.status.toUpperCase();
+    const s = (c.status ?? 'OFFLINE').toUpperCase();
     return s === 'ONLINE' || s === 'RECORDING';
   }).length;
 
@@ -259,10 +259,10 @@ export function DashboardCctvWall() {
             variant="ops"
             compact
             state={{
-              doorsLocked: focusedClient.doorsLocked,
-              immobiliserOn: focusedClient.immobiliserOn,
-              theftRecovery: focusedClient.theftRecovery,
-              hornActive: focusedClient.hornActive,
+              doorsLocked: focusedClient.doorsLocked ?? true,
+              immobiliserOn: focusedClient.immobiliserOn ?? false,
+              theftRecovery: focusedClient.theftRecovery ?? false,
+              hornActive: focusedClient.hornActive ?? false,
             }}
             busyAction={remoteBusy}
             onCommand={(action) => void sendRemote(action)}

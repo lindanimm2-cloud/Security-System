@@ -57,13 +57,13 @@ export function DashboardFleetStrip() {
           {list.map((v) => {
             const cam = v.cameras?.[0];
             return (
-              <li key={v.id} className={`ops-fleet__item ops-fleet__item--${v.status.toLowerCase()}`}>
+              <li key={v.id} className={`ops-fleet__item ops-fleet__item--${(v.status ?? 'unknown').toLowerCase()}`}>
                 {cam ? (
                   <CctvLiveFeed camera={cam} href={CONTROL_ROOM_ROUTES.fleet} compact />
                 ) : null}
                 <strong className="ops-fleet__callsign">{v.callSign}</strong>
                 <span className="ops-fleet__type">{fleetTeamLabel(v.vehicleType, v.teamName)}</span>
-                <em className="ops-fleet__status">{v.status.replace(/_/g, ' ')}</em>
+                <em className="ops-fleet__status">{(v.status ?? 'UNKNOWN').replace(/_/g, ' ')}</em>
               </li>
             );
           })}

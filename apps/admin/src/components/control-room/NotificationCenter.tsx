@@ -235,8 +235,8 @@ export function NotificationCenter() {
                 }`}
               >
                 <div className="notification-item__top">
-                  <span className={`notification-cat notification-cat--${n.category.toLowerCase()}`}>
-                    {CATEGORY_LABELS[n.category] ?? n.category}
+                  <span className={`notification-cat notification-cat--${(n.category ?? 'system').toLowerCase()}`}>
+                    {CATEGORY_LABELS[n.category ?? 'SYSTEM'] ?? n.category ?? 'System'}
                   </span>
                   <span className={`notification-priority notification-priority--${n.priority}`}>
                     {n.priority}

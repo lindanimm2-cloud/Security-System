@@ -68,21 +68,11 @@ export function AuthGuard({
   }, [portal, loginPath, router]);
 
   if (!ready || !session) {
-    const live = typeof window !== 'undefined' ? getSession(portal) : null;
     const action = getActionKind();
     const copy =
       action === 'sign-out' || action === 'session-expired' || action === 'sign-in'
         ? actionCopy(action)
-        : live
-          ? (PORTAL_BOOT_COPY[portal] ?? actionCopy('open-portal'))
-          : {
-              label: 'Redirecting to sign-in…',
-              hints: [
-                'Your session is no longer active.',
-                'Taking you to the login screen.',
-                'System updates underway…',
-              ],
-            };
+        : (PORTAL_BOOT_COPY[portal] ?? actionCopy('open-portal'));
     return (
       <LoadingSpinner
         brand

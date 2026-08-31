@@ -30,7 +30,7 @@ function FeedInner({
   featured?: boolean;
   compact?: boolean;
 }) {
-  const status = camera.status.toLowerCase();
+  const status = (camera.status ?? 'offline').toLowerCase();
   const live =
     camera.isLiveCapable !== false &&
     (status === 'online' || status === 'recording');
