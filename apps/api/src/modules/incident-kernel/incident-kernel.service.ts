@@ -33,7 +33,8 @@ export type EmergencyKind =
   | 'fire'
   | 'alarm'
   | 'manual'
-  | 'service-request';
+  | 'service-request'
+  | 'vehicle-panic';
 
 export type CreateEmergencyInput = {
   tenantId: string;
@@ -143,7 +144,12 @@ export class IncidentKernelService {
       payload: { publicRef, kind: input.kind, type: input.type },
     });
 
-    if (input.kind === 'panic' || input.kind === 'silent' || input.kind === 'home-panic') {
+    if (
+      input.kind === 'panic' ||
+      input.kind === 'silent' ||
+      input.kind === 'home-panic' ||
+      input.kind === 'vehicle-panic'
+    ) {
       await this.recordEvent({
         tenantId: input.tenantId,
         incidentId: incident.id,
@@ -968,6 +974,7 @@ export class IncidentKernelService {
     lng: Prisma.Decimal;
     address: string | null;
     publicRef: string;
+    vehicleId?: string | null;
     user: { firstName: string; lastName: string };
   }) {
     this.realtime.emitIncidentCreated(incident.tenantId, {
@@ -982,6 +989,7 @@ export class IncidentKernelService {
       isSilent: incident.isSilent,
       createdAt: incident.createdAt.toISOString(),
       publicRef: incident.publicRef,
+      vehicleId: incident.vehicleId ?? null,
     });
   }
 }

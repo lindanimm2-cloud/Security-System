@@ -1,12 +1,18 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { CctvLiveFeed, type CctvCamera } from '@/components/portal/CctvLiveFeed';
+import { VehicleRemotePad } from '@/components/vehicle/VehicleRemotePad';
 import { useApi } from '@/hooks/useApi';
+import { usePlatformEvents } from '@/hooks/usePlatformEvents';
 import { shouldBackgroundPoll } from '@/lib/demo/is-demo-mode';
 import { adminApi, type ApiResponse } from '@/lib/api-client';
 import { CONTROL_ROOM_ROUTES } from '@/lib/control-room-routes';
+import {
+  subscribeVehicleFocus,
+  type VehicleRemoteAction,
+} from '@/lib/vehicle-remote';
 
 type SitePreview = {
   id: string;
@@ -30,7 +36,24 @@ type FleetVehicle = {
   cameras?: CctvCamera[];
 };
 
+type ClientVehicle = {
+  id: string;
+  callSign: string;
+  registration: string;
+  make?: string;
+  model?: string;
+  owner?: string;
+  status: string;
+  theftRecovery: boolean;
+  immobiliserOn: boolean;
+  doorsLocked: boolean;
+  hornActive?: boolean;
+  panicFocus?: boolean;
+  cameras?: CctvCamera[];
+};
+
 type FeedTab = 'sites' | 'dash';
+type DashSource = (FleetVehicle | ClientVehicle) & { source: 'fleet' | 'client' };
 
 export function DashboardCctvWall() {
   const { data, loading, reload } = useApi(
@@ -41,38 +64,85 @@ export function DashboardCctvWall() {
     () => adminApi.get<ApiResponse<FleetVehicle[]>>('/control-room/fleet'),
     [],
   );
+  const { data: clientData, reload: reloadClients } = useApi(
+    () => adminApi.get<ApiResponse<ClientVehicle[]>>('/control-room/client-vehicles'),
+    [],
+  );
   const [tab, setTab] = useState<FeedTab>('dash');
+  const [focusVehicleId, setFocusVehicleId] = useState<string | null>(null);
+  const [remoteBusy, setRemoteBusy] = useState<VehicleRemoteAction | null>(null);
+  const [remoteNote, setRemoteNote] = useState('');
+
+  const refresh = useCallback(() => {
+    void reload({ silent: true });
+    void reloadFleet({ silent: true });
+    void reloadClients({ silent: true });
+  }, [reload, reloadFleet, reloadClients]);
 
   useEffect(() => {
     if (!shouldBackgroundPoll()) return;
-    const id = window.setInterval(() => {
-      void reload({ silent: true });
-      void reloadFleet({ silent: true });
-    }, 15000);
+    const id = window.setInterval(() => refresh(), 15000);
     return () => window.clearInterval(id);
-  }, [reload, reloadFleet]);
+  }, [refresh]);
+
+  useEffect(() => {
+    return subscribeVehicleFocus((detail) => {
+      setFocusVehicleId(detail.vehicleId);
+      setTab('dash');
+      if (detail.action === 'panic') {
+        setRemoteNote(`Vehicle panic — ${detail.registration}. Dash cameras switched.`);
+      }
+      void reloadClients({ silent: true });
+    });
+  }, [reloadClients]);
+
+  usePlatformEvents('admin', ['vehicle.panic', 'vehicle.remote'], (payload) => {
+    const vehicleId = typeof payload.vehicleId === 'string' ? payload.vehicleId : null;
+    if (!vehicleId) return;
+    setFocusVehicleId(vehicleId);
+    setTab('dash');
+    if (payload.event === 'vehicle.panic' || payload.action === 'panic') {
+      const plate = typeof payload.registration === 'string' ? payload.registration : 'vehicle';
+      setRemoteNote(`Vehicle panic — ${plate}. Dash cameras switched.`);
+    }
+    void reloadClients({ silent: true });
+  });
 
   const sites = data?.data?.sites ?? [];
   const fleet = fleetData?.data ?? [];
+  const clientVehicles = clientData?.data ?? [];
 
   const hotSite =
     sites.find((s) => s.alarmStatus === 'TRIGGERED' && (s.cameras?.length ?? 0) > 0) ??
     sites.find((s) => (s.cameras?.length ?? 0) > 0) ??
     sites[0];
 
-  const dashUnits = useMemo(
-    () =>
-      fleet
-        .filter((v) => (v.cameras?.length ?? 0) > 0)
-        .sort((a, b) => {
-          const rank = (s: string) =>
-            s === 'ON_DUTY' || s === 'EN_ROUTE' || s === 'DEPLOYED' ? 0 : s === 'MAINTENANCE' || s === 'OFFLINE' ? 2 : 1;
-          return rank(a.status) - rank(b.status);
-        }),
-    [fleet],
-  );
+  const dashUnits = useMemo<DashSource[]>(() => {
+    const clients: DashSource[] = clientVehicles
+      .filter((v) => (v.cameras?.length ?? 0) > 0)
+      .map((v) => ({ ...v, source: 'client' as const }));
+    const company: DashSource[] = fleet
+      .filter((v) => (v.cameras?.length ?? 0) > 0)
+      .map((v) => ({ ...v, source: 'fleet' as const }));
+    return [...clients, ...company].sort((a, b) => {
+      const hot = (u: DashSource) => {
+        if (u.id === focusVehicleId) return 0;
+        if (u.source === 'client' && 'panicFocus' in u && u.panicFocus) return 1;
+        if (u.source === 'client' && 'theftRecovery' in u && u.theftRecovery) return 2;
+        const s = u.status;
+        if (s === 'ON_DUTY' || s === 'EN_ROUTE' || s === 'DEPLOYED' || s === 'RECOVERY') return 3;
+        if (s === 'MAINTENANCE' || s === 'OFFLINE') return 5;
+        return 4;
+      };
+      return hot(a) - hot(b);
+    });
+  }, [clientVehicles, fleet, focusVehicleId]);
 
   const hotUnit = dashUnits[0];
+  const focusedClient =
+    hotUnit?.source === 'client'
+      ? (clientVehicles.find((v) => v.id === hotUnit.id) ?? null)
+      : null;
   const siteCameras = (hotSite?.cameras ?? []).slice(0, 4);
   const dashCameras = (hotUnit?.cameras ?? []).slice(0, 4);
   const usingDash = tab === 'dash';
@@ -80,7 +150,9 @@ export function DashboardCctvWall() {
   const primary = cameras[0];
   const rest = cameras.slice(1, 4);
   const href = usingDash
-    ? CONTROL_ROOM_ROUTES.fleet
+    ? focusedClient
+      ? CONTROL_ROOM_ROUTES.map
+      : CONTROL_ROOM_ROUTES.fleet
     : hotSite
       ? `${CONTROL_ROOM_ROUTES.surveillance}/${hotSite.id}`
       : CONTROL_ROOM_ROUTES.surveillance;
@@ -91,24 +163,44 @@ export function DashboardCctvWall() {
     return s === 'ONLINE' || s === 'RECORDING';
   }).length;
 
+  async function sendRemote(action: VehicleRemoteAction) {
+    if (!focusedClient) return;
+    setRemoteBusy(action);
+    setRemoteNote('');
+    try {
+      const res = await adminApi.post<ApiResponse<{ message?: string }>>(
+        `/control-room/client-vehicles/${focusedClient.id}/remote`,
+        { action },
+      );
+      setRemoteNote(res.data?.message ?? 'Command sent.');
+      refresh();
+    } catch {
+      setRemoteNote('Remote command failed.');
+    } finally {
+      setRemoteBusy(null);
+    }
+  }
+
+  const dashLabel = usingDash
+    ? hotUnit
+      ? hotUnit.source === 'client'
+        ? `${hotUnit.registration} client dash · ${dashOnline}/${dashCameras.length} live`
+        : `${hotUnit.callSign} dash cam · ${dashOnline}/${dashCameras.length} online`
+      : loading
+        ? 'Loading dash cams…'
+        : 'Fleet dash cams'
+    : hotSite
+      ? `${hotSite.name} · ${siteOnline} online`
+      : loading
+        ? 'Loading cameras…'
+        : 'Live site cameras';
+
   return (
     <section className="ops-board__cctv" aria-label="CCTV footage">
       <div className="panel-header ops-board__pane-head">
         <div>
           <h2>CCTV</h2>
-          <p className="text-muted">
-            {usingDash
-              ? hotUnit
-                ? `${hotUnit.callSign} dash cam · ${dashOnline}/${dashCameras.length} online`
-                : loading
-                  ? 'Loading dash cams…'
-                  : 'Fleet dash cams'
-              : hotSite
-                ? `${hotSite.name} · ${siteOnline} online`
-                : loading
-                  ? 'Loading cameras…'
-                  : 'Live site cameras'}
-          </p>
+          <p className="text-muted">{dashLabel}</p>
         </div>
         <Link href={usingDash ? CONTROL_ROOM_ROUTES.fleet : CONTROL_ROOM_ROUTES.surveillance} className="link-sm">
           {usingDash ? 'Fleet' : 'All sites'}
@@ -143,7 +235,7 @@ export function DashboardCctvWall() {
             {loading
               ? 'Pulling live feeds.'
               : usingDash
-                ? 'Company vehicles will show dash-cam footage here.'
+                ? 'Client and company vehicles will show dash-cam footage here.'
                 : 'Link site cameras to show footage here.'}
           </p>
         </div>
@@ -159,6 +251,24 @@ export function DashboardCctvWall() {
           ) : null}
         </div>
       )}
+
+      {usingDash && focusedClient ? (
+        <div className="ops-cctv__vehicle-cmd">
+          {remoteNote ? <p className="text-muted">{remoteNote}</p> : null}
+          <VehicleRemotePad
+            variant="ops"
+            compact
+            state={{
+              doorsLocked: focusedClient.doorsLocked,
+              immobiliserOn: focusedClient.immobiliserOn,
+              theftRecovery: focusedClient.theftRecovery,
+              hornActive: focusedClient.hornActive,
+            }}
+            busyAction={remoteBusy}
+            onCommand={(action) => void sendRemote(action)}
+          />
+        </div>
+      ) : null}
     </section>
   );
 }

@@ -54,7 +54,7 @@ function VehiclesContent() {
       features={[
         { title: 'Vehicle Registration', description: 'Register all vehicles linked to your account.', status: hasVehicle ? `${vehicles.length} registered` : undefined, href: '/portal/vehicles#vehicles-list', action: 'View vehicles', price: 'R 500/mo', requiresAccess: 'vehicle', requiresAddon: 'VEHICLE_RESPONSE' },
         { title: 'Live Tracking', description: 'View vehicle locations in real time when tracking is active.', status: 'Per vehicle', href: '/portal/vehicles#vehicles-list', action: 'Open vehicle profile', price: 'R 500/mo', requiresAccess: 'vehicle', requiresAddon: 'VEHICLE_RESPONSE' },
-        { title: 'Theft Recovery Mode', description: 'Enhanced monitoring when a vehicle is stolen.', status: 'Ready', href: '/portal/vehicles#vehicles-list', action: 'Activate recovery', price: 'R 500/mo', requiresAccess: 'vehicle', requiresAddon: 'VEHICLE_RESPONSE' },
+        { title: 'Remote lock & immobiliser', description: 'Lock doors, pulse horn, or cut the starter from your phone.', status: 'Ready', href: '/portal/vehicles#vehicles-list', action: 'Open vehicle remote', price: 'R 500/mo', requiresAccess: 'vehicle', requiresAddon: 'VEHICLE_RESPONSE' },
         { title: 'Geofencing', description: 'Alerts when vehicles enter or exit zones.', status: 'Active', href: '/portal/safe-zones', action: 'Manage zones', price: 'R 500/mo', requiresAccess: 'vehicle', requiresAddon: 'VEHICLE_RESPONSE' },
         { title: 'Roadside Assistance', description: 'Request breakdown and roadside assistance.', href: '/portal/requests/roadside', action: 'Request roadside help', requiresAccess: 'vehicle', requiresAddon: 'VEHICLE_RESPONSE', price: 'R 500/mo' },
         { title: 'Incident Reporting', description: 'Report accidents and vehicle-related incidents.', href: '/portal/theft', action: 'Report incident', requiresAccess: 'vehicle', requiresAddon: 'VEHICLE_RESPONSE', price: 'R 500/mo' },
@@ -74,7 +74,10 @@ function VehiclesContent() {
                 </span>
               </div>
               <p>{v.year} {v.make} {v.model}</p>
-              <p className="text-muted">{v.insuranceInfo ?? 'No insurance on file'}</p>
+              <p className="text-muted">
+                {v.immobiliserOn ? 'Immobiliser on' : v.theftRecovery ? 'Recovery active' : 'Remote lock ready'}
+                {v.insuranceInfo ? ` · ${v.insuranceInfo}` : ''}
+              </p>
               <span className="feature-action">Open vehicle profile →</span>
             </Link>
           ))}

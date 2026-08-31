@@ -58,7 +58,7 @@ function ProfileContent() {
   );
   const [editOpen, setEditOpen] = useState(false);
 
-  if (profileLoading) return <LoadingSpinner label="Loading profile..." fullScreen />;
+  if (profileLoading) return <LoadingSpinner label="Loading profile…" fullScreen />;
   if (profileError) return <ErrorAlert error={profileError} onRetry={reloadProfile} />;
 
   const o = profileData!.data;

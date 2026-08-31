@@ -24,6 +24,7 @@ import { SidebarCollapseButton, SidebarWebsiteLink, SignOutIcon } from '@/compon
 import { FloatingSupportDock } from './FloatingSupportDock';
 import { ShellRouteActions } from './nav/ShellRouteActions';
 import { PortalAmbientProvider, usePortalAmbient } from './portal/PortalAmbientProvider';
+import { PortalHomeStatusLight } from './portal/PortalHomeStatusLight';
 
 export function PortalShell({
   session,
@@ -150,12 +151,11 @@ function PortalShellInner({
         >
           <span className={`menu-toggle-icon ${menuOpen ? 'menu-toggle-icon--open' : ''}`} />
         </button>
-        <BrandMark variant="portal" compact />
+        <BrandMark variant="portal" compact showProduct={false} />
         <h1 className="mobile-shell-header__title">4DS Protect</h1>
         <div className="mobile-topbar-actions">
           <ShellRouteActions homeHref="/portal" compact />
-          <PortalProtectionBadge compact />
-          <PortalNavClock compact />
+          <PortalHomeStatusLight compact />
           <ThemeToggle className="theme-toggle--compact" />
           <PortalNotificationCenter />
         </div>
@@ -235,6 +235,7 @@ function PortalShellInner({
             <ShellRouteActions homeHref="/portal" />
             <PortalNavClock />
             <ThemeToggle className="theme-toggle--compact" />
+            <PortalHomeStatusLight />
             <PortalProtectionBadge />
             <PortalNotificationCenter />
           </div>

@@ -11,7 +11,7 @@ import { officerApi, type ApiResponse } from '@/lib/api-client';
 
 const LiveMap = dynamic(() => import('@/components/maps/LiveMap'), {
   ssr: false,
-  loading: () => <LoadingSpinner label="Loading map..." />,
+  loading: () => <LoadingSpinner label="Loading map…" />,
 });
 
 type MapData = {
@@ -52,7 +52,7 @@ function MapContent() {
     [],
   );
 
-  if (loading) return <LoadingSpinner label="Loading map..." fullScreen />;
+  if (loading) return <LoadingSpinner label="Loading map…" fullScreen />;
   if (error) return <ErrorAlert error={error} onRetry={reload} />;
 
   const m = data?.data && !Array.isArray(data.data) ? data.data : null;

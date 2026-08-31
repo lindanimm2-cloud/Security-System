@@ -28,6 +28,8 @@ export const PlatformEvent = {
   SOS_CAPABILITY_CHANGED: 'device.sos_capability_changed',
   ALARM_TRIGGERED: 'alarm.triggered',
   ALARM_ACKNOWLEDGED: 'alarm.acknowledged',
+  VEHICLE_REMOTE: 'vehicle.remote',
+  VEHICLE_PANIC: 'vehicle.panic',
   MESSAGE_CREATED: 'message.created',
   CALL_STARTED: 'call.started',
   CALL_ENDED: 'call.ended',

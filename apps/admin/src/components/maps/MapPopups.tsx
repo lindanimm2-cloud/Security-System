@@ -5,6 +5,8 @@ import { CallActions } from '@/components/calls/CallActions';
 import { IncidentDetailsMenu } from '@/components/control-room/IncidentDetailsMenu';
 import { QuickDispatchPanel } from '@/components/control-room/QuickDispatchPanel';
 import { isAwaitingDispatch } from '@/lib/incident-status';
+import { VehicleRemotePad } from '@/components/vehicle/VehicleRemotePad';
+import type { VehicleRemoteAction } from '@/lib/vehicle-remote';
 import type { MapClient, MapFleetVehicle, MapIncident, MapOfficer, MapProperty, MapVehicle } from './map-types';
 import { customerHref } from '@/lib/control-room-routes';
 import { SubscriptionBadge } from '@/components/control-room/SubscriptionBadge';
@@ -192,7 +194,13 @@ export function FleetVehiclePopup({ vehicle }: { vehicle: MapFleetVehicle }) {
   );
 }
 
-export function VehiclePopup({ vehicle }: { vehicle: MapVehicle }) {
+export function VehiclePopup({
+  vehicle,
+  onRemote,
+}: {
+  vehicle: MapVehicle;
+  onRemote?: (action: VehicleRemoteAction) => void | Promise<void>;
+}) {
   return (
     <div className="map-popup-panel">
       <div className="map-popup-panel__header">
@@ -208,11 +216,27 @@ export function VehiclePopup({ vehicle }: { vehicle: MapVehicle }) {
         <dd>{vehicle.owner}</dd>
         <dt>Tracker</dt>
         <dd>{vehicle.trackerStatus}</dd>
+        <dt>Doors</dt>
+        <dd>{vehicle.doorsLocked === false ? 'Unlocked' : 'Locked'}</dd>
+        <dt>Immobiliser</dt>
+        <dd>{vehicle.immobiliserOn ? 'Engaged' : 'Released'}</dd>
         <dt>Speed</dt>
         <dd>{vehicle.speed} km/h</dd>
         <dt>Last updated</dt>
         <dd>{formatTime(vehicle.updatedAt)}</dd>
       </dl>
+      {onRemote ? (
+        <VehicleRemotePad
+          variant="ops"
+          compact
+          state={{
+            doorsLocked: vehicle.doorsLocked ?? true,
+            immobiliserOn: Boolean(vehicle.immobiliserOn),
+            theftRecovery: Boolean(vehicle.theftRecovery || vehicle.vehicleType === 'STOLEN'),
+          }}
+          onCommand={onRemote}
+        />
+      ) : null}
     </div>
   );
 }

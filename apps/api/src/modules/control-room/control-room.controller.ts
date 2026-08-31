@@ -310,6 +310,26 @@ export class ControlRoomController {
     return this.controlRoomService.listFleet(user.tenantId);
   }
 
+  @Get('client-vehicles')
+  clientVehicles(@CurrentUser() user: AuthUser) {
+    return this.controlRoomService.listClientVehicles(user.tenantId);
+  }
+
+  @Post('client-vehicles/:id/remote')
+  clientVehicleRemote(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Body() body: { action?: string },
+  ) {
+    return this.clientService.remoteCommand({
+      tenantId: user.tenantId,
+      vehicleId: id,
+      action: body?.action,
+      actorUserId: user.id,
+      source: 'control-room',
+    });
+  }
+
   @Post('fleet')
   createFleet(
     @CurrentUser() user: AuthUser,

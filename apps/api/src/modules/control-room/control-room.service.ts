@@ -18,6 +18,7 @@ import { SubscriptionService } from '../client/subscription.service';
 import { RealtimeGateway } from '../realtime/realtime.gateway';
 import { FleetService } from './fleet.service';
 import { IncidentKernelService } from '../incident-kernel/incident-kernel.service';
+import { clientVehicleDashCams } from '../client/vehicle-remote';
 import {
   OFFICER_AVAILABLE_MARKER_PREFIX,
   parseOfficerIdFromVolunteerNote,
@@ -335,6 +336,9 @@ export class ControlRoomService {
         trackerStatus: v.trackerLinked ? 'LIVE TRACKING' : 'OFFLINE',
         speed: isStolen ? 42 + (this.hashSeed(v.id) % 35) : 0,
         updatedAt: v.updatedAt.toISOString(),
+        doorsLocked: v.doorsLocked,
+        immobiliserOn: v.immobiliserOn,
+        theftRecovery: isStolen,
       };
     });
 
@@ -973,6 +977,42 @@ export class ControlRoomService {
 
   listFleet(tenantId: string) {
     return this.fleet.listFleet(tenantId);
+  }
+
+  async listClientVehicles(tenantId: string) {
+    const vehicles = await this.prisma.vehicle.findMany({
+      where: { tenantId },
+      include: { user: { select: { id: true, firstName: true, lastName: true } } },
+      orderBy: [{ theftRecovery: 'desc' }, { updatedAt: 'desc' }],
+    });
+    return {
+      success: true,
+      data: vehicles.map((v) => ({
+        id: v.id,
+        registration: v.registration,
+        make: v.make,
+        model: v.model,
+        color: v.color,
+        owner: `${v.user.firstName} ${v.user.lastName}`,
+        ownerId: v.user.id,
+        trackerLinked: v.trackerLinked,
+        theftRecovery: v.theftRecovery,
+        immobiliserOn: v.immobiliserOn,
+        doorsLocked: v.doorsLocked,
+        lat: v.lastKnownLat != null ? Number(v.lastKnownLat) : null,
+        lng: v.lastKnownLng != null ? Number(v.lastKnownLng) : null,
+        updatedAt: v.updatedAt.toISOString(),
+        status: v.theftRecovery
+          ? 'RECOVERY'
+          : v.immobiliserOn
+            ? 'IMMOBILISED'
+            : v.doorsLocked
+              ? 'LOCKED'
+              : 'UNLOCKED',
+        callSign: v.registration,
+        cameras: clientVehicleDashCams(v),
+      })),
+    };
   }
 
   createFleetVehicle(

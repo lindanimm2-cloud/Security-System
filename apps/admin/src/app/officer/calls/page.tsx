@@ -26,7 +26,7 @@ export default function OfficerCallsPage() {
         <header className="page-header">
           <div>
             <h2>Field communications</h2>
-            <p>Call control room, clients, or team members. Notes stay in the call lens while you navigate.</p>
+            <p>Call the control room, clients, or team members. Notes stay in the call lens while you navigate.</p>
           </div>
           {dir && <DispatchLineButton phone={dir.dispatchLine.phone} name={dir.dispatchLine.name} />}
         </header>

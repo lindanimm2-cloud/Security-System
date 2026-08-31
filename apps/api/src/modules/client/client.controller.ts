@@ -217,6 +217,22 @@ export class ClientController {
     return this.clientService.activateTheftRecovery(user.id, user.tenantId, id);
   }
 
+  @Post('vehicles/:id/remote')
+  vehicleRemote(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Body() body: { action?: string },
+  ) {
+    return this.clientService.remoteCommand({
+      tenantId: user.tenantId,
+      vehicleId: id,
+      action: body?.action,
+      actorUserId: user.id,
+      source: 'portal',
+      ownerUserId: user.id,
+    });
+  }
+
   @Get('properties')
   properties(@CurrentUser() user: AuthUser) {
     return this.clientService.getProperties(user.id);

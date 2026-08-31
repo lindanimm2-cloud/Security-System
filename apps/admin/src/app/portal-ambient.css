@@ -37,43 +37,43 @@
 }
 
 .shell--portal[data-portal-ambient='away'] {
-  --portal-ambient-strength: 0.42;
+  --portal-ambient-strength: 0.58;
   --portal-ambient-r: 251;
   --portal-ambient-g: 146;
   --portal-ambient-b: 60;
-  --portal-ambient-card: 0.06;
+  --portal-ambient-card: 0.09;
 }
 
 .shell--portal[data-portal-ambient='stay'] {
-  --portal-ambient-strength: 0.48;
+  --portal-ambient-strength: 0.62;
   --portal-ambient-r: 56;
   --portal-ambient-g: 189;
   --portal-ambient-b: 248;
-  --portal-ambient-card: 0.07;
+  --portal-ambient-card: 0.1;
 }
 
 .shell--portal[data-portal-ambient='night'] {
-  --portal-ambient-strength: 0.5;
+  --portal-ambient-strength: 0.66;
   --portal-ambient-r: 139;
   --portal-ambient-g: 92;
   --portal-ambient-b: 246;
-  --portal-ambient-card: 0.08;
+  --portal-ambient-card: 0.11;
 }
 
 .shell--portal[data-portal-ambient='disarm'] {
-  --portal-ambient-strength: 0.32;
+  --portal-ambient-strength: 0.4;
   --portal-ambient-r: 74;
   --portal-ambient-g: 222;
   --portal-ambient-b: 128;
-  --portal-ambient-card: 0.05;
+  --portal-ambient-card: 0.07;
 }
 
 .shell--portal[data-portal-ambient='triggered'] {
-  --portal-ambient-strength: 0.55;
+  --portal-ambient-strength: 0.72;
   --portal-ambient-r: 248;
   --portal-ambient-g: 113;
   --portal-ambient-b: 113;
-  --portal-ambient-card: 0.09;
+  --portal-ambient-card: 0.13;
 }
 
 .shell--portal[data-portal-ambient='triggered']::before {
@@ -187,12 +187,116 @@
   );
 }
 
+/* Status-light rim — same language as the active alarm-mode button */
+.shell--portal[data-portal-ambient]:not([data-portal-ambient='none'])::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  border-radius: 0;
+  box-shadow:
+    inset 0 2px 0 rgba(var(--portal-ambient-r), var(--portal-ambient-g), var(--portal-ambient-b), 0.55),
+    inset 0 0 48px rgba(var(--portal-ambient-r), var(--portal-ambient-g), var(--portal-ambient-b), 0.08);
+}
+
+.shell--portal[data-portal-ambient='triggered']::after {
+  animation: portal-ambient-alert 2.4s ease-in-out infinite;
+}
+
+.shell--portal .mobile-shell-header--portal,
+.shell--portal .topbar--portal {
+  border-bottom-color: color-mix(
+    in srgb,
+    var(--border) 55%,
+    rgba(var(--portal-ambient-r), var(--portal-ambient-g), var(--portal-ambient-b), 0.45)
+  );
+  box-shadow: 0 8px 24px rgba(var(--portal-ambient-r), var(--portal-ambient-g), var(--portal-ambient-b), calc(var(--portal-ambient-card) * 0.8));
+}
+
+.shell--portal .mobile-bottom-nav__pill {
+  box-shadow:
+    0 0 18px rgba(var(--portal-ambient-r), var(--portal-ambient-g), var(--portal-ambient-b), calc(var(--portal-ambient-card) * 1.4)),
+    var(--shadow-sm, 0 1px 2px rgba(0, 0, 0, 0.2));
+}
+
+.portal-status-light {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-height: 32px;
+  padding: 0.22rem 0.7rem 0.22rem 0.55rem;
+  border-radius: 999px;
+  text-decoration: none;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgb(var(--portal-ambient-r), var(--portal-ambient-g), var(--portal-ambient-b));
+  background: rgba(var(--portal-ambient-r), var(--portal-ambient-g), var(--portal-ambient-b), 0.12);
+  border: 1px solid rgba(var(--portal-ambient-r), var(--portal-ambient-g), var(--portal-ambient-b), 0.42);
+  box-shadow:
+    0 0 16px rgba(var(--portal-ambient-r), var(--portal-ambient-g), var(--portal-ambient-b), 0.22),
+    inset 0 1px 0 rgba(var(--portal-ambient-r), var(--portal-ambient-g), var(--portal-ambient-b), 0.18);
+}
+
+.portal-status-light:hover {
+  background: rgba(var(--portal-ambient-r), var(--portal-ambient-g), var(--portal-ambient-b), 0.18);
+}
+
+.portal-status-light__dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: rgb(var(--portal-ambient-r), var(--portal-ambient-g), var(--portal-ambient-b));
+  box-shadow: 0 0 8px rgba(var(--portal-ambient-r), var(--portal-ambient-g), var(--portal-ambient-b), 0.85);
+  animation: portal-status-light-pulse 2s ease-in-out infinite;
+}
+
+.portal-status-light--compact {
+  min-height: 28px;
+  padding: 0.18rem 0.45rem;
+  gap: 0;
+}
+
+.portal-status-light--compact .portal-status-light__label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+}
+
+.portal-status-light--compact .portal-status-light__dot {
+  width: 8px;
+  height: 8px;
+}
+
+@keyframes portal-status-light-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 6px rgba(var(--portal-ambient-r), var(--portal-ambient-g), var(--portal-ambient-b), 0.7);
+    transform: scale(1);
+  }
+  50% {
+    box-shadow: 0 0 12px rgba(var(--portal-ambient-r), var(--portal-ambient-g), var(--portal-ambient-b), 1);
+    transform: scale(1.12);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .shell--portal[data-portal-ambient='triggered'] {
     animation: none;
   }
 
-  .shell--portal::before {
+  .shell--portal::before,
+  .shell--portal::after {
     transition: none;
+    animation: none;
+  }
+
+  .portal-status-light__dot {
+    animation: none;
   }
 }

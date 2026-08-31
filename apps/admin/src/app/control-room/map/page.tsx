@@ -68,6 +68,10 @@ import { IncidentDetailsMenu } from '@/components/control-room/IncidentDetailsMe
 import { CONTROL_ROOM_ROUTES } from '@/lib/control-room-routes';
 import { getSocketUrl } from '@/lib/socket';
 import { isDemoMode, shouldBackgroundPoll } from '@/lib/demo/is-demo-mode';
+import {
+  subscribeVehicleFocus,
+  type VehicleRemoteAction,
+} from '@/lib/vehicle-remote';
 
 const CommandCentreMap = dynamic(() => import('@/components/maps/CommandCentreMap'), {
   ssr: false,
@@ -272,6 +276,21 @@ function MapContent() {
       setFlyTo({ lat: stolen.lat, lng: stolen.lng, zoom: 16 });
     }
   }, [theftRecoveryMode, mapData?.vehicles]);
+
+  useEffect(() => {
+    return subscribeVehicleFocus((detail) => {
+      setTheftRecoveryMode(true);
+      setTheftFocusId(detail.vehicleId);
+      const vehicle = rawMapData?.vehicles.find((v) => v.id === detail.vehicleId);
+      if (vehicle) setFlyTo({ lat: vehicle.lat, lng: vehicle.lng, zoom: 16 });
+      void reload({ silent: true });
+    });
+  }, [rawMapData?.vehicles, reload]);
+
+  async function sendVehicleRemote(vehicleId: string, action: VehicleRemoteAction) {
+    await adminApi.post(`/control-room/client-vehicles/${vehicleId}/remote`, { action });
+    void reload({ silent: true });
+  }
 
   function returnToOverview() {
     setSelectedIncidentId(null);
@@ -561,6 +580,7 @@ function MapContent() {
               if (incident) selectIncident(incident);
             }}
             onDispatchAssigned={() => void reload({ silent: true })}
+            onVehicleRemote={(vehicleId, action) => void sendVehicleRemote(vehicleId, action)}
           />
         </div>
       </div>

@@ -8,8 +8,8 @@ export type OfficerNavItem = {
 };
 
 export const OFFICER_NAV: OfficerNavItem[] = [
+  { href: '/officer/queue', label: 'Your Jobs', icon: 'queue' },
   { href: '/officer', label: 'Home', icon: 'home', exact: true },
-  { href: '/officer/queue', label: 'Jobs', icon: 'queue' },
   { href: '/officer/map', label: 'Map', icon: 'navigation' },
   { href: '/officer/record', label: 'Evidence', icon: 'evidence' },
   { href: '/officer/report', label: 'Incident Report', icon: 'report' },
@@ -20,10 +20,10 @@ export const OFFICER_NAV: OfficerNavItem[] = [
   { href: '/officer/settings', label: 'Settings', icon: 'account' },
 ];
 
-/** Floating mobile bottom bar — Home · Jobs · Map · Evidence · Settings */
+/** Floating mobile bottom bar — Your Jobs · Home · Map · Evidence · Settings */
 export const OFFICER_MOBILE_NAV: Array<OfficerNavItem & { mobileLabel: string }> = [
+  { href: '/officer/queue', label: 'Your Jobs', mobileLabel: 'Jobs', icon: 'queue' },
   { href: '/officer', label: 'Home', mobileLabel: 'Home', icon: 'home', exact: true },
-  { href: '/officer/queue', label: 'Jobs', mobileLabel: 'Jobs', icon: 'queue' },
   { href: '/officer/map', label: 'Map', mobileLabel: 'Map', icon: 'navigation' },
   { href: '/officer/record', label: 'Evidence', mobileLabel: 'Evidence', icon: 'evidence' },
   { href: '/officer/settings', label: 'Settings', mobileLabel: 'Settings', icon: 'account' },

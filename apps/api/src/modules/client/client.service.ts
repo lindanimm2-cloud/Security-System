@@ -4,6 +4,7 @@ import {
   ConversationType,
   IncidentPriority,
   IncidentType,
+  NotificationPriority,
   NotificationType,
   CompanyVehicleType,
   PanicSource,
@@ -14,6 +15,12 @@ import { RealtimeGateway } from '../realtime/realtime.gateway';
 import { IncidentKernelService } from '../incident-kernel/incident-kernel.service';
 import { DeviceSecurityService } from '../device-security/device-security.service';
 import { hasCategoryAccess } from './plans.catalog';
+import { PlatformEvent } from '../incident-kernel/incident-events';
+import {
+  clientVehicleDashCams,
+  isVehicleRemoteAction,
+  type VehicleRemoteAction,
+} from './vehicle-remote';
 
 @Injectable()
 export class ClientService {
@@ -142,6 +149,7 @@ export class ClientService {
           theftRecovery: v.theftRecovery,
           trackerLinked: v.trackerLinked,
           immobiliserOn: v.immobiliserOn,
+          doorsLocked: v.doorsLocked,
         })),
         properties: properties.map((p) => ({
           id: p.id,
@@ -936,6 +944,7 @@ export class ClientService {
           phoneTrackingEnabled: vehicle.phoneTrackingEnabled,
           theftRecovery: vehicle.theftRecovery,
           immobiliserOn: vehicle.immobiliserOn,
+          doorsLocked: vehicle.doorsLocked,
           insuranceInfo: vehicle.insuranceInfo,
           updatedAt: vehicle.updatedAt,
         },
@@ -953,6 +962,7 @@ export class ClientService {
         responseTeam: {
           synced: trackingActive,
         },
+        cameras: clientVehicleDashCams(vehicle),
         alerts: alerts.map((a) => ({
           id: a.id,
           type: a.type,
@@ -1062,6 +1072,149 @@ export class ClientService {
       vehiclePlate: vehicle.registration,
     });
     return result;
+  }
+
+  async remoteCommand(opts: {
+    tenantId: string;
+    vehicleId: string;
+    action: unknown;
+    actorUserId: string;
+    source: 'portal' | 'control-room';
+    ownerUserId?: string;
+  }) {
+    if (!isVehicleRemoteAction(opts.action)) {
+      throw new BadRequestException('Unknown vehicle remote action');
+    }
+    const action = opts.action;
+    const vehicle = await this.prisma.vehicle.findFirst({
+      where: {
+        id: opts.vehicleId,
+        tenantId: opts.tenantId,
+        ...(opts.ownerUserId ? { userId: opts.ownerUserId } : {}),
+      },
+      include: { user: true },
+    });
+    if (!vehicle) throw new NotFoundException('Vehicle not found');
+
+    const data: {
+      doorsLocked?: boolean;
+      immobiliserOn?: boolean;
+      theftRecovery?: boolean;
+      trackerLinked?: boolean;
+    } = {};
+
+    if (action === 'lock') data.doorsLocked = true;
+    if (action === 'unlock') data.doorsLocked = false;
+    if (action === 'immobilise') data.immobiliserOn = true;
+    if (action === 'release') data.immobiliserOn = false;
+    if (action === 'panic') {
+      data.doorsLocked = true;
+      data.immobiliserOn = true;
+      data.theftRecovery = true;
+      data.trackerLinked = true;
+    }
+
+    const updated =
+      Object.keys(data).length > 0
+        ? await this.prisma.vehicle.update({ where: { id: vehicle.id }, data })
+        : vehicle;
+
+    let incidentId: string | null = null;
+    if (action === 'panic') {
+      const lat = Number(updated.lastKnownLat ?? vehicle.user.lastKnownLat ?? -29.8587);
+      const lng = Number(updated.lastKnownLng ?? vehicle.user.lastKnownLng ?? 31.0218);
+      const incident = await this.kernel.createFromEmergency({
+        tenantId: opts.tenantId,
+        userId: vehicle.userId,
+        type: IncidentType.PANIC,
+        title: `Vehicle panic — ${vehicle.registration}`,
+        description: `${vehicle.make} ${vehicle.model} · remote panic`,
+        lat,
+        lng,
+        address: `${vehicle.registration} last known`,
+        priority: IncidentPriority.CRITICAL,
+        vehicleId: vehicle.id,
+        vehicleMake: vehicle.make,
+        vehicleModel: vehicle.model,
+        vehicleColor: vehicle.color,
+        vehiclePlate: vehicle.registration,
+        source: opts.source,
+        actorUserId: opts.actorUserId,
+        kind: 'vehicle-panic',
+        autoDispatch: true,
+      });
+      incidentId = incident.id;
+
+      await this.prisma.notification.create({
+        data: {
+          tenantId: opts.tenantId,
+          userId: vehicle.userId,
+          incidentId,
+          type: NotificationType.PANIC_ALERT,
+          priority: NotificationPriority.P0,
+          title: `Vehicle panic — ${vehicle.registration}`,
+          body: 'Dash cameras switched to this vehicle. Central locking and immobiliser engaged.',
+        },
+      });
+    }
+
+    const snapshot = {
+      id: updated.id,
+      registration: updated.registration,
+      make: updated.make,
+      model: updated.model,
+      doorsLocked: updated.doorsLocked,
+      immobiliserOn: updated.immobiliserOn,
+      theftRecovery: updated.theftRecovery,
+      trackerLinked: updated.trackerLinked,
+      cameras: clientVehicleDashCams(updated),
+    };
+
+    this.realtime.emitPlatformEvent(
+      opts.tenantId,
+      action === 'panic' ? PlatformEvent.VEHICLE_PANIC : PlatformEvent.VEHICLE_REMOTE,
+      {
+        vehicleId: updated.id,
+        registration: updated.registration,
+        action,
+        source: opts.source,
+        incidentId,
+        doorsLocked: snapshot.doorsLocked,
+        immobiliserOn: snapshot.immobiliserOn,
+        theftRecovery: snapshot.theftRecovery,
+        owner: `${vehicle.user.firstName} ${vehicle.user.lastName}`,
+        cameras: snapshot.cameras,
+      },
+      { incidentId, userId: vehicle.userId },
+    );
+
+    return {
+      success: true,
+      data: {
+        ...snapshot,
+        action,
+        incidentId,
+        hornActive: action === 'horn',
+        message: this.remoteActionMessage(action, updated.registration),
+      },
+    };
+  }
+
+  private remoteActionMessage(action: VehicleRemoteAction, registration: string) {
+    switch (action) {
+      case 'lock':
+        return `${registration} doors locked.`;
+      case 'unlock':
+        return `${registration} doors unlocked.`;
+      case 'immobilise':
+        return `${registration} immobiliser engaged — starter interrupt when stationary.`;
+      case 'release':
+        return `${registration} immobiliser released.`;
+      case 'horn':
+        return `${registration} horn and lights pulsing.`;
+      case 'panic':
+        return `${registration} vehicle panic sent — control room viewing dash cameras.`;
+    }
   }
 
   async getProperties(userId: string) {

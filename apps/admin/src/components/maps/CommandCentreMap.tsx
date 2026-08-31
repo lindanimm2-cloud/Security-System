@@ -44,6 +44,7 @@ import {
 } from './MapPopups';
 import { MapOverlapPicker, type OverlapPinOption } from './MapOverlapPicker';
 import { overlapGroupKey, spreadOverlappingMarkers } from './spread-overlapping-markers';
+import type { VehicleRemoteAction } from '@/lib/vehicle-remote';
 
 type CommandCentreMapProps = {
   data: MapCommandData;
@@ -56,6 +57,7 @@ type CommandCentreMapProps = {
   theftRecoveryFocusId?: string | null;
   onSelectIncident?: (id: string) => void;
   onDispatchAssigned?: () => void;
+  onVehicleRemote?: (vehicleId: string, action: VehicleRemoteAction) => void | Promise<void>;
 };
 
 type MapPinPayload = {
@@ -252,6 +254,7 @@ export default function CommandCentreMap({
   theftRecoveryFocusId,
   onSelectIncident,
   onDispatchAssigned,
+  onVehicleRemote,
 }: CommandCentreMapProps) {
   const clients = data.clients ?? [];
   const officers = data.officers ?? [];
@@ -588,6 +591,7 @@ export default function CommandCentreMap({
                 icon={vehicleIcon('STOLEN')}
                 selected={theftRecoveryFocusId === vehicle.id}
                 riseOnHover
+                popupMaxWidth={320}
                 overlapGroupSize={groupOptions.length}
                 onOverlapHover={() => {
                   if (groupOptions.length > 1) {
@@ -607,7 +611,14 @@ export default function CommandCentreMap({
                   }
                 }}
               >
-                <VehiclePopup vehicle={vehicle} />
+                <VehiclePopup
+                  vehicle={vehicle}
+                  onRemote={
+                    onVehicleRemote
+                      ? (action) => void onVehicleRemote(vehicle.id, action)
+                      : undefined
+                  }
+                />
               </AnimatedMarker>
             );
           })}

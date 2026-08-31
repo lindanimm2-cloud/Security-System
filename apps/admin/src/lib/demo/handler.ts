@@ -4,6 +4,7 @@ import {
   DEMO_ERROR_REPORTS_KEY,
   developerTicketCode,
 } from '../developer-tickets';
+import { dispatchVehicleFocus, type VehicleRemoteAction } from '../vehicle-remote';
 import { FLEET_TEAMS, fleetTeamLabel } from '../fleet-teams';
 import { getDemoCategories, getDemoProducts } from './catalog';
 import { handleDeviceSecurityDemo } from './device-security';
@@ -795,10 +796,218 @@ let demoVehicleState = {
   phoneTrackingEnabled: false,
   theftRecovery: true,
   immobiliserOn: false,
+  doorsLocked: true,
   trackingMode: 'THEFT_RECOVERY' as 'OFF' | 'TRACKER' | 'PHONE' | 'THEFT_RECOVERY',
   lat: -29.81,
   lng: 31.04,
 };
+
+let demoVehiclePanicId: string | null = null;
+const demoHornUntil = new Map<string, number>();
+
+function liveDemoClientVehicle(id: string) {
+  const base = demoClientVehicles.find((v) => v.id === id) ?? demoClientVehicles[0];
+  if (!base) return null;
+  if (base.id === 'demo-veh-1') {
+    return {
+      ...base,
+      theftRecovery: demoVehicleState.theftRecovery,
+      immobiliserOn: demoVehicleState.immobiliserOn,
+      doorsLocked: demoVehicleState.doorsLocked,
+      lat: demoVehicleState.lat,
+      lng: demoVehicleState.lng,
+    };
+  }
+  return { ...base, doorsLocked: base.doorsLocked ?? true };
+}
+
+function demoClientDashCams(vehicleId: string, registration: string) {
+  const feed = demoVehicleCameraFeeds.find((f) => f.vehicleId === vehicleId);
+  if (feed) {
+    return feed.cameras.map((c) => ({
+      id: c.id,
+      name: c.name,
+      locationLabel: c.locationLabel,
+      channel: c.channel,
+      status: c.status,
+      snapshotUrl: c.snapshotUrl,
+      isLiveCapable: c.isLiveCapable,
+      isInterior: c.isInterior,
+    }));
+  }
+  return demoDashCams(vehicleId, registration, true);
+}
+
+function formatCrClientVehicle(id: string) {
+  const live = liveDemoClientVehicle(id);
+  if (!live) return null;
+  return {
+    id: live.id,
+    registration: live.registration,
+    make: live.make,
+    model: live.model,
+    color: live.color,
+    owner: live.ownerName,
+    ownerId: live.ownerId,
+    trackerLinked: live.trackerLinked,
+    theftRecovery: live.theftRecovery,
+    immobiliserOn: live.immobiliserOn,
+    doorsLocked: live.doorsLocked ?? true,
+    lat: live.lat,
+    lng: live.lng,
+    updatedAt: new Date().toISOString(),
+    status: live.theftRecovery
+      ? 'RECOVERY'
+      : live.immobiliserOn
+        ? 'IMMOBILISED'
+        : live.doorsLocked
+          ? 'LOCKED'
+          : 'UNLOCKED',
+    callSign: live.registration,
+    cameras: demoClientDashCams(live.id, live.registration),
+    panicFocus: demoVehiclePanicId === live.id,
+    hornActive: (demoHornUntil.get(live.id) ?? 0) > Date.now(),
+  };
+}
+
+function applyDemoVehicleRemote(
+  vehicleId: string,
+  action: string,
+  actorName: string,
+): {
+  action: VehicleRemoteAction;
+  message: string;
+  incidentId: string | null;
+  hornActive: boolean;
+  id: string;
+  registration: string;
+  make: string;
+  model: string;
+  doorsLocked: boolean;
+  immobiliserOn: boolean;
+  theftRecovery: boolean;
+  trackerLinked: boolean;
+  cameras: ReturnType<typeof demoClientDashCams>;
+} | null {
+  const allowed: VehicleRemoteAction[] = ['lock', 'unlock', 'immobilise', 'release', 'horn', 'panic'];
+  if (!(allowed as string[]).includes(action)) return null;
+  const typed = action as VehicleRemoteAction;
+  const target = demoClientVehicles.find((v) => v.id === vehicleId) ?? demoClientVehicles.find((v) => v.id === 'demo-veh-1');
+  if (!target) return null;
+
+  const isPrimary = target.id === 'demo-veh-1';
+  let doorsLocked = isPrimary ? demoVehicleState.doorsLocked : (target.doorsLocked ?? true);
+  let immobiliserOn = isPrimary ? demoVehicleState.immobiliserOn : target.immobiliserOn;
+  let theftRecovery = isPrimary ? demoVehicleState.theftRecovery : target.theftRecovery;
+
+  if (typed === 'lock') doorsLocked = true;
+  if (typed === 'unlock') doorsLocked = false;
+  if (typed === 'immobilise') immobiliserOn = true;
+  if (typed === 'release') immobiliserOn = false;
+  if (typed === 'panic') {
+    doorsLocked = true;
+    immobiliserOn = true;
+    theftRecovery = true;
+  }
+
+  target.doorsLocked = doorsLocked;
+  target.immobiliserOn = immobiliserOn;
+  target.theftRecovery = theftRecovery;
+  if (isPrimary) {
+    demoVehicleState.doorsLocked = doorsLocked;
+    demoVehicleState.immobiliserOn = immobiliserOn;
+    demoVehicleState.theftRecovery = theftRecovery;
+    if (typed === 'panic') demoVehicleState.trackingMode = 'THEFT_RECOVERY';
+  }
+
+  if (typed === 'horn') demoHornUntil.set(target.id, Date.now() + 20_000);
+  let incidentId: string | null = null;
+  if (typed === 'panic') {
+    demoVehiclePanicId = target.id;
+    const existing = demoIncidents.find(
+      (i) => i.type === 'PANIC' && i.title.includes(target.registration) && isActiveDemoIncident(i.status),
+    );
+    if (!existing) {
+      const id = `demo-inc-${Date.now()}`;
+      demoIncidents.unshift({
+        id,
+        type: 'PANIC',
+        status: 'OPEN',
+        title: `Vehicle panic — ${target.registration}`,
+        isSilent: false,
+        time: 'Just now',
+        priority: 'CRITICAL',
+        user: actorName,
+        location: `${target.make} ${target.model} · live track`,
+      });
+      incidentId = id;
+    } else {
+      incidentId = existing.id;
+    }
+    demoControlRoomNotifications.unshift({
+      id: `demo-n-veh-${Date.now()}`,
+      category: 'PANIC',
+      title: `Vehicle panic — ${target.registration}`,
+      body: `${actorName} · dash cameras switched to this vehicle`,
+      priority: 'critical',
+      isRead: false,
+      createdAt: new Date().toISOString(),
+      link: '/control-room',
+    });
+    dispatchVehicleFocus({
+      vehicleId: target.id,
+      registration: target.registration,
+      make: target.make,
+      model: target.model,
+      owner: target.ownerName,
+      action: typed,
+      incidentId,
+      doorsLocked,
+      immobiliserOn,
+      theftRecovery,
+      cameras: demoClientDashCams(target.id, target.registration),
+    });
+  } else {
+    dispatchVehicleFocus({
+      vehicleId: target.id,
+      registration: target.registration,
+      make: target.make,
+      model: target.model,
+      owner: target.ownerName,
+      action: typed,
+      incidentId: null,
+      doorsLocked,
+      immobiliserOn,
+      theftRecovery,
+      cameras: demoClientDashCams(target.id, target.registration),
+    });
+  }
+
+  const messages: Record<VehicleRemoteAction, string> = {
+    lock: `${target.registration} doors locked.`,
+    unlock: `${target.registration} doors unlocked.`,
+    immobilise: `${target.registration} immobiliser engaged — starter interrupt when stationary.`,
+    release: `${target.registration} immobiliser released.`,
+    horn: `${target.registration} horn and lights pulsing.`,
+    panic: `${target.registration} vehicle panic sent — control room viewing dash cameras.`,
+  };
+
+  return {
+    action: typed,
+    message: messages[typed],
+    incidentId,
+    hornActive: typed === 'horn' || (demoHornUntil.get(target.id) ?? 0) > Date.now(),
+    id: target.id,
+    registration: target.registration,
+    make: target.make,
+    model: target.model,
+    doorsLocked,
+    immobiliserOn,
+    theftRecovery,
+    trackerLinked: target.trackerLinked,
+    cameras: demoClientDashCams(target.id, target.registration),
+  };
+}
 
 const demoContacts = [
   {
@@ -2446,6 +2655,8 @@ export async function handleDemoRequest<T>({
           make: 'Toyota',
           model: 'Fortuner',
           theftRecovery: demoVehicleState.theftRecovery,
+          immobiliserOn: demoVehicleState.immobiliserOn,
+          doorsLocked: demoVehicleState.doorsLocked,
         },
       ],
       properties: demoProperties.filter((p) => {
@@ -3059,36 +3270,57 @@ export async function handleDemoRequest<T>({
     const vehicleProfileMatch = clean.match(/^\/client\/vehicles\/([^/]+)\/profile$/);
     if (vehicleProfileMatch && m === 'GET') {
       const vehicleId = vehicleProfileMatch[1];
+      const live = liveDemoClientVehicle(vehicleId);
+      const v = live ?? {
+        id: vehicleId,
+        registration: 'ND 123-456',
+        make: 'Toyota',
+        model: 'Fortuner',
+        variant: 'GD-6',
+        year: 2022,
+        color: 'White',
+        vin: 'JTMDN123456789012',
+        trackerLinked: true,
+        theftRecovery: demoVehicleState.theftRecovery,
+        immobiliserOn: demoVehicleState.immobiliserOn,
+        doorsLocked: demoVehicleState.doorsLocked,
+        insuranceInfo: 'Santam comprehensive',
+      };
       return ok({
         vehicle: {
-          id: vehicleId,
-          registration: 'ND 123-456',
-          make: 'Toyota',
-          model: 'Fortuner',
-          variant: 'GD-6',
-          year: 2022,
-          color: 'White',
-          vin: 'JTMDN123456789012',
-          trackerLinked: true,
+          id: v.id,
+          registration: v.registration,
+          make: v.make,
+          model: v.model,
+          variant: 'variant' in v ? v.variant ?? null : 'GD-6',
+          year: 'year' in v ? v.year : 2022,
+          color: v.color,
+          vin: 'vin' in v ? v.vin : null,
+          trackerLinked: v.trackerLinked,
           phoneTrackingEnabled: demoVehicleState.phoneTrackingEnabled,
-          theftRecovery: demoVehicleState.theftRecovery,
-          immobiliserOn: demoVehicleState.immobiliserOn,
-          insuranceInfo: 'Santam comprehensive',
+          theftRecovery: v.theftRecovery,
+          immobiliserOn: v.immobiliserOn,
+          doorsLocked: v.doorsLocked ?? true,
+          insuranceInfo: 'insuranceInfo' in v ? v.insuranceInfo : 'Santam comprehensive',
           updatedAt: new Date().toISOString(),
         },
         tracking: {
           active: demoVehicleState.trackingMode !== 'OFF',
-          mode: demoVehicleState.trackingMode,
+          mode: v.theftRecovery ? 'THEFT_RECOVERY' : demoVehicleState.trackingMode,
           hasPosition: true,
-          lat: demoVehicleState.lat,
-          lng: demoVehicleState.lng,
+          lat: 'lat' in v ? v.lat : demoVehicleState.lat,
+          lng: 'lng' in v ? v.lng : demoVehicleState.lng,
           lastUpdate: new Date().toISOString(),
-          trail: mapTrail(demoVehicleState.lat, demoVehicleState.lng).map((p, i) => ({
+          trail: mapTrail(
+            'lat' in v ? v.lat : demoVehicleState.lat,
+            'lng' in v ? v.lng : demoVehicleState.lng,
+          ).map((p, i) => ({
             ...p,
             at: new Date(Date.now() - (7 - i) * 45000).toISOString(),
           })),
         },
         responseTeam: { synced: true },
+        cameras: demoClientDashCams(v.id, v.registration),
         alerts: [],
         incidents: [],
       }) as T;
@@ -3224,6 +3456,7 @@ export async function handleDemoRequest<T>({
         trackerLinked: v.trackerLinked,
         theftRecovery: v.id === 'demo-veh-1' ? demoVehicleState.theftRecovery : v.theftRecovery,
         immobiliserOn: v.id === 'demo-veh-1' ? demoVehicleState.immobiliserOn : v.immobiliserOn,
+        doorsLocked: v.id === 'demo-veh-1' ? demoVehicleState.doorsLocked : (v.doorsLocked ?? true),
         insuranceInfo: v.insuranceInfo,
       })),
     ) as T;
@@ -3328,7 +3561,9 @@ export async function handleDemoRequest<T>({
     ) as T;
   }
   {
-    const vehicleIdMatch = clean.match(/^\/client\/vehicles\/([^/]+)\/(tracking\/phone|location|theft-recovery)$/);
+    const vehicleIdMatch = clean.match(
+      /^\/client\/vehicles\/([^/]+)\/(tracking\/phone|location|theft-recovery|remote)$/,
+    );
     if (vehicleIdMatch && (m === 'POST' || m === 'DELETE')) {
       const action = vehicleIdMatch[2];
       const lat = Number(payload.lat);
@@ -3363,6 +3598,12 @@ export async function handleDemoRequest<T>({
             location: 'Live phone relay',
           });
         }
+      }
+      if (action === 'remote' && m === 'POST') {
+        const actor = user ? `${user.firstName ?? ''} ${user.lastName ?? ''}`.trim() || user.email : 'Nomsa Client';
+        const result = applyDemoVehicleRemote(vehicleIdMatch[1], String(payload.action ?? ''), actor);
+        if (!result) return { success: false as const, message: 'Unknown vehicle remote action' } as T;
+        return ok(result) as T;
       }
       return ok({
         ok: true,
@@ -3775,7 +4016,20 @@ export async function handleDemoRequest<T>({
           avatarUrl: demoOfficerRoster.find((o) => o.id === 'demo-off-6')?.avatarUrl ?? null,
         },
       ],
-      vehicles: demoMapVehicles(),
+      vehicles: demoMapVehicles().map((v) => {
+        const live = liveDemoClientVehicle(v.id);
+        if (!live) return v;
+        return {
+          ...v,
+          lat: live.lat,
+          lng: live.lng,
+          vehicleType: live.theftRecovery ? 'STOLEN' : 'CLIENT',
+          doorsLocked: live.doorsLocked ?? true,
+          immobiliserOn: live.immobiliserOn,
+          theftRecovery: live.theftRecovery,
+          speed: live.theftRecovery ? live.speed : v.speed,
+        };
+      }),
       fleet: demoFleet.map((v, i) => ({
         id: v.id,
         lat: DURBAN.lat + 0.012 - i * 0.007,
@@ -4275,6 +4529,22 @@ export async function handleDemoRequest<T>({
           ? payload.incidentId.trim()
           : null;
       return ok(decorateDemoDocument(doc)) as T;
+    }
+  }
+  if (clean === '/control-room/client-vehicles' && m === 'GET') {
+    const rows = demoClientVehicles
+      .map((v) => formatCrClientVehicle(v.id))
+      .filter((v): v is NonNullable<typeof v> => Boolean(v))
+      .sort((a, b) => Number(b.panicFocus) - Number(a.panicFocus) || Number(b.theftRecovery) - Number(a.theftRecovery));
+    return ok(rows) as T;
+  }
+  {
+    const remoteMatch = clean.match(/^\/control-room\/client-vehicles\/([^/]+)\/remote$/);
+    if (remoteMatch && m === 'POST') {
+      const actor = user ? `${user.firstName ?? ''} ${user.lastName ?? ''}`.trim() || user.email : 'Control room';
+      const result = applyDemoVehicleRemote(remoteMatch[1], String(payload.action ?? ''), actor);
+      if (!result) return { success: false as const, message: 'Unknown vehicle remote action' } as T;
+      return ok(result) as T;
     }
   }
   if (clean === '/control-room/fleet' && m === 'GET') {

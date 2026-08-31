@@ -24,6 +24,7 @@ export type MapIncidentPayload = {
   isSilent?: boolean;
   createdAt?: string;
   trail?: { lat: number; lng: number }[];
+  vehicleId?: string | null;
 };
 
 export type PositionUpdatePayload = {

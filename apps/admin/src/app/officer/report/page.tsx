@@ -114,7 +114,7 @@ function ReportContent() {
     }
   }
 
-  if (loading) return <LoadingSpinner label="Loading assignments..." fullScreen />;
+  if (loading) return <LoadingSpinner label="Loading assignments…" fullScreen />;
   if (error) return <ErrorAlert error={error} onRetry={reload} />;
 
   return (
@@ -177,7 +177,7 @@ function ReportContent() {
                   value={content}
                   onChange={(e) => setContent(e.target.value)}
                   rows={5}
-                  placeholder="On-scene observations, suspect description, actions taken..."
+                  placeholder="On-scene observations, suspect description, actions taken…"
                 />
               </label>
               <ReportAttachments

@@ -38,7 +38,7 @@ function OfficerSettingsContent() {
       {
         title: 'Field',
         items: [
-          { id: 'jobs', label: 'Job queue', icon: 'queue', href: '/officer/queue' },
+          { id: 'jobs', label: 'Your Jobs', icon: 'queue', href: '/officer/queue' },
           { id: 'map', label: 'Navigation map', icon: 'navigation', href: '/officer/map' },
           { id: 'evidence', label: 'Evidence capture', icon: 'evidence', href: '/officer/record' },
           { id: 'report', label: 'Incident report', icon: 'report', href: '/officer/report' },

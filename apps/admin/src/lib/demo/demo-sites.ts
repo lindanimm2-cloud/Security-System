@@ -1049,6 +1049,7 @@ export type DemoClientVehicle = {
   trackerLinked: boolean;
   theftRecovery: boolean;
   immobiliserOn: boolean;
+  doorsLocked?: boolean;
   insuranceInfo: string;
   ownerName: string;
   ownerId: string;
@@ -1292,5 +1293,8 @@ export function demoMapVehicles() {
     trackerStatus: v.trackerStatus,
     speed: v.speed,
     updatedAt: nowIso(),
+    doorsLocked: v.doorsLocked ?? true,
+    immobiliserOn: v.immobiliserOn,
+    theftRecovery: v.theftRecovery,
   }));
 }

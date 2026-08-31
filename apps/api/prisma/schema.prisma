@@ -839,6 +839,7 @@ model Vehicle {
   lastKnownLat    Decimal?  @map("last_known_lat") @db.Decimal(10, 8)
   lastKnownLng    Decimal?  @map("last_known_lng") @db.Decimal(11, 8)
   immobiliserOn   Boolean   @default(false) @map("immobiliser_on")
+  doorsLocked           Boolean   @default(true) @map("doors_locked")
   createdAt       DateTime  @default(now()) @map("created_at")
   updatedAt       DateTime  @updatedAt @map("updated_at")
 

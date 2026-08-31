@@ -30,6 +30,7 @@ import {
   markAnnounced,
   shouldAnnounce,
 } from '@/lib/ops-alert-memory';
+import { subscribeVehicleFocus } from '@/lib/vehicle-remote';
 
 type PriorityAlertContextValue = {
   criticalAlert: PriorityAlert | null;
@@ -221,9 +222,24 @@ export function PriorityAlertProvider({ children }: { children: React.ReactNode 
 
     window.addEventListener(DEMO_DEV_TICKET_EVENT, onTicket);
     window.addEventListener('storage', onStorage);
+    const unsubVehicle = subscribeVehicleFocus((detail) => {
+      if (detail.action !== 'panic') return;
+      pushAlert({
+        id: `vehicle-panic-${detail.vehicleId}-${detail.incidentId ?? Date.now()}`,
+        tier: 'critical',
+        kind: 'panic',
+        category: 'VEHICLE',
+        title: `Vehicle panic — ${detail.registration}`,
+        subtitle: `${detail.owner ?? 'Client'} · dash cameras switched`,
+        link: '/control-room',
+        incidentId: detail.incidentId ?? undefined,
+        createdAt: new Date().toISOString(),
+      });
+    });
     return () => {
       window.removeEventListener(DEMO_DEV_TICKET_EVENT, onTicket);
       window.removeEventListener('storage', onStorage);
+      unsubVehicle();
     };
   }, [pushAlert]);
 

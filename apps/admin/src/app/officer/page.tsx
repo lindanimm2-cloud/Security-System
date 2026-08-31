@@ -93,7 +93,7 @@ function DashboardContent() {
     [],
   );
   const [actionLoading, setActionLoading] = useState<string | null>(null);
-  const [filter, setFilter] = useState('all');
+  const [filter, setFilter] = useState('queue');
   const [sosBusy, setSosBusy] = useState(false);
   const [sosMsg, setSosMsg] = useState('');
   const [checkInMsg, setCheckInMsg] = useState('');
@@ -204,10 +204,10 @@ function DashboardContent() {
         source: 'hold',
         incidentId: active?.incident.id ?? null,
       });
-      setSosMsg('SOS sent to control room and supervisor.');
+      setSosMsg('SOS sent to the control room and your supervisor.');
       void reload({ silent: true });
     } catch {
-      setSosMsg('SOS queued for control room (demo).');
+      setSosMsg('SOS queued for the control room (demo).');
     } finally {
       setSosBusy(false);
     }
@@ -223,7 +223,7 @@ function DashboardContent() {
     }
   }
 
-  if (loading) return <LoadingSpinner label="Loading dashboard..." fullScreen />;
+  if (loading) return <LoadingSpinner label="Loading dashboard…" fullScreen />;
   if (error || !d) return <ErrorAlert error={error} onRetry={reload} />;
 
   const primary = active ? nextDispatchAction(active.status) : null;
@@ -242,7 +242,7 @@ function DashboardContent() {
           {
             id: 'urgent',
             title: `${urgentCount} high-priority`,
-            detail: 'Incidents needing fast response',
+            detail: 'Incidents that need a fast response',
             href: '/officer/queue',
           },
         ]
@@ -250,7 +250,7 @@ function DashboardContent() {
     {
       id: 'messages',
       title: 'Dispatch chat',
-      detail: 'Check for control-room messages',
+      detail: 'Check for control room messages',
       href: '/officer/messages',
     },
   ];
@@ -271,7 +271,7 @@ function DashboardContent() {
           title={sosMsg ? 'Officer SOS active' : `${active!.incident.type} — priority response`}
           detail={
             sosMsg ||
-            `${active!.incident.client} · control room tracking your status`
+            `${active!.incident.client} · control room is tracking your status`
           }
           statusLine={active?.incident.address ?? d.officer.zone ?? 'Field'}
           liveLabel="Live · field"
@@ -295,18 +295,18 @@ function DashboardContent() {
       )}
 
       <OpsMyShiftHeader
-        title={`${d.officer.firstName} · field home`}
+        title={`${d.officer.firstName} · Field Home`}
         subtitle={
           active
             ? `Current job · ${active.incident.type}`
             : waiting.length
-              ? `${waiting.length} in queue · standby`
+              ? `${waiting.length} in queue · on standby`
               : 'No active assignment'
         }
         chips={[
+          { id: 'queue', label: 'Your Jobs', count: waiting.length, tone: 'warn' },
           { id: 'all', label: 'Board', count: (active ? 1 : 0) + waiting.length },
           { id: 'urgent', label: 'Urgent', count: urgentCount, tone: 'urgent' },
-          { id: 'queue', label: 'Jobs', count: waiting.length, tone: 'warn' },
           {
             id: 'messages',
             label: 'Messages',
@@ -324,32 +324,109 @@ function DashboardContent() {
         }}
       />
 
-      <div className="protect-tile protect-tile--panic" style={{ marginBottom: '0.75rem' }}>
-        <HoldToActivate
-          label="Officer SOS"
-          holdLabel="Hold to alert CR + supervisor…"
-          loading={sosBusy}
-          onActivate={() => sendSos()}
-        />
-      </div>
+      {(showQueue || showUrgentOnly) && (
+        <OpsSection
+          title="Your Jobs"
+          action={
+            <Link href="/officer/queue" className="link-sm">
+              View all
+            </Link>
+          }
+        >
+          {filteredWaiting.length === 0 ? (
+            <p className="text-muted" style={{ margin: 0 }}>
+              {showUrgentOnly
+                ? 'No high-priority jobs in your queue right now.'
+                : 'No queued jobs yet. New assignments from dispatch will appear here.'}
+            </p>
+          ) : (
+            <div className="ops-queue-list">
+              {filteredWaiting.slice(0, 5).map((item) => {
+                const next = nextDispatchAction(item.status);
+                return (
+                  <OpsSwipeRow
+                    key={item.id}
+                    label={next?.label ?? 'Open'}
+                    disabled={!!actionLoading || !next}
+                    onSwipePrimary={() => {
+                      if (!next) return;
+                      void patchDispatch(item, next.path, `${item.id}-${next.key}`, item.status);
+                    }}
+                  >
+                    <div
+                      className={`ops-queue-card ${officerQueueRowClass(item.status, item.incident.type)}`}
+                    >
+                      <div className="card-header-row">
+                        <strong>
+                          {item.incident.type} — {item.incident.client}
+                        </strong>
+                        <DispatchStatusBadge status={item.status} />
+                      </div>
+                      {item.incident.address && (
+                        <span className="text-muted">{item.incident.address}</span>
+                      )}
+                      <div className="ops-queue-card__actions">
+                        {next && (
+                          <button
+                            type="button"
+                            className={`btn-sm ${officerTaskButtonClass(primaryTaskAction(item.status) ?? 'accept', item.status)}`}
+                            disabled={!!actionLoading}
+                            onClick={() =>
+                              void patchDispatch(
+                                item,
+                                next.path,
+                                `${item.id}-${next.key}`,
+                                item.status,
+                              )
+                            }
+                          >
+                            {next.label}
+                          </button>
+                        )}
+                        <Link
+                          href={`https://www.google.com/maps/dir/?api=1&destination=${item.incident.lat},${item.incident.lng}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="btn-sm btn-secondary"
+                        >
+                          Navigate
+                        </Link>
+                      </div>
+                    </div>
+                  </OpsSwipeRow>
+                );
+              })}
+            </div>
+          )}
+        </OpsSection>
+      )}
 
-      <div className="check-grid" aria-label="Quick check-ins">
-        {checkIns.map((item) => (
-          <button
-            key={item.kind}
-            type="button"
-            className="check-row"
-            onClick={() => void checkIn(item.kind)}
-          >
-            <strong>{item.label}</strong>
-          </button>
-        ))}
-      </div>
-      {checkInMsg || sosMsg ? (
-        <p className="alert alert--success" role="status">
-          {sosMsg || checkInMsg}
-        </p>
-      ) : null}
+      {active ? (
+        <OfficerActiveAssignment
+          dispatch={active}
+          actionLoading={actionLoading}
+          onAction={runAction}
+        />
+      ) : (
+        <section className="officer-standby portal-card">
+          <p className="dash-ops__eyebrow">
+            <span className="ops-live-chip__dot" aria-hidden />
+            Standby · refreshes every 20s
+          </p>
+          <h2>No active job</h2>
+          <p className="text-muted">
+            You are available. Open Your Jobs when dispatch assigns the next call.
+          </p>
+          <div className="officer-standby__actions">
+            <Link href="/officer/queue" className="btn-primary">
+              Open Your Jobs
+            </Link>
+            <Link href="/officer/map" className="btn-secondary">
+              Map
+            </Link>
+          </div>
+        </section>
+      )}
 
       {active && primary && (
         <OpsQuickWork
@@ -392,101 +469,32 @@ function DashboardContent() {
         />
       )}
 
-      {active ? (
-        <OfficerActiveAssignment
-          dispatch={active}
-          actionLoading={actionLoading}
-          onAction={runAction}
+      <div className="protect-tile protect-tile--panic" style={{ marginBottom: '0.75rem' }}>
+        <HoldToActivate
+          label="Officer SOS"
+          holdLabel="Hold to alert control room and supervisor…"
+          loading={sosBusy}
+          onActivate={() => sendSos()}
         />
-      ) : (
-        <section className="officer-standby portal-card">
-          <p className="dash-ops__eyebrow">
-            <span className="ops-live-chip__dot" aria-hidden />
-            Standby · refresh 20s
-          </p>
-          <h2>No active job</h2>
-          <p className="text-muted">
-            You are available. Pull the next job when dispatch assigns you.
-          </p>
-          <div className="officer-standby__actions">
-            <Link href="/officer/queue" className="btn-primary">
-              Open jobs
-            </Link>
-            <Link href="/officer/map" className="btn-secondary">
-              Map
-            </Link>
-          </div>
-        </section>
-      )}
+      </div>
 
-      {showQueue && filteredWaiting.length > 0 && (
-        <OpsSection
-          title="Your jobs"
-          action={
-            <Link href="/officer/queue" className="link-sm">
-              View all
-            </Link>
-          }
-        >
-          <div className="ops-queue-list">
-            {filteredWaiting.slice(0, 5).map((item) => {
-              const next = nextDispatchAction(item.status);
-              return (
-                <OpsSwipeRow
-                  key={item.id}
-                  label={next?.label ?? 'Open'}
-                  disabled={!!actionLoading || !next}
-                  onSwipePrimary={() => {
-                    if (!next) return;
-                    void patchDispatch(item, next.path, `${item.id}-${next.key}`, item.status);
-                  }}
-                >
-                  <div
-                    className={`ops-queue-card ${officerQueueRowClass(item.status, item.incident.type)}`}
-                  >
-                    <div className="card-header-row">
-                      <strong>
-                        {item.incident.type} — {item.incident.client}
-                      </strong>
-                      <DispatchStatusBadge status={item.status} />
-                    </div>
-                    {item.incident.address && (
-                      <span className="text-muted">{item.incident.address}</span>
-                    )}
-                    <div className="ops-queue-card__actions">
-                      {next && (
-                        <button
-                          type="button"
-                          className={`btn-sm ${officerTaskButtonClass(primaryTaskAction(item.status) ?? 'accept', item.status)}`}
-                          disabled={!!actionLoading}
-                          onClick={() =>
-                            void patchDispatch(
-                              item,
-                              next.path,
-                              `${item.id}-${next.key}`,
-                              item.status,
-                            )
-                          }
-                        >
-                          {next.label}
-                        </button>
-                      )}
-                      <Link
-                        href={`https://www.google.com/maps/dir/?api=1&destination=${item.incident.lat},${item.incident.lng}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="btn-sm btn-secondary"
-                      >
-                        Navigate
-                      </Link>
-                    </div>
-                  </div>
-                </OpsSwipeRow>
-              );
-            })}
-          </div>
-        </OpsSection>
-      )}
+      <div className="check-grid" aria-label="Quick check-ins">
+        {checkIns.map((item) => (
+          <button
+            key={item.kind}
+            type="button"
+            className="check-row"
+            onClick={() => void checkIn(item.kind)}
+          >
+            <strong>{item.label}</strong>
+          </button>
+        ))}
+      </div>
+      {checkInMsg || sosMsg ? (
+        <p className="alert alert--success" role="status">
+          {sosMsg || checkInMsg}
+        </p>
+      ) : null}
 
       <OpsNeedsYou items={needsItems} viewAllHref="/officer/messages" />
 

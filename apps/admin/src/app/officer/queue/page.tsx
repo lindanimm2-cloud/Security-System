@@ -63,7 +63,7 @@ function actionLabel(primary: ReturnType<typeof primaryTaskAction>): string {
 
 export default function OfficerQueuePage() {
   return (
-    <OfficerLayout title="Incident Queue">
+    <OfficerLayout title="Your Jobs">
       <QueueContent />
     </OfficerLayout>
   );
@@ -113,7 +113,7 @@ function QueueContent() {
     }
   }
 
-  if (loading) return <LoadingSpinner label="Loading queue..." fullScreen />;
+  if (loading) return <LoadingSpinner label="Loading your jobs…" fullScreen />;
   if (error) return <ErrorAlert error={error} onRetry={reload} />;
 
   const q = data!.data;
@@ -122,7 +122,7 @@ function QueueContent() {
     <>
       {actionError ? <ErrorAlert message={actionError} /> : null}
       <section className="portal-card">
-        <h2>Your assignments</h2>
+        <h2>Your Jobs</h2>
         {q.assigned.length === 0 ? (
           <p className="text-muted">No assignments in your queue.</p>
         ) : (

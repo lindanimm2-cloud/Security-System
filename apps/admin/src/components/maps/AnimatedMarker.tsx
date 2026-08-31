@@ -15,6 +15,7 @@ type AnimatedMarkerProps = {
   onOverlapHover?: () => void;
   onOverlapLeave?: () => void;
   markerRef?: (marker: LeafletMarker | null) => void;
+  popupMaxWidth?: number;
 };
 
 function lerp(a: number, b: number, t: number) {
@@ -32,6 +33,7 @@ export function AnimatedMarker({
   onOverlapHover,
   onOverlapLeave,
   markerRef,
+  popupMaxWidth = 280,
 }: AnimatedMarkerProps) {
   const internalRef = useRef<LeafletMarker | null>(null);
   const animRef = useRef<number | null>(null);
@@ -94,7 +96,7 @@ export function AnimatedMarker({
         },
       }}
     >
-      {children && <Popup maxWidth={280} minWidth={220} className="map-popup--compact">{children}</Popup>}
+      {children && <Popup maxWidth={popupMaxWidth} minWidth={220} className="map-popup--compact">{children}</Popup>}
     </Marker>
   );
 }

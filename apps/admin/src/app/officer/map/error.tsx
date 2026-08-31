@@ -16,7 +16,7 @@ export default function OfficerMapError({
       homeHref="/officer/map"
       homeLabel="Reload map"
       title="Navigation map unavailable"
-      description="This map could not load. Try again — your assignment is still on Jobs."
+      description="This map could not load. Try again — your assignment is still on Your Jobs."
     />
   );
 }

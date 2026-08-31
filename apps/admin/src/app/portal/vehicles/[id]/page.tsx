@@ -9,11 +9,13 @@ import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { PortalLayout } from '@/components/portal/PortalLayout';
 import { PortalVehicleMap, VehicleMapIdle } from '@/components/portal/PortalVehicleMap';
 import { UpgradeBanner } from '@/components/portal/UpgradeBanner';
+import { VehicleRemotePad } from '@/components/vehicle/VehicleRemotePad';
 import { useSubscriptionAccess } from '@/hooks/useSubscriptionAccess';
 import { useApi } from '@/hooks/useApi';
 import { clientApi, type ApiResponse } from '@/lib/api-client';
 import { formatClientNotificationTime } from '@/lib/client-notifications';
 import { friendlyErrorMessage } from '@/lib/friendly-error';
+import type { VehicleRemoteAction } from '@/lib/vehicle-remote';
 
 type VehicleProfile = {
   vehicle: {
@@ -29,6 +31,7 @@ type VehicleProfile = {
     phoneTrackingEnabled: boolean;
     theftRecovery: boolean;
     immobiliserOn: boolean;
+    doorsLocked?: boolean;
     insuranceInfo: string | null;
     updatedAt: string;
   };
@@ -80,6 +83,7 @@ function VehicleProfileContent() {
 
   const [trackingBusy, setTrackingBusy] = useState(false);
   const [recoveryBusy, setRecoveryBusy] = useState(false);
+  const [remoteBusy, setRemoteBusy] = useState<VehicleRemoteAction | null>(null);
   const [msg, setMsg] = useState('');
 
   const refreshPosition = useCallback(async () => {
@@ -146,6 +150,23 @@ function VehicleProfileContent() {
     }
   }
 
+  async function sendRemote(action: VehicleRemoteAction) {
+    setRemoteBusy(action);
+    setMsg('');
+    try {
+      const res = await clientApi.post<ApiResponse<{ message?: string }>>(
+        `/client/vehicles/${vehicleId}/remote`,
+        { action },
+      );
+      setMsg(res.data?.message ?? 'Remote command sent.');
+      reload();
+    } catch (e) {
+      setMsg(friendlyErrorMessage(e, 'action'));
+    } finally {
+      setRemoteBusy(null);
+    }
+  }
+
   if (loading || accessLoading) return <LoadingSpinner label="Loading vehicle..." fullScreen />;
   if (error) return <ErrorAlert error={error} onRetry={reload} />;
   if (!access?.vehicle) {
@@ -205,6 +226,18 @@ function VehicleProfileContent() {
 
       {msg && <div className="alert alert--success">{msg}</div>}
 
+      <section className="portal-card">
+        <VehicleRemotePad
+          state={{
+            doorsLocked: v.doorsLocked ?? true,
+            immobiliserOn: v.immobiliserOn,
+            theftRecovery: v.theftRecovery,
+          }}
+          busyAction={remoteBusy}
+          onCommand={(action) => void sendRemote(action)}
+        />
+      </section>
+
       <section className="portal-card vehicle-profile__map-section">
         <div className="card-header-row">
           <h2>Live map</h2>
@@ -255,6 +288,7 @@ function VehicleProfileContent() {
             <li><span>GPS tracker</span><strong>{v.trackerLinked ? 'Linked' : 'Not linked'}</strong></li>
             <li><span>Phone relay</span><strong>{v.phoneTrackingEnabled ? 'Active' : 'Off'}</strong></li>
             <li><span>Immobiliser</span><strong>{v.immobiliserOn ? 'Engaged' : 'Released'}</strong></li>
+            <li><span>Central locking</span><strong>{v.doorsLocked !== false ? 'Locked' : 'Unlocked'}</strong></li>
             <li><span>Response team</span><strong>{profile.responseTeam.synced ? 'Receiving live feed' : 'Idle'}</strong></li>
           </ul>
           <div className="vehicle-profile__actions">

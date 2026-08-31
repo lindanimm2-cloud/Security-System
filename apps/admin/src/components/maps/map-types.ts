@@ -130,6 +130,9 @@ export type MapVehicle = {
   trackerStatus: string;
   speed: number;
   updatedAt: string | null;
+  doorsLocked?: boolean;
+  immobiliserOn?: boolean;
+  theftRecovery?: boolean;
 };
 
 export type MapProperty = {
