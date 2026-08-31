@@ -23,6 +23,7 @@ import { navHrefIsActive } from '@/lib/nav-active';
 import { SidebarCollapseButton, SidebarWebsiteLink, SignOutIcon } from '@/components/nav/SidebarCollapseButton';
 import { FloatingSupportDock } from './FloatingSupportDock';
 import { ShellRouteActions } from './nav/ShellRouteActions';
+import { PortalAmbientProvider, usePortalAmbient } from './portal/PortalAmbientProvider';
 
 export function PortalShell({
   session,
@@ -31,6 +32,21 @@ export function PortalShell({
   session: AuthSession;
   children: React.ReactNode;
 }) {
+  return (
+    <PortalAmbientProvider>
+      <PortalShellInner session={session}>{children}</PortalShellInner>
+    </PortalAmbientProvider>
+  );
+}
+
+function PortalShellInner({
+  session,
+  children,
+}: {
+  session: AuthSession;
+  children: React.ReactNode;
+}) {
+  const { ambient } = usePortalAmbient();
   const router = useRouter();
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -40,9 +56,12 @@ export function PortalShell({
   const hideQuickActions = /^\/portal\/(?:chat|messages|communications|family\/chat|contacts)(?:\/|$)/.test(
     pathname,
   );
-  const showSilentFab =
+  const hasPanicConsole =
     pathname === '/portal' ||
-    /^\/portal\/(?:protect|emergency|security)(?:\/|$)/.test(pathname);
+    pathname === '/portal/protect' ||
+    pathname === '/portal/emergency';
+  const showSilentFab =
+    !hasPanicConsole && /^\/portal\/security(?:\/|$)/.test(pathname);
   const navSections = useMemo(() => {
     const sections = filterPortalNav(access, accessLoading);
     if (tierCode !== 'PREMIUM') return sections;
@@ -113,7 +132,10 @@ export function PortalShell({
   return (
     <>
       {handoff.overlay}
-    <div className="shell shell--portal shell--with-bottom-nav">
+    <div
+      className="shell shell--portal shell--with-bottom-nav"
+      data-portal-ambient={ambient}
+    >
       <header className="mobile-shell-header mobile-shell-header--portal">
         <button
           type="button"
@@ -214,8 +236,8 @@ export function PortalShell({
           </div>
         </header>
         <main className="portal-main portal-main--with-sidebar portal-main--with-call-bar">
-          <PortalPermissionsBanner />
           {children}
+          <PortalPermissionsBanner />
         </main>
       </div>
 

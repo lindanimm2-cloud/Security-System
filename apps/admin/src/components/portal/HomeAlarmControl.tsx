@@ -6,6 +6,8 @@ import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { SketchIcon } from '@/components/icons/SketchIcon';
 import { clientApi } from '@/lib/api-client';
 import { ARM_MODE_OPTIONS, alarmStatusLabel, isArmedStatus, type ArmMode } from '@/lib/sa-alarm';
+import { portalAmbientFromAlarm } from '@/lib/portal-ambient';
+import { usePortalAmbientOptional } from '@/components/portal/PortalAmbientProvider';
 
 type Property = {
   id: string;
@@ -40,12 +42,16 @@ export function HomeAlarmControl({
   const [optimisticStatus, setOptimisticStatus] = useState<Record<string, string>>({});
   const isDashboard = variant === 'dashboard';
   const merged = isDashboard && feeds != null;
+  const ambientCtx = usePortalAmbientOptional();
 
   async function setMode(property: Property, mode: ArmMode) {
     if (!hasAccess) return;
     setLoadingId(`${property.id}-${mode}`);
     setMsg('');
     setOptimisticStatus((prev) => ({ ...prev, [property.id]: mode }));
+    if (property.id === properties[0]?.id) {
+      ambientCtx?.setAmbientOverride(portalAmbientFromAlarm(mode));
+    }
     try {
       await clientApi.patch(`/client/properties/${property.id}/alarm`, { status: mode });
       setMsg(`${property.name}: ${alarmStatusLabel(mode)}.`);
@@ -56,6 +62,9 @@ export function HomeAlarmControl({
         delete next[property.id];
         return next;
       });
+      if (property.id === properties[0]?.id) {
+        ambientCtx?.setAmbientOverride(null);
+      }
     } finally {
       setLoadingId(null);
     }

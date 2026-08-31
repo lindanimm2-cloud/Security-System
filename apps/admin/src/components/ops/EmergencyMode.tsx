@@ -77,7 +77,10 @@ export function HoldToActivate({
   }
 
   const isCircle =
-    className.includes('hold-activate--circle') || className.includes('panic-orbit-btn');
+    className.includes('hold-activate--circle') ||
+    className.includes('panic-orbit-btn') ||
+    className.includes('panic-neu__knob') ||
+    className.includes('panic-orb');
 
   return (
     <button
@@ -103,7 +106,7 @@ export function HoldToActivate({
         aria-hidden
       />
       <span className="hold-activate__label">
-        {loading
+        {loading && !keepLabel
           ? 'Sending…'
           : holding && !keepLabel
             ? `Release to cancel · ${Math.max(1, Math.ceil((1 - progress) * (holdMs / 1000)))}`

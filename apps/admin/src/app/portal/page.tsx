@@ -19,9 +19,9 @@ import { OpsNeedsYou } from '@/components/ops/OpsQuickWork';
 import { OpsUndoToast, useUndoToast } from '@/components/ops/OpsUndoToast';
 import {
   EmergencyModeBanner,
-  HoldToActivate,
   ProtectionStatusCard,
 } from '@/components/ops/EmergencyMode';
+import { PanicNeuConsole, type PanicNeuBusy } from '@/components/portal/PanicNeuConsole';
 import { DashboardLiveCctv } from '@/components/portal/DashboardLiveCctv';
 import { IncidentTimeline } from '@/components/incident/IncidentTimeline';
 import { SlideCarousel, SlideCarouselCard } from '@/components/portal/SlideCarousel';
@@ -229,72 +229,26 @@ function OverviewDashboard() {
       )}
 
       {access?.emergency !== false && (
-        <section className="panic-section panic-tray" aria-label="Emergency controls">
-          <HoldToActivate
-            label="Panic"
-            holdLabel="Keep holding…"
-            holdMs={3000}
-            hideHint
-            keepLabel
-            loading={panicLoading}
-            disabled={silentLoading || medicalLoading || fireLoading}
-            className="hold-activate--circle panic-knob"
-            onActivate={() => handlePanic(false)}
-          >
-            <span className="panic-knob__title">Panic</span>
-            <span className="panic-knob__sub">Hold 3 seconds</span>
-          </HoldToActivate>
-          <p className="panic-note">Release to cancel</p>
-
-          <div className="panic-orbit">
-            <HoldToActivate
-              label="Silent Panic. Hold 2 seconds to notify control room discreetly."
-              holdMs={2000}
-              tone="warn"
-              hideHint
-              keepLabel
-              className="panic-orbit-btn panic-orbit-btn--silent panic-knob"
-              loading={silentLoading}
-              disabled={panicLoading || medicalLoading || fireLoading}
-              onActivate={() => handlePanic(true)}
-            >
-              <span className="panic-knob__kicker">Hold 2s</span>
-              <span className="panic-knob__title">Silent</span>
-            </HoldToActivate>
-            {access?.medical !== false && (
-              <button
-                type="button"
-                className="panic-orbit-btn panic-orbit-btn--medical panic-knob"
-                onClick={handleMedicalEmergency}
-                disabled={panicLoading || silentLoading || medicalLoading || fireLoading}
-              >
-                {medicalLoading ? '…' : (
-                  <>
-                    <span className="panic-knob__kicker">Hold 2s</span>
-                    <span className="panic-knob__title">Medical</span>
-                  </>
-                )}
-              </button>
-            )}
-            <button
-              type="button"
-              className="panic-orbit-btn panic-orbit-btn--fire panic-knob"
-              onClick={handleFireEmergency}
-              disabled={panicLoading || silentLoading || medicalLoading || fireLoading}
-            >
-              {fireLoading ? '…' : (
-                <>
-                  <span className="panic-knob__kicker">Hold 2s</span>
-                  <span className="panic-knob__title">Fire</span>
-                </>
-              )}
-            </button>
-            <Link href="/portal/emergency" className="panic-orbit-btn panic-orbit-btn--hub panic-knob">
-              <span className="panic-knob__kicker">Open</span>
-              <span className="panic-knob__title">Hub</span>
-            </Link>
-          </div>
-        </section>
+        <PanicNeuConsole
+          className="panic-section"
+          showHub
+          showMedical={access?.medical !== false}
+          busy={
+            (panicLoading
+              ? 'panic'
+              : silentLoading
+                ? 'silent'
+                : medicalLoading
+                  ? 'medical'
+                  : fireLoading
+                    ? 'fire'
+                    : null) satisfies PanicNeuBusy
+          }
+          onPanic={() => handlePanic(false)}
+          onSilent={() => handlePanic(true)}
+          onMedical={() => void handleMedicalEmergency()}
+          onFire={() => void handleFireEmergency()}
+        />
       )}
 
       <HomeAlarmControl
@@ -320,6 +274,7 @@ function OverviewDashboard() {
           {alertMsg}
         </div>
       ) : null}
+      </div>
 
       <div className="portal-status-dock">
         <ProtectionStatusCard
@@ -340,7 +295,6 @@ function OverviewDashboard() {
           ]}
         />
         <EmergencyProtectionBanner />
-      </div>
       </div>
 
       <div className="portal-brief">

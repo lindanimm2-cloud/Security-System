@@ -5,8 +5,9 @@ import { useCallsOptional } from '@/components/calls/CallProvider';
 import { useApi } from '@/hooks/useApi';
 import { clientApi, type ApiResponse } from '@/lib/api-client';
 import { friendlyErrorMessage } from '@/lib/friendly-error';
-import { HoldToActivate } from '@/components/ops/EmergencyMode';
 import { CONTROL_ROOM_LINE } from '@/lib/control-room-line';
+import { PanicNeuButton } from '@/components/portal/PanicNeuButton';
+import { SilentPanicIcon } from '@/components/portal/PanicNeuIcons';
 
 type DispatchMeta = {
   meta?: { dispatchLine: { name: string; phone: string } };
@@ -68,32 +69,15 @@ export function MiniCallSafetyBar({
             : 'silent-call-fab--floating'
       }`}
     >
-      <HoldToActivate
+      <PanicNeuButton
         label="Silent Panic. Hold for 2 seconds to notify dispatch discreetly."
-        holdLabel="Hold"
         holdMs={2000}
         tone="warn"
-        className="silent-call-fab__btn"
-        disabled={callBusy}
         loading={callBusy}
-        hideHint
-        keepLabel
+        disabled={callBusy}
         onActivate={() => startSilentCall()}
-      >
-        <span className="silent-call-fab__icon" aria-hidden>
-          <MutePhoneIcon />
-        </span>
-        <span className="silent-call-fab__text">{callBusy ? '…' : 'Silent Panic'}</span>
-      </HoldToActivate>
+        icon={<SilentPanicIcon />}
+      />
     </div>
-  );
-}
-
-function MutePhoneIcon() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden>
-      <path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6A19.79 19.79 0 012.12 4.18 2 2 0 014.11 2h3a2 2 0 012 1.72c.13.96.36 1.9.7 2.81a2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.91.34 1.85.57 2.81.7A2 2 0 0122 16.92z" />
-      <path d="M3 3l18 18" />
-    </svg>
   );
 }

@@ -4,6 +4,7 @@ import { CallShell } from '@/components/calls/CallShell';
 import { TabSessionBoot } from '@/components/TabSessionBoot';
 import './globals.css';
 import './control-room-polish.css';
+import './portal-ambient.css';
 import './psim-hub.css';
 import './mobile-light-polish.css';
 

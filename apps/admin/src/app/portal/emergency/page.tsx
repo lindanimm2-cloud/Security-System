@@ -2,11 +2,10 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { EmergencyDispatchCallCard } from '@/components/portal/EmergencyCallButton';
 import { FeatureHub } from '@/components/portal/FeatureHub';
 import { PortalLayout } from '@/components/portal/PortalLayout';
-import { HoldToActivate } from '@/components/ops/EmergencyMode';
+import { PanicNeuConsole, type PanicNeuBusy } from '@/components/portal/PanicNeuConsole';
 import { EmergencyProtectionBanner } from '@/components/security/EmergencyProtectionBanner';
 import { useApi } from '@/hooks/useApi';
 import { clientApi, type ApiResponse } from '@/lib/api-client';
@@ -33,8 +32,6 @@ function EmergencyContent() {
   const [medicalLoading, setMedicalLoading] = useState(false);
   const [fireLoading, setFireLoading] = useState(false);
   const [msg, setMsg] = useState('');
-
-  const anyLoading = panicLoading || silentLoading || medicalLoading || fireLoading;
 
   async function trigger(silent: boolean) {
     if (silent) setSilentLoading(true);
@@ -94,64 +91,25 @@ function EmergencyContent() {
 
       <EmergencyProtectionBanner compact />
 
-      <div id="emergency-actions" className="emergency-actions panic-tray">
-        <HoldToActivate
-          label="Panic"
-          holdMs={3000}
-          hideHint
-          keepLabel
-          loading={panicLoading}
-          disabled={anyLoading}
-          className="hold-activate--circle panic-knob"
-          onActivate={() => trigger(false)}
-        >
-          <span className="panic-knob__title">Panic</span>
-          <span className="panic-knob__sub">Hold 3 seconds</span>
-        </HoldToActivate>
-        <p className="panic-note">Release to cancel</p>
-        <div className="emergency-actions__secondary panic-orbit">
-          <HoldToActivate
-            label="Silent Panic. Hold 2 seconds to notify control room discreetly."
-            holdMs={2000}
-            tone="warn"
-            hideHint
-            keepLabel
-            className="panic-orbit-btn panic-orbit-btn--silent panic-knob"
-            loading={silentLoading}
-            disabled={anyLoading && !silentLoading}
-            onActivate={() => trigger(true)}
-          >
-            <span className="panic-knob__kicker">Hold 2s</span>
-            <span className="panic-knob__title">Silent</span>
-          </HoldToActivate>
-          <button
-            type="button"
-            className="panic-orbit-btn panic-orbit-btn--medical panic-knob"
-            onClick={requestAmbulance}
-            disabled={anyLoading}
-          >
-            {medicalLoading ? <LoadingSpinner label="" size="sm" /> : (
-              <>
-                <span className="panic-knob__kicker">Hold 2s</span>
-                <span className="panic-knob__title">Medical</span>
-              </>
-            )}
-          </button>
-          <button
-            type="button"
-            className="panic-orbit-btn panic-orbit-btn--fire panic-knob"
-            onClick={requestFire}
-            disabled={anyLoading}
-          >
-            {fireLoading ? <LoadingSpinner label="" size="sm" /> : (
-              <>
-                <span className="panic-knob__kicker">Hold 2s</span>
-                <span className="panic-knob__title">Fire</span>
-              </>
-            )}
-          </button>
-        </div>
-      </div>
+      <PanicNeuConsole
+        id="emergency-actions"
+        className="emergency-actions"
+        busy={
+          (panicLoading
+            ? 'panic'
+            : silentLoading
+              ? 'silent'
+              : medicalLoading
+                ? 'medical'
+                : fireLoading
+                  ? 'fire'
+                  : null) satisfies PanicNeuBusy
+        }
+        onPanic={() => trigger(false)}
+        onSilent={() => trigger(true)}
+        onMedical={() => void requestAmbulance()}
+        onFire={() => void requestFire()}
+      />
       {msg && <p className="alert alert--success">{msg}</p>}
           <p className="text-muted medical-emergency-hint">
             Set up your medical profile under <Link href="/portal/medical">Medical</Link> so responders receive

@@ -6,13 +6,13 @@ import { ErrorAlert } from '@/components/ErrorAlert';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import {
   EmergencyModeBanner,
-  HoldToActivate,
   ProtectionStatusCard,
 } from '@/components/ops/EmergencyMode';
 import { PortalLayout } from '@/components/portal/PortalLayout';
 import { EmergencyCallButton, EmergencyDispatchCallCard } from '@/components/portal/EmergencyCallButton';
 import { CONTROL_ROOM_LINE } from '@/lib/control-room-line';
 import { EmergencyProtectionBanner } from '@/components/security/EmergencyProtectionBanner';
+import { PanicNeuConsole, type PanicNeuBusy } from '@/components/portal/PanicNeuConsole';
 import { useApi } from '@/hooks/useApi';
 import { clientApi, type ApiResponse } from '@/lib/api-client';
 import { friendlyErrorMessage } from '@/lib/friendly-error';
@@ -143,72 +143,29 @@ function ProtectContent() {
       <EmergencyDispatchCallCard />
 
       {access?.emergency !== false && (
-        <section className="panic-section panic-tray" aria-label="Emergency controls">
-          <HoldToActivate
-            label="Panic"
-            holdLabel="Sending panic…"
-            holdMs={3000}
-            hideHint
-            keepLabel
-            loading={busy === 'panic'}
-            disabled={!!busy && busy !== 'panic'}
-            className="hold-activate--circle panic-knob"
-            onActivate={() => send('panic')}
-          >
-            <span className="panic-knob__title">Panic</span>
-            <span className="panic-knob__sub">Hold 3 seconds</span>
-          </HoldToActivate>
-          <p className="panic-note">Release to cancel</p>
-          <div className="panic-orbit">
-            <HoldToActivate
-              label="Silent Panic. Hold 2 seconds to notify control room discreetly."
-              holdMs={2000}
-              tone="warn"
-              hideHint
-              keepLabel
-              className="panic-orbit-btn panic-orbit-btn--silent panic-knob"
-              loading={busy === 'silent'}
-              disabled={!!busy && busy !== 'silent'}
-              onActivate={() => send('silent')}
-            >
-              <span className="panic-knob__kicker">Hold 2s</span>
-              <span className="panic-knob__title">Silent</span>
-            </HoldToActivate>
-            {access?.medical !== false && (
-              <HoldToActivate
-                label="Medical emergency. Hold 2 seconds."
-                holdMs={2000}
-                tone="medical"
-                hideHint
-                keepLabel
-                className="panic-orbit-btn panic-orbit-btn--medical panic-knob"
-                loading={busy === 'medical'}
-                disabled={!!busy && busy !== 'medical'}
-                onActivate={() => send('medical')}
-              >
-                <span className="panic-knob__kicker">Hold 2s</span>
-                <span className="panic-knob__title">Medical</span>
-              </HoldToActivate>
-            )}
-            <HoldToActivate
-              label="Fire emergency. Hold 2 seconds."
-              holdMs={2000}
-              tone="warn"
-              hideHint
-              keepLabel
-              className="panic-orbit-btn panic-orbit-btn--fire panic-knob"
-              loading={busy === 'fire'}
-              disabled={!!busy && busy !== 'fire'}
-              onActivate={() => send('fire')}
-            >
-              <span className="panic-knob__kicker">Hold 2s</span>
-              <span className="panic-knob__title">Fire</span>
-            </HoldToActivate>
-          </div>
-        </section>
+        <PanicNeuConsole
+          className="panic-section"
+          showMedical={access?.medical !== false}
+          busy={
+            (busy === 'panic'
+              ? 'panic'
+              : busy === 'silent'
+                ? 'silent'
+                : busy === 'medical'
+                  ? 'medical'
+                  : busy === 'fire'
+                    ? 'fire'
+                    : null) satisfies PanicNeuBusy
+          }
+          onPanic={() => send('panic')}
+          onSilent={() => send('silent')}
+          onMedical={() => send('medical')}
+          onFire={() => send('fire')}
+        />
       )}
 
       {msg ? <p className="alert alert--success">{msg}</p> : null}
+      </div>
 
       <div className="portal-status-dock">
         <ProtectionStatusCard
@@ -229,7 +186,6 @@ function ProtectContent() {
           ]}
         />
         <EmergencyProtectionBanner />
-      </div>
       </div>
     </div>
   );

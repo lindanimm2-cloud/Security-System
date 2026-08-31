@@ -1,0 +1,198 @@
+/* Portal home-state ambient lighting — tints atmosphere only, not brand/accent colors */
+
+.shell--portal {
+  --portal-ambient-strength: 0;
+  --portal-ambient-r: 148;
+  --portal-ambient-g: 163;
+  --portal-ambient-b: 184;
+  --portal-ambient-card: 0;
+  position: relative;
+  isolation: isolate;
+}
+
+.shell--portal::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: var(--portal-ambient-strength);
+  background:
+    radial-gradient(
+      ellipse 125% 88% at 50% -12%,
+      rgba(var(--portal-ambient-r), var(--portal-ambient-g), var(--portal-ambient-b), 0.28),
+      transparent 58%
+    ),
+    radial-gradient(
+      ellipse 70% 55% at 100% 42%,
+      rgba(var(--portal-ambient-r), var(--portal-ambient-g), var(--portal-ambient-b), 0.1),
+      transparent 52%
+    ),
+    radial-gradient(
+      ellipse 55% 45% at 0% 78%,
+      rgba(var(--portal-ambient-r), var(--portal-ambient-g), var(--portal-ambient-b), 0.07),
+      transparent 50%
+    );
+  transition: opacity 0.85s ease, background 0.85s ease;
+}
+
+.shell--portal[data-portal-ambient='away'] {
+  --portal-ambient-strength: 0.42;
+  --portal-ambient-r: 251;
+  --portal-ambient-g: 146;
+  --portal-ambient-b: 60;
+  --portal-ambient-card: 0.06;
+}
+
+.shell--portal[data-portal-ambient='stay'] {
+  --portal-ambient-strength: 0.48;
+  --portal-ambient-r: 56;
+  --portal-ambient-g: 189;
+  --portal-ambient-b: 248;
+  --portal-ambient-card: 0.07;
+}
+
+.shell--portal[data-portal-ambient='night'] {
+  --portal-ambient-strength: 0.5;
+  --portal-ambient-r: 139;
+  --portal-ambient-g: 92;
+  --portal-ambient-b: 246;
+  --portal-ambient-card: 0.08;
+}
+
+.shell--portal[data-portal-ambient='disarm'] {
+  --portal-ambient-strength: 0.32;
+  --portal-ambient-r: 74;
+  --portal-ambient-g: 222;
+  --portal-ambient-b: 128;
+  --portal-ambient-card: 0.05;
+}
+
+.shell--portal[data-portal-ambient='triggered'] {
+  --portal-ambient-strength: 0.55;
+  --portal-ambient-r: 248;
+  --portal-ambient-g: 113;
+  --portal-ambient-b: 113;
+  --portal-ambient-card: 0.09;
+}
+
+.shell--portal[data-portal-ambient='triggered']::before {
+  animation: portal-ambient-alert 2.4s ease-in-out infinite;
+}
+
+@keyframes portal-ambient-alert {
+  0%,
+  100% {
+    opacity: calc(var(--portal-ambient-strength) * 0.88);
+  }
+
+  50% {
+    opacity: calc(var(--portal-ambient-strength) * 1.12);
+  }
+}
+
+.shell--portal > * {
+  position: relative;
+  z-index: 1;
+}
+
+.shell--portal .portal-shell-main,
+.shell--portal .portal-sidebar,
+.shell--portal .mobile-shell-header--portal {
+  background: color-mix(
+    in srgb,
+    var(--surface) calc(100% - var(--portal-ambient-card) * 100%),
+    rgba(var(--portal-ambient-r), var(--portal-ambient-g), var(--portal-ambient-b), 0.14)
+  );
+}
+
+.shell--portal .portal-main {
+  background: color-mix(
+    in srgb,
+    var(--bg) calc(100% - var(--portal-ambient-card) * 120%),
+    rgba(var(--portal-ambient-r), var(--portal-ambient-g), var(--portal-ambient-b), 0.08)
+  );
+}
+
+.shell--portal .portal-card,
+.shell--portal .home-alarm-card--dashboard {
+  border-color: color-mix(
+    in srgb,
+    var(--border) 72%,
+    rgba(var(--portal-ambient-r), var(--portal-ambient-g), var(--portal-ambient-b), 0.35)
+  );
+  box-shadow:
+    0 10px 28px rgba(var(--portal-ambient-r), var(--portal-ambient-g), var(--portal-ambient-b), calc(var(--portal-ambient-card) * 0.9)),
+    var(--shadow-sm, 0 1px 2px rgba(0, 0, 0, 0.08));
+}
+
+.shell--portal .mobile-bottom-nav__pill {
+  border-color: color-mix(
+    in srgb,
+    var(--glass-border, var(--border)) 70%,
+    rgba(var(--portal-ambient-r), var(--portal-ambient-g), var(--portal-ambient-b), 0.28)
+  );
+}
+
+/* Light theme — softer wash so cards stay readable */
+[data-theme='light'] .shell--portal[data-portal-ambient='away'] {
+  --portal-ambient-strength: 0.28;
+}
+
+[data-theme='light'] .shell--portal[data-portal-ambient='stay'] {
+  --portal-ambient-strength: 0.32;
+}
+
+[data-theme='light'] .shell--portal[data-portal-ambient='night'] {
+  --portal-ambient-strength: 0.34;
+}
+
+[data-theme='light'] .shell--portal[data-portal-ambient='disarm'] {
+  --portal-ambient-strength: 0.22;
+}
+
+[data-theme='light'] .shell--portal[data-portal-ambient='triggered'] {
+  --portal-ambient-strength: 0.36;
+}
+
+[data-theme='light'] .shell--portal::before {
+  background:
+    radial-gradient(
+      ellipse 125% 88% at 50% -12%,
+      rgba(var(--portal-ambient-r), var(--portal-ambient-g), var(--portal-ambient-b), 0.16),
+      transparent 58%
+    ),
+    radial-gradient(
+      ellipse 70% 55% at 100% 42%,
+      rgba(var(--portal-ambient-r), var(--portal-ambient-g), var(--portal-ambient-b), 0.07),
+      transparent 52%
+    );
+}
+
+[data-theme='light'] .shell--portal .portal-shell-main,
+[data-theme='light'] .shell--portal .portal-sidebar,
+[data-theme='light'] .shell--portal .mobile-shell-header--portal {
+  background: color-mix(
+    in srgb,
+    var(--surface) 92%,
+    rgba(var(--portal-ambient-r), var(--portal-ambient-g), var(--portal-ambient-b), 0.08)
+  );
+}
+
+[data-theme='light'] .shell--portal .portal-main {
+  background: color-mix(
+    in srgb,
+    var(--bg) 94%,
+    rgba(var(--portal-ambient-r), var(--portal-ambient-g), var(--portal-ambient-b), 0.06)
+  );
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .shell--portal[data-portal-ambient='triggered'] {
+    animation: none;
+  }
+
+  .shell--portal::before {
+    transition: none;
+  }
+}
