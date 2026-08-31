@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import { SiteDispatchStrip } from '@/components/site/SiteDispatchStrip';
 
 export const metadata: Metadata = {
   title: 'Services',
@@ -341,6 +342,10 @@ export default function ServicesPage() {
           </div>
         </section>
       ))}
+
+      <section className="nx-section nx-section--dispatch">
+        <SiteDispatchStrip />
+      </section>
 
       <section className="nx-band">
         <div className="nx-band-inner">

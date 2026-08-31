@@ -216,7 +216,7 @@ function ProfileContent() {
             (key) => subscription.access?.[key],
           ) && (
             <p className="text-muted">
-              Personal emergency cover is always available. Add home, vehicle, family, or medical modules from Subscription.
+              Personal emergency cover is always available. Add home, vehicle, family, or medical protection from Subscription.
             </p>
           )}
         </section>

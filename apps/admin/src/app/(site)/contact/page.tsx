@@ -2,6 +2,7 @@
 
 import { FormEvent, useState } from 'react';
 import Link from 'next/link';
+import { SiteDispatchStrip } from '@/components/site/SiteDispatchStrip';
 
 export default function ContactPage() {
   const [sent, setSent] = useState(false);
@@ -47,6 +48,7 @@ export default function ContactPage() {
 
       <section className="nx-section nx-contact">
         <div className="nx-contact-details">
+          <SiteDispatchStrip />
           <h2>Reach us</h2>
           <dl>
             <div>

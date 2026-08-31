@@ -7,10 +7,11 @@ import {
   MedicalPanicIcon,
   PanicAlertIcon,
   SilentPanicIcon,
+  VehiclePanicIcon,
 } from '@/components/portal/PanicNeuIcons';
 import { PanicNeuButton } from '@/components/portal/PanicNeuButton';
 
-export type PanicNeuBusy = 'panic' | 'silent' | 'medical' | 'fire' | null;
+export type PanicNeuBusy = 'panic' | 'silent' | 'medical' | 'fire' | 'vehicle' | null;
 
 type Props = {
   busy: PanicNeuBusy;
@@ -18,6 +19,7 @@ type Props = {
   onSilent: () => void | Promise<void>;
   onMedical?: () => void | Promise<void>;
   onFire?: () => void | Promise<void>;
+  onVehicle?: () => void | Promise<void>;
   showMedical?: boolean;
   showHub?: boolean;
   hubHref?: string;
@@ -35,6 +37,7 @@ export function PanicNeuConsole({
   onSilent,
   onMedical,
   onFire,
+  onVehicle,
   showMedical = true,
   showHub = false,
   hubHref = '/portal/emergency',
@@ -43,6 +46,7 @@ export function PanicNeuConsole({
 }: Props) {
   const showFire = Boolean(onFire);
   const showMed = showMedical && Boolean(onMedical);
+  const showVehicle = Boolean(onVehicle);
 
   return (
     <section
@@ -112,16 +116,33 @@ export function PanicNeuConsole({
         {showFire ? <span>Fire</span> : null}
       </div>
 
-      {showHub ? (
-        <div className="panic-neu__hub">
-          <Link href={hubHref} className="panic-neu__hub-link" aria-label="Open emergency hub">
-            <div className="panic-neu__well panic-neu__well--hub">
-              <span className="panic-neu__knob panic-neu__knob--static">
-                <HubPanicIcon />
-              </span>
+      {showVehicle || showHub ? (
+        <div className="panic-neu__aux">
+          {showVehicle ? (
+            <div className="panic-neu__aux-item">
+              <PanicNeuButton
+                label="Vehicle panic. Hold 2 seconds to alert control room and open dash cameras."
+                holdMs={2000}
+                variant="vehicle"
+                tone="danger"
+                loading={busy === 'vehicle'}
+                disabled={isDisabled(busy, 'vehicle')}
+                onActivate={onVehicle!}
+                icon={<VehiclePanicIcon />}
+              />
+              <span className="panic-neu__hub-label">Vehicle</span>
             </div>
-            <span className="panic-neu__hub-label">Hub</span>
-          </Link>
+          ) : null}
+          {showHub ? (
+            <Link href={hubHref} className="panic-neu__hub-link" aria-label="Open emergency hub">
+              <div className="panic-neu__well panic-neu__well--hub">
+                <span className="panic-neu__knob panic-neu__knob--static">
+                  <HubPanicIcon />
+                </span>
+              </div>
+              <span className="panic-neu__hub-label">Hub</span>
+            </Link>
+          ) : null}
         </div>
       ) : null}
     </section>

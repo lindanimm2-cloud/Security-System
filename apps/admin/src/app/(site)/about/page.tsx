@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import { SiteDispatchStrip } from '@/components/site/SiteDispatchStrip';
 
 export const metadata: Metadata = {
   title: 'About',
@@ -106,6 +107,8 @@ export default function AboutPage() {
             <span>Primary metro coverage</span>
           </div>
         </div>
+
+        <SiteDispatchStrip />
 
         <div className="nx-section-cta">
           <Link href="/services" className="nx-btn nx-btn--primary">

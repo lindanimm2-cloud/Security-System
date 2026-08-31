@@ -85,7 +85,7 @@ export function CommandHubPanels({ initialTab = 'overview' }: { initialTab?: Psi
 
   return (
     <div className="psim-hub">
-      <nav className="psim-hub__tabs" aria-label="PSIM modules">
+      <nav className="psim-hub__tabs" aria-label="PSIM tools">
         {TABS.map((t) => (
           <button
             key={t.id}

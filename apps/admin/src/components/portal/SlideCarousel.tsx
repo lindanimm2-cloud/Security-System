@@ -15,6 +15,8 @@ type SlideCarouselProps = {
   subtitle?: string;
   seeAllHref?: string;
   seeAllLabel?: string;
+  /** `grid` fills the row — no clipped peek cards. */
+  layout?: 'swipe' | 'grid';
   children: ReactNode;
   className?: string;
 };
@@ -33,12 +35,14 @@ export function SlideCarousel({
   subtitle,
   seeAllHref,
   seeAllLabel = 'See all',
+  layout = 'swipe',
   children,
   className = '',
 }: SlideCarouselProps) {
   const trackRef = useRef<HTMLDivElement>(null);
   const [active, setActive] = useState(0);
   const count = Children.count(children);
+  const isGrid = layout === 'grid';
 
   const syncActive = useCallback(() => {
     const track = trackRef.current;
@@ -60,6 +64,7 @@ export function SlideCarousel({
   }, [count]);
 
   useEffect(() => {
+    if (isGrid) return;
     const track = trackRef.current;
     if (!track) return;
     syncActive();
@@ -69,7 +74,7 @@ export function SlideCarousel({
       track.removeEventListener('scroll', syncActive);
       window.removeEventListener('resize', syncActive);
     };
-  }, [syncActive, count]);
+  }, [syncActive, count, isGrid]);
 
   function scrollTo(index: number) {
     const track = trackRef.current;
@@ -79,7 +84,10 @@ export function SlideCarousel({
   }
 
   return (
-    <section className={`slide-carousel ${className}`.trim()} aria-label={title}>
+    <section
+      className={`slide-carousel ${isGrid ? 'slide-carousel--grid' : ''} ${className}`.trim()}
+      aria-label={title}
+    >
       <div className="slide-carousel__head">
         <div>
           <h2>{title}</h2>
@@ -96,7 +104,7 @@ export function SlideCarousel({
         {children}
       </div>
 
-      {count > 1 ? (
+      {count > 1 && !isGrid ? (
         <div className="slide-carousel__dots" role="tablist" aria-label={`${title} slides`}>
           {Array.from({ length: count }).map((_, i) => (
             <button

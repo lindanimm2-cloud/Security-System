@@ -28,10 +28,17 @@ function EmergencyContent() {
     [],
   );
 
+  const { data: vehiclesPayload } = useApi(
+    () => clientApi.get<ApiResponse<{ id: string }[]>>('/client/vehicles'),
+    [],
+  );
+  const vehicleId = vehiclesPayload?.data?.[0]?.id;
+
   const [panicLoading, setPanicLoading] = useState(false);
   const [silentLoading, setSilentLoading] = useState(false);
   const [medicalLoading, setMedicalLoading] = useState(false);
   const [fireLoading, setFireLoading] = useState(false);
+  const [vehicleLoading, setVehicleLoading] = useState(false);
   const [msg, setMsg] = useState('');
   const undo = useUndoToast();
 
@@ -87,6 +94,25 @@ function EmergencyContent() {
     }
   }
 
+  async function requestVehiclePanic() {
+    if (!vehicleId) return;
+    setVehicleLoading(true);
+    setMsg('');
+    try {
+      const res = await clientApi.post<ApiResponse<{ message?: string }>>(
+        `/client/vehicles/${vehicleId}/remote`,
+        { action: 'panic' },
+      );
+      setMsg(res.data?.message ?? 'Vehicle panic sent. Control room viewing dash cameras.');
+      undo.show('Vehicle panic sent', undefined, {
+        kind: 'critical',
+        detail: 'Control room viewing dash cameras',
+      });
+    } finally {
+      setVehicleLoading(false);
+    }
+  }
+
   return (
     <FeatureHub
       title="Emergency Hub"
@@ -100,7 +126,7 @@ function EmergencyContent() {
         { title: 'Home security', description: 'Alarms and CCTV for a registered property. Use Fire below for a property emergency.', href: '/portal/home', action: 'Open home security' },
         { title: 'Trusted devices', description: 'Primary phone, lock, mark lost, or replace.', href: '/portal/security/devices', action: 'Open devices' },
         { title: 'Emergency access', description: 'Recover from another phone without weakening authentication.', href: '/portal/security/emergency-access', action: 'Open recovery' },
-        { title: 'Incident History', description: 'Alerts, responses, and outcomes.', href: '/portal/incidents', action: 'View history' },
+        { title: 'Response history', description: 'Alerts, responses, and outcomes.', href: '/portal/incidents', action: 'View history' },
       ]}
     >
       <EmergencyDispatchCallCard
@@ -122,12 +148,15 @@ function EmergencyContent() {
                 ? 'medical'
                 : fireLoading
                   ? 'fire'
-                  : null) satisfies PanicNeuBusy
+                  : vehicleLoading
+                    ? 'vehicle'
+                    : null) satisfies PanicNeuBusy
         }
         onPanic={() => trigger(false)}
         onSilent={() => trigger(true)}
         onMedical={() => void requestAmbulance()}
         onFire={() => void requestFire()}
+        onVehicle={vehicleId ? () => void requestVehiclePanic() : undefined}
       />
       {msg && <p className="alert alert--success">{msg}</p>}
       <OpsUndoToast toast={undo.toast} onDismiss={undo.clear} />

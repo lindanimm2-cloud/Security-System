@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { MedicalLayout } from '@/components/medical/MedicalLayout';
 import { ErrorAlert } from '@/components/ErrorAlert';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
+import { EmptyState } from '@/components/ui/EmptyState';
 import { useApi } from '@/hooks/useApi';
 import { adminApi, type ApiResponse } from '@/lib/api-client';
 
@@ -62,14 +63,19 @@ function MedicalQueueContent() {
 
   return (
     <div className="page-content">
+      <p className="ec-kicker">4DS Medical</p>
       <p className="text-muted">
         Dual response — security ticket stays on the ops board. Officers never see full PHI.
       </p>
       {tickets.length === 0 ? (
-        <div className="empty-state">No medical tickets.</div>
+        <EmptyState
+          kicker="Queue"
+          title="No medical tickets"
+          body="ALS/BLS jobs will appear here when dispatch requests a crew."
+        />
       ) : (
         tickets.map((t) => (
-          <article key={t.id} className="queue-card" style={{ borderBottom: '1px solid var(--border)' }}>
+          <article key={t.id} className="queue-card portal-card">
             <div className="card-header-row">
               <span className={`priority-chip priority-chip--${t.priority === 'CRITICAL' ? 'P0' : 'P1'}`}>
                 {t.level}

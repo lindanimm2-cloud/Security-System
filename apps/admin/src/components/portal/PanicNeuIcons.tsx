@@ -39,6 +39,18 @@ export function FirePanicIcon({ className = 'panic-neu__icon' }: IconProps) {
   );
 }
 
+export function VehiclePanicIcon({ className = 'panic-neu__icon' }: IconProps) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden>
+      <path d="M5 13 7.2 8.2A1.5 1.5 0 0 1 8.5 7.5h7a1.5 1.5 0 0 1 1.3.7L19 13" strokeLinejoin="round" />
+      <path d="M3.5 13h17v4.5a1 1 0 0 1-1 1h-15a1 1 0 0 1-1-1V13z" strokeLinejoin="round" />
+      <circle cx="7.5" cy="17.5" r="1.15" />
+      <circle cx="16.5" cy="17.5" r="1.15" />
+      <path d="M8 10.5h8" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 export function HubPanicIcon({ className = 'panic-neu__icon' }: IconProps) {
   return (
     <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden>

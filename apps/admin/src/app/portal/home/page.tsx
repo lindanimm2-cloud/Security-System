@@ -12,12 +12,14 @@ import { SlideCarousel, SlideCarouselCard } from '@/components/portal/SlideCarou
 import { SlidingSection } from '@/components/portal/SlidingSection';
 import { CctvLiveFeed } from '@/components/portal/CctvLiveFeed';
 import { PropertyRegisterForm } from '@/components/portal/PropertyRegisterForm';
+import { HomeAlarmControl } from '@/components/portal/HomeAlarmControl';
+import { ClientVehicleRemote } from '@/components/vehicle/ClientVehicleRemote';
 import { HoldToActivate } from '@/components/ops/EmergencyMode';
 import { OpsDialog } from '@/components/ops/OpsDialog';
 import { useSubscriptionAccess } from '@/hooks/useSubscriptionAccess';
 import { useApi } from '@/hooks/useApi';
 import { clientApi, type ApiResponse } from '@/lib/api-client';
-import { alarmStatusLabel, isArmedStatus } from '@/lib/sa-alarm';
+import { alarmStatusLabel } from '@/lib/sa-alarm';
 
 type Camera = {
   id: string;
@@ -81,23 +83,21 @@ function HomeContent() {
     () => clientApi.get<ApiResponse<Site[]>>('/client/surveillance/sites'),
     [],
   );
-
-  async function toggleAlarm(id: string, status: 'ARMED' | 'DISARMED') {
-    if (!access?.home) return;
-    setLoadingId(`${id}-${status}`);
-    setArmMsg('');
-    setArmMsgError(false);
-    try {
-      await clientApi.patch(`/client/properties/${id}/alarm`, { status });
-      reload();
-      setArmMsg(status === 'DISARMED' ? 'Alarm disarmed.' : 'Away armed.');
-    } catch (e) {
-      setArmMsgError(true);
-      setArmMsg(e instanceof Error ? e.message : 'Could not update the alarm.');
-    } finally {
-      setLoadingId(null);
-    }
-  }
+  const { data: vehiclesPayload, reload: reloadVehicles } = useApi(
+    () =>
+      clientApi.get<
+        ApiResponse<
+          {
+            id: string;
+            registration: string;
+            doorsLocked?: boolean;
+            immobiliserOn?: boolean;
+            theftRecovery?: boolean;
+          }[]
+        >
+      >('/client/vehicles'),
+    [],
+  );
 
   async function homePanic(id: string) {
     setLoadingId(`${id}-panic`);
@@ -118,9 +118,10 @@ function HomeContent() {
   if (loading || accessLoading) return <LoadingSpinner label="Loading home security..." fullScreen />;
   if (error) return <ErrorAlert error={error} onRetry={reload} />;
 
-  const sites = data!.data;
+  const sites = Array.isArray(data?.data) ? data.data : [];
   const hasHome = access?.home ?? false;
   const primaryCamSite = sites.find((s) => s.cameraCount > 0);
+  const primaryVehicle = vehiclesPayload?.data?.[0];
 
   return (
     <FeatureHub
@@ -168,18 +169,7 @@ function HomeContent() {
                 />
               </OpsDialog>
             )}
-          <SlidingSection
-            title="Home arm state"
-            subtitle={sites[0] ? alarmStatusLabel(sites[0].alarmStatus) : 'Register your property'}
-            defaultOpen
-            storageKey="portal-home-arm"
-            headerAction={
-              <Link href="/portal/protect" className="link-sm">
-                Protect
-              </Link>
-            }
-          >
-          <section className="portal-card portal-card--flat" aria-label="Arm state">
+          <div className="home-arm-setup">
             <div className="card-header-row">
               <button
                 type="button"
@@ -188,43 +178,32 @@ function HomeContent() {
               >
                 Register property
               </button>
+              <Link href="/portal/protect" className="link-sm">
+                Protect
+              </Link>
             </div>
-            {sites[0] ? (
+            {sites.length > 0 ? (
               <>
-                <div className="home-arm-bar">
-                  <span className={`home-arm-bar__status status-pill status-pill--${sites[0].alarmStatus.toLowerCase()}`}>
-                    {alarmStatusLabel(sites[0].alarmStatus)}
-                  </span>
-                  <button
-                    type="button"
-                    className={`home-arm-bar__btn ${isArmedStatus(sites[0].alarmStatus) ? 'btn-primary' : 'btn-secondary'} btn-sm`}
-                    disabled={!!loadingId}
-                    onClick={() =>
-                      void toggleAlarm(
-                        sites[0].id,
-                        isArmedStatus(sites[0].alarmStatus) ? 'DISARMED' : 'ARMED',
-                      )
-                    }
-                  >
-                    {loadingId ===
-                    `${sites[0].id}-${isArmedStatus(sites[0].alarmStatus) ? 'DISARMED' : 'ARMED'}` ? (
-                      <LoadingSpinner label="" size="sm" />
-                    ) : isArmedStatus(sites[0].alarmStatus) ? (
-                      'Disarm'
-                    ) : (
-                      'Away arm'
-                    )}
-                  </button>
-                  <HoldToActivate
-                    className="hold-activate--inline"
-                    label="Hold to panic"
-                    holdLabel="Hold to panic…"
-                    holdMs={1200}
-                    loading={loadingId === `${sites[0].id}-panic`}
-                    disabled={!!loadingId}
-                    onActivate={() => homePanic(sites[0].id)}
-                  />
-                </div>
+                <HomeAlarmControl
+                  variant="dashboard"
+                  properties={sites.map((s) => ({
+                    id: s.id,
+                    name: s.name,
+                    alarmStatus: s.alarmStatus,
+                    alarmLinked: s.alarmLinked,
+                  }))}
+                  hasAccess={hasHome}
+                  onUpdated={reload}
+                />
+                <HoldToActivate
+                  className="hold-activate--inline"
+                  label="Hold to panic"
+                  holdLabel="Hold to panic…"
+                  holdMs={1200}
+                  loading={loadingId === `${sites[0].id}-panic`}
+                  disabled={!!loadingId}
+                  onActivate={() => homePanic(sites[0].id)}
+                />
                 {armMsg ? (
                   <p
                     className={`home-arm-bar__feedback ${armMsgError ? 'home-arm-bar__feedback--err' : ''}`}
@@ -242,8 +221,13 @@ function HomeContent() {
                 </button>
               </p>
             )}
-          </section>
-          </SlidingSection>
+            {access?.vehicle !== false && primaryVehicle ? (
+              <ClientVehicleRemote
+                vehicle={primaryVehicle}
+                onUpdated={() => void reloadVehicles()}
+              />
+            ) : null}
+          </div>
 
           {sites.filter((s) => s.cameraCount > 0).length > 0 && (
             <SlideCarousel
@@ -358,8 +342,9 @@ function HomeContent() {
             ) : (
               sites.map((p) => (
                 <div key={p.id} className="entity-card">
+                  <p className="ec-kicker">Home security</p>
                   <div className="entity-card-header">
-                    <Link href={`/portal/home/${p.id}`} className="status-list-link">
+                    <Link href={`/portal/home/${p.id}`} className="entity-card-title">
                       {p.name}
                     </Link>
                     <span className={`status-pill status-pill--${p.alarmStatus.toLowerCase()}`}>
@@ -379,28 +364,9 @@ function HomeContent() {
                       : ''}
                   </p>
                   {p.accessNotes && <p className="text-muted">{p.accessNotes}</p>}
-                  <div className="entity-card-actions">
-                    <Link href={`/portal/home/${p.id}`} className="btn-secondary btn-sm">
-                      Zones &amp; cams
-                    </Link>
-                    <button
-                      type="button"
-                      className={`btn-sm ${isArmedStatus(p.alarmStatus) ? 'btn-primary' : 'btn-secondary'}`}
-                      onClick={() =>
-                        void toggleAlarm(p.id, isArmedStatus(p.alarmStatus) ? 'DISARMED' : 'ARMED')
-                      }
-                      disabled={!!loadingId}
-                    >
-                      {loadingId ===
-                      `${p.id}-${isArmedStatus(p.alarmStatus) ? 'DISARMED' : 'ARMED'}` ? (
-                        <LoadingSpinner label="" size="sm" />
-                      ) : isArmedStatus(p.alarmStatus) ? (
-                        'Disarm'
-                      ) : (
-                        'Away arm'
-                      )}
-                    </button>
-                  </div>
+                  <Link href={`/portal/home/${p.id}`} className="feature-action">
+                    Manage site
+                  </Link>
                 </div>
               ))
             )}

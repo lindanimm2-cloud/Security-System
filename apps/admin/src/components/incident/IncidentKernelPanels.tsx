@@ -65,7 +65,7 @@ export function IncidentKernelPanels({
         <RespondingResources resources={resourceData?.data ?? []} compact={compact} />
       </div>
       <div>
-        <h3>Timeline</h3>
+        <h3>What happened</h3>
         <IncidentTimeline items={timelineData?.data ?? []} compact={compact} />
       </div>
       {showChat ? <IncidentChat incidentId={incidentId} portal={portal} /> : null}

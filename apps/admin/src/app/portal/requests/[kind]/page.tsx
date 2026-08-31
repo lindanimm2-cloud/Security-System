@@ -58,11 +58,11 @@ function KindContent() {
         <div className="page-header">
           <div>
             <h1>Community alerts</h1>
-            <p className="text-muted">Incident notices for your area appear in Updates.</p>
+            <p className="text-muted">Neighbourhood alerts for your area appear in Updates.</p>
           </div>
         </div>
         <section className="portal-card">
-          <p>You receive local incident notifications when they affect your saved address and safe zones.</p>
+          <p>You receive local safety alerts when they affect your saved address and safe zones.</p>
           <div className="svc-req__actions" style={{ marginTop: '1rem' }}>
             <Link href="/portal/updates" className="btn-primary">
               Open updates

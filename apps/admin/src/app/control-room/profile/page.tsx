@@ -34,7 +34,7 @@ type DeveloperDesk = {
 
 const DEVELOPER_LINKS = [
   { label: 'Developer desk', href: '/control-room/developer', desc: 'Issue tickets & support chat' },
-  { label: 'Ops Board', href: '/control-room', desc: 'Live incidents, CCTV wall, fleet strip' },
+  { label: 'Ops Board', href: '/control-room', desc: 'Live alerts, CCTV wall, fleet strip' },
   { label: 'Live map', href: '/control-room/map', desc: 'Fleet & incident positions' },
   { label: 'Incidents', href: '/control-room/incidents', desc: 'Panic, medical, and dispatch queue' },
   { label: 'Customers', href: '/control-room/customers', desc: 'CRM, subscriptions, billing checks' },

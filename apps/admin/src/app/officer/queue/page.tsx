@@ -185,7 +185,7 @@ function QueueContent() {
       </section>
 
       <section className="portal-card page-section">
-        <h2 className="section-title section-title--tight">Open incidents</h2>
+        <h2 className="section-title section-title--tight">Open jobs</h2>
         <p className="text-muted mb-1">
           Unassigned incidents in your zone — tap Available when you are nearby and ready to respond.
         </p>

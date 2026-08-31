@@ -328,7 +328,7 @@ export function RoleProfileDialog({
 
         {modules.length > 0 && !editingRole ? (
           <section>
-            <h4 className="role-profile__section-title">Module access</h4>
+            <h4 className="role-profile__section-title">Tool access</h4>
             <ul className="role-profile__modules">
               {modules.map((item) => (
                 <li key={item.module}>

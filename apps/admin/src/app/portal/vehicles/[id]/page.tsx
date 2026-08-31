@@ -13,6 +13,7 @@ import { VehicleRemotePad } from '@/components/vehicle/VehicleRemotePad';
 import { useSubscriptionAccess } from '@/hooks/useSubscriptionAccess';
 import { useApi } from '@/hooks/useApi';
 import { clientApi, type ApiResponse } from '@/lib/api-client';
+import { IncidentTimeline } from '@/components/incident/IncidentTimeline';
 import { formatClientNotificationTime } from '@/lib/client-notifications';
 import { friendlyErrorMessage } from '@/lib/friendly-error';
 import type { VehicleRemoteAction } from '@/lib/vehicle-remote';
@@ -203,6 +204,7 @@ function VehicleProfileContent() {
     <div className="page-content vehicle-profile">
       <div className="page-header">
         <div>
+          <p className="ec-kicker">Vehicle</p>
           <p className="text-muted">
             <Link href="/portal/vehicles" className="interactive-text">Vehicle Security</Link>
             {' · Profile'}
@@ -328,7 +330,7 @@ function VehicleProfileContent() {
           </ul>
           <div className="vehicle-profile__actions">
             <Link href={`/portal/theft?plate=${encodeURIComponent(v.registration)}`} className="btn-secondary">
-              Report incident
+              Report what happened
             </Link>
             <Link href="/portal/safe-zones" className="btn-ghost">Geofence zones</Link>
           </div>
@@ -357,23 +359,25 @@ function VehicleProfileContent() {
 
       <section className="portal-card">
         <div className="card-header-row">
-          <h2>Incident history</h2>
+          <div>
+            <p className="ec-kicker">Vehicle activity</p>
+            <h2>What happened</h2>
+          </div>
           <Link href="/portal/incidents" className="link-sm">View all</Link>
         </div>
         {profile.incidents.length === 0 ? (
-          <p className="text-muted">No incidents linked to this vehicle.</p>
+          <p className="text-muted">No alerts linked to this vehicle.</p>
         ) : (
-          <ul className="status-list">
-            {profile.incidents.map((i) => (
-              <li key={i.id} className="status-list-item">
-                <Link href="/portal/incidents" className="status-list-link">
-                  {i.title}
-                  <span className="text-muted"> · {i.address ?? 'Unknown'}</span>
-                </Link>
-                <span className={`status-pill status-pill--${i.priority.toLowerCase()}`}>{i.status}</span>
-              </li>
-            ))}
-          </ul>
+          <IncidentTimeline
+            items={profile.incidents.map((i) => ({
+              id: i.id,
+              kind: 'event' as const,
+              type: `incident.${i.status.toLowerCase()}`,
+              source: i.address ?? 'vehicle',
+              createdAt: i.createdAt,
+              payload: { kind: i.type, content: i.title },
+            }))}
+          />
         )}
       </section>
     </div>

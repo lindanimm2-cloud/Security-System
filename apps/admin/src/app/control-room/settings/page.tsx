@@ -278,7 +278,7 @@ export default function ControlRoomSettingsPage() {
       <div className="page-content page-content--settings">
         <section className="settings-hero">
           <div>
-            <p className="settings-hero__eyebrow">Settings</p>
+            <p className="ec-kicker">4DS Control Room</p>
             <h1>Settings &amp; Configuration</h1>
             <p className="text-muted">
               Control how your organisation, users, alerts, permissions and security systems operate.
@@ -474,9 +474,9 @@ export default function ControlRoomSettingsPage() {
                   <div className="settings-panel__head">
                     <div>
                       <p className="settings-panel__eyebrow">Permission Matrix</p>
-                      <h2>Module visibility by role</h2>
+                      <h2>Tool access by role</h2>
                       <p className="text-muted">
-                        Quick enterprise view of which roles can access core modules.
+                        Quick view of which roles can use core tools.
                       </p>
                     </div>
                   </div>
@@ -484,7 +484,7 @@ export default function ControlRoomSettingsPage() {
                     <table className="data-table settings-matrix-table">
                       <thead>
                         <tr>
-                          <th>Module</th>
+                          <th>Tool</th>
                           <th>Owner</th>
                           <th>Manager</th>
                           <th>Supervisor</th>

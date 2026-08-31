@@ -38,7 +38,7 @@ export const PORTAL_NAV: PortalNavSection[] = [
       { href: '/portal/security/permissions', label: 'Permissions', icon: 'officers', requiresAccess: 'emergency' },
       { href: '/portal/contacts', label: 'Emergency Contacts', icon: 'contacts', requiresAccess: 'emergency' },
       { href: '/portal/medical', label: 'Medical', icon: 'medical', requiresAccess: 'medical' },
-      { href: '/portal/incidents', label: 'Incident History', icon: 'incidents', requiresAccess: 'emergency' },
+      { href: '/portal/incidents', label: 'Response history', icon: 'incidents', requiresAccess: 'emergency' },
       { href: '/portal/evidence', label: 'Evidence Vault', icon: 'evidence', requiresAccess: 'emergency' },
     ],
   },

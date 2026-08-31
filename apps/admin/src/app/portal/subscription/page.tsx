@@ -255,7 +255,7 @@ function SubscriptionContent() {
         ))}
       </div>
 
-      <h2 className="section-title">Add-on modules</h2>
+      <h2 className="section-title">Protection add-ons</h2>
       <div className="tier-grid">
         {p.addons.map((a) => (
           <div key={a.code} className={`tier-card ${a.isActive ? 'tier-card--current' : ''}`}>

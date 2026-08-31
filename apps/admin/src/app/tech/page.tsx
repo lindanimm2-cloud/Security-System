@@ -340,11 +340,12 @@ function TechDashboardContent() {
           </div>
         </section>
       ) : showCompleted && completedJobs.length === 0 ? (
-        <EmptyState title="Nothing completed yet" body="Finished jobs will land here." />
+        <EmptyState title="Nothing completed yet" kicker="Installs" body="Finished jobs will land here." />
       ) : filter === 'urgent' && dueSoonJobs.length === 0 ? (
-        <EmptyState title="Nothing due soon" body="No jobs in the next four hours." />
+        <EmptyState title="Nothing due soon" kicker="Installs" body="No jobs in the next four hours." />
       ) : !showCompleted && openJobs.length === 0 ? (
         <EmptyState
+          kicker="Installs"
           title="No open installs"
           body="When jobs are assigned, they appear here first."
           action={

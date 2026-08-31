@@ -2800,7 +2800,7 @@ export async function handleDemoRequest<T>({
         tier: {
           name: 'Premium Protect',
           priceFormatted: 'R799/mo',
-          description: 'Priority response and full module access.',
+          description: 'Priority response and full access to protection features.',
         },
         addons: [
           {
@@ -2887,7 +2887,7 @@ export async function handleDemoRequest<T>({
       ? 'Monthly subscription renewal'
       : typeof payload.tierCode === 'string'
         ? `Upgrade to ${payload.tierCode}`
-        : `Add-on: ${String(payload.addonCode ?? 'module')}`;
+        : `Add-on: ${String(payload.addonCode ?? 'service')}`;
     demoCheckoutPayments[ref] = {
       reference: ref,
       provider: 'PayFast',

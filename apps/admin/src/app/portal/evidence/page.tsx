@@ -86,7 +86,7 @@ function EvidenceContent() {
 
         <div>
 
-          <h1>Incident Evidence Vault</h1>
+          <h1>Evidence vault</h1>
 
           <p className="text-muted">Secure storage for photos, videos, documents, and evidence.</p>
 

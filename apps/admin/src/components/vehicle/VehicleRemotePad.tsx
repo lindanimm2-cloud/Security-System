@@ -9,6 +9,7 @@ type VehicleRemotePadProps = {
   disabled?: boolean;
   variant?: 'client' | 'ops';
   compact?: boolean;
+  hidePanic?: boolean;
   onCommand: (action: VehicleRemoteAction) => void | Promise<void>;
 };
 
@@ -18,6 +19,7 @@ export function VehicleRemotePad({
   disabled,
   variant = 'client',
   compact = false,
+  hidePanic = false,
   onCommand,
 }: VehicleRemotePadProps) {
   const ops = variant === 'ops';
@@ -90,7 +92,7 @@ export function VehicleRemotePad({
         </button>
         <button
           type="button"
-          className={`vehicle-remote__btn ${state.hornActive ? 'vehicle-remote__btn--on' : ''}`}
+          className={`vehicle-remote__btn ${state.hornActive ? 'vehicle-remote__btn--on' : ''} ${hidePanic ? 'vehicle-remote__btn--span' : ''}`}
           disabled={disabled || busy}
           onClick={() => void onCommand('horn')}
         >
@@ -99,17 +101,19 @@ export function VehicleRemotePad({
           </span>
           <strong>{busyAction === 'horn' ? 'Pulsing…' : 'Horn / lights'}</strong>
         </button>
-        <HoldToActivate
-          label={busyAction === 'panic' ? 'Sending…' : 'Vehicle panic'}
-          holdLabel="Hold to panic"
-          holdMs={1800}
-          tone="danger"
-          keepLabel
-          hideHint={compact}
-          disabled={disabled || busy}
-          className="vehicle-remote__hold vehicle-remote__btn vehicle-remote__btn--panic"
-          onActivate={() => void onCommand('panic')}
-        />
+        {hidePanic ? null : (
+          <HoldToActivate
+            label={busyAction === 'panic' ? 'Sending…' : 'Vehicle panic'}
+            holdLabel="Hold to panic"
+            holdMs={1800}
+            tone="danger"
+            keepLabel
+            hideHint={compact}
+            disabled={disabled || busy}
+            className="vehicle-remote__hold vehicle-remote__btn vehicle-remote__btn--panic"
+            onActivate={() => void onCommand('panic')}
+          />
+        )}
       </div>
       <p className="vehicle-remote__hint">
         Immobiliser cuts the starter when the vehicle is stationary — standard tracker practice. It does not shut a moving engine.

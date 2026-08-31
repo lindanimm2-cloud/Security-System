@@ -7,9 +7,10 @@ import { useState, useEffect } from 'react';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { PortalLayout } from '@/components/portal/PortalLayout';
 import { useApi } from '@/hooks/useApi';
-import { EmergencyCallButton, formatZaPhone } from '@/components/portal/EmergencyCallButton';
+import { EmergencyCallButton, EmergencyDispatchCallCard, formatZaPhone } from '@/components/portal/EmergencyCallButton';
 import { useCallsOptional } from '@/components/calls/CallProvider';
 import { HomeAlarmControl } from '@/components/portal/HomeAlarmControl';
+import { ClientVehicleRemote } from '@/components/vehicle/ClientVehicleRemote';
 import { clientApi, type ApiResponse } from '@/lib/api-client';
 import { friendlyErrorMessage } from '@/lib/friendly-error';
 import { useSubscriptionAccess } from '@/hooks/useSubscriptionAccess';
@@ -37,7 +38,16 @@ type Overview = {
   stats: { contactCount: number; familyCount: number; activeIncidents: number; unreadNotifications: number };
   services: Record<string, string>;
   subscription: { planName: string; status: string; memberId: string } | null;
-  vehicles: { id: string; registration: string; make: string; model: string; theftRecovery: boolean }[];
+  vehicles?: {
+    id: string;
+    registration: string;
+    make: string;
+    model: string;
+    theftRecovery: boolean;
+    immobiliserOn?: boolean;
+    doorsLocked?: boolean;
+    hornActive?: boolean;
+  }[];
   properties: { id: string; name: string; alarmStatus: string; alarmLinked: boolean }[];
   family: { id: string; name: string; trackingEnabled: boolean; phone?: string }[];
   contacts: { id: string; name: string; phone: string; relationship: string | null; priority: number }[];
@@ -84,6 +94,7 @@ function OverviewDashboard() {
   const [silentLoading, setSilentLoading] = useState(false);
   const [medicalLoading, setMedicalLoading] = useState(false);
   const [fireLoading, setFireLoading] = useState(false);
+  const [vehicleLoading, setVehicleLoading] = useState(false);
   const [alertMsg, setAlertMsg] = useState('');
   const [filter, setFilter] = useState('all');
   const [selectedFamily, setSelectedFamily] = useState<FamilyProfilePerson | null>(null);
@@ -175,6 +186,27 @@ function OverviewDashboard() {
     }
   }
 
+  async function handleVehiclePanic(vehicleId: string) {
+    setVehicleLoading(true);
+    setAlertMsg('');
+    try {
+      const res = await clientApi.post<ApiResponse<{ message?: string }>>(
+        `/client/vehicles/${vehicleId}/remote`,
+        { action: 'panic' },
+      );
+      setAlertMsg(res.data?.message ?? 'Vehicle panic sent. Control room viewing dash cameras.');
+      undo.show('Vehicle panic sent', undefined, {
+        kind: 'critical',
+        detail: 'Control room viewing dash cameras',
+      });
+      void reload();
+    } catch (e) {
+      setAlertMsg(friendlyErrorMessage(e, 'action'));
+    } finally {
+      setVehicleLoading(false);
+    }
+  }
+
   async function callDispatch() {
     const phone = contactsPayload?.meta?.dispatchLine?.phone ?? CONTROL_ROOM_LINE.phone;
     const name = contactsPayload?.meta?.dispatchLine?.name ?? CONTROL_ROOM_LINE.name;
@@ -197,23 +229,28 @@ function OverviewDashboard() {
   if (loading) return <LoadingSpinner label="Loading overview..." fullScreen />;
   if (error) return <ErrorAlert error={error} onRetry={reload} />;
 
-  const d = data!.data;
+  const d = data?.data;
+  if (!d) return <ErrorAlert error="Overview could not be loaded." onRetry={reload} />;
   type ContactRow = Overview['contacts'][number] & {
     linkedUserId?: string | null;
     isDispatch?: boolean;
   };
-  const contacts: ContactRow[] = contactsPayload?.data ?? d.contacts;
+  const contacts: ContactRow[] = contactsPayload?.data ?? d.contacts ?? [];
   const personalContacts = contacts.filter((c) => {
     const text = `${c.name} ${c.relationship ?? ''}`.toLowerCase();
     return !c.isDispatch && !text.includes('dispatch') && !text.includes('4ds');
   });
-  const activeIncidents = d.recentIncidents.filter((i) =>
+  const recentIncidents = d.recentIncidents ?? [];
+  const family = d.family ?? [];
+  const vehicles = d.vehicles ?? [];
+  const activeIncidents = recentIncidents.filter((i) =>
     ['OPEN', 'ACTIVE', 'DISPATCHED', 'IN_PROGRESS', 'RESPONDING'].includes(
       i.status.toUpperCase(),
     ),
   );
   const hasAlert = d.stats.activeIncidents > 0 || activeIncidents.length > 0;
-  const primaryAlarm = d.properties[0];
+  const primaryAlarm = d.properties?.[0];
+  const primaryVehicle = d.vehicles?.[0];
   const tone = protectionStatusTone({
     activeIncidents: d.stats.activeIncidents,
     criticalIncidents: hasAlert ? d.stats.activeIncidents : 0,
@@ -223,7 +260,7 @@ function OverviewDashboard() {
   return (
     <div className="portal-dash">
       <div className="portal-dash__stage">
-      {(hasAlert || alertMsg.includes('Panic') || alertMsg.includes('Medical') || alertMsg.includes('Fire')) && (
+      {(hasAlert || alertMsg.includes('Panic') || alertMsg.includes('Medical') || alertMsg.includes('Fire') || alertMsg.includes('Vehicle')) && (
         <EmergencyModeBanner
           title={activeIncidents[0]?.title ?? 'Emergency active'}
           detail="Control room notified. Stay available if safe."
@@ -260,21 +297,40 @@ function OverviewDashboard() {
                   ? 'medical'
                   : fireLoading
                     ? 'fire'
-                    : null) satisfies PanicNeuBusy
+                    : vehicleLoading
+                      ? 'vehicle'
+                      : null) satisfies PanicNeuBusy
           }
           onPanic={() => handlePanic(false)}
           onSilent={() => handlePanic(true)}
           onMedical={() => void handleMedicalEmergency()}
           onFire={() => void handleFireEmergency()}
+          onVehicle={
+            access?.vehicle !== false && primaryVehicle
+              ? () => void handleVehiclePanic(primaryVehicle.id)
+              : undefined
+          }
         />
       )}
 
       <HomeAlarmControl
         variant="dashboard"
-        properties={d.properties}
+        properties={d.properties ?? []}
         hasAccess={!!access?.home}
         onUpdated={reload}
         feeds={<DashboardLiveCctv embedded />}
+      />
+
+      {access?.vehicle !== false && primaryVehicle ? (
+        <ClientVehicleRemote
+          vehicle={primaryVehicle}
+          onUpdated={() => void reload()}
+        />
+      ) : null}
+
+      <EmergencyDispatchCallCard
+        phone={contactsPayload?.meta?.dispatchLine?.phone}
+        name={contactsPayload?.meta?.dispatchLine?.name}
       />
 
       {d.liveResponse ? (
@@ -335,7 +391,7 @@ function OverviewDashboard() {
           },
           {
             id: 'urgent',
-            label: 'Incidents',
+            label: 'Alerts',
             count: d.stats.activeIncidents,
             tone: hasAlert ? 'urgent' : 'ok',
           },
@@ -374,19 +430,19 @@ function OverviewDashboard() {
       {(filter === 'all' || filter === 'urgent') && (
       <SlideCarousel
         title="Coverage"
-        subtitle="Tap a card to open"
         seeAllHref="/portal/incidents"
-        seeAllLabel="All incidents"
+        seeAllLabel="All alerts"
+        layout="grid"
         className="slide-carousel--brief"
       >
         <SlideCarouselCard
-          title="Incidents"
+          title="Alerts"
           href="/portal/incidents"
           tone={hasAlert ? 'alert' : 'ok'}
         >
           <strong className="slide-carousel__stat">{d.stats.activeIncidents}</strong>
           <p className="text-muted">
-            {hasAlert ? 'Open events — tap for updates' : 'No open incidents · you are clear'}
+            {hasAlert ? 'Open alerts — tap for updates' : 'No open alerts · you are clear'}
           </p>
         </SlideCarouselCard>
         <SlideCarouselCard
@@ -426,21 +482,21 @@ function OverviewDashboard() {
         <SlideCarouselCard title="Family" href="/portal/family" tone={d.stats.familyCount > 0 ? 'ok' : 'muted'}>
           <strong className="slide-carousel__stat">{d.stats.familyCount}</strong>
           <p className="text-muted">
-            {d.family.filter((m) => m.trackingEnabled).length} tracking · {d.safeZoneCount} safe zones
+            {family.filter((m) => m.trackingEnabled).length} tracking · {d.safeZoneCount} safe zones
           </p>
         </SlideCarouselCard>
-        {d.vehicles[0] ? (
+        {primaryVehicle ? (
           <SlideCarouselCard
             title="Vehicle"
-            href={`/portal/vehicles/${d.vehicles[0].id}`}
-            tone={d.vehicles[0].theftRecovery ? 'alert' : 'ok'}
+            href={`/portal/vehicles/${primaryVehicle.id}`}
+            tone={primaryVehicle.theftRecovery ? 'alert' : 'ok'}
           >
             <strong className="slide-carousel__stat slide-carousel__stat--sm">
-              {d.vehicles[0].registration}
+              {primaryVehicle.registration}
             </strong>
             <p className="text-muted">
-              {d.vehicles[0].make} {d.vehicles[0].model} ·{' '}
-              {d.vehicles[0].theftRecovery ? 'Recovery mode' : 'Secure'}
+              {primaryVehicle.make} {primaryVehicle.model} ·{' '}
+              {primaryVehicle.theftRecovery ? 'Recovery mode' : 'Secure'}
             </p>
           </SlideCarouselCard>
         ) : null}
@@ -450,11 +506,11 @@ function OverviewDashboard() {
 
       <SlideCarousel
         title="Your services"
-        subtitle="Swipe through active modules"
         seeAllHref="/portal/subscription"
         seeAllLabel="Manage plan"
+        layout="grid"
       >
-        {Object.entries(d.services)
+        {Object.entries(d.services ?? {})
           .filter(([key]) => key !== 'communications')
           .map(([key, status]) => (
             <SlideCarouselCard
@@ -468,9 +524,15 @@ function OverviewDashboard() {
               tone={status === 'active' || status === 'monitoring' ? 'ok' : status === 'upgrade' ? 'warn' : 'muted'}
             >
               <span className={`service-status-badge service-status-badge--${status}`}>
-                {status === 'upgrade' ? 'Upgrade' : status}
+                {status === 'upgrade' ? 'Upgrade' : status === 'monitoring' ? 'Monitoring' : status === 'active' ? 'Active' : status}
               </span>
-              <p className="text-muted">Tap to open module</p>
+              <p className="text-muted">
+                {status === 'upgrade'
+                  ? 'Add to your plan'
+                  : status === 'monitoring'
+                    ? 'Control room watching'
+                    : 'On your plan'}
+              </p>
             </SlideCarouselCard>
           ))}
       </SlideCarousel>
@@ -481,7 +543,7 @@ function OverviewDashboard() {
             ? [
                 {
                   id: 'inc',
-                  title: `${d.stats.activeIncidents} active incident${d.stats.activeIncidents === 1 ? '' : 's'}`,
+                  title: `${d.stats.activeIncidents} active alert${d.stats.activeIncidents === 1 ? '' : 's'}`,
                   detail: 'Tap for status and responder updates',
                   href: '/portal/incidents',
                 },
@@ -504,23 +566,35 @@ function OverviewDashboard() {
       {(hasAlert || activeIncidents.length > 0) && (
         <section className="portal-card portal-card--accent">
           <div className="card-header-row">
-            <h2>Live incident updates</h2>
+            <div>
+              <p className="ec-kicker">Live response</p>
+              <h2>What&apos;s happening</h2>
+            </div>
             <Link href="/portal/incidents" className="link-sm">
               Full history
             </Link>
           </div>
           <ul className="activity-list">
-            {(activeIncidents.length ? activeIncidents : d.recentIncidents)
+            {(activeIncidents.length ? activeIncidents : recentIncidents)
               .slice(0, 4)
               .map((i) => (
-                <li key={i.id} className="activity-item">
+                <li
+                  key={i.id}
+                  className={`activity-item ${
+                    /panic|trigger|critical/i.test(`${i.title ?? ''} ${i.type ?? ''} ${i.status ?? ''}`)
+                      ? 'activity-item--critical'
+                      : /en.?route|dispatch/i.test(i.status)
+                        ? 'activity-item--progress'
+                        : 'activity-item--warn'
+                  }`}
+                >
                   <Link href="/portal/incidents" className="activity-item-link">
                     <div>
                       <div className="activity-title">
                         {i.title ?? i.type}
                         {i.isSilent ? ' (silent)' : ''}
                       </div>
-                      <div className="activity-detail">{i.status}</div>
+                      <div className="activity-detail">{i.status.replace(/_/g, ' ').toLowerCase()}</div>
                     </div>
                     <span className="activity-time">{i.time}</span>
                   </Link>
@@ -580,14 +654,14 @@ function OverviewDashboard() {
             </Link>
           </div>
           <ul className="status-list">
-            {d.family.length === 0 ? (
+            {family.length === 0 ? (
               <li>
                 <Link href="/portal/family" className="interactive-text">
                   No family members linked — set up family
                 </Link>
               </li>
             ) : (
-              d.family.map((m) => (
+              family.map((m) => (
                 <li key={m.id} className="status-list-item">
                   <button
                     type="button"
@@ -634,13 +708,13 @@ function OverviewDashboard() {
               Manage
             </Link>
           </div>
-          {d.vehicles.length === 0 ? (
+          {vehicles.length === 0 ? (
             <Link href="/portal/vehicles" className="interactive-text text-muted">
               No vehicles registered — add vehicle
             </Link>
           ) : (
             <ul className="status-list">
-              {d.vehicles.map((v) => (
+              {vehicles.map((v) => (
                 <li key={v.id} className="status-list-item">
                   <Link href={`/portal/vehicles/${v.id}`} className="status-list-link">
                     {v.registration} — {v.make} {v.model}
@@ -676,7 +750,7 @@ function OverviewDashboard() {
             </Link>
             <Link href="/portal/incidents" className="action-tile">
               <span className="action-icon">📋</span>
-              <span className="action-label">Incidents</span>
+              <span className="action-label">Alerts</span>
               <span className="action-desc">{d.stats.activeIncidents} active</span>
             </Link>
             <Link href="/portal/emergency" className="action-tile">
@@ -691,7 +765,7 @@ function OverviewDashboard() {
             <h2>Active Services</h2>
           </Link>
           <div className="service-status-grid">
-            {Object.entries(d.services)
+            {Object.entries(d.services ?? {})
               .filter(([key]) => key !== 'communications')
               .map(([key, status]) => (
                 <Link
@@ -745,24 +819,24 @@ function OverviewDashboard() {
           <section className="portal-card">
             <div className="card-header-row">
               <Link href="/portal/incidents" className="card-title-link">
-                <h2>Recent Incidents</h2>
+                <h2>Recent alerts</h2>
               </Link>
               <Link href="/portal/incidents" className="link-sm">
                 Full history
               </Link>
             </div>
             <ul className="activity-list">
-              {d.recentIncidents.length === 0 ? (
+              {recentIncidents.length === 0 ? (
                 <li className="activity-item">
                   <Link href="/portal/incidents" className="activity-item-link">
                     <div>
-                      <div className="activity-title">No incidents</div>
+                      <div className="activity-title">No alerts</div>
                       <div className="activity-detail">You&apos;re safe</div>
                     </div>
                   </Link>
                 </li>
               ) : (
-                d.recentIncidents.map((i) => (
+                recentIncidents.map((i) => (
                   <li key={i.id} className="activity-item">
                     <Link href="/portal/incidents" className="activity-item-link">
                       <div>
@@ -770,7 +844,7 @@ function OverviewDashboard() {
                           {i.title ?? i.type}
                           {i.isSilent ? ' (silent)' : ''}
                         </div>
-                        <div className="activity-detail">{i.status}</div>
+                        <div className="activity-detail">{i.status.replace(/_/g, ' ').toLowerCase()}</div>
                       </div>
                       <span className="activity-time">{i.time}</span>
                     </Link>

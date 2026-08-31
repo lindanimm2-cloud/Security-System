@@ -89,6 +89,7 @@ function MedicalContent() {
       <div className="page-content page-content--form">
         <div className="page-header">
           <div>
+            <p className="ec-kicker">Medical profile</p>
             <h1>Medical Profile</h1>
             <p className="text-muted">Your medical details are on file and shared with responders during emergencies.</p>
           </div>
@@ -215,6 +216,7 @@ function MedicalContent() {
     <div className="page-content page-content--form">
       <div className="page-header">
         <div>
+          <p className="ec-kicker">Medical profile</p>
           <h1>{isComplete ? 'Edit Medical Profile' : 'Set Up Medical Profile'}</h1>
           <p className="text-muted">
             {isComplete

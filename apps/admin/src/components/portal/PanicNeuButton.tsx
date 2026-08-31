@@ -11,7 +11,7 @@ type Props = {
   loading?: boolean;
   tone?: 'danger' | 'warn' | 'medical';
   size?: 'lg' | 'sm';
-  variant?: 'panic' | 'silent' | 'medical' | 'fire' | 'hub';
+  variant?: 'panic' | 'silent' | 'medical' | 'fire' | 'vehicle' | 'hub';
   icon: ReactNode;
   showIndicator?: boolean;
 };

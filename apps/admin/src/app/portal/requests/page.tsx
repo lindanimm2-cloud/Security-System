@@ -50,6 +50,7 @@ function RequestsContent() {
       </p>
       <div className="page-header">
         <div>
+          <p className="ec-kicker">4DS Protect</p>
           <h1>Service requests</h1>
           <p className="text-muted">Check-ins, journeys, escorts and wellness visits.</p>
         </div>
@@ -77,7 +78,12 @@ function RequestsContent() {
         ) : (
           <ul className="activity-list">
             {rows.map((row) => (
-              <li key={row.id} className="activity-item">
+              <li
+                key={row.id}
+                className={`activity-item ${
+                  row.status !== 'COMPLETED' && row.status !== 'RESOLVED' ? 'activity-item--progress' : ''
+                }`}
+              >
                 <Link href="/portal/incidents" className="activity-item-link">
                   <div>
                     <div className="activity-title">{row.title}</div>

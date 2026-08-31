@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import type { ReactNode } from 'react';
 import type { FeatureCard } from '@/lib/portal-nav';
 import type { AccessMap } from '@/lib/subscription-plans';
 import { featureLink, isLocked } from '@/lib/subscription-plans';
@@ -16,7 +17,7 @@ export function FeatureHub({
   features: FeatureCard[];
   access?: AccessMap | null;
   accessKey?: keyof AccessMap;
-  children?: React.ReactNode;
+  children?: ReactNode;
 }) {
   const sectionLocked = isLocked(access ?? null, accessKey);
 
@@ -24,8 +25,9 @@ export function FeatureHub({
     <div className="page-content">
       <div className="page-header">
         <div>
+          <p className="ec-kicker">4DS Protect</p>
           <h1>{title}</h1>
-          {subtitle && <p className="text-muted">{subtitle}</p>}
+          {subtitle && <p className="ec-lede">{subtitle}</p>}
         </div>
         {sectionLocked && accessKey && (
           <Link href={`/portal/subscription/upgrade?addon=${accessKey === 'home' ? 'HOME_SECURITY' : accessKey === 'vehicle' ? 'VEHICLE_RESPONSE' : accessKey === 'family' ? 'FAMILY' : 'MEDICAL_PLUS'}`} className="btn-secondary">
@@ -56,7 +58,7 @@ export function FeatureHub({
               <p>{f.description}</p>
               {f.price && <span className="feature-price">{f.price}</span>}
               <span className="feature-action">
-                {locked ? `Add from ${f.price ?? 'subscription'}` : f.action} →
+                {locked ? `Add from ${f.price ?? 'subscription'}` : f.action ?? 'Open'}
               </span>
             </>
           );

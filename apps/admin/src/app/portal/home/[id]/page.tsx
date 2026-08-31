@@ -11,6 +11,9 @@ import { SensorZonePanel, type SensorRow } from '@/components/portal/SensorZoneP
 import { useSubscriptionAccess } from '@/hooks/useSubscriptionAccess';
 import { useApi } from '@/hooks/useApi';
 import { clientApi, type ApiResponse } from '@/lib/api-client';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { HoldToActivate } from '@/components/ops/EmergencyMode';
+import { IncidentTimeline } from '@/components/incident/IncidentTimeline';
 import { ARM_MODE_OPTIONS, alarmStatusLabel, type ArmMode } from '@/lib/sa-alarm';
 
 type Camera = {
@@ -132,10 +135,16 @@ function SiteContent() {
   if (error) return <ErrorAlert error={error} onRetry={reload} />;
   if (!access?.home) {
     return (
-      <div className="empty-state">
-        Home Security is required to view alarms and cameras.{' '}
-        <Link href="/portal/subscription/upgrade">Upgrade</Link>
-      </div>
+      <EmptyState
+        kicker="Home security"
+        title="Home Security required"
+        body="Add Home Security to view alarms, zones, and cameras for this property."
+        action={
+          <Link href="/portal/subscription/upgrade?addon=HOME_SECURITY" className="feature-action">
+            Upgrade plan
+          </Link>
+        }
+      />
     );
   }
 
@@ -147,8 +156,9 @@ function SiteContent() {
     <div className="page-content">
       <div className="page-header">
         <div>
+          <p className="ec-kicker">Home security</p>
           <p className="text-muted" style={{ marginBottom: '0.35rem' }}>
-            <Link href="/portal/home">← Home security</Link>
+            <Link href="/portal/home">← All properties</Link>
           </p>
           <h1>{site.name}</h1>
           <p className="text-muted">{site.address}</p>
@@ -176,42 +186,55 @@ function SiteContent() {
         </section>
       )}
 
-      <div className="arm-mode-row" style={{ marginBottom: '1rem' }}>
-        {ARM_MODE_OPTIONS.map((opt) => {
-          const active = displayStatus === opt.value;
-          return (
-            <button
-              key={opt.value}
-              type="button"
-              title={opt.hint}
-              aria-pressed={active}
-              className={`arm-mode-btn arm-mode-btn--${opt.colorKey} ${active ? 'arm-mode-btn--active' : ''}`}
-              disabled={!!loadingId}
-              onClick={() => void setMode(opt.value)}
-            >
-              {loadingId === opt.value ? (
-                <span style={{ fontSize: '1.1rem' }}>…</span>
-              ) : (
-                <>
-                  <svg
-                    className="arm-mode-btn__icon"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    aria-hidden
-                    dangerouslySetInnerHTML={{ __html: opt.icon }}
-                  />
-                  <span className="arm-mode-btn__label">{opt.label}</span>
-                  {active ? <span className="arm-mode-btn__dot" aria-hidden /> : null}
-                </>
-              )}
-            </button>
-          );
-        })}
-        <button type="button" className="btn-danger btn-sm" disabled={!!loadingId} onClick={() => void homePanic()}>
-          {loadingId === 'panic' ? 'Sending…' : 'Home Panic'}
-        </button>
-      </div>
+      <section className="alarm-mode-pad" aria-label="Alarm mode">
+        <p className="alarm-mode-pad__kicker">Alarm mode</p>
+        <div className="arm-mode-row arm-mode-row--dashboard">
+          {ARM_MODE_OPTIONS.map((opt) => {
+            const active = displayStatus === opt.value;
+            return (
+              <button
+                key={opt.value}
+                type="button"
+                title={opt.hint}
+                aria-pressed={active}
+                className={`arm-mode-btn arm-mode-btn--${opt.colorKey} ${active ? 'arm-mode-btn--active' : ''}`}
+                disabled={!!loadingId}
+                onClick={() => void setMode(opt.value)}
+              >
+                {loadingId === opt.value ? (
+                  <span style={{ fontSize: '1.1rem' }}>…</span>
+                ) : (
+                  <>
+                    <svg
+                      className="arm-mode-btn__icon"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      aria-hidden
+                      dangerouslySetInnerHTML={{ __html: opt.icon }}
+                    />
+                    <span className="arm-mode-btn__label">{opt.label}</span>
+                    {active ? <span className="arm-mode-btn__dot" aria-hidden /> : null}
+                  </>
+                )}
+              </button>
+            );
+          })}
+        </div>
+        <p className="home-alarm-card__hint">
+          {ARM_MODE_OPTIONS.find((opt) => opt.value === displayStatus)?.hint ??
+            alarmStatusLabel(displayStatus)}
+        </p>
+        <HoldToActivate
+          className="hold-activate--inline"
+          label="Hold to panic"
+          holdLabel="Hold to panic…"
+          holdMs={1200}
+          loading={loadingId === 'panic'}
+          disabled={!!loadingId}
+          onActivate={() => void homePanic()}
+        />
+      </section>
 
       {(site.gateCode || site.keyHolder || site.accessNotes) && (
         <section className="portal-card">
@@ -320,30 +343,26 @@ function SiteContent() {
       </section>
 
       <section className="portal-card">
+        <p className="ec-kicker">Site activity</p>
         <h2>Recent events</h2>
         {site.events.length === 0 ? (
           <p className="text-muted">No alarm or camera events recorded.</p>
         ) : (
-          <ul className="status-list">
-            {site.events.map((e) => (
-              <li key={e.id} className="status-list-item">
-                <div>
-                  <strong>{e.title}</strong>
-                  <p className="text-muted" style={{ margin: '0.15rem 0 0' }}>
-                    {e.type.replace(/_/g, ' ')}
-                    {e.cidCode ? ` · CID ${e.cidCode}` : ''}
-                    {e.sensor ? ` · Z${e.sensor.zoneNumber}` : ''}
-                    {e.camera ? ` · ${e.camera.name}` : ''}
-                    {' · '}
-                    {new Date(e.triggeredAt).toLocaleString()}
-                  </p>
-                </div>
-                <span className={`status-pill status-pill--${e.status.toLowerCase()}`}>
-                  {e.status.replace(/_/g, ' ')}
-                </span>
-              </li>
-            ))}
-          </ul>
+          <IncidentTimeline
+            items={site.events.map((e) => ({
+              id: e.id,
+              kind: 'event' as const,
+              type:
+                e.severity === 'CRITICAL' || /panic|alarm/i.test(e.type)
+                  ? 'alarm.triggered'
+                  : `${e.type}.${e.status}`.toLowerCase(),
+              source: e.sensor
+                ? `Z${e.sensor.zoneNumber}`
+                : e.camera?.name ?? e.title,
+              createdAt: e.triggeredAt,
+              payload: { kind: e.type, content: e.description ?? e.title },
+            }))}
+          />
         )}
       </section>
     </div>

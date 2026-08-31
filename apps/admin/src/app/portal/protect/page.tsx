@@ -28,6 +28,7 @@ type Overview = {
     familyCount: number;
   };
   properties: { id: string; name: string; alarmStatus: string; alarmLinked: boolean }[];
+  vehicles?: { id: string; registration: string }[];
   family: { id: string; name: string; trackingEnabled: boolean }[];
   recentIncidents: { id: string; type: string; status: string; title: string; time: string }[];
 };
@@ -51,7 +52,7 @@ function ProtectContent() {
   const [emergencyOpen, setEmergencyOpen] = useState(false);
   const undo = useUndoToast();
 
-  async function send(kind: 'panic' | 'silent' | 'medical' | 'fire') {
+  async function send(kind: 'panic' | 'silent' | 'medical' | 'fire' | 'vehicle', vehicleId?: string) {
     setBusy(kind);
     setMsg('');
     try {
@@ -59,6 +60,12 @@ function ProtectContent() {
         await clientApi.post('/client/panic', { silent: kind === 'silent' });
       } else if (kind === 'medical') {
         await clientApi.post('/client/medical/emergency', {});
+      } else if (kind === 'vehicle') {
+        if (!vehicleId) {
+          setMsg('No vehicle on this account.');
+          return;
+        }
+        await clientApi.post(`/client/vehicles/${vehicleId}/remote`, { action: 'panic' });
       } else {
         await clientApi.post('/client/fire/emergency', {});
       }
@@ -70,7 +77,9 @@ function ProtectContent() {
             ? 'Medical emergency requested.'
             : kind === 'fire'
               ? 'Fire emergency requested.'
-              : 'Panic alert sent. Control room notified.',
+              : kind === 'vehicle'
+                ? 'Vehicle panic sent. Control room viewing dash cameras.'
+                : 'Panic alert sent. Control room notified.',
       );
       if (kind === 'panic') {
         undo.show('Panic alert sent', async () => {
@@ -86,6 +95,11 @@ function ProtectContent() {
         undo.show('Ambulance requested', undefined, {
           kind: 'medical',
           detail: 'Medical profile shared with responders',
+        });
+      } else if (kind === 'vehicle') {
+        undo.show('Vehicle panic sent', undefined, {
+          kind: 'critical',
+          detail: 'Control room viewing dash cameras',
         });
       } else {
         undo.show('Fire response requested', undefined, {
@@ -178,12 +192,19 @@ function ProtectContent() {
                   ? 'medical'
                   : busy === 'fire'
                     ? 'fire'
-                    : null) satisfies PanicNeuBusy
+                    : busy === 'vehicle'
+                      ? 'vehicle'
+                      : null) satisfies PanicNeuBusy
           }
           onPanic={() => send('panic')}
           onSilent={() => send('silent')}
           onMedical={() => send('medical')}
           onFire={() => send('fire')}
+          onVehicle={
+            access?.vehicle !== false && d.vehicles?.[0]
+              ? () => send('vehicle', d.vehicles![0].id)
+              : undefined
+          }
         />
       )}
 

@@ -73,7 +73,7 @@ function UpdatesContent() {
         <div>
           <h1>Security Updates</h1>
           <p className="text-muted">
-            Your personal alerts, incident updates, and account notifications.
+            Your personal alerts, response updates, and account notices.
           </p>
         </div>
       </div>

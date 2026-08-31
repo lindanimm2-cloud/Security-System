@@ -174,8 +174,8 @@
 [data-theme='light'] .shell--portal .mobile-shell-header--portal {
   background: color-mix(
     in srgb,
-    var(--surface) 92%,
-    rgba(var(--portal-ambient-r), var(--portal-ambient-g), var(--portal-ambient-b), 0.08)
+    var(--surface) 96%,
+    rgba(var(--portal-ambient-r), var(--portal-ambient-g), var(--portal-ambient-b), 0.05)
   );
 }
 

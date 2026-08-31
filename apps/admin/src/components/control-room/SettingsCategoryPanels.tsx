@@ -874,7 +874,7 @@ function AuditPanel({ entries }: { entries: CrSettings['audit'] }) {
       '4ds-settings-audit.csv',
       rows.map((row) => ({
         Time: row.time,
-        Module: row.module,
+        Tool: row.module,
         Title: row.title,
         Detail: row.detail,
         Actor: row.actor,
@@ -894,7 +894,7 @@ function AuditPanel({ entries }: { entries: CrSettings['audit'] }) {
         title: 'Configuration audit log',
         reference: `AUD-${stamp.slice(0, 10).replace(/-/g, '')}`,
         issuedAt: stamp,
-        status: module === 'all' ? 'All modules' : module,
+        status: module === 'all' ? 'All tools' : module,
         billTo: {
           name: company.legalName,
           email: company.invoiceEmail || undefined,
@@ -903,7 +903,7 @@ function AuditPanel({ entries }: { entries: CrSettings['audit'] }) {
         },
         total: `${rows.length} entries`,
         table: {
-          headers: ['Time', 'Module', 'Title', 'Detail', 'Actor'],
+          headers: ['Time', 'Tool', 'Title', 'Detail', 'Actor'],
           rows: rows.map((row) => [row.time, row.module, row.title, row.detail, row.actor]),
         },
         notes: [
@@ -926,10 +926,10 @@ function AuditPanel({ entries }: { entries: CrSettings['audit'] }) {
         <div className="settings-panel__actions">
           <UiSelect
             compact
-            ariaLabel="Filter module"
+            ariaLabel="Filter tool"
             value={module}
             onChange={setModule}
-            options={modules.map((value) => ({ value, label: value === 'all' ? 'All modules' : value }))}
+            options={modules.map((value) => ({ value, label: value === 'all' ? 'All tools' : value }))}
           />
           <button type="button" className="btn-primary btn-sm" onClick={exportAuditReport}>
             Print report
@@ -944,7 +944,7 @@ function AuditPanel({ entries }: { entries: CrSettings['audit'] }) {
           <thead>
             <tr>
               <th>Time</th>
-              <th>Module</th>
+              <th>Tool</th>
               <th>Change</th>
               <th>Actor</th>
             </tr>

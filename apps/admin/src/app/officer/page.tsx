@@ -409,10 +409,13 @@ function DashboardContent() {
         />
       ) : (
         <section className="officer-standby portal-card">
-          <p className="dash-ops__eyebrow">
-            <span className="ops-live-chip__dot" aria-hidden />
-            Standby · refreshes every 20s
-          </p>
+          <div className="ec-dispatch__top">
+            <p className="ec-kicker">4DS Field</p>
+            <span className="ec-online">
+              <span className="ec-dot" aria-hidden />
+              Online · on shift
+            </span>
+          </div>
           <h2>No active job</h2>
           <p className="text-muted">
             You are available. Open Your Jobs when dispatch assigns the next call.

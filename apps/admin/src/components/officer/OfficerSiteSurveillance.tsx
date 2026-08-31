@@ -1,5 +1,6 @@
 'use client';
 
+import { IncidentTimeline } from '@/components/incident/IncidentTimeline';
 import { useApi } from '@/hooks/useApi';
 import { officerApi, type ApiResponse } from '@/lib/api-client';
 
@@ -157,14 +158,17 @@ export function OfficerSiteSurveillance({ incidentId }: Props) {
       )}
 
       {ctx.events.length > 0 && (
-        <ul className="status-list officer-surveillance__events">
-          {ctx.events.slice(0, 4).map((e) => (
-            <li key={e.id} className="status-list-item">
-              <span>{e.title}</span>
-              <span className="text-muted">{e.status.replace(/_/g, ' ')}</span>
-            </li>
-          ))}
-        </ul>
+        <IncidentTimeline
+          compact
+          items={ctx.events.slice(0, 4).map((e) => ({
+            id: e.id,
+            kind: 'event' as const,
+            type: `${e.type}.${e.status}`.toLowerCase(),
+            source: 'site',
+            createdAt: e.triggeredAt,
+            payload: { content: e.title },
+          }))}
+        />
       )}
     </section>
   );

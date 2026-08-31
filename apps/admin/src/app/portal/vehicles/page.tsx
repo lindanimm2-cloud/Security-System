@@ -57,7 +57,7 @@ function VehiclesContent() {
         { title: 'Remote lock & immobiliser', description: 'Lock doors, pulse horn, or cut the starter from your phone.', status: 'Ready', href: '/portal/vehicles#vehicles-list', action: 'Open vehicle remote', price: 'R 500/mo', requiresAccess: 'vehicle', requiresAddon: 'VEHICLE_RESPONSE' },
         { title: 'Geofencing', description: 'Alerts when vehicles enter or exit zones.', status: 'Active', href: '/portal/safe-zones', action: 'Manage zones', price: 'R 500/mo', requiresAccess: 'vehicle', requiresAddon: 'VEHICLE_RESPONSE' },
         { title: 'Roadside Assistance', description: 'Request breakdown and roadside assistance.', href: '/portal/requests/roadside', action: 'Request roadside help', requiresAccess: 'vehicle', requiresAddon: 'VEHICLE_RESPONSE', price: 'R 500/mo' },
-        { title: 'Incident Reporting', description: 'Report accidents and vehicle-related incidents.', href: '/portal/theft', action: 'Report incident', requiresAccess: 'vehicle', requiresAddon: 'VEHICLE_RESPONSE', price: 'R 500/mo' },
+        { title: 'Report an alert', description: 'Report accidents, theft, or anything that needs a response.', href: '/portal/theft', action: 'Report what happened', requiresAccess: 'vehicle', requiresAddon: 'VEHICLE_RESPONSE', price: 'R 500/mo' },
       ]}
       access={access}
       accessKey="vehicle"
@@ -67,6 +67,7 @@ function VehiclesContent() {
         <div id="vehicles-list" className="entity-grid">
           {vehicles.map((v) => (
             <Link key={v.id} href={`/portal/vehicles/${v.id}`} className="entity-card entity-card--link">
+              <p className="ec-kicker">Vehicle</p>
               <div className="entity-card-header">
                 <span className="entity-card-title">{v.registration}</span>
                 <span className={`status-pill ${v.theftRecovery ? 'status-pill--alert' : 'status-pill--ok'}`}>
@@ -78,7 +79,7 @@ function VehiclesContent() {
                 {v.immobiliserOn ? 'Immobiliser on' : v.theftRecovery ? 'Recovery active' : 'Remote lock ready'}
                 {v.insuranceInfo ? ` · ${v.insuranceInfo}` : ''}
               </p>
-              <span className="feature-action">Open vehicle profile →</span>
+              <span className="feature-action">Open vehicle profile</span>
             </Link>
           ))}
         </div>

@@ -27,7 +27,19 @@ type Incident = {
 };
 
 function formatStatus(value: string) {
-  return value.replace(/_/g, ' ');
+  const key = value.toUpperCase();
+  const labels: Record<string, string> = {
+    OPEN: 'Open',
+    ACTIVE: 'In progress',
+    DISPATCHED: 'Response underway',
+    ASSIGNED: 'Responder assigned',
+    EN_ROUTE: 'On the way',
+    ON_SCENE: 'On scene',
+    RESOLVED: 'All clear',
+    COMPLETED: 'Complete',
+    CANCELLED: 'Cancelled',
+  };
+  return labels[key] ?? value.replace(/_/g, ' ').toLowerCase();
 }
 
 export default function IncidentsPage() {
@@ -64,7 +76,7 @@ function IncidentsContent() {
     [incidents, search],
   );
 
-  if (loading) return <LoadingSpinner label="Loading incidents..." fullScreen />;
+  if (loading) return <LoadingSpinner label="Loading alerts..." fullScreen />;
   if (error) return <ErrorAlert error={error} onRetry={reload} />;
 
   const selected = filtered.find((i) => i.id === openId) ?? incidents.find((i) => i.id === openId) ?? null;
@@ -73,15 +85,15 @@ function IncidentsContent() {
     <div className="page-content">
       <div className="page-header">
         <div>
-          <h1>Incident History</h1>
-          <p className="text-muted">Complete record of alerts, responses, and outcomes.</p>
+          <h1>Response history</h1>
+          <p className="text-muted">Alerts, who responded, and how it ended.</p>
         </div>
       </div>
       <div className="list-search-bar">
         <ListSearch
           value={search}
           onChange={setSearch}
-          placeholder="Search incidents, location, status…"
+          placeholder="Search alerts, location, status…"
           resultCount={filtered.length}
           totalCount={incidents.length}
         />
@@ -89,11 +101,11 @@ function IncidentsContent() {
       <div className="list-card">
         {filtered.length === 0 ? (
           <EmptyState
-            title={search.trim() ? 'No matches' : 'No incidents'}
+            title={search.trim() ? 'No matches' : 'No alerts yet'}
             body={
               search.trim()
                 ? 'Try a different type, status, or address.'
-                : 'No incidents recorded. Stay safe.'
+                : 'When you request help, it will show up here.'
             }
           />
         ) : (
@@ -105,7 +117,9 @@ function IncidentsContent() {
               onClick={() => setOpenId(i.id)}
             >
               <div className="list-row-top">
-                <span className={`incident-type incident-type--${i.priority.toLowerCase()}`}>{i.type}</span>
+                <span className={`incident-type incident-type--${i.priority.toLowerCase()}`}>
+                  {i.type === 'PANIC' ? 'Panic' : i.type.replace(/_/g, ' ').toLowerCase().replace(/^\w/, (c) => c.toUpperCase())}
+                </span>
                 <span className="badge">{formatStatus(i.status)}</span>
                 {i.isSilent ? <span className="badge">Silent</span> : null}
               </div>

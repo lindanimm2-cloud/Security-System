@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { FeaturedProducts } from '@/components/site/FeaturedProducts';
+import { SiteDispatchStrip } from '@/components/site/SiteDispatchStrip';
 import { STORE_DEPARTMENTS } from '@/lib/store-catalog';
 
 const DEPARTMENTS = [
@@ -128,6 +129,8 @@ export default function HomePage() {
           ))}
         </div>
       </section>
+
+      <SiteDispatchStrip />
 
       <section className="nx-band" style={{ borderRadius: 10, margin: 0 }}>
         <div className="nx-band-inner">

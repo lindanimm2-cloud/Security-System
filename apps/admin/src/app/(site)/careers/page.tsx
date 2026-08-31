@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import { SiteDispatchStrip } from '@/components/site/SiteDispatchStrip';
 
 export const metadata: Metadata = {
   title: 'Careers',
@@ -73,6 +74,7 @@ export default function CareersPage() {
             </article>
           ))}
         </div>
+        <SiteDispatchStrip />
         <div className="nx-section-cta">
           <Link href="/contact" className="nx-btn nx-btn--primary">
             General applications
