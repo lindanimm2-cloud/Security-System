@@ -7,6 +7,7 @@ import { FeatureHub } from '@/components/portal/FeatureHub';
 import { PortalLayout } from '@/components/portal/PortalLayout';
 import { PanicNeuConsole, type PanicNeuBusy } from '@/components/portal/PanicNeuConsole';
 import { EmergencyProtectionBanner } from '@/components/security/EmergencyProtectionBanner';
+import { OpsUndoToast, useUndoToast } from '@/components/ops/OpsUndoToast';
 import { useApi } from '@/hooks/useApi';
 import { clientApi, type ApiResponse } from '@/lib/api-client';
 
@@ -32,6 +33,7 @@ function EmergencyContent() {
   const [medicalLoading, setMedicalLoading] = useState(false);
   const [fireLoading, setFireLoading] = useState(false);
   const [msg, setMsg] = useState('');
+  const undo = useUndoToast();
 
   async function trigger(silent: boolean) {
     if (silent) setSilentLoading(true);
@@ -40,6 +42,15 @@ function EmergencyContent() {
     try {
       await clientApi.post('/client/panic', { silent });
       setMsg(silent ? 'Silent alert sent to control room.' : 'Panic alert sent. Help is on the way.');
+      undo.show(
+        silent ? 'Silent alert sent' : 'Panic alert sent',
+        async () => {
+          await clientApi.post('/client/panic/cancel');
+        },
+        silent
+          ? { kind: 'silent', detail: 'Control room notified discreetly' }
+          : { kind: 'critical', detail: 'Help is on the way' },
+      );
     } finally {
       setPanicLoading(false);
       setSilentLoading(false);
@@ -52,6 +63,10 @@ function EmergencyContent() {
     try {
       await clientApi.post('/client/medical/emergency');
       setMsg('Ambulance requested. Medical profile shared with responders.');
+      undo.show('Ambulance requested', undefined, {
+        kind: 'medical',
+        detail: 'Medical profile shared with responders',
+      });
     } finally {
       setMedicalLoading(false);
     }
@@ -63,6 +78,10 @@ function EmergencyContent() {
     try {
       await clientApi.post('/client/fire/emergency');
       setMsg('Fire response requested. Fire unit and dispatch notified.');
+      undo.show('Fire response requested', undefined, {
+        kind: 'fire',
+        detail: 'Fire unit and dispatch notified',
+      });
     } finally {
       setFireLoading(false);
     }
@@ -111,10 +130,11 @@ function EmergencyContent() {
         onFire={() => void requestFire()}
       />
       {msg && <p className="alert alert--success">{msg}</p>}
-          <p className="text-muted medical-emergency-hint">
-            Set up your medical profile under <Link href="/portal/medical">Medical</Link> so responders receive
-            allergies, medications, and instructions.
-          </p>
+      <OpsUndoToast toast={undo.toast} onDismiss={undo.clear} />
+      <p className="text-muted medical-emergency-hint">
+        Set up your medical profile under <Link href="/portal/medical">Medical</Link> so responders receive
+        allergies, medications, and instructions.
+      </p>
     </FeatureHub>
   );
 }

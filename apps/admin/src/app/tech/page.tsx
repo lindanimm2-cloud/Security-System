@@ -147,10 +147,16 @@ function TechDashboardContent() {
         status: next,
         overrideReason: overrideReason || undefined,
       });
-      undo.show(`Marked ${workflowLabel(next)}`, async () => {
-        await techApi.patch(`/store/tech/jobs/${job.id}/status`, { status: prev });
-        setJobs((list) => (list ?? liveJobs).map((j) => (j.id === job.id ? { ...j, status: prev } : j)));
-      });
+      undo.show(
+        `Marked ${workflowLabel(next)}`,
+        async () => {
+          await techApi.patch(`/store/tech/jobs/${job.id}/status`, { status: prev });
+          setJobs((list) => (list ?? liveJobs).map((j) => (j.id === job.id ? { ...j, status: prev } : j)));
+        },
+        next === 'COMPLETED'
+          ? { kind: 'success', detail: 'Job closed · tap Undo to reopen' }
+          : { kind: 'info', detail: 'Workflow updated · tap Undo to reverse' },
+      );
     } catch (e) {
       setJobs((list) => (list ?? liveJobs).map((j) => (j.id === job.id ? { ...j, status: prev } : j)));
       setActionError(e instanceof Error ? e.message : 'Could not update this job. Try again.');

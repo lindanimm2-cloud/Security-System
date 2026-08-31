@@ -624,12 +624,92 @@
   height: 0.62rem;
   margin-top: 0.16rem;
   background: var(--accent);
-  box-shadow: 0 0 12px color-mix(in srgb, var(--accent) 50%, transparent);
+  box-shadow:
+    0 0 0 3px color-mix(in srgb, var(--accent) 28%, transparent),
+    0 0 12px color-mix(in srgb, var(--accent) 55%, transparent);
+  animation: cr-lifecycle-glow 1.6s ease-in-out infinite;
 }
 
 .cr-lifecycle__step--current .cr-lifecycle__label {
   color: var(--text);
   font-weight: 600;
+}
+
+.cr-lifecycle__step[data-step='ACK'] .cr-lifecycle__dot,
+.cr-lifecycle__step[data-step='VERIFY'] .cr-lifecycle__dot {
+  --lc-tone: #ff2d4a;
+}
+
+.cr-lifecycle__step[data-step='DISPATCHED'] .cr-lifecycle__dot {
+  --lc-tone: #f5b942;
+}
+
+.cr-lifecycle__step[data-step='EN_ROUTE'] .cr-lifecycle__dot {
+  --lc-tone: #22d3ee;
+}
+
+.cr-lifecycle__step[data-step='ON_SCENE'] .cr-lifecycle__dot {
+  --lc-tone: #818cf8;
+}
+
+.cr-lifecycle__step[data-step='RESOLVED'] .cr-lifecycle__dot,
+.cr-lifecycle__step[data-step='CLOSED'] .cr-lifecycle__dot {
+  --lc-tone: #34d399;
+}
+
+.cr-lifecycle__step--done .cr-lifecycle__dot {
+  background: var(--lc-tone, var(--success));
+  box-shadow: 0 0 8px color-mix(in srgb, var(--lc-tone, var(--success)) 50%, transparent);
+}
+
+.cr-lifecycle__step--done .cr-lifecycle__line {
+  background: color-mix(in srgb, var(--lc-tone, var(--success)) 45%, transparent);
+}
+
+.cr-lifecycle__step--current .cr-lifecycle__dot {
+  background: var(--lc-tone, var(--accent));
+  box-shadow:
+    0 0 0 3px color-mix(in srgb, var(--lc-tone, var(--accent)) 28%, transparent),
+    0 0 14px color-mix(in srgb, var(--lc-tone, var(--accent)) 65%, transparent);
+}
+
+.cr-lifecycle__step[data-step='ACK'].cr-lifecycle__step--current .cr-lifecycle__dot,
+.cr-lifecycle__step[data-step='VERIFY'].cr-lifecycle__step--current .cr-lifecycle__dot {
+  animation: cr-lifecycle-glow-urgent 1.15s ease-in-out infinite;
+}
+
+@keyframes cr-lifecycle-glow {
+  0%,
+  100% {
+    box-shadow:
+      0 0 0 3px color-mix(in srgb, var(--lc-tone, var(--accent)) 22%, transparent),
+      0 0 10px color-mix(in srgb, var(--lc-tone, var(--accent)) 50%, transparent);
+  }
+  50% {
+    box-shadow:
+      0 0 0 6px color-mix(in srgb, var(--lc-tone, var(--accent)) 0%, transparent),
+      0 0 16px color-mix(in srgb, var(--lc-tone, var(--accent)) 80%, transparent);
+  }
+}
+
+@keyframes cr-lifecycle-glow-urgent {
+  0%,
+  100% {
+    box-shadow:
+      0 0 0 3px color-mix(in srgb, var(--lc-tone, var(--accent)) 30%, transparent),
+      0 0 10px color-mix(in srgb, var(--lc-tone, var(--accent)) 60%, transparent);
+  }
+  50% {
+    box-shadow:
+      0 0 0 7px color-mix(in srgb, var(--lc-tone, var(--accent)) 0%, transparent),
+      0 0 18px color-mix(in srgb, var(--lc-tone, var(--accent)) 90%, transparent);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cr-lifecycle__step--current .cr-lifecycle__dot {
+    animation: none;
+  }
 }
 
 /* Hide horizontal workflow when lifecycle is present */
@@ -642,14 +722,6 @@
 .incident-timeline__item {
   grid-template-columns: 0.85rem minmax(0, 1fr);
   gap: 0.65rem;
-}
-
-.incident-timeline__dot {
-  width: 0.5rem;
-  height: 0.5rem;
-  margin-top: 0.35rem;
-  background: color-mix(in srgb, var(--accent) 45%, var(--muted));
-  box-shadow: 0 0 8px color-mix(in srgb, var(--accent) 20%, transparent);
 }
 
 .incident-timeline__body {

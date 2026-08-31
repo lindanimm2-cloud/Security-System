@@ -2484,6 +2484,7 @@ export async function handleDemoRequest<T>({
             kind: 'event',
             type: 'incident.created',
             source: 'portal',
+            payload: { kind: 'panic' },
             createdAt: new Date().toISOString(),
           },
           {

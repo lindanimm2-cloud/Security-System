@@ -101,6 +101,9 @@ function QueueContent() {
           await officerApi.post(`/officer/dispatch/${d.id}/undo`, { status: prev });
           void reload();
         },
+        primary === 'complete'
+          ? { kind: 'success', detail: 'Tap Undo to restore this assignment' }
+          : { kind: 'info', detail: 'Status updated · tap Undo to reverse' },
       );
       void reload();
     } catch (e) {

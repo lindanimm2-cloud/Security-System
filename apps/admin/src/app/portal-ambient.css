@@ -91,7 +91,7 @@
   }
 }
 
-.shell--portal > * {
+.shell--portal > .portal-shell-main {
   position: relative;
   z-index: 1;
 }

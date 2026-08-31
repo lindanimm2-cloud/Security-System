@@ -13,6 +13,7 @@ import { EmergencyCallButton, EmergencyDispatchCallCard } from '@/components/por
 import { CONTROL_ROOM_LINE } from '@/lib/control-room-line';
 import { EmergencyProtectionBanner } from '@/components/security/EmergencyProtectionBanner';
 import { PanicNeuConsole, type PanicNeuBusy } from '@/components/portal/PanicNeuConsole';
+import { OpsUndoToast, useUndoToast } from '@/components/ops/OpsUndoToast';
 import { useApi } from '@/hooks/useApi';
 import { clientApi, type ApiResponse } from '@/lib/api-client';
 import { friendlyErrorMessage } from '@/lib/friendly-error';
@@ -48,6 +49,7 @@ function ProtectContent() {
   const [busy, setBusy] = useState<string | null>(null);
   const [msg, setMsg] = useState('');
   const [emergencyOpen, setEmergencyOpen] = useState(false);
+  const undo = useUndoToast();
 
   async function send(kind: 'panic' | 'silent' | 'medical' | 'fire') {
     setBusy(kind);
@@ -70,6 +72,27 @@ function ProtectContent() {
               ? 'Fire emergency requested.'
               : 'Panic alert sent. Control room notified.',
       );
+      if (kind === 'panic') {
+        undo.show('Panic alert sent', async () => {
+          await clientApi.post('/client/panic/cancel');
+          void reload();
+        }, { kind: 'critical', detail: 'Control room notified · help is on the way' });
+      } else if (kind === 'silent') {
+        undo.show('Silent alert sent', async () => {
+          await clientApi.post('/client/panic/cancel');
+          void reload();
+        }, { kind: 'silent', detail: 'Sent discreetly' });
+      } else if (kind === 'medical') {
+        undo.show('Ambulance requested', undefined, {
+          kind: 'medical',
+          detail: 'Medical profile shared with responders',
+        });
+      } else {
+        undo.show('Fire response requested', undefined, {
+          kind: 'fire',
+          detail: 'Dispatch and fire unit notified',
+        });
+      }
       void reload();
     } catch (e) {
       setMsg(friendlyErrorMessage(e, 'action'));
@@ -121,20 +144,20 @@ function ProtectContent() {
           detail="Control room has been notified. Stay on the line if safe."
           statusLine={
             d.user.address
-              ? `Location shared · ${d.user.address}`
+              ? `Location · ${d.user.address}`
               : 'Location sharing active'
           }
+          liveLabel="Live · control room"
+          primaryAction={
+            <EmergencyCallButton
+              name={CONTROL_ROOM_LINE.name}
+              phone={CONTROL_ROOM_LINE.phone}
+              isDispatch
+              size="lg"
+            />
+          }
           actions={
-            <>
-              <EmergencyCallButton
-                name={CONTROL_ROOM_LINE.name}
-                phone={CONTROL_ROOM_LINE.phone}
-                isDispatch
-              />
-              <Link href="/portal/incidents" className="btn-sm btn-sm--link">
-                View response
-              </Link>
-            </>
+            <Link href="/portal/incidents">View response</Link>
           }
           onDismiss={() => setEmergencyOpen(false)}
         />
@@ -187,6 +210,7 @@ function ProtectContent() {
         />
         <EmergencyProtectionBanner />
       </div>
+      <OpsUndoToast toast={undo.toast} onDismiss={undo.clear} />
     </div>
   );
 }

@@ -153,24 +153,32 @@ function DashboardContent() {
       if (path === 'complete') {
         setLocalActive(null);
         setLocalQueue((prev) => (prev ?? queue).filter((q) => q.id !== item.id));
-        undo.show('Assignment completed', async () => {
-          await officerApi.post(`/officer/dispatch/${item.id}/undo`, {
-            status: previousStatus,
-          });
-          void reload();
-        });
+        undo.show(
+          'Assignment completed',
+          async () => {
+            await officerApi.post(`/officer/dispatch/${item.id}/undo`, {
+              status: previousStatus,
+            });
+            void reload();
+          },
+          { kind: 'success', detail: 'Tap Undo to restore this assignment' },
+        );
       } else {
         const updated = { ...item, status: nextStatus };
         setLocalActive(updated);
         setLocalQueue((prev) =>
           (prev ?? queue).map((q) => (q.id === item.id ? updated : q)),
         );
-        undo.show(`Marked ${nextStatus.replace(/_/g, ' ').toLowerCase()}`, async () => {
-          await officerApi.post(`/officer/dispatch/${item.id}/undo`, {
-            status: previousStatus,
-          });
-          void reload();
-        });
+        undo.show(
+          `Marked ${nextStatus.replace(/_/g, ' ').toLowerCase()}`,
+          async () => {
+            await officerApi.post(`/officer/dispatch/${item.id}/undo`, {
+              status: previousStatus,
+            });
+            void reload();
+          },
+          { kind: 'info', detail: 'Status updated · tap Undo to reverse' },
+        );
       }
       void reload({ silent: true });
     } finally {
@@ -266,24 +274,22 @@ function DashboardContent() {
             `${active!.incident.client} · control room tracking your status`
           }
           statusLine={active?.incident.address ?? d.officer.zone ?? 'Field'}
+          liveLabel="Live · field"
+          primaryAction={
+            active && primary ? (
+              <button
+                type="button"
+                disabled={!!actionLoading}
+                onClick={() =>
+                  void patchDispatch(active, primary.path, primary.key, active.status)
+                }
+              >
+                {primary.label}
+              </button>
+            ) : null
+          }
           actions={
-            <>
-              {active && primary ? (
-                <button
-                  type="button"
-                  className="btn-sm btn-primary"
-                  disabled={!!actionLoading}
-                  onClick={() =>
-                    void patchDispatch(active, primary.path, primary.key, active.status)
-                  }
-                >
-                  {primary.label}
-                </button>
-              ) : null}
-              <Link href="/officer/messages" className="btn-sm">
-                Dispatch chat
-              </Link>
-            </>
+            <Link href="/officer/messages">Dispatch chat</Link>
           }
         />
       )}

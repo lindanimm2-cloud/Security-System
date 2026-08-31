@@ -11,6 +11,7 @@ type Props = {
   loading?: boolean;
   tone?: 'danger' | 'warn' | 'medical';
   size?: 'lg' | 'sm';
+  variant?: 'panic' | 'silent' | 'medical' | 'fire' | 'hub';
   icon: ReactNode;
   showIndicator?: boolean;
 };
@@ -23,13 +24,16 @@ export function PanicNeuButton({
   loading,
   tone = 'danger',
   size = 'sm',
+  variant = 'panic',
   icon,
   showIndicator = false,
 }: Props) {
   const isLg = size === 'lg';
 
   return (
-    <div className={`panic-neu__well ${isLg ? 'panic-neu__well--lg' : ''}`}>
+    <div
+      className={`panic-neu__well ${isLg ? 'panic-neu__well--lg' : ''} panic-neu__well--${variant}`.trim()}
+    >
       {showIndicator ? <span className="panic-neu__indicator" aria-hidden /> : null}
       <HoldToActivate
         label={label}

@@ -72,6 +72,7 @@ export function MiniCallSafetyBar({
       <PanicNeuButton
         label="Silent Panic. Hold for 2 seconds to notify dispatch discreetly."
         holdMs={2000}
+        variant="silent"
         tone="warn"
         loading={callBusy}
         disabled={callBusy}

@@ -55,6 +55,7 @@ export function PanicNeuConsole({
           label="Panic"
           holdMs={3000}
           size="lg"
+          variant="panic"
           showIndicator
           tone="danger"
           loading={busy === 'panic'}
@@ -70,6 +71,7 @@ export function PanicNeuConsole({
         <PanicNeuButton
           label="Silent Panic. Hold 2 seconds to notify control room discreetly."
           holdMs={2000}
+          variant="silent"
           tone="warn"
           loading={busy === 'silent'}
           disabled={isDisabled(busy, 'silent')}
@@ -81,6 +83,7 @@ export function PanicNeuConsole({
           <PanicNeuButton
             label="Medical emergency. Hold 2 seconds."
             holdMs={2000}
+            variant="medical"
             tone="medical"
             loading={busy === 'medical'}
             disabled={isDisabled(busy, 'medical')}
@@ -93,6 +96,7 @@ export function PanicNeuConsole({
           <PanicNeuButton
             label="Fire emergency. Hold 2 seconds."
             holdMs={2000}
+            variant="fire"
             tone="warn"
             loading={busy === 'fire'}
             disabled={isDisabled(busy, 'fire')}
@@ -111,7 +115,7 @@ export function PanicNeuConsole({
       {showHub ? (
         <div className="panic-neu__hub">
           <Link href={hubHref} className="panic-neu__hub-link" aria-label="Open emergency hub">
-            <div className="panic-neu__well">
+            <div className="panic-neu__well panic-neu__well--hub">
               <span className="panic-neu__knob panic-neu__knob--static">
                 <HubPanicIcon />
               </span>

@@ -127,33 +127,45 @@ export type EmergencyModeProps = {
   title: string;
   detail?: string;
   statusLine?: string;
+  liveLabel?: string;
+  primaryAction?: ReactNode;
   actions?: ReactNode;
   onDismiss?: () => void;
 };
 
-/** Full-bleed emergency chrome that replaces normal dashboard content. */
+/** Active-emergency card — same layout language as the 24/7 control-room card. */
 export function EmergencyModeBanner({
   title,
   detail,
   statusLine,
+  liveLabel = 'Live · 24/7 response',
+  primaryAction,
   actions,
   onDismiss,
 }: EmergencyModeProps) {
   return (
     <section className="emergency-mode" role="alert" aria-live="assertive">
-      <div className="emergency-mode__pulse" aria-hidden />
-      <div className="emergency-mode__body">
-        <p className="emergency-mode__eyebrow">Active emergency</p>
-        <h2>{title}</h2>
-        {detail ? <p>{detail}</p> : null}
-        {statusLine ? <p className="emergency-mode__status">{statusLine}</p> : null}
-        {actions ? <div className="emergency-mode__actions">{actions}</div> : null}
-        {onDismiss ? (
-          <button type="button" className="btn-sm btn-sm--ghost" onClick={onDismiss}>
-            Minimize
-          </button>
-        ) : null}
+      <div className="emergency-mode__top">
+        <p className="emergency-mode__kicker">Active emergency</p>
+        <span className="emergency-mode__live">
+          <span className="emergency-mode__dot" aria-hidden />
+          {liveLabel}
+        </span>
       </div>
+      <h2>{title}</h2>
+      {statusLine ? <p className="emergency-mode__lead">{statusLine}</p> : null}
+      {primaryAction ? <div className="emergency-mode__primary">{primaryAction}</div> : null}
+      {actions || onDismiss ? (
+        <div className="emergency-mode__actions">
+          {actions}
+          {onDismiss ? (
+            <button type="button" className="emergency-mode__minimize" onClick={onDismiss}>
+              Minimize
+            </button>
+          ) : null}
+        </div>
+      ) : null}
+      {detail ? <p className="emergency-mode__note">{detail}</p> : null}
     </section>
   );
 }
@@ -164,18 +176,29 @@ export type ProtectionStatusProps = {
   lines: string[];
 };
 
+const PROTECTION_META = {
+  ok: { kicker: 'Protection status', live: 'Online · protected' },
+  attention: { kicker: 'Needs attention', live: 'Check required' },
+  emergency: { kicker: 'Active emergency', live: 'Live · response' },
+} as const;
+
 export function ProtectionStatusCard({ tone, title, lines }: ProtectionStatusProps) {
+  const meta = PROTECTION_META[tone];
   return (
     <section className={`protection-status protection-status--${tone}`} aria-live="polite">
-      <div className="protection-status__dot" aria-hidden />
-      <div>
-        <h2>{title}</h2>
-        <ul>
-          {lines.map((line) => (
-            <li key={line}>{line}</li>
-          ))}
-        </ul>
+      <div className="protection-status__top">
+        <p className="protection-status__kicker">{meta.kicker}</p>
+        <span className="protection-status__live">
+          <span className="protection-status__dot" aria-hidden />
+          {meta.live}
+        </span>
       </div>
+      <h2>{title}</h2>
+      <ul>
+        {lines.map((line) => (
+          <li key={line}>{line}</li>
+        ))}
+      </ul>
     </section>
   );
 }

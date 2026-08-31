@@ -95,6 +95,10 @@ function PortalShellInner({
   }, [pathname]);
 
   useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [pathname]);
+
+  useEffect(() => {
     const publicId = getOrCreateLocalDeviceId();
     void clientApi.post('/client/security/devices/heartbeat', { publicId }).catch(() => undefined);
   }, []);
@@ -236,8 +240,8 @@ function PortalShellInner({
           </div>
         </header>
         <main className="portal-main portal-main--with-sidebar portal-main--with-call-bar">
-          {children}
           <PortalPermissionsBanner />
+          {children}
         </main>
       </div>
 

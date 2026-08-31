@@ -26,7 +26,7 @@ export function IncidentLifecycle({
         const current = idx === safeIndex;
         const state = done ? 'done' : current ? 'current' : 'pending';
         return (
-          <li key={step} className={`cr-lifecycle__step cr-lifecycle__step--${state}`}>
+          <li key={step} className={`cr-lifecycle__step cr-lifecycle__step--${state}`} data-step={step}>
             <span className="cr-lifecycle__rail" aria-hidden>
               <span className="cr-lifecycle__dot" />
               {idx < steps.length - 1 ? <span className="cr-lifecycle__line" /> : null}

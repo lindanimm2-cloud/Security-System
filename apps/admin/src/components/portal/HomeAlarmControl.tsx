@@ -140,7 +140,7 @@ export function HomeAlarmControl({
 
   function renderModeButtons() {
     return (
-      <div className={`arm-mode-row ${isDashboard ? 'arm-mode-row--dashboard' : ''}${merged ? ' arm-mode-row--merged' : ''}`}>
+      <div className={`arm-mode-row ${isDashboard ? 'arm-mode-row--dashboard' : ''}`}>
         {ARM_MODE_OPTIONS.map((opt) => {
           const active = primaryStatus === opt.value;
           const key = `${primary.id}-${opt.value}`;
@@ -177,7 +177,24 @@ export function HomeAlarmControl({
     );
   }
 
-  return (
+  const hint = (
+    <p className="home-alarm-card__hint">
+      {isTriggered
+        ? 'Alarm triggered · responders notified'
+        : activeOpt?.hint ?? alarmStatusLabel(primaryStatus)}
+      {primary.alarmLinked === false ? ' · Panel not linked' : ''}
+    </p>
+  );
+
+  const pad = (
+    <section className="alarm-mode-pad" aria-label="Alarm mode">
+      <p className="alarm-mode-pad__kicker">Alarm mode</p>
+      {renderModeButtons()}
+      {hint}
+    </section>
+  );
+
+  const card = (
     <section
       className={`portal-card home-alarm-card home-alarm-card--${colorKey} ${isDashboard ? 'home-alarm-card--dashboard' : ''} ${merged ? 'home-sec' : ''} ${armed ? 'home-alarm-card--armed' : ''} ${isTriggered ? 'home-alarm-card--triggered' : ''}`}
       aria-label="Home security"
@@ -209,31 +226,14 @@ export function HomeAlarmControl({
         </div>
       </div>
 
-      {msg ? <div className="alert alert--success home-alarm-card__feedback">{msg}</div> : null}
+      {msg && !isDashboard ? <div className="alert alert--success home-alarm-card__feedback">{msg}</div> : null}
 
-      {merged ? (
-        <div className="home-sec__body">
-          <div className="home-sec__feeds">{feeds}</div>
-          <div className="home-sec__pad">
-            <p className="home-sec__pad-kicker">Alarm mode</p>
-            {renderModeButtons()}
-            <p className="home-alarm-card__hint">
-              {isTriggered
-                ? 'Alarm triggered · responders notified'
-                : activeOpt?.hint ?? alarmStatusLabel(primaryStatus)}
-              {primary.alarmLinked === false ? ' · Panel not linked' : ''}
-            </p>
-          </div>
-        </div>
+      {isDashboard ? (
+        merged ? <div className="home-sec__feeds">{feeds}</div> : null
       ) : (
         <>
           {renderModeButtons()}
-          <p className="home-alarm-card__hint">
-            {isTriggered
-              ? 'Alarm triggered · responders notified'
-              : activeOpt?.hint ?? alarmStatusLabel(primaryStatus)}
-            {primary.alarmLinked === false ? ' · Panel not linked' : ''}
-          </p>
+          {hint}
         </>
       )}
 
@@ -283,4 +283,16 @@ export function HomeAlarmControl({
       ) : null}
     </section>
   );
+
+  if (isDashboard) {
+    return (
+      <>
+        {pad}
+        {msg ? <div className="alert alert--success home-alarm-card__feedback">{msg}</div> : null}
+        {card}
+      </>
+    );
+  }
+
+  return card;
 }
