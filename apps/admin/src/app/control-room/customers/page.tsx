@@ -686,11 +686,11 @@ function CustomersContent() {
                           ? new Date(c.subscription.validUntil).toLocaleDateString()
                           : '—'}
                       </td>
-                      <td>
+                      <td className="customers-actions">
                         <button type="button" className="btn-sm" onClick={() => setSelectedId(c.id)}>
                           Manage
                         </button>
-                        <Link href={`/control-room/sites/${c.id}`} className="btn-sm">
+                        <Link href={`/control-room/sites/${c.id}`} className="btn-sm btn-secondary">
                           Site
                         </Link>
                       </td>
@@ -704,6 +704,19 @@ function CustomersContent() {
             <div className="empty-state empty-state--inline">No customers match your filters.</div>
           )}
         </section>
+      )}
+
+      {selectedId && !catalog && (
+        <OpsDialog
+          title="Manage subscription"
+          onClose={() => {
+            setSelectedId(null);
+            setFormError('');
+          }}
+          wide
+        >
+          <LoadingSpinner label="Loading plans…" />
+        </OpsDialog>
       )}
 
       {selectedId && catalog && (

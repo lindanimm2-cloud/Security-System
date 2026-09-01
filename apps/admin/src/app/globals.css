@@ -129,57 +129,57 @@
 /* Light mode — must follow :root. html[data-theme] beats :root specificity. */
 html[data-theme='light'] {
   color-scheme: light;
-  --bg: #b4bcc6;
-  --surface: #c4cad4;
-  --surface-2: #a8b0bb;
-  --border: rgba(72, 82, 96, 0.22);
-  --text: #24303c;
-  --muted: #556070;
-  --loader-color: #6b7280;
-  --text-disabled: #7a8490;
+  --bg: #e8eef5;
+  --surface: #ffffff;
+  --surface-2: #dce3ec;
+  --border: rgba(28, 39, 54, 0.12);
+  --text: #1a2430;
+  --muted: #5a6776;
+  --loader-color: #64748b;
+  --text-disabled: #8b96a3;
   --accent: #dc2626;
   --accent-hover: #b91c1c;
-  --accent-soft: rgba(220, 38, 38, 0.12);
-  --accent-muted: rgba(220, 38, 38, 0.2);
+  --accent-soft: rgba(220, 38, 38, 0.1);
+  --accent-muted: rgba(220, 38, 38, 0.18);
   --accent-text: #b91c1c;
   --on-accent: #ffffff;
   --success: #15803d;
-  --success-soft: rgba(22, 163, 74, 0.14);
+  --success-soft: rgba(22, 163, 74, 0.12);
   --warning: #b45309;
-  --warning-soft: rgba(217, 119, 6, 0.14);
-  --neu-light: rgba(255, 255, 255, 0.42);
-  --neu-dark: rgba(72, 82, 96, 0.32);
+  --warning-soft: rgba(217, 119, 6, 0.12);
+  --neu-light: rgba(255, 255, 255, 0.92);
+  --neu-dark: rgba(28, 39, 54, 0.1);
   --neu-raised-sm:
-    4px 4px 9px rgba(72, 82, 96, 0.22),
-    -3px -3px 7px rgba(255, 255, 255, 0.38);
+    0 1px 2px rgba(28, 39, 54, 0.06),
+    0 4px 12px rgba(28, 39, 54, 0.05);
   --neu-raised:
-    8px 8px 18px rgba(72, 82, 96, 0.26),
-    -6px -6px 14px rgba(255, 255, 255, 0.36);
+    0 1px 2px rgba(28, 39, 54, 0.05),
+    0 12px 28px rgba(28, 39, 54, 0.08);
   --neu-inset:
-    inset 5px 5px 10px rgba(72, 82, 96, 0.22),
-    inset -4px -4px 9px rgba(255, 255, 255, 0.32);
+    inset 0 1px 2px rgba(28, 39, 54, 0.08),
+    inset 0 2px 6px rgba(28, 39, 54, 0.04);
   --neu-knob:
-    5px 6px 12px rgba(72, 82, 96, 0.28),
-    -3px -3px 8px rgba(255, 255, 255, 0.4),
-    inset 0 1px 0 rgba(255, 255, 255, 0.38);
+    0 2px 8px rgba(28, 39, 54, 0.12),
+    0 1px 0 rgba(255, 255, 255, 0.9),
+    inset 0 1px 0 rgba(255, 255, 255, 1);
   --shadow-sm: var(--neu-raised-sm);
   --shadow-md: var(--neu-raised);
-  --input-bg: #d0d6de;
-  --field-bg: #d0d6de;
-  --field-bg-focus: #dce1e8;
-  --field-border: rgba(72, 82, 96, 0.28);
+  --input-bg: #ffffff;
+  --field-bg: #ffffff;
+  --field-bg-focus: #ffffff;
+  --field-border: rgba(28, 39, 54, 0.16);
   --field-border-focus: color-mix(in srgb, var(--accent) 45%, transparent);
   --field-shadow: none;
   --field-shadow-focus: 0 0 0 3px var(--accent-soft);
-  --topbar-bg: rgba(180, 188, 198, 0.92);
-  --glass: rgba(180, 188, 198, 0.86);
-  --glass-border: rgba(255, 255, 255, 0.28);
-  --glow-accent: rgba(220, 38, 38, 0.16);
+  --topbar-bg: rgba(255, 255, 255, 0.9);
+  --glass: rgba(255, 255, 255, 0.86);
+  --glass-border: rgba(28, 39, 54, 0.1);
+  --glow-accent: rgba(220, 38, 38, 0.14);
   --status-live: #15803d;
-  --menu-bg: #c4cad4;
-  --monitor: #8e97a3;
+  --menu-bg: #ffffff;
+  --monitor: #c5ced9;
   --danger: #b91c1c;
-  --danger-soft: rgba(185, 28, 28, 0.12);
+  --danger-soft: rgba(185, 28, 28, 0.1);
   --status-success: var(--success);
   --status-active: var(--accent);
   --status-warning: var(--warning);
@@ -12597,9 +12597,11 @@ html[data-theme='light'] .btn-action:hover:not(:disabled) {
   background: rgba(255, 255, 255, 0.06);
 }
 
-.vehicle-remote__btn:disabled {
-  opacity: 0.42;
+.vehicle-remote__btn:disabled,
+.vehicle-remote .hold-activate:disabled {
+  opacity: 1;
   cursor: not-allowed;
+  filter: none;
 }
 
 .vehicle-remote__btn--on {
@@ -12639,8 +12641,15 @@ html[data-theme='light'] .btn-action:hover:not(:disabled) {
     linear-gradient(180deg, rgba(255, 255, 255, 0.035) 0%, rgba(255, 255, 255, 0.01) 100%);
 }
 
+.vehicle-remote--dash .home-sec__watch,
+.vehicle-remote + .home-sec__watch {
+  margin-top: 0.85rem;
+  padding-top: 0.85rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
 .vehicle-remote__dash-link {
-  margin: 0;
+  margin: 0.55rem 0 0;
 }
 
 .vehicle-remote__hold.hold-activate {
@@ -16865,6 +16874,19 @@ html.cr-compact-tables .shell--admin .data-table td {
 
 .customers-card .data-table td {
   vertical-align: middle;
+}
+
+.customers-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.35rem;
+  min-width: 5.5rem;
+}
+
+.customers-actions .btn-sm {
+  justify-content: center;
+  text-align: center;
 }
 
 .customer-sub-modal__links {
@@ -31346,22 +31368,22 @@ html[data-theme='light'] body,
 [data-theme='light'] .theme-toggle {
   background: linear-gradient(180deg, #b7bec8 0%, #a8b0bb 100%);
   box-shadow: var(--neu-inset);
-  color: #fff;
+  color: var(--text);
 }
 
 [data-theme='light'] .theme-toggle-track {
   background:
     linear-gradient(145deg, rgba(255, 255, 255, 0.72) 0%, rgba(214, 220, 228, 0.35) 46%, rgba(150, 160, 174, 0.4) 100%);
-  color: #fff;
+  color: var(--text);
   box-shadow: var(--neu-knob);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
 }
 
 [data-theme='light'] .theme-toggle-label {
-  color: #fff;
+  color: var(--text);
   font-weight: 650;
-  text-shadow: 0 1px 1px rgba(70, 80, 94, 0.35);
+  text-shadow: none;
 }
 
 [data-theme='light'] .btn-secondary,
@@ -31502,6 +31524,119 @@ html[data-theme='light'] body,
 [data-theme='light'] .vehicle-remote--dash {
   background: var(--surface);
   border-color: var(--border);
+}
+
+[data-theme='light'] .vehicle-remote--dash .home-sec__watch,
+[data-theme='light'] .vehicle-remote + .home-sec__watch {
+  border-top-color: var(--border);
+}
+
+[data-theme='light'] .vehicle-remote__btn,
+[data-theme='light'] .vehicle-remote__hold.hold-activate {
+  color: var(--text);
+  background: color-mix(in srgb, var(--surface) 42%, var(--surface-2));
+  border-color: var(--border);
+  box-shadow: var(--neu-raised-sm);
+}
+
+[data-theme='light'] .vehicle-remote__btn:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--surface) 22%, var(--surface-2));
+  border-color: rgba(72, 82, 96, 0.38);
+}
+
+[data-theme='light'] .vehicle-remote__btn--on {
+  border-color: rgba(21, 128, 61, 0.38);
+  background: rgba(21, 128, 61, 0.14);
+  color: #166534;
+}
+
+[data-theme='light'] .vehicle-remote__btn--warn,
+[data-theme='light'] .vehicle-remote__btn--cut,
+[data-theme='light'] .vehicle-remote__btn--cut.hold-activate {
+  border-color: rgba(180, 83, 9, 0.38);
+  background: rgba(180, 83, 9, 0.1);
+  color: #92400e;
+}
+
+[data-theme='light'] .vehicle-remote__btn--panic,
+[data-theme='light'] .vehicle-remote__btn--panic.hold-activate {
+  border-color: rgba(185, 28, 28, 0.38);
+  background: rgba(185, 28, 28, 0.1);
+  color: #b91c1c;
+}
+
+[data-theme='light'] .vehicle-remote--ops {
+  background: rgba(185, 28, 28, 0.08);
+  border-color: rgba(185, 28, 28, 0.22);
+}
+
+[data-theme='light'] .home-sec__watch--loading {
+  background: color-mix(in srgb, var(--surface-2) 55%, var(--surface));
+}
+
+[data-theme='light'] .home-sec__watch-count {
+  color: #15803d;
+}
+
+[data-theme='light'] .home-alarm-card__status--away {
+  color: #9a3412;
+  background: rgba(234, 88, 12, 0.16);
+}
+
+[data-theme='light'] .home-alarm-card__status--stay {
+  color: #075985;
+  background: rgba(14, 165, 233, 0.16);
+}
+
+[data-theme='light'] .home-alarm-card__status--night {
+  color: #5b21b6;
+  background: rgba(139, 92, 246, 0.16);
+}
+
+[data-theme='light'] .home-alarm-card__status--disarm {
+  color: #166534;
+  background: rgba(22, 163, 74, 0.16);
+}
+
+[data-theme='light'] .home-alarm-card__status--triggered {
+  color: #991b1b;
+  background: rgba(220, 38, 38, 0.16);
+}
+
+[data-theme='light'] .home-alarm-card__linked--ok {
+  color: #166534;
+}
+
+[data-theme='light'] .home-alarm-card--dashboard.home-alarm-card--away {
+  border-color: rgba(234, 88, 12, 0.28);
+  background:
+    radial-gradient(90% 70% at 100% 0%, rgba(234, 88, 12, 0.12), transparent 55%),
+    var(--surface);
+}
+
+[data-theme='light'] .home-alarm-card--dashboard.home-alarm-card--stay {
+  border-color: rgba(14, 165, 233, 0.28);
+  background:
+    radial-gradient(90% 70% at 100% 0%, rgba(14, 165, 233, 0.12), transparent 55%),
+    var(--surface);
+}
+
+[data-theme='light'] .home-alarm-card--dashboard.home-alarm-card--night {
+  border-color: rgba(124, 58, 237, 0.28);
+  background:
+    radial-gradient(90% 70% at 100% 0%, rgba(139, 92, 246, 0.14), transparent 55%),
+    var(--surface);
+}
+
+[data-theme='light'] .home-alarm-card--dashboard.home-alarm-card--disarm {
+  border-color: rgba(22, 163, 74, 0.28);
+  background:
+    radial-gradient(90% 70% at 100% 0%, rgba(22, 163, 74, 0.12), transparent 55%),
+    var(--surface);
+}
+
+[data-theme='light'] .home-alarm-card--dashboard.home-alarm-card--triggered {
+  border-color: rgba(185, 28, 28, 0.4);
 }
 
 [data-theme='light'] .panic-neu {

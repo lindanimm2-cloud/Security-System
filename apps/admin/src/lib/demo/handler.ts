@@ -1914,6 +1914,192 @@ function buildBillingOverview() {
   };
 }
 
+const DEMO_CONTROL_PLANS_CATALOG = {
+  tiers: [
+    { code: 'PERSONAL', name: 'Personal Protect', priceFormatted: 'R690.00/mo', description: 'Panic, tracking, and personal response.' },
+    { code: 'FAMILY', name: 'Family Protect', priceFormatted: 'R1,250.00/mo', description: 'Family tracking, home, and vehicle add-ons.' },
+    { code: 'HOME', name: 'Home Protect', priceFormatted: 'R690.00/mo', description: 'Property monitoring and alarm integration.' },
+    { code: 'BUSINESS', name: 'Business Protect', priceFormatted: 'R3,100.00/mo', description: 'Multi-site cover and priority dispatch.' },
+    { code: 'ESSENTIAL', name: '4DS Essential', priceFormatted: 'R199/mo', description: 'Personal protection and emergency contacts.' },
+    { code: 'PREMIUM', name: '4DS Premium Protection', priceFormatted: 'R899/mo', description: 'All services included.' },
+  ],
+  addons: [
+    { code: 'HOME_SECURITY', name: 'Home Security', priceFormatted: 'R300/mo', description: 'Property monitoring and CCTV.', category: 'home' },
+    { code: 'VEHICLE_RESPONSE', name: 'Vehicle Response', priceFormatted: 'R500/mo', description: 'Theft recovery and live vehicle trails.', category: 'vehicle' },
+    { code: 'FAMILY', name: 'Family Safety Pack', priceFormatted: 'R150/mo', description: 'Family tracking and safe zones.', category: 'family' },
+    { code: 'MEDICAL_PLUS', name: 'Medical Plus', priceFormatted: 'R120/mo', description: 'Extended medical profile for responders.', category: 'medical' },
+  ],
+};
+
+const demoCustomerAddons = new Map<string, string[]>();
+const demoCustomerLoyalty = new Map<
+  string,
+  {
+    tier: string;
+    tierName: string;
+    points: number;
+    tierDiscountPercent: number;
+    manualDiscountPercent: number;
+    effectiveDiscountPercent: number;
+    activePromoCode: string | null;
+    benefits: string;
+    notes: string | null;
+    nextTierName: string | null;
+    pointsToNext: number;
+  }
+>();
+
+const demoDiscountCodes: {
+  id: string;
+  code: string;
+  percentOff: number;
+  appliesTo: string;
+  maxUses: number | null;
+  usedCount: number;
+  isActive: boolean;
+  expiresAt: string | null;
+  description: string | null;
+}[] = [
+  {
+    id: 'demo-disc-1',
+    code: 'GEAR15',
+    percentOff: 15,
+    appliesTo: 'STORE',
+    maxUses: 500,
+    usedCount: 42,
+    isActive: true,
+    expiresAt: new Date(Date.now() + 90 * 86400000).toISOString(),
+    description: 'Gear store launch promo',
+  },
+  {
+    id: 'demo-disc-2',
+    code: 'NEXUS10',
+    percentOff: 10,
+    appliesTo: 'BOTH',
+    maxUses: null,
+    usedCount: 8,
+    isActive: true,
+    expiresAt: null,
+    description: 'New member subscription discount',
+  },
+];
+
+function findDemoCustomer(userId: string) {
+  return demoClients.find((c) => c.id === userId) ?? null;
+}
+
+function demoSubscriptionPriceFormatted(tierCode: string) {
+  return formatDemoZar(DEMO_SUBSCRIPTION_MRR_CENTS[tierCode] ?? 69000);
+}
+
+function demoCustomerAccess(tierCode: string, userId: string) {
+  const vehicleCount = demoClientVehicles.filter((v) => v.ownerId === userId).length;
+  const isPremium = tierCode === 'PREMIUM';
+  const addons = demoCustomerAddons.get(userId) ?? [];
+  return {
+    home:
+      isPremium ||
+      tierCode === 'HOME' ||
+      tierCode === 'FAMILY' ||
+      tierCode === 'BUSINESS' ||
+      addons.includes('HOME_SECURITY'),
+    vehicle:
+      isPremium || vehicleCount > 0 || tierCode === 'FAMILY' || addons.includes('VEHICLE_RESPONSE'),
+    family: isPremium || tierCode === 'FAMILY' || addons.includes('FAMILY'),
+    medical: true,
+    personal: true,
+    emergency: true,
+  };
+}
+
+function demoFormatSubscription(client: (typeof demoClients)[number], userId: string) {
+  const tierCode = client.subscription.tierCode;
+  const addons = demoCustomerAddons.get(userId) ?? [];
+  const overdue = client.subscription.status === 'PAST_DUE';
+  const activeAddonDetails = DEMO_CONTROL_PLANS_CATALOG.addons
+    .filter((a) => tierCode === 'PREMIUM' || addons.includes(a.code))
+    .map((a) => ({ code: a.code, name: a.name, priceFormatted: a.priceFormatted }));
+  return {
+    planName: client.subscription.planName,
+    tierCode,
+    tierLabel: tierCode,
+    addons: tierCode === 'PREMIUM' ? DEMO_CONTROL_PLANS_CATALOG.addons.map((a) => a.code) : addons,
+    activeAddonDetails,
+    status: client.subscription.status,
+    priceFormatted: demoSubscriptionPriceFormatted(tierCode),
+    memberId: client.subscription.memberId,
+    validUntil: new Date(Date.now() + 30 * 86400000).toISOString(),
+    lastPaidAt: overdue ? null : new Date(Date.now() - 16 * 86400000).toISOString(),
+    nextBillingAt: new Date(Date.now() + 14 * 86400000).toISOString(),
+    billingFailedCount: overdue ? 2 : 0,
+    isOverdue: overdue,
+    daysPastDue: overdue ? 12 : 0,
+    amountDueFormatted: overdue ? demoSubscriptionPriceFormatted(tierCode) : undefined,
+    access: demoCustomerAccess(tierCode, userId),
+  };
+}
+
+function demoLoyaltyFor(userId: string) {
+  return (
+    demoCustomerLoyalty.get(userId) ?? {
+      tier: 'SILVER',
+      tierName: 'Silver',
+      points: 420,
+      tierDiscountPercent: 5,
+      manualDiscountPercent: 0,
+      effectiveDiscountPercent: 5,
+      activePromoCode: 'GEAR15',
+      benefits: '5% off monthly cover · gear promo ready',
+      notes: null,
+      nextTierName: 'Gold',
+      pointsToNext: 80,
+    }
+  );
+}
+
+function demoSiteProfileForCustomer(userId: string) {
+  const client = findDemoCustomer(userId);
+  const site =
+    demoSurveillanceSites.find((s) => s.owner.id === userId) ??
+    (client
+      ? demoSurveillanceSites.find((s) => s.owner.name.includes(client.firstName))
+      : undefined) ??
+    demoSurveillanceSites[0];
+  if (!site) return null;
+  const fullName = client ? `${client.firstName} ${client.lastName}` : site.owner.name;
+  return {
+    id: userId,
+    name: site.name,
+    address: site.address,
+    alarmStatus: site.alarmStatus,
+    people: [
+      { name: fullName, role: 'Primary subscriber', phone: client?.phone ?? site.owner.phone },
+    ],
+    response: {
+      slaMinutes: 8,
+      nearestUnit: site.assignedFleet?.[0]?.callSign ?? 'Unit 101',
+      lastIncident:
+        demoIncidents.find((i) => client && i.user.includes(client.firstName))?.time ?? '7 days ago',
+    },
+    equipment: [
+      ...site.cameras.slice(0, 3).map((c) => ({
+        name: c.name,
+        serial: c.id.toUpperCase(),
+        status: c.status,
+      })),
+      ...site.sensors.slice(0, 2).map((s) => ({
+        name: s.name,
+        serial: s.id.toUpperCase(),
+        status: s.status,
+      })),
+    ],
+    incidents: demoIncidents
+      .filter((i) => !client || i.user.includes(client.firstName))
+      .slice(0, 5)
+      .map((i) => ({ id: i.id, type: i.type, status: i.status, time: i.time })),
+  };
+}
+
 const demoBranches = [
   {
     id: 'demo-branch-1',
@@ -3165,10 +3351,22 @@ export async function handleDemoRequest<T>({
     const homeSite =
       ownedSites.find((s) => s.cameraCount > 0) ??
       demoSurveillanceSites.find((s) => s.id === 'demo-prop-1');
-    const ownedVehicleIds = new Set(
-      (ownedSites.length ? ownedSites : demoSurveillanceSites.filter((s) => s.id === 'demo-prop-1'))
-        .flatMap((s) => s.linkedVehicles.map((v) => v.id)),
+    const ownedVehicles = demoClientVehicles.filter(
+      (v) =>
+        v.ownerId === ownerId ||
+        v.ownerName.toLowerCase().includes(String(user?.firstName ?? 'nomsa').toLowerCase()),
     );
+    const linkedFromSites = (ownedSites.length
+      ? ownedSites
+      : demoSurveillanceSites.filter((s) => s.id === 'demo-prop-1')
+    ).flatMap((s) => s.linkedVehicles.map((v) => v.id));
+    const ownedVehicleIds = new Set([
+      ...linkedFromSites,
+      ...(ownedVehicles.length ? ownedVehicles : demoClientVehicles.filter((v) => v.id === 'demo-veh-1')).map(
+        (v) => v.id,
+      ),
+    ]);
+    if (ownedVehicleIds.size === 0) ownedVehicleIds.add('demo-veh-1');
     return ok({
       home: homeSite
         ? {
@@ -5097,7 +5295,24 @@ export async function handleDemoRequest<T>({
       const userPatch = clean.match(/^\/control-room\/users\/([^/]+)$/);
       if (userPatch && m === 'PATCH') {
         const target = demoManagedUsers.find((item) => item.id === userPatch[1]);
-        if (!target) return { success: false as const, message: 'User not found' } as T;
+        if (!target) {
+          const client = findDemoCustomer(userPatch[1]);
+          if (
+            client &&
+            typeof payload.password === 'string' &&
+            payload.password.trim().length >= 8
+          ) {
+            if (!canManageUserPasswords(user?.role)) {
+              return {
+                success: false as const,
+                message: 'Only owners, developers, and tenant admins can change user passwords',
+              } as T;
+            }
+            setDemoAccountPassword(client.email, payload.password.trim());
+            return ok({ id: client.id, email: client.email }) as T;
+          }
+          return { success: false as const, message: 'User not found' } as T;
+        }
         if (typeof payload.firstName === 'string' && payload.firstName.trim()) {
           target.firstName = payload.firstName.trim();
         }
@@ -5188,6 +5403,190 @@ export async function handleDemoRequest<T>({
     }
     if (clean === '/control-room/billing/overview' && m === 'GET') {
       return ok(buildBillingOverview()) as T;
+    }
+    if (clean === '/control-room/subscription/plans' && m === 'GET') {
+      return ok(DEMO_CONTROL_PLANS_CATALOG) as T;
+    }
+    if (clean === '/control-room/discount-codes' && m === 'GET') {
+      return ok(demoDiscountCodes) as T;
+    }
+    if (clean === '/control-room/discount-codes' && m === 'POST') {
+      const code = String(payload.code ?? '').trim().toUpperCase();
+      const percentOff = Number(payload.percentOff ?? 0);
+      if (!code || percentOff < 1 || percentOff > 30) {
+        return { success: false as const, message: 'Valid code and percent (1–30) required' } as T;
+      }
+      const row = {
+        id: `demo-disc-${Date.now()}`,
+        code,
+        percentOff,
+        appliesTo: String(payload.appliesTo ?? 'BOTH'),
+        maxUses: typeof payload.maxUses === 'number' ? payload.maxUses : null,
+        usedCount: 0,
+        isActive: payload.isActive !== false,
+        expiresAt: typeof payload.expiresAt === 'string' ? payload.expiresAt : null,
+        description: typeof payload.description === 'string' ? payload.description : null,
+      };
+      demoDiscountCodes.unshift(row);
+      return ok(row) as T;
+    }
+    if (clean === '/control-room/billing/run-overdue-check' && m === 'POST') {
+      const pastDue = demoClients.filter((c) => c.subscription.status === 'PAST_DUE').length;
+      return ok({
+        scanned: demoClients.length,
+        markedPastDue: 0,
+        noticesSent: pastDue,
+      }) as T;
+    }
+    {
+      const siteMatch = clean.match(/^\/control-room\/sites\/([^/]+)$/);
+      if (siteMatch && m === 'GET') {
+        const profile = demoSiteProfileForCustomer(siteMatch[1]);
+        if (!profile) return { success: false as const, message: 'Site not found' } as T;
+        return ok(profile) as T;
+      }
+    }
+    {
+      const customerSubMatch = clean.match(/^\/control-room\/customers\/([^/]+)\/subscription$/);
+      if (customerSubMatch && m === 'GET') {
+        const client = findDemoCustomer(customerSubMatch[1]);
+        if (!client) return { success: false as const, message: 'Customer not found' } as T;
+        const userId = client.id;
+        return ok({
+          customer: {
+            id: userId,
+            firstName: client.firstName,
+            lastName: client.lastName,
+            email: client.email,
+            phone: client.phone,
+            role: 'USER',
+            roleLabel: 'Primary subscriber',
+            status: 'ACTIVE',
+            incidentCount: userId.includes('client-demo') ? 2 : userId.includes('thabo') ? 1 : 0,
+            vehicleCount: demoClientVehicles.filter((v) => v.ownerId === userId).length,
+            propertyCount: demoSurveillanceSites.filter((s) => s.owner.id === userId).length,
+            subscription: null,
+          },
+          subscription: demoFormatSubscription(client, userId),
+          payments: [
+            {
+              id: `demo-pay-${userId}-1`,
+              reference: `PAY-${client.subscription.memberId}`,
+              amountFormatted: demoSubscriptionPriceFormatted(client.subscription.tierCode),
+              status: client.subscription.status === 'PAST_DUE' ? 'FAILED' : 'COMPLETED',
+              kind: 'MONTHLY',
+              createdAt: new Date(Date.now() - 32 * 86400000).toISOString(),
+            },
+            {
+              id: `demo-pay-${userId}-2`,
+              reference: `PAY-${client.subscription.memberId}-PREV`,
+              amountFormatted: demoSubscriptionPriceFormatted(client.subscription.tierCode),
+              status: 'COMPLETED',
+              kind: 'MONTHLY',
+              createdAt: new Date(Date.now() - 62 * 86400000).toISOString(),
+            },
+          ],
+        }) as T;
+      }
+      if (customerSubMatch && m === 'PATCH') {
+        const client = findDemoCustomer(customerSubMatch[1]);
+        if (!client) return { success: false as const, message: 'Customer not found' } as T;
+        const userId = client.id;
+        if (typeof payload.tierCode === 'string' && payload.tierCode.trim()) {
+          const tier = DEMO_CONTROL_PLANS_CATALOG.tiers.find((t) => t.code === payload.tierCode);
+          client.subscription.tierCode = payload.tierCode.trim();
+          if (tier) client.subscription.planName = tier.name;
+        }
+        if (Array.isArray(payload.addons)) {
+          demoCustomerAddons.set(
+            userId,
+            payload.addons.filter((c: unknown) => typeof c === 'string'),
+          );
+        }
+        if (typeof payload.status === 'string' && payload.status.trim()) {
+          client.subscription.status = payload.status.trim();
+        }
+        if (typeof payload.memberId === 'string' && payload.memberId.trim()) {
+          client.subscription.memberId = payload.memberId.trim();
+        }
+        if (typeof payload.note === 'string' && payload.note.trim()) {
+          demoCustomerLoyalty.set(userId, {
+            ...demoLoyaltyFor(userId),
+            notes: payload.note.trim(),
+          });
+        }
+        return ok({
+          customer: {
+            id: userId,
+            firstName: client.firstName,
+            lastName: client.lastName,
+            email: client.email,
+            phone: client.phone,
+            role: 'USER',
+            status: 'ACTIVE',
+          },
+          subscription: demoFormatSubscription(client, userId),
+        }) as T;
+      }
+    }
+    {
+      const loyaltyMatch = clean.match(/^\/control-room\/customers\/([^/]+)\/loyalty$/);
+      if (loyaltyMatch && m === 'GET') {
+        const client = findDemoCustomer(loyaltyMatch[1]);
+        if (!client) return { success: false as const, message: 'Customer not found' } as T;
+        return ok(demoLoyaltyFor(loyaltyMatch[1])) as T;
+      }
+      if (loyaltyMatch && m === 'PATCH') {
+        const userId = loyaltyMatch[1];
+        const client = findDemoCustomer(userId);
+        if (!client) return { success: false as const, message: 'Customer not found' } as T;
+        const current = demoLoyaltyFor(userId);
+        const manual = Math.min(
+          30,
+          Math.max(0, Number(payload.manualDiscountPercent ?? current.manualDiscountPercent)),
+        );
+        const adjust = Number(payload.adjustPoints ?? 0);
+        const next = {
+          ...current,
+          manualDiscountPercent: manual,
+          effectiveDiscountPercent: Math.min(30, current.tierDiscountPercent + manual),
+          notes:
+            payload.notes === null
+              ? null
+              : typeof payload.notes === 'string'
+                ? payload.notes
+                : current.notes,
+          points: Math.max(0, current.points + (Number.isFinite(adjust) ? adjust : 0)),
+        };
+        demoCustomerLoyalty.set(userId, next);
+        return ok(next) as T;
+      }
+    }
+    {
+      const chargeMatch = clean.match(/^\/control-room\/customers\/([^/]+)\/charge-monthly$/);
+      if (chargeMatch && m === 'POST') {
+        const client = findDemoCustomer(chargeMatch[1]);
+        if (!client) return { success: false as const, message: 'Customer not found' } as T;
+        const ref = `CRG-${Date.now().toString(36).toUpperCase()}`;
+        return ok({
+          reference: ref,
+          amountFormatted: demoSubscriptionPriceFormatted(client.subscription.tierCode),
+          checkoutUrl: `/portal/subscription/checkout?ref=${encodeURIComponent(ref)}`,
+        }) as T;
+      }
+    }
+    {
+      const inviteMatch = clean.match(/^\/control-room\/customers\/([^/]+)\/invite$/);
+      if (inviteMatch && m === 'POST') {
+        const client = findDemoCustomer(inviteMatch[1]);
+        if (!client) return { success: false as const, message: 'Customer not found' } as T;
+        const code = `NX-${Date.now().toString(36).toUpperCase().slice(-6)}`;
+        return ok({
+          inviteCode: code,
+          inviteToken: code,
+          inviteUrl: `/portal/register?token=${encodeURIComponent(code)}`,
+        }) as T;
+      }
     }
     if (clean === '/control-room/client-chats' && m === 'GET') {
       return ok(demoClientChatThreads()) as T;
