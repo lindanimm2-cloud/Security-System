@@ -214,6 +214,7 @@ const PRIORITY_RANK: Record<ControlRoomNotification['priority'], number> = {
 export function sortNotificationsForOps<
   T extends Pick<ControlRoomNotification, 'priority' | 'category' | 'isRead' | 'createdAt'>,
 >(items: T[]): T[] {
+  if (!Array.isArray(items)) return [];
   return [...items].sort((a, b) => {
     const unreadDelta = Number(a.isRead) - Number(b.isRead);
     if (unreadDelta !== 0) return unreadDelta;
@@ -245,6 +246,7 @@ const INCIDENT_PRIORITY_RANK: Record<string, number> = {
 export function sortIncidentsForOps<
   T extends { priority: string; type?: string; time?: string; createdAt?: string },
 >(items: T[]): T[] {
+  if (!Array.isArray(items)) return [];
   return [...items].sort((a, b) => {
     const typeRank = (t?: string) => {
       const x = (t ?? '').toUpperCase();

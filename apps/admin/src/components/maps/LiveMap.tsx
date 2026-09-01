@@ -2,11 +2,12 @@
 
 import 'leaflet/dist/leaflet.css';
 
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { MapContainer, Marker, Popup, TileLayer, useMap } from 'react-leaflet';
 import { DispatchMenuButton } from '@/components/control-room/DispatchMenuButton';
 import { IncidentDetailsMenu } from '@/components/control-room/IncidentDetailsMenu';
 import { legacyIncidentIcon, officerIcon, userIcon } from './map-icons';
+import { safeFitBounds, safeSetView } from './safe-map-move';
 import { spreadOverlappingMarkers } from './spread-overlapping-markers';
 
 export type MapUser = { id: string; name: string; lat: number; lng: number };
@@ -41,9 +42,15 @@ type LiveMapProps = {
 function FlyToTarget({ target }: { target: { lat: number; lng: number } | null }) {
   const map = useMap();
   useEffect(() => {
-    if (target) {
-      map.flyTo([target.lat, target.lng], 15, { duration: 1.2 });
-    }
+    if (!target) return;
+    if (safeSetView(map, target.lat, target.lng, 15)) return;
+    const retry = () => safeSetView(map, target.lat, target.lng, 15);
+    map.on('resize', retry);
+    const id = window.setTimeout(retry, 250);
+    return () => {
+      map.off('resize', retry);
+      window.clearTimeout(id);
+    };
   }, [target, map]);
   return null;
 }
@@ -66,12 +73,15 @@ function FitBoundsOnLoad({
       ...officers.map((o) => [o.lat, o.lng] as [number, number]),
       ...incidents.map((i) => [i.lat, i.lng] as [number, number]),
     ];
-    if (points.length > 1) {
-      map.fitBounds(points, { padding: [48, 48], maxZoom: 14 });
+    if (points.length > 1 && safeFitBounds(map, points)) {
+      fitted.current = true;
     }
-    fitted.current = true;
   }, [map, users, officers, incidents]);
   return null;
+}
+
+function hasCoords(lat?: number, lng?: number) {
+  return Number.isFinite(lat) && Number.isFinite(lng);
 }
 
 export default function LiveMap({
@@ -81,18 +91,41 @@ export default function LiveMap({
   incidents = [],
   flyTo,
 }: LiveMapProps) {
+  const [ready, setReady] = useState(false);
+  useEffect(() => {
+    setReady(true);
+    return () => setReady(false);
+  }, []);
+
+  const safeUsers = useMemo(
+    () => users.filter((u) => hasCoords(u.lat, u.lng)),
+    [users],
+  );
+  const safeOfficers = useMemo(
+    () => officers.filter((o) => hasCoords(o.lat, o.lng)),
+    [officers],
+  );
+  const safeIncidents = useMemo(
+    () => incidents.filter((i) => hasCoords(i.lat, i.lng)),
+    [incidents],
+  );
+
   const safeCenter = {
     lat: Number.isFinite(center?.lat) ? center.lat : -29.8587,
     lng: Number.isFinite(center?.lng) ? center.lng : 31.0218,
   };
   const spreadPositions = useMemo(() => {
     const sources = [
-      ...users.map((u) => ({ id: `user-${u.id}`, lat: u.lat, lng: u.lng })),
-      ...officers.map((o) => ({ id: `officer-${o.id}`, lat: o.lat, lng: o.lng })),
-      ...incidents.map((i) => ({ id: `incident-${i.id}`, lat: i.lat, lng: i.lng })),
+      ...safeUsers.map((u) => ({ id: `user-${u.id}`, lat: u.lat, lng: u.lng })),
+      ...safeOfficers.map((o) => ({ id: `officer-${o.id}`, lat: o.lat, lng: o.lng })),
+      ...safeIncidents.map((i) => ({ id: `incident-${i.id}`, lat: i.lat, lng: i.lng })),
     ];
     return spreadOverlappingMarkers(sources);
-  }, [users, officers, incidents]);
+  }, [safeUsers, safeOfficers, safeIncidents]);
+
+  if (!ready) {
+    return <div className="leaflet-map-container" />;
+  }
 
   return (
     <div className="leaflet-map-container">
@@ -107,10 +140,10 @@ export default function LiveMap({
           url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
         />
 
-        <FitBoundsOnLoad users={users} officers={officers} incidents={incidents} />
-        <FlyToTarget target={flyTo ?? null} />
+        <FitBoundsOnLoad users={safeUsers} officers={safeOfficers} incidents={safeIncidents} />
+        <FlyToTarget target={flyTo && hasCoords(flyTo.lat, flyTo.lng) ? flyTo : null} />
 
-        {users.map((u) => {
+        {safeUsers.map((u) => {
           const pos = spreadPositions.get(`user-${u.id}`) ?? { lat: u.lat, lng: u.lng };
           return (
           <Marker key={`user-${u.id}`} position={[pos.lat, pos.lng]} icon={userIcon} riseOnHover riseOffset={1200}>
@@ -125,7 +158,7 @@ export default function LiveMap({
           );
         })}
 
-        {officers.map((o) => {
+        {safeOfficers.map((o) => {
           const pos = spreadPositions.get(`officer-${o.id}`) ?? { lat: o.lat, lng: o.lng };
           return (
           <Marker key={`officer-${o.id}`} position={[pos.lat, pos.lng]} icon={officerIcon('ARMED_RESPONSE', o.avatarUrl)} riseOnHover riseOffset={1200}>
@@ -133,7 +166,7 @@ export default function LiveMap({
               <strong>{o.name}</strong>
               <br />
               <span className="map-popup-tag map-popup-tag--officer">
-                Officer · {o.status.replace('_', ' ')}
+                Officer · {(o.status ?? 'UNKNOWN').replace('_', ' ')}
               </span>
               {o.zone && <><br /><span>{o.zone}</span></>}
               <br />
@@ -145,7 +178,7 @@ export default function LiveMap({
           );
         })}
 
-        {incidents.map((i) => {
+        {safeIncidents.map((i) => {
           const pos = spreadPositions.get(`incident-${i.id}`) ?? { lat: i.lat, lng: i.lng };
           return (
           <Marker

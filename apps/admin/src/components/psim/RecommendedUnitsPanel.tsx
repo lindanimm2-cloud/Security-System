@@ -85,7 +85,7 @@ function UnitRow({
           {candidate.name}
         </strong>
         <span className="text-muted">
-          {candidate.zone} · {candidate.status.replace(/_/g, ' ')}
+          {candidate.zone} · {(candidate.status ?? 'UNKNOWN').replace(/_/g, ' ')}
           {candidate.etaMin ? ` · ~${candidate.etaMin} min` : ''}
         </span>
         <span className="psim-units__reasons">{candidate.reasons.join(' · ')}</span>

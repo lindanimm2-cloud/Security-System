@@ -26,6 +26,7 @@ import {
 import { RecommendedUnitsPanel } from '@/components/psim/RecommendedUnitsPanel';
 import { OpsCommandStrip, type OpsQueueFilter } from '@/components/control-room/OpsCommandStrip';
 import { OpsQuickWork, OpsCompactStats } from '@/components/ops/OpsQuickWork';
+import { SectionErrorBoundary } from '@/components/ui/SectionErrorBoundary';
 import { IncidentKernelPanels } from '@/components/incident/IncidentKernelPanels';
 import { shouldBackgroundPoll } from '@/lib/demo/is-demo-mode';
 import {
@@ -98,10 +99,13 @@ function OverviewContent() {
   const canAccess = (href: string) => allowedNav.has(href);
 
   const d = data?.data;
+  const incidents = Array.isArray(d?.incidents) ? d.incidents : [];
+  const officers = Array.isArray(d?.officers) ? d.officers : [];
+  const stats = d?.stats;
 
   const prioritizedIncidents = useMemo(
-    () => (d ? sortIncidentsForOps(d.incidents.filter((i) => isActiveIncident(i.status))) : []),
-    [d],
+    () => sortIncidentsForOps(incidents.filter((i) => isActiveIncident(i.status))),
+    [incidents],
   );
 
   const filteredIncidents = useMemo(() => {
@@ -177,7 +181,7 @@ function OverviewContent() {
 
   if (loading) return <LoadingSpinner label="Loading live ops board..." fullScreen />;
   if (error) return <ErrorAlert error={error} onRetry={reload} />;
-  if (!d) return null;
+  if (!d || !stats) return null;
 
   return (
     <div className="dash-ops dash-ops--ops-board">
@@ -248,7 +252,7 @@ function OverviewContent() {
           <div className="ops-board__pane-head">
             <h2>Incidents</h2>
             <p className="text-muted">
-              {filteredIncidents.length} in view · {d.stats.availableOfficers} units available
+              {filteredIncidents.length} in view · {stats.availableOfficers} units available
             </p>
           </div>
           <div className="ops-board__queue-list">
@@ -278,16 +282,26 @@ function OverviewContent() {
         <div className="ops-board__center">
           <section className="ops-board__map" aria-label="Live map">
             {canAccess(CONTROL_ROOM_ROUTES.map) ? (
-              <DashboardLiveMap focusIncidentId={focusIncidentId} />
+              <SectionErrorBoundary label="Live map">
+                <DashboardLiveMap focusIncidentId={focusIncidentId} />
+              </SectionErrorBoundary>
             ) : (
               <div className="empty-state">Map access not available for this role.</div>
             )}
           </section>
 
-          {canAccess(CONTROL_ROOM_ROUTES.surveillance) ? <DashboardCctvWall /> : null}
+          {canAccess(CONTROL_ROOM_ROUTES.surveillance) ? (
+            <SectionErrorBoundary label="CCTV">
+              <DashboardCctvWall />
+            </SectionErrorBoundary>
+          ) : null}
         </div>
 
-        {canAccess(CONTROL_ROOM_ROUTES.fleet) ? <DashboardFleetStrip /> : null}
+        {canAccess(CONTROL_ROOM_ROUTES.fleet) ? (
+          <SectionErrorBoundary label="Vehicles">
+            <DashboardFleetStrip />
+          </SectionErrorBoundary>
+        ) : null}
 
         <aside className="ops-board__detail ops-board__detail--command" aria-label="Incident detail">
           <div className="ops-board__pane-head">
@@ -375,7 +389,7 @@ function OverviewContent() {
                     incidentType={focus.type}
                     priority={focus.priority}
                     location={focus.location}
-                    officers={d.officers.map((o) => ({
+                    officers={officers.map((o) => ({
                       id: o.id,
                       name: o.name,
                       status: o.status,
@@ -446,7 +460,7 @@ function OverviewContent() {
           <div className="ops-board__pane-head">
             <div>
               <h2>Availability</h2>
-              <p className="text-muted">{d.officers.length} officers</p>
+              <p className="text-muted">{officers.length} officers</p>
             </div>
             {canAccess(CONTROL_ROOM_ROUTES.officers) && (
               <Link href={CONTROL_ROOM_ROUTES.officers} className="link-sm">
@@ -455,7 +469,7 @@ function OverviewContent() {
             )}
           </div>
           <ul className="ops-board__avail-list officer-list officer-list--managed">
-            {d.officers.map((o) => (
+            {officers.map((o) => (
               <li key={o.id} className="officer-row officer-row--managed">
                 <div className="officer-row-body">
                   <OfficerStatusDot status={o.status} />
@@ -486,9 +500,9 @@ function OverviewContent() {
             ? [
                 {
                   label: 'Incidents',
-                  value: String(d.stats.activeIncidents),
+                  value: String(stats.activeIncidents),
                   href: CONTROL_ROOM_ROUTES.incidents,
-                  warn: d.stats.criticalIncidents > 0,
+                  warn: stats.criticalIncidents > 0,
                 },
               ]
             : []),
@@ -496,14 +510,14 @@ function OverviewContent() {
             ? [
                 {
                   label: 'Available',
-                  value: String(d.stats.availableOfficers),
+                  value: String(stats.availableOfficers),
                   href: officerHref(),
                 },
               ]
             : []),
           {
             label: 'Avg response',
-            value: d.stats.avgResponseFormatted,
+            value: stats.avgResponseFormatted,
             href: canAccess(CONTROL_ROOM_ROUTES.analytics)
               ? CONTROL_ROOM_ROUTES.analytics
               : undefined,

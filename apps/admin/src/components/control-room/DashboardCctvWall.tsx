@@ -108,9 +108,9 @@ export function DashboardCctvWall() {
     void reloadClients({ silent: true });
   });
 
-  const sites = data?.data?.sites ?? [];
-  const fleet = fleetData?.data ?? [];
-  const clientVehicles = clientData?.data ?? [];
+  const sites = Array.isArray(data?.data?.sites) ? data.data.sites : [];
+  const fleet = Array.isArray(fleetData?.data) ? fleetData.data : [];
+  const clientVehicles = Array.isArray(clientData?.data) ? clientData.data : [];
 
   const hotSite =
     sites.find((s) => s.alarmStatus === 'TRIGGERED' && (s.cameras?.length ?? 0) > 0) ??

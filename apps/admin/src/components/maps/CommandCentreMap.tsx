@@ -44,6 +44,7 @@ import {
 } from './MapPopups';
 import { MapOverlapPicker, type OverlapPinOption } from './MapOverlapPicker';
 import { overlapGroupKey, spreadOverlappingMarkers } from './spread-overlapping-markers';
+import { safeSetView } from './safe-map-move';
 import type { VehicleRemoteAction } from '@/lib/vehicle-remote';
 
 type CommandCentreMapProps = {
@@ -79,9 +80,16 @@ function FlyToTarget({
 }) {
   const map = useMap();
   useEffect(() => {
-    if (target) {
-      map.flyTo([target.lat, target.lng], target.zoom ?? 16, { duration: 1.1 });
-    }
+    if (!target) return;
+    const zoom = target.zoom ?? 16;
+    if (safeSetView(map, target.lat, target.lng, zoom)) return;
+    const retry = () => safeSetView(map, target.lat, target.lng, zoom);
+    map.on('resize', retry);
+    const id = window.setTimeout(retry, 250);
+    return () => {
+      map.off('resize', retry);
+      window.clearTimeout(id);
+    };
   }, [target, map]);
   return null;
 }

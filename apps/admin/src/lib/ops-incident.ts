@@ -37,8 +37,8 @@ export type OpsAlertKind =
 
 export type OpsCardDensity = 'panic' | 'p1' | 'p2' | 'p3';
 
-export function opsAlertKind(type: string): OpsAlertKind {
-  const t = type.toUpperCase();
+export function opsAlertKind(type?: string | null): OpsAlertKind {
+  const t = (type ?? '').toUpperCase();
   if (t.includes('PANIC')) return 'panic';
   if (t === 'MEDICAL') return 'medical';
   if (t === 'FIRE') return 'fire';
@@ -48,7 +48,7 @@ export function opsAlertKind(type: string): OpsAlertKind {
   return 'technical';
 }
 
-export function isPanicIncident(type: string) {
+export function isPanicIncident(type?: string | null) {
   return opsAlertKind(type) === 'panic';
 }
 
@@ -100,11 +100,12 @@ export function openedAtMs(incident: OpsIncident, now = Date.now()): number {
     const t = new Date(incident.createdAt).getTime();
     if (Number.isFinite(t)) return t;
   }
-  const min = incident.time.match(/(\d+)\s*min/);
+  const time = typeof incident.time === 'string' ? incident.time : '';
+  const min = time.match(/(\d+)\s*min/);
   if (min) return now - Number(min[1]) * 60_000;
-  const hr = incident.time.match(/(\d+)\s*h/);
+  const hr = time.match(/(\d+)\s*h/);
   if (hr) return now - Number(hr[1]) * 3_600_000;
-  const sec = incident.time.match(/(\d+)\s*s/);
+  const sec = time.match(/(\d+)\s*s/);
   if (sec) return now - Number(sec[1]) * 1000;
   return now;
 }

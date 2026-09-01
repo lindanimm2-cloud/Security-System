@@ -41,7 +41,7 @@ export function CallMiniPlayer() {
     if (ctx?.panelExpanded) {
       notesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }
-  }, [activeCall?.notes.length, ctx?.panelExpanded]);
+  }, [activeCall?.notes?.length, ctx?.panelExpanded]);
 
   if (!ctx) return null;
 

@@ -33,7 +33,7 @@ export function RespondingResources({
   resources: RespondingResource[];
   compact?: boolean;
 }) {
-  if (!resources.length) {
+  if (!Array.isArray(resources) || !resources.length) {
     return <p className="text-muted">No units assigned yet.</p>;
   }
 
@@ -45,7 +45,7 @@ export function RespondingResources({
             <span className="responding-cards__unit">{row.callSign}</span>
             <span className="responding-cards__meta">
               {KIND_LABEL[row.kind]}
-              <span className="responding-cards__status"> · {row.status.replace(/_/g, ' ')}</span>
+              <span className="responding-cards__status"> · {(row.status ?? '').replace(/_/g, ' ')}</span>
               {row.etaSeconds != null ? ` · ETA ${formatEta(row.etaSeconds)}` : ''}
             </span>
           </li>
@@ -70,7 +70,7 @@ export function RespondingResources({
             <tr key={row.id}>
               <td>{row.callSign}</td>
               <td>{KIND_LABEL[row.kind]}</td>
-              <td>{row.status.replace(/_/g, ' ')}</td>
+              <td>{(row.status ?? '').replace(/_/g, ' ')}</td>
               {!compact && <td>{formatEta(row.etaSeconds)}</td>}
             </tr>
           ))}

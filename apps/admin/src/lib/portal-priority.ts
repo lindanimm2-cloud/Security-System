@@ -95,7 +95,7 @@ export function incidentPriorityBand(
   priority: string,
   type?: string,
 ): IncidentPriorityBand {
-  const p = priority.toUpperCase();
+  const p = (priority ?? '').toUpperCase();
   const t = (type ?? '').toUpperCase();
   if (t === 'MEDICAL' || t === 'FIRE' || p === 'CRITICAL') return 'P0';
   if (t === 'PANIC' || p === 'HIGH') return 'P1';

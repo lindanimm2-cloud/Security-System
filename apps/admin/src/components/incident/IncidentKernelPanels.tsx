@@ -62,11 +62,17 @@ export function IncidentKernelPanels({
     <div className={`incident-kernel-panels${compact ? ' incident-kernel-panels--compact' : ''}`}>
       <div>
         <h3>Responding</h3>
-        <RespondingResources resources={resourceData?.data ?? []} compact={compact} />
+        <RespondingResources
+          resources={Array.isArray(resourceData?.data) ? resourceData.data : []}
+          compact={compact}
+        />
       </div>
       <div>
         <h3>What happened</h3>
-        <IncidentTimeline items={timelineData?.data ?? []} compact={compact} />
+        <IncidentTimeline
+          items={Array.isArray(timelineData?.data) ? timelineData.data : []}
+          compact={compact}
+        />
       </div>
       {showChat ? <IncidentChat incidentId={incidentId} portal={portal} /> : null}
     </div>

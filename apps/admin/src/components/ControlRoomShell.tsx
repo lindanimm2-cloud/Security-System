@@ -40,8 +40,8 @@ export function ControlRoomShell({
   const crSettings = useCrSettings();
 
   useEffect(() => {
-    document.documentElement.classList.toggle('cr-compact-tables', crSettings.general.compactTables);
-  }, [crSettings.general.compactTables]);
+    document.documentElement.classList.toggle('cr-compact-tables', Boolean(crSettings.general?.compactTables));
+  }, [crSettings.general?.compactTables]);
 
   useEffect(() => {
     let cancelled = false;

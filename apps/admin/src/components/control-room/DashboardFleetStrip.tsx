@@ -32,7 +32,7 @@ export function DashboardFleetStrip() {
     return () => window.clearInterval(id);
   }, [reload]);
 
-  const list = (data?.data ?? []).slice(0, 8);
+  const list = (Array.isArray(data?.data) ? data.data : []).slice(0, 8);
 
   return (
     <section className="ops-board__vehicles" aria-label="Vehicles">

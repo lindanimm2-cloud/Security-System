@@ -49,7 +49,7 @@ function formatTime(iso: string) {
 
 export function NotificationCenter() {
   const crSettings = useCrSettings();
-  const bellEnabled = crSettings.notifications.bell;
+  const bellEnabled = crSettings.notifications?.bell !== false;
   const { data, reload } = useApi(
     () => adminApi.get<ApiResponse<NotificationData>>('/control-room/notifications'),
     [],
@@ -64,7 +64,7 @@ export function NotificationCenter() {
     setMounted(true);
   }, []);
 
-  const notifications = data?.data?.notifications ?? [];
+  const notifications = Array.isArray(data?.data?.notifications) ? data.data.notifications : [];
   const unreadCount = data?.data?.unreadCount ?? 0;
 
   const sorted = useMemo(

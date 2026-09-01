@@ -44,48 +44,56 @@ export function DashboardLiveMap({ focusIncidentId, className = '' }: DashboardL
 
   const users = useMemo(
     () =>
-      (mapData?.clients ?? []).map((c) => ({
-        id: c.id,
-        name: c.name,
-        lat: c.lat,
-        lng: c.lng,
-      })),
+      (mapData?.clients ?? [])
+        .filter((c) => Number.isFinite(c.lat) && Number.isFinite(c.lng))
+        .map((c) => ({
+          id: c.id,
+          name: c.name,
+          lat: c.lat,
+          lng: c.lng,
+        })),
     [mapData],
   );
 
   const officers = useMemo(
     () =>
-      (mapData?.officers ?? []).map((o) => ({
-        id: o.id,
-        name: o.name,
-        lat: o.lat,
-        lng: o.lng,
-        status: o.status,
-        zone: o.zone,
-        avatarUrl: o.avatarUrl,
-      })),
+      (mapData?.officers ?? [])
+        .filter((o) => Number.isFinite(o.lat) && Number.isFinite(o.lng))
+        .map((o) => ({
+          id: o.id,
+          name: o.name,
+          lat: o.lat,
+          lng: o.lng,
+          status: o.status,
+          zone: o.zone,
+          avatarUrl: o.avatarUrl,
+        })),
     [mapData],
   );
 
   const incidents = useMemo(
     () =>
-      (mapData?.incidents ?? []).map((i) => ({
-        id: i.id,
-        type: i.type,
-        priority: i.priority,
-        status: i.status,
-        name: i.name,
-        lat: i.lat,
-        lng: i.lng,
-        address: i.address,
-      })),
+      (mapData?.incidents ?? [])
+        .filter((i) => Number.isFinite(i.lat) && Number.isFinite(i.lng))
+        .map((i) => ({
+          id: i.id,
+          type: i.type,
+          priority: i.priority,
+          status: i.status,
+          name: i.name,
+          lat: i.lat,
+          lng: i.lng,
+          address: i.address,
+        })),
     [mapData],
   );
 
   const flyTo = useMemo(() => {
     if (!focusIncidentId || !mapData) return null;
-    const hit = mapData.incidents.find((i) => i.id === focusIncidentId);
-    return hit ? { lat: hit.lat, lng: hit.lng } : null;
+    const hit = (mapData.incidents ?? []).find((i) => i.id === focusIncidentId);
+    return hit && Number.isFinite(hit.lat) && Number.isFinite(hit.lng)
+      ? { lat: hit.lat, lng: hit.lng }
+      : null;
   }, [focusIncidentId, mapData]);
 
   const center = mapData?.center ?? { lat: -29.8587, lng: 31.0218 };

@@ -48,7 +48,7 @@ function statusScore(status: string): number {
 
 function zoneScore(officerZone: string, contextZone?: string): number {
   if (!contextZone) return 5;
-  const oz = officerZone.toLowerCase();
+  const oz = (officerZone ?? '').toLowerCase();
   const cz = contextZone.toLowerCase();
   if (oz === cz) return 30;
   if (oz.includes(cz.split(' ')[0]) || cz.includes(oz.split(' ')[0])) return 15;
@@ -82,6 +82,7 @@ export function rankOfficersForDispatch(
   context: DispatchContext,
   limit = 3,
 ): DispatchCandidate[] {
+  if (!Array.isArray(officers)) return [];
   const type = (context.incidentType ?? '').toUpperCase();
   const neededSkills = TYPE_SKILLS[type] ?? ['armed'];
   const ctxZone = context.zone ?? guessZone(context.location);
@@ -112,7 +113,7 @@ export function rankOfficersForDispatch(
       score += priorityBoost(context.priority);
 
       const etaMin =
-        o.status.toUpperCase() === 'AVAILABLE'
+        (o.status ?? '').toUpperCase() === 'AVAILABLE'
           ? Math.max(3, Math.round((o.avgResponseSec ?? 240) / 60))
           : undefined;
 

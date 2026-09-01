@@ -73,7 +73,7 @@ const SOURCE_LABEL: Record<string, string> = {
 };
 
 function labelFor(item: TimelineItem) {
-  const t = item.type.toLowerCase();
+  const t = String(item?.type ?? '').toLowerCase();
   const kind = String(item.payload?.kind ?? '').toLowerCase();
 
   if (kind === 'panic' || kind === 'home-panic') return 'Panic initiated';
@@ -132,7 +132,7 @@ const TONE_BY_TYPE: Record<string, TimelineTone> = {
 };
 
 export function toneForTimelineItem(item: TimelineItem): TimelineTone {
-  const t = item.type.toLowerCase();
+  const t = String(item?.type ?? '').toLowerCase();
   const kind = String(item.payload?.kind ?? '').toLowerCase();
 
   if (item.kind === 'note' || t.includes('note') || t.includes('message')) return 'info';
@@ -176,10 +176,11 @@ export function IncidentTimeline({
   items: TimelineItem[];
   compact?: boolean;
 }) {
-  if (!items.length) {
+  const list = Array.isArray(items) ? items : [];
+  if (!list.length) {
     return <p className="text-muted incident-timeline__empty">No updates yet.</p>;
   }
-  const shown = compact ? items.slice(-3) : items;
+  const shown = compact ? list.slice(-3) : list;
   return (
     <ol className={`incident-timeline ${compact ? 'incident-timeline--compact' : ''}`}>
       {shown.map((item, index) => {

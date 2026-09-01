@@ -250,7 +250,7 @@ export function CrmEyeLens() {
   }, [reloadDash, reloadNotifs, reloadChat]);
 
   const dash = dashRes?.data;
-  const incidents = dash?.incidents ?? [];
+  const incidents = Array.isArray(dash?.incidents) ? dash.incidents : [];
   const settings = effectiveLensSettings(lensSettings);
   const queue = useMemo(() => criticalLensQueue(incidents, settings, ackedIds), [incidents, settings, ackedIds]);
   const badge = lensBadge(queue);
@@ -365,15 +365,18 @@ export function CrmEyeLens() {
     return () => window.clearTimeout(id);
   }, [open, settings.autoCollapse, panicLive, selectedId, tab]);
 
-  const leads = salesRes?.data?.leads ?? [];
+  const leads = Array.isArray(salesRes?.data?.leads) ? salesRes.data.leads : [];
   const unread = notifRes?.data?.unreadCount ?? 0;
-  const customers = useMemo(() => customersRes?.data ?? [], [customersRes]);
+  const customers = useMemo(() => {
+    const raw = customersRes?.data;
+    return Array.isArray(raw) ? raw : [];
+  }, [customersRes]);
   const chatUnread = useMemo(() => {
     const me = session?.user.id;
     if (!me) return 0;
-    const messages = chatRes?.data?.messages ?? [];
+    const messages = Array.isArray(chatRes?.data?.messages) ? chatRes.data.messages : [];
     const cutoff = Date.now() - 60 * 60 * 1000;
-    return messages.filter((m) => m.sender.id !== me && new Date(m.createdAt).getTime() > cutoff).length;
+    return messages.filter((m) => m.sender?.id !== me && new Date(m.createdAt).getTime() > cutoff).length;
   }, [chatRes, session]);
 
   const followUps = useMemo(() => {

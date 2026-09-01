@@ -91,9 +91,9 @@ export function maskMapDataForScreenshot(data: MapCommandData): MapCommandData {
 
   const fleet = data.fleet?.map((v) => ({
     ...v,
-    crew: v.crew.map((c) => ({
+    crew: (v.crew ?? []).map((c) => ({
       ...c,
-      name: officerIdToUnit.get(c.officerId) ?? c.role.replace(/_/g, ' '),
+      name: officerIdToUnit.get(c.officerId) ?? (c.role ?? '').replace(/_/g, ' '),
     })),
     updatedAt: FROZEN_ISO,
   }));
