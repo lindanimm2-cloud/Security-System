@@ -850,6 +850,18 @@
   font-size: 0.72rem;
 }
 
+.ops-board--console .ops-board__center > .ops-board__cctv {
+  padding-bottom: 0.75rem;
+}
+
+.ops-board.ops-board--console .ops-cctv__dock {
+  padding-bottom: 1.2rem;
+}
+
+.ops-board.ops-board--console .ops-cctv__dock .vehicle-remote--ops {
+  padding-bottom: 0.7rem;
+}
+
 .cctv-feed {
   border: 1px solid var(--cr-edge);
   border-radius: var(--cr-radius-sm);

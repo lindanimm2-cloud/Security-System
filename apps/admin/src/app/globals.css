@@ -29238,7 +29238,7 @@ select optgroup {
   flex: 1 1 0;
   min-height: 380px;
   overflow: hidden;
-  padding-bottom: 0.35rem;
+  padding-bottom: 0.75rem;
 }
 
 .ops-board--console .ops-board__detail {
@@ -30612,7 +30612,7 @@ select optgroup {
   flex-shrink: 0;
   min-height: 0;
   margin-top: auto;
-  padding: 0.35rem 0.55rem 0.95rem;
+  padding: 0.35rem 0.55rem 1.2rem;
   border-top: 1px solid color-mix(in srgb, var(--border) 40%, transparent);
 }
 
@@ -30621,7 +30621,7 @@ select optgroup {
 }
 
 .ops-cctv__dock .vehicle-remote--ops {
-  padding: 0.35rem 0.15rem 0.45rem;
+  padding: 0.35rem 0.15rem 0.7rem;
   border: 0;
   background: transparent;
 }
