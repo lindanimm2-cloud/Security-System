@@ -4,6 +4,7 @@ import { FormEvent, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
+import { UiSelect } from '@/components/ui/UiSelect';
 import { clientApi } from '@/lib/api-client';
 import { friendlyErrorMessage } from '@/lib/friendly-error';
 import {
@@ -46,6 +47,13 @@ export function ServiceRequestForm({ def }: { def: ServiceRequestDef }) {
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
+    const missing = visible.find(
+      (field) => field.required && field.type === 'select' && !String(values[field.name] ?? ''),
+    );
+    if (missing) {
+      setError(`Choose ${missing.label.toLowerCase()}.`);
+      return;
+    }
     setBusy(true);
     setError('');
     const details: Record<string, string | boolean | number> = {};
@@ -102,19 +110,17 @@ export function ServiceRequestForm({ def }: { def: ServiceRequestDef }) {
                   onChange={(e) => setValues((prev) => ({ ...prev, [field.name]: e.target.value }))}
                 />
               ) : field.type === 'select' ? (
-                <select
-                  id={id}
-                  required={field.required}
+                <UiSelect
+                  ariaLabel={field.label}
+                  compact={false}
+                  placeholder="Select…"
                   value={String(values[field.name] ?? '')}
-                  onChange={(e) => setValues((prev) => ({ ...prev, [field.name]: e.target.value }))}
-                >
-                  <option value="">Select…</option>
-                  {field.options?.map((opt) => (
-                    <option key={opt.value} value={opt.value}>
-                      {opt.label}
-                    </option>
-                  ))}
-                </select>
+                  onChange={(value) => setValues((prev) => ({ ...prev, [field.name]: value }))}
+                  options={[
+                    { value: '', label: 'Select…' },
+                    ...(field.options ?? []).map((opt) => ({ value: opt.value, label: opt.label })),
+                  ]}
+                />
               ) : (
                 <input
                   id={id}

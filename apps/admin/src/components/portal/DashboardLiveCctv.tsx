@@ -26,13 +26,17 @@ type DashboardFeeds = {
 type Props = {
   /** Strip carousel chrome so this can sit inside Home Security. */
   embedded?: boolean;
+  /** Limit to home cameras, a vehicle dashcam, or both. */
+  kind?: 'all' | 'home' | 'vehicle';
+  /** When kind is vehicle, show only this vehicle's cameras. */
+  vehicleId?: string;
 };
 
 function onlineCount(cameras: CctvCamera[], fallback?: number) {
   return fallback ?? cameras.filter((c) => c.status.toUpperCase() !== 'OFFLINE').length;
 }
 
-function useDashboardFeeds() {
+function useDashboardFeeds(kind: NonNullable<Props['kind']>, vehicleId?: string) {
   const { access, loading: accessLoading } = useSubscriptionAccess();
   const { data, loading } = useApi(
     () => clientApi.get<ApiResponse<DashboardFeeds>>('/client/surveillance/dashboard-feeds'),
@@ -45,23 +49,30 @@ function useDashboardFeeds() {
 
   const sources = useMemo(() => {
     const list: Array<{ key: string; kind: 'home' | 'vehicle'; source: FeedSource }> = [];
-    if (home && home.cameras.length > 0) {
+    if (kind !== 'vehicle' && home && home.cameras.length > 0) {
       list.push({ key: 'home', kind: 'home', source: home });
     }
-    for (const v of vehicles) {
-      if (v.cameras.length > 0) {
-        list.push({ key: v.id, kind: 'vehicle', source: v });
+    if (kind !== 'home') {
+      for (const v of vehicles) {
+        if (vehicleId && v.id !== vehicleId) continue;
+        if (v.cameras.length > 0) {
+          list.push({ key: v.id, kind: 'vehicle', source: v });
+        }
       }
     }
     return list;
-  }, [home, vehicles]);
+  }, [home, vehicles, kind, vehicleId]);
 
   return { sources, loading: accessLoading || loading };
 }
 
 /** Live CCTV — carousel on its own, or a compact pane inside Home Security. */
-export function DashboardLiveCctv({ embedded = false }: Props) {
-  const { sources, loading } = useDashboardFeeds();
+export function DashboardLiveCctv({
+  embedded = false,
+  kind = 'all',
+  vehicleId,
+}: Props) {
+  const { sources, loading } = useDashboardFeeds(kind, vehicleId);
   const [activeKey, setActiveKey] = useState<string | null>(null);
 
   if (loading) {
@@ -81,7 +92,29 @@ export function DashboardLiveCctv({ embedded = false }: Props) {
     );
   }
 
-  if (sources.length === 0) return null;
+  if (sources.length === 0) {
+    if (embedded && kind === 'vehicle') {
+      return (
+        <div className="home-sec__watch home-sec__watch--empty">
+          <div className="home-sec__watch-head">
+            <div>
+              <p className="home-sec__watch-kicker">Dash cameras</p>
+              <p className="home-sec__watch-title">No dashcam linked</p>
+            </div>
+          </div>
+          <p className="home-sec__watch-empty-copy">
+            Live dashcam and cabin footage will appear here once a camera is linked to this vehicle.
+          </p>
+          {vehicleId ? (
+            <Link href={`/portal/vehicles/${vehicleId}`} className="home-sec__watch-open">
+              Open vehicle
+            </Link>
+          ) : null}
+        </div>
+      );
+    }
+    return null;
+  }
 
   const selected = sources.find((s) => s.key === activeKey) ?? sources[0];
   const cameras = selected.source.cameras;
@@ -95,12 +128,41 @@ export function DashboardLiveCctv({ embedded = false }: Props) {
   const totalCams = sources.reduce((n, s) => n + s.source.cameras.length, 0);
 
   if (embedded) {
+    if (!primary) {
+      return (
+        <div className="home-sec__watch home-sec__watch--empty">
+          <div className="home-sec__watch-head">
+            <div>
+              <p className="home-sec__watch-kicker">Dash cameras</p>
+              <p className="home-sec__watch-title">No dashcam linked</p>
+            </div>
+          </div>
+          <p className="home-sec__watch-empty-copy">
+            Live dashcam and cabin footage will appear here once a camera is linked to this vehicle.
+          </p>
+          {vehicleId ? (
+            <Link href={`/portal/vehicles/${vehicleId}`} className="home-sec__watch-open">
+              Open vehicle
+            </Link>
+          ) : null}
+        </div>
+      );
+    }
+
     return (
       <div className="home-sec__watch">
         <div className="home-sec__watch-head">
           <div>
-            <p className="home-sec__watch-kicker">Live cameras</p>
-            <p className="home-sec__watch-title">{selected.source.label}</p>
+            <p className="home-sec__watch-kicker">
+              {kind === 'vehicle' ? 'Dash cameras' : 'Live cameras'}
+            </p>
+            <p className="home-sec__watch-title">
+              {kind === 'vehicle'
+                ? selected.source.subtitle
+                  ? `${selected.source.label} · ${selected.source.subtitle}`
+                  : selected.source.label
+                : selected.source.label}
+            </p>
           </div>
           <span className="home-sec__watch-count">
             {online}/{cameras.length} live

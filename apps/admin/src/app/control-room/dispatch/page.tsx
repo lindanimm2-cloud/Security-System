@@ -18,10 +18,12 @@ import { setActiveIncidentId } from '@/lib/dispatch-context';
 import { officerStatusLabel } from '@/lib/officer-status';
 import { CONTROL_ROOM_ROUTES, incidentHref, mapHref, officerHref } from '@/lib/control-room-routes';
 import { ListSearch } from '@/components/ui/ListSearch';
+import { LayoutViewToggle } from '@/components/ui/LayoutViewToggle';
 import { UserAvatar } from '@/components/ui/UserAvatar';
 import { ChartCard, countBy, DonutChart, GaugeChart, HorizontalBars, type ChartTone } from '@/components/ui/charts';
 import { isAwaitingDispatch } from '@/lib/incident-status';
 import { matchesSearch } from '@/lib/list-search';
+import { useLayoutView } from '@/hooks/useLayoutView';
 
 type Officer = {
   id: string;
@@ -126,6 +128,7 @@ function DispatchContent() {
   const [assigning, setAssigning] = useState<string | null>(null);
   const [showReport, setShowReport] = useState(false);
   const [search, setSearch] = useState('');
+  const [officerLayout, setOfficerLayout] = useLayoutView('control-room-dispatch-officers');
 
   const allUnassigned = useMemo(
     () => (data?.data.incidents ?? []).filter((i) => isAwaitingDispatch(i.status, i.officer)),
@@ -419,15 +422,20 @@ function DispatchContent() {
       )}
 
       <div className="page-header page-section">
-        <h2>Officer availability</h2>
-        <span className="text-muted">Override status if an officer is too busy or returning</span>
+        <div>
+          <h2>Officer availability</h2>
+          <span className="text-muted">Override status if an officer is too busy or returning</span>
+        </div>
+        <LayoutViewToggle value={officerLayout} onChange={setOfficerLayout} label="Officer layout" />
       </div>
       {officers.length === 0 ? (
         <div className="empty-state empty-state--inline">
           {search.trim() ? 'No matching officers.' : 'No officers on roster.'}
         </div>
       ) : (
-        <div className="officer-roster officer-roster--compact">
+        <div
+          className={`officer-roster officer-roster--compact ${officerLayout === 'list' ? 'officer-roster--list' : ''}`}
+        >
           {officers.map((o) => (
             <article key={o.id} className="officer-roster-card officer-roster-card--compact">
               <div className="officer-roster-card__header">

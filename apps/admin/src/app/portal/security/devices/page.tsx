@@ -44,7 +44,7 @@ function DevicesContent() {
     <div className="page-content sec-page">
       <SecurityDocFrame
         docId="SCH-DEV-01"
-        kicker="Schedule A"
+        kicker="Client protection file"
         title="Trusted devices"
         summary="This device is identified with an internal ID. IMEI is never used as the primary security identifier. Location is shown only where legally permitted and permission exists."
         toc={[
@@ -56,13 +56,15 @@ function DevicesContent() {
         <SecurityArticle id="primary" number="01" title="Primary security device">
           {primary ? (
             <article className="sec-sheet">
+              <p className="sec-trust__kicker">Device trust status</p>
               <div className="sec-sheet__identity">
                 <h3>{primary.name}</h3>
                 <DeviceStatusBadge status={primary.status} isPrimary />
+                <span className="sec-trust__mark">Verified</span>
               </div>
-              <p className="sec-sheet__lede">This device holds primary standing on your protection file.</p>
+              <p className="sec-sheet__lede">Primary registered device on this protection file.</p>
               <p className="sec-sheet__meta">
-                Last active {primary.lastActiveLabel}
+                Last verified · {primary.lastActiveLabel}
                 {primary.osName ? ` · ${primary.osName}${primary.osVersion ? ` ${primary.osVersion}` : ''}` : ''}
               </p>
               <div className="sec-sheet__actions">

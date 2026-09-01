@@ -134,37 +134,37 @@
   );
 }
 
-/* Light theme — softer wash so cards stay readable */
+/* Light theme — quieter wash so white cards stay readable */
 [data-theme='light'] .shell--portal[data-portal-ambient='away'] {
-  --portal-ambient-strength: 0.28;
+  --portal-ambient-strength: 0.14;
 }
 
 [data-theme='light'] .shell--portal[data-portal-ambient='stay'] {
-  --portal-ambient-strength: 0.32;
+  --portal-ambient-strength: 0.16;
 }
 
 [data-theme='light'] .shell--portal[data-portal-ambient='night'] {
-  --portal-ambient-strength: 0.34;
+  --portal-ambient-strength: 0.16;
 }
 
 [data-theme='light'] .shell--portal[data-portal-ambient='disarm'] {
-  --portal-ambient-strength: 0.22;
+  --portal-ambient-strength: 0.12;
 }
 
 [data-theme='light'] .shell--portal[data-portal-ambient='triggered'] {
-  --portal-ambient-strength: 0.36;
+  --portal-ambient-strength: 0.22;
 }
 
 [data-theme='light'] .shell--portal::before {
   background:
     radial-gradient(
       ellipse 125% 88% at 50% -12%,
-      rgba(var(--portal-ambient-r), var(--portal-ambient-g), var(--portal-ambient-b), 0.16),
+      rgba(var(--portal-ambient-r), var(--portal-ambient-g), var(--portal-ambient-b), 0.08),
       transparent 58%
     ),
     radial-gradient(
       ellipse 70% 55% at 100% 42%,
-      rgba(var(--portal-ambient-r), var(--portal-ambient-g), var(--portal-ambient-b), 0.07),
+      rgba(var(--portal-ambient-r), var(--portal-ambient-g), var(--portal-ambient-b), 0.04),
       transparent 52%
     );
 }
@@ -172,19 +172,11 @@
 [data-theme='light'] .shell--portal .portal-shell-main,
 [data-theme='light'] .shell--portal .portal-sidebar,
 [data-theme='light'] .shell--portal .mobile-shell-header--portal {
-  background: color-mix(
-    in srgb,
-    var(--surface) 96%,
-    rgba(var(--portal-ambient-r), var(--portal-ambient-g), var(--portal-ambient-b), 0.05)
-  );
+  background: var(--glass, rgba(255, 255, 255, 0.9));
 }
 
 [data-theme='light'] .shell--portal .portal-main {
-  background: color-mix(
-    in srgb,
-    var(--bg) 94%,
-    rgba(var(--portal-ambient-r), var(--portal-ambient-g), var(--portal-ambient-b), 0.06)
-  );
+  background: var(--bg);
 }
 
 /* Status-light rim — same language as the active alarm-mode button */
@@ -198,6 +190,12 @@
   box-shadow:
     inset 0 2px 0 rgba(var(--portal-ambient-r), var(--portal-ambient-g), var(--portal-ambient-b), 0.55),
     inset 0 0 48px rgba(var(--portal-ambient-r), var(--portal-ambient-g), var(--portal-ambient-b), 0.08);
+}
+
+[data-theme='light'] .shell--portal[data-portal-ambient]:not([data-portal-ambient='none'])::after {
+  box-shadow:
+    inset 0 2px 0 rgba(var(--portal-ambient-r), var(--portal-ambient-g), var(--portal-ambient-b), 0.28),
+    inset 0 0 28px rgba(var(--portal-ambient-r), var(--portal-ambient-g), var(--portal-ambient-b), 0.04);
 }
 
 .shell--portal[data-portal-ambient='triggered']::after {

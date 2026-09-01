@@ -13,9 +13,11 @@ import { CONTROL_ROOM_ROUTES, mapHref } from '@/lib/control-room-routes';
 import { OpsDialog } from '@/components/ops/OpsDialog';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ListSearch } from '@/components/ui/ListSearch';
+import { LayoutViewToggle } from '@/components/ui/LayoutViewToggle';
 import { UserAvatar } from '@/components/ui/UserAvatar';
 import { friendlyErrorMessage } from '@/lib/friendly-error';
 import { matchesSearch } from '@/lib/list-search';
+import { useLayoutView } from '@/hooks/useLayoutView';
 
 const MAX_AVATAR_BYTES = 512_000;
 
@@ -81,6 +83,7 @@ function OfficersContent() {
   const [formError, setFormError] = useState('');
   const [notice, setNotice] = useState('');
   const [search, setSearch] = useState('');
+  const [layoutView, setLayoutView] = useLayoutView('control-room-officers');
 
   const officers = data?.data ?? [];
   const filteredOfficers = useMemo(
@@ -203,14 +206,17 @@ function OfficersContent() {
         />
       )}
 
-      <div className="list-search-bar">
-        <ListSearch
-          value={search}
-          onChange={setSearch}
-          placeholder="Search officers, zone, vehicle…"
-          resultCount={filteredOfficers.length}
-          totalCount={officers.length}
-        />
+      <div className="list-toolbar">
+        <div className="list-search-bar">
+          <ListSearch
+            value={search}
+            onChange={setSearch}
+            placeholder="Search officers, zone, vehicle…"
+            resultCount={filteredOfficers.length}
+            totalCount={officers.length}
+          />
+        </div>
+        <LayoutViewToggle value={layoutView} onChange={setLayoutView} label="Officer layout" />
       </div>
 
       {filteredOfficers.length === 0 ? (
@@ -219,7 +225,7 @@ function OfficersContent() {
           body={search.trim() ? 'Try a different name, zone, rank, or vehicle.' : 'Add an officer to build the roster.'}
         />
       ) : (
-        <div className="officer-roster">
+        <div className={`officer-roster ${layoutView === 'list' ? 'officer-roster--list' : ''}`}>
           {filteredOfficers.map((o) => (
             <OfficerCard key={o.id} officer={o} onEdit={() => openEdit(o)} onUpdated={reload} />
           ))}

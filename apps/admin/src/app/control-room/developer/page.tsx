@@ -1,39 +1,39 @@
 'use client';
 
-import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { ControlRoomLayout } from '@/components/control-room/ControlRoomLayout';
+import { DeveloperErrorAnalytics, DeveloperProfileCard } from '@/components/developer/DeveloperAnalytics';
+import { DeveloperCommandHeader, DeveloperQuickDock } from '@/components/developer/DeveloperCommandHeader';
+import { DeveloperDeploymentPanel, DeveloperPlatformHealth } from '@/components/developer/DeveloperOpsPanels';
+import { DeveloperTicketCard } from '@/components/developer/DeveloperTicketCard';
 import { ErrorAlert } from '@/components/ErrorAlert';
 import { InternalChat } from '@/components/InternalChat';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
+import { ListSearch } from '@/components/ui/ListSearch';
 import { useApi } from '@/hooks/useApi';
 import { adminApi, type ApiResponse } from '@/lib/api-client';
 import { getSession } from '@/lib/auth';
+import {
+  appendAudit,
+  buildTicketContext,
+  computeAnalytics,
+  DEFAULT_PLATFORM_HEALTH,
+  DEFAULT_PRODUCTION,
+  detectDuplicateGroups,
+  enrichTicket,
+  parseTicketContext,
+  type DevCommandDesk,
+  type DevTicket,
+  type DevWorkflowStatus,
+  workflowToLegacy,
+} from '@/lib/developer-desk';
 import {
   DEMO_DEV_TICKET_EVENT,
   DEMO_ERROR_REPORTS_KEY,
   developerTicketCode,
 } from '@/lib/developer-tickets';
 import { shouldBackgroundPoll } from '@/lib/demo/is-demo-mode';
-import { ListSearch } from '@/components/ui/ListSearch';
 import { matchesSearch } from '@/lib/list-search';
-
-type Desk = {
-  tenantName: string;
-  canViewRevenue: boolean;
-  revenueNote: string;
-  openErrorReports: number;
-  recentReports: {
-    id: string;
-    message: string;
-    path: string | null;
-    status: string;
-    createdAt: string;
-    reporter: string;
-    ticketCode?: string;
-  }[];
-  platformLinks?: { label: string; href: string }[];
-};
 
 type Report = {
   id: string;
@@ -42,25 +42,14 @@ type Report = {
   context: string | null;
   status: string;
   createdAt: string;
+  resolvedAt?: string | null;
   ticketCode?: string;
   reporter: { id: string; name: string; role: string; email: string };
 };
 
-type ReportList = {
-  openCount: number;
-  reports: Report[];
-};
+type ReportList = { openCount: number; reports: Report[] };
 
-type TicketFilter = 'OPEN' | 'ACKNOWLEDGED' | 'RESOLVED' | 'ALL';
-
-function formatContext(raw: string | null): string {
-  if (!raw) return 'No technical context attached.';
-  try {
-    return JSON.stringify(JSON.parse(raw), null, 2);
-  } catch {
-    return raw;
-  }
-}
+type TicketFilter = 'OPEN' | 'IN_PROGRESS' | 'RESOLVED' | 'ALL';
 
 function ticketQueryId(): string | null {
   if (typeof window === 'undefined') return null;
@@ -69,7 +58,7 @@ function ticketQueryId(): string | null {
 
 export default function DeveloperDeskPage() {
   return (
-    <ControlRoomLayout title="Developer desk">
+    <ControlRoomLayout title="Developer command centre">
       <DeveloperDeskContent />
     </ControlRoomLayout>
   );
@@ -87,17 +76,8 @@ function DeveloperDeskContent() {
   const desk = useApi(
     () =>
       isDev
-        ? adminApi.get<ApiResponse<Desk>>('/developer/desk')
-        : Promise.resolve({
-            success: true as const,
-            data: {
-              tenantName: '',
-              canViewRevenue: false,
-              revenueNote: '',
-              openErrorReports: 0,
-              recentReports: [],
-            },
-          }),
+        ? adminApi.get<ApiResponse<DevCommandDesk>>('/developer/desk')
+        : Promise.resolve({ success: true as const, data: null }),
     [isDev],
   );
 
@@ -137,11 +117,99 @@ function DeveloperDeskContent() {
     el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
   }, [focusId, reports.data]);
 
-  async function setStatus(id: string, status: 'ACKNOWLEDGED' | 'RESOLVED' | 'OPEN') {
-    setBusy(id);
+  const tickets = useMemo(
+    () => (reports.data?.data?.reports ?? []).map((r) => enrichTicket(r)),
+    [reports.data],
+  );
+
+  const duplicateGroups = useMemo(() => detectDuplicateGroups(tickets), [tickets]);
+  const dupCountById = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const g of duplicateGroups) {
+      for (const id of g.ticketIds) map.set(id, g.count);
+    }
+    return map;
+  }, [duplicateGroups]);
+
+  const openCount = tickets.filter((t) => t.status === 'OPEN').length;
+  const inProgressCount = tickets.filter((t) => t.status === 'ACKNOWLEDGED').length;
+  const resolvedCount = tickets.filter((t) => t.status === 'RESOLVED').length;
+  const criticalCount = tickets.filter(
+    (t) => (t.severity === 'P0' || t.severity === 'P1') && t.status !== 'RESOLVED',
+  ).length;
+
+  const statusFiltered = useMemo(() => {
+    return tickets.filter((t) => {
+      if (filter === 'ALL') return true;
+      if (filter === 'OPEN') return t.status === 'OPEN';
+      if (filter === 'IN_PROGRESS') return t.status === 'ACKNOWLEDGED';
+      return t.status === 'RESOLVED';
+    });
+  }, [tickets, filter]);
+
+  const filtered = useMemo(
+    () =>
+      statusFiltered.filter((t) =>
+        matchesSearch(
+          search,
+          t.message,
+          t.path,
+          t.status,
+          t.workflowStatus,
+          t.severity,
+          t.reporter.name,
+          t.reporter.email,
+          t.ticketCode,
+          developerTicketCode(t.id),
+        ),
+      ),
+    [statusFiltered, search],
+  );
+
+  async function patchTicket(
+    ticket: DevTicket,
+    patch: {
+      workflowStatus?: DevWorkflowStatus;
+      reproduction?: { reproducible: boolean };
+      mergeDuplicates?: boolean;
+    },
+  ) {
+    setBusy(ticket.id);
     setActionError('');
     try {
-      await adminApi.patch(`/developer/error-reports/${id}`, { status });
+      let meta = parseTicketContext(ticket.context);
+      if (patch.workflowStatus) {
+        meta = appendAudit(
+          { ...meta, workflowStatus: patch.workflowStatus },
+          `Status → ${patch.workflowStatus}`,
+          session?.user.firstName,
+        );
+      }
+      if (patch.reproduction) {
+        meta = {
+          ...meta,
+          reproduction: {
+            ...meta.reproduction,
+            reproducible: patch.reproduction.reproducible,
+            notes: patch.reproduction.reproducible
+              ? 'Issue confirmed reproducible'
+              : 'Unable to reproduce in dev environment',
+          },
+        };
+        meta = appendAudit(
+          meta,
+          patch.reproduction.reproducible ? 'Marked reproducible' : 'Unable to reproduce',
+          session?.user.firstName,
+        );
+      }
+      const workflowStatus = patch.workflowStatus ?? meta.workflowStatus ?? ticket.workflowStatus;
+      const status = workflowToLegacy(workflowStatus);
+      await adminApi.patch(`/developer/error-reports/${ticket.id}`, {
+        status,
+        workflowStatus,
+        context: buildTicketContext(meta),
+        mergeDuplicates: patch.mergeDuplicates,
+      });
       reports.reload();
       desk.reload();
     } catch (err) {
@@ -151,281 +219,165 @@ function DeveloperDeskContent() {
     }
   }
 
-  const list = reports.data?.data;
-  const deskData = desk.data?.data;
-  const allReports = list?.reports ?? [];
-  const statusFiltered = useMemo(
-    () => allReports.filter((r) => (filter === 'ALL' ? true : r.status === filter)),
-    [allReports, filter],
-  );
-  const filtered = useMemo(
-    () =>
-      statusFiltered.filter((r) =>
-        matchesSearch(
-          search,
-          r.message,
-          r.path,
-          r.status,
-          r.reporter.name,
-          r.reporter.email,
-          r.id,
-          r.ticketCode,
-          developerTicketCode(r.id),
-        ),
-      ),
-    [statusFiltered, search],
-  );
-
   if (desk.loading || reports.loading) {
-    return <LoadingSpinner label="Loading developer desk…" fullScreen />;
+    return <LoadingSpinner label="Loading developer command centre…" fullScreen />;
   }
 
   if (!session || session.user.role !== 'DEVELOPER') {
     return (
       <div className="empty-state portal-card">
-        Developer desk is only available on the developer sign-in.
+        Developer command centre is only available on the developer sign-in.
       </div>
     );
   }
 
-  const ackCount = allReports.filter((r) => r.status === 'ACKNOWLEDGED').length;
-  const resolvedCount = allReports.filter((r) => r.status === 'RESOLVED').length;
-  const openCount = list?.openCount ?? allReports.filter((r) => r.status === 'OPEN').length;
-  const platformLinks = deskData?.platformLinks ?? [
-    { label: 'Ops Board', href: '/control-room' },
-    { label: 'Live map', href: '/control-room/map' },
-    { label: 'CCTV', href: '/control-room/surveillance' },
-    { label: 'Vehicles', href: '/control-room/fleet' },
-    { label: 'Incidents', href: '/control-room/incidents' },
-    { label: 'Device security', href: '/control-room/device-security' },
-    { label: 'Dispatch', href: '/control-room/dispatch' },
-    { label: 'Customers', href: '/control-room/customers' },
-    { label: 'Gear store', href: '/control-room/store' },
-    { label: 'Internal chat', href: '/control-room/chat' },
-    { label: 'Client portal', href: '/portal' },
-    { label: 'Settings', href: '/control-room/my-settings' },
-  ];
+  const deskData: DevCommandDesk = desk.data?.data ?? {
+    tenantName: '4DS Security',
+    canViewRevenue: false,
+    revenueNote: '',
+    openErrorReports: openCount,
+    systemStatus: criticalCount > 0 ? 'incident' : openCount > 0 ? 'degraded' : 'operational',
+    systemMessage:
+      criticalCount > 0
+        ? 'Critical issues require immediate attention'
+        : 'Production monitoring active',
+    production: DEFAULT_PRODUCTION,
+    recentDeployments: [
+      DEFAULT_PRODUCTION,
+      { ...DEFAULT_PRODUCTION, version: '2.4.17', build: '8410', environment: 'production' },
+    ],
+    platformHealth: DEFAULT_PLATFORM_HEALTH,
+    analytics: computeAnalytics(tickets),
+    duplicateGroups,
+    recentReports: [],
+    developers: [],
+    developerAccess: {
+      production: true,
+      staging: true,
+      database: false,
+      serverLogs: true,
+      deployments: true,
+      monitoring: true,
+    },
+  };
+
+  const devUser = deskData.developers[0];
 
   return (
-    <div className="page-content">
-      <div className="page-header">
-        <div>
-          <p className="text-muted">
-            Incoming issues become tickets here as soon as someone sends details from an error page.
-            {isDev && deskData ? ` · ${deskData.revenueNote}` : ''}
-          </p>
-        </div>
-        {list && (
-          <span className="status-pill status-pill--new">{openCount} open tickets</span>
-        )}
-      </div>
-
+    <div className="page-content dev-cmd">
       {(desk.error || reports.error || actionError) && (
         <ErrorAlert error={desk.error ?? reports.error ?? actionError} onRetry={reports.reload} />
       )}
 
-      <div className="dev-desk-stats">
-        <div className="dev-desk-stat">
-          <strong>{openCount}</strong>
-          <span>Open</span>
-        </div>
-        <div className="dev-desk-stat">
-          <strong>{ackCount}</strong>
-          <span>In progress</span>
-        </div>
-        <div className="dev-desk-stat">
-          <strong>{resolvedCount}</strong>
-          <span>Resolved</span>
-        </div>
-        <div className="dev-desk-stat">
-          <strong>{allReports.length}</strong>
-          <span>Total tickets</span>
-        </div>
-      </div>
+      <DeveloperCommandHeader
+        desk={deskData}
+        openCount={openCount}
+        criticalCount={criticalCount}
+        inProgressCount={inProgressCount}
+        resolvedCount={resolvedCount}
+      />
 
-      <section className="portal-card">
-        <div className="card-header-row">
-          <h2>Platform health</h2>
-          <span className="text-muted">Quick links to verify features</span>
-        </div>
-        <div className="dev-desk-links">
-          {platformLinks.map((link) => (
-            <Link key={link.href + link.label} href={link.href}>
-              {link.label}
-            </Link>
-          ))}
-        </div>
-      </section>
+      <div className="dev-cmd-layout">
+        <div className="dev-cmd-layout__main">
+          <DeveloperQuickDock />
 
-      <section className="portal-card" style={{ marginTop: '1rem' }}>
-        <div className="card-header-row">
-          <h2>Issue tickets</h2>
-          <span className="text-muted">Live queue · stack traces stay on this desk</span>
-        </div>
-        <div className="dev-ticket-filters">
-          {(['OPEN', 'ACKNOWLEDGED', 'RESOLVED', 'ALL'] as TicketFilter[]).map((key) => (
-            <button
-              key={key}
-              type="button"
-              className={`dev-ticket-filter ${filter === key ? 'dev-ticket-filter--on' : ''}`}
-              onClick={() => setFilter(key)}
-            >
-              {key === 'ACKNOWLEDGED' ? 'In progress' : key === 'ALL' ? 'All' : key.charAt(0) + key.slice(1).toLowerCase()}
-            </button>
-          ))}
-        </div>
-        <div className="list-search-bar">
-          <ListSearch
-            value={search}
-            onChange={setSearch}
-            placeholder="Search tickets, path, reporter…"
-            resultCount={filtered.length}
-            totalCount={statusFiltered.length}
-            id="dev-ticket-search"
-          />
-        </div>
-        {!filtered.length ? (
-          <p className="text-muted">
-            {search.trim()
-              ? 'No tickets match this search.'
-              : filter === 'OPEN'
-                ? 'No open tickets. New issues appear here the moment someone taps “Send details to developer”.'
-                : 'No tickets in this view.'}
-          </p>
-        ) : (
-          <div className="dev-ticket-list">
-            {filtered.map((r) => (
-              <IssueTicketCard
-                key={r.id}
-                report={r}
-                busy={busy === r.id}
-                focused={focusId === r.id}
-                onStatus={(status) => void setStatus(r.id, status)}
+          {duplicateGroups.length > 0 ? (
+            <section className="dev-cmd-merge-banner">
+              <strong>Similar incidents detected</strong>
+              <p className="text-muted">
+                {duplicateGroups.length} error pattern{duplicateGroups.length === 1 ? '' : 's'} with multiple
+                reports. Review and merge to avoid duplicate work.
+              </p>
+              <div className="dev-cmd-merge-banner__chips">
+                {duplicateGroups.slice(0, 3).map((g) => (
+                  <span key={g.fingerprint} className="status-pill status-pill--warn">
+                    {g.count} reports · {developerTicketCode(g.ticketIds[0])}
+                  </span>
+                ))}
+              </div>
+            </section>
+          ) : null}
+
+          <section id="dev-tickets" className="dev-cmd-panel">
+            <div className="dev-cmd-panel__head">
+              <h2>Developer incidents</h2>
+              <span className="text-muted">Full lifecycle · safe diagnostic snapshots</span>
+            </div>
+            <div className="dev-ticket-filters">
+              {(['OPEN', 'IN_PROGRESS', 'RESOLVED', 'ALL'] as TicketFilter[]).map((key) => (
+                <button
+                  key={key}
+                  type="button"
+                  className={`dev-ticket-filter ${filter === key ? 'dev-ticket-filter--on' : ''}`}
+                  onClick={() => setFilter(key)}
+                >
+                  {key === 'IN_PROGRESS' ? 'In progress' : key === 'ALL' ? 'All' : key.charAt(0) + key.slice(1).toLowerCase()}
+                </button>
+              ))}
+            </div>
+            <div className="list-search-bar">
+              <ListSearch
+                value={search}
+                onChange={setSearch}
+                placeholder="Search tickets, error code, path, reporter…"
+                resultCount={filtered.length}
+                totalCount={statusFiltered.length}
+                id="dev-ticket-search"
               />
-            ))}
-          </div>
-        )}
-      </section>
+            </div>
+            {!filtered.length ? (
+              <p className="text-muted">
+                {search.trim()
+                  ? 'No tickets match this search.'
+                  : 'No open tickets. New issues appear when someone taps “Send details to developer”.'}
+              </p>
+            ) : (
+              <div className="dev-incident-list">
+                {filtered.map((t) => (
+                  <DeveloperTicketCard
+                    key={t.id}
+                    ticket={t}
+                    busy={busy === t.id}
+                    focused={focusId === t.id}
+                    duplicateCount={dupCountById.get(t.id)}
+                    onWorkflow={(status) => void patchTicket(t, { workflowStatus: status })}
+                    onReproducible={(reproducible) =>
+                      void patchTicket(t, { reproduction: { reproducible } })
+                    }
+                    onMerge={
+                      (dupCountById.get(t.id) ?? 0) > 1
+                        ? () => void patchTicket(t, { workflowStatus: 'DUPLICATE', mergeDuplicates: true })
+                        : undefined
+                    }
+                  />
+                ))}
+              </div>
+            )}
+          </section>
 
-      {isDev && deskData?.recentReports.length ? (
-        <section className="portal-card" style={{ marginTop: '1rem' }}>
-          <div className="card-header-row">
-            <h2>Recent activity</h2>
-          </div>
-          <ul className="status-list">
-            {deskData.recentReports.map((r) => (
-              <li key={r.id} className="status-list-item">
-                <div>
-                  <strong>{r.ticketCode ?? developerTicketCode(r.id)}</strong>
-                  <p className="text-muted" style={{ margin: '0.15rem 0 0' }}>
-                    {r.message} · {r.reporter}
-                    {r.path ? ` · ${r.path}` : ''}
-                    {' · '}
-                    {new Date(r.createdAt).toLocaleString()}
-                  </p>
-                </div>
-                <span className={`status-pill status-pill--${r.status.toLowerCase()}`}>
-                  {r.status.replace(/_/g, ' ')}
-                </span>
-              </li>
-            ))}
-          </ul>
-        </section>
-      ) : null}
-
-      <section className="portal-card" style={{ marginTop: '1rem' }}>
-        <div className="card-header-row">
-          <h2>Developer support chat</h2>
-          <span className="text-muted">Owner · control room · store · techs</span>
+          <section id="dev-chat" className="dev-cmd-panel">
+            <div className="dev-cmd-panel__head">
+              <h2>Developer support chat</h2>
+              <span className="text-muted">Owner · control room · techs</span>
+            </div>
+            <InternalChat portal="admin" channel="dev-support" embedded />
+          </section>
         </div>
-        <InternalChat portal="admin" channel="dev-support" embedded />
-      </section>
+
+        <aside className="dev-cmd-layout__side">
+          <DeveloperPlatformHealth services={deskData.platformHealth} />
+          <DeveloperDeploymentPanel
+            production={deskData.production}
+            recent={deskData.recentDeployments}
+          />
+          <DeveloperErrorAnalytics analytics={deskData.analytics ?? computeAnalytics(tickets)} />
+          <DeveloperProfileCard
+            name={devUser ? `${devUser.firstName} ${devUser.lastName}` : session.user.firstName}
+            email={devUser?.email ?? session.user.email}
+            access={deskData.developerAccess}
+          />
+        </aside>
+      </div>
     </div>
-  );
-}
-
-function IssueTicketCard({
-  report,
-  busy,
-  focused,
-  onStatus,
-}: {
-  report: Report;
-  busy: boolean;
-  focused: boolean;
-  onStatus: (status: 'ACKNOWLEDGED' | 'RESOLVED' | 'OPEN') => void;
-}) {
-  const code = report.ticketCode ?? developerTicketCode(report.id);
-  const statusClass = report.status.toLowerCase();
-
-  return (
-    <article
-      id={`dev-ticket-${report.id}`}
-      className={`dev-ticket ${focused ? 'dev-ticket--focus' : ''} ${
-        report.status === 'OPEN' ? 'dev-ticket--open' : ''
-      }`}
-    >
-      <div className="dev-ticket__top">
-        <span className="dev-ticket__code">{code}</span>
-        <span className={`status-pill status-pill--${statusClass}`}>
-          {report.status.replace(/_/g, ' ')}
-        </span>
-      </div>
-      <h3 className="dev-ticket__title">{report.message}</h3>
-      <p className="dev-ticket__meta">
-        {report.reporter.name} · {report.reporter.role}
-        {report.path ? ` · ${report.path}` : ''}
-        {' · '}
-        {new Date(report.createdAt).toLocaleString()}
-      </p>
-      {report.context ? (
-        <details className="dev-report-context">
-          <summary>Technical details</summary>
-          <pre>{formatContext(report.context)}</pre>
-        </details>
-      ) : null}
-      <div className="queue-card__actions">
-        {report.status === 'OPEN' && (
-          <button
-            type="button"
-            className="btn-secondary btn-sm"
-            disabled={busy}
-            onClick={() => onStatus('ACKNOWLEDGED')}
-          >
-            Take ticket
-          </button>
-        )}
-        {report.status === 'ACKNOWLEDGED' && (
-          <button
-            type="button"
-            className="btn-secondary btn-sm"
-            disabled={busy}
-            onClick={() => onStatus('OPEN')}
-          >
-            Reopen
-          </button>
-        )}
-        {report.status !== 'RESOLVED' && (
-          <button
-            type="button"
-            className="btn-primary btn-sm"
-            disabled={busy}
-            onClick={() => onStatus('RESOLVED')}
-          >
-            Resolve
-          </button>
-        )}
-        {report.status === 'RESOLVED' && (
-          <button
-            type="button"
-            className="btn-secondary btn-sm"
-            disabled={busy}
-            onClick={() => onStatus('OPEN')}
-          >
-            Reopen
-          </button>
-        )}
-      </div>
-    </article>
   );
 }

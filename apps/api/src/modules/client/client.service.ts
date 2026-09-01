@@ -4,12 +4,17 @@ import {
   ConversationType,
   IncidentPriority,
   IncidentType,
+  MessageAttachmentKind,
   NotificationPriority,
   NotificationType,
   CompanyVehicleType,
   PanicSource,
+  SensorStatus,
+  SensorType,
   UserRole,
 } from '@prisma/client';
+import { mkdir, writeFile } from 'fs/promises';
+import { join, extname } from 'path';
 import { PrismaService } from '../../database/prisma.service';
 import { RealtimeGateway } from '../realtime/realtime.gateway';
 import { IncidentKernelService } from '../incident-kernel/incident-kernel.service';
@@ -21,6 +26,16 @@ import {
   isVehicleRemoteAction,
   type VehicleRemoteAction,
 } from './vehicle-remote';
+
+type FamilyUpload = {
+  originalname: string;
+  mimetype: string;
+  size: number;
+  buffer: Buffer;
+};
+
+const FAMILY_CHAT_MAX_FILE_BYTES = 25 * 1024 * 1024;
+const FAMILY_CHAT_UPLOAD_ROOT = join(process.cwd(), 'uploads', 'chat');
 
 @Injectable()
 export class ClientService {
@@ -487,6 +502,7 @@ export class ClientService {
                     id: true,
                     firstName: true,
                     lastName: true,
+                    phone: true,
                     familyMessagingEnabled: true,
                   },
                 },
@@ -509,6 +525,7 @@ export class ClientService {
               .map((m) => ({
                 id: m.user.id,
                 name: `${m.user.firstName} ${m.user.lastName}`,
+                phone: m.user.phone,
               }))
           : [],
       },
@@ -546,7 +563,8 @@ export class ClientService {
       },
       orderBy: { createdAt: 'asc' },
       include: {
-        sender: { select: { id: true, firstName: true, lastName: true, role: true } },
+        sender: { select: { id: true, firstName: true, lastName: true, role: true, phone: true } },
+        attachments: { orderBy: { createdAt: 'asc' } },
       },
     });
 
@@ -555,34 +573,113 @@ export class ClientService {
       data: {
         familyId: ctx.familyId,
         familyMessagingEnabled: true,
-        messages,
+        messages: messages.map((message) => this.formatFamilyMessage(message)),
         eligibleMembers: ctx.eligibleMembers,
       },
     };
   }
 
-  async sendFamilyMessage(userId: string, tenantId: string, content: string) {
-    const trimmed = content?.trim();
-    if (!trimmed) throw new BadRequestException('Message cannot be empty');
+  async sendFamilyMessage(
+    userId: string,
+    tenantId: string,
+    content: string,
+    files: FamilyUpload[] = [],
+    location?: { lat: number; lng: number } | null,
+    replyToId?: string | null,
+  ) {
+    const hasLocation =
+      location != null && Number.isFinite(location.lat) && Number.isFinite(location.lng);
+    let trimmed = content?.trim() ?? '';
+    if (hasLocation) {
+      trimmed = `📍 Live location\n${location.lat.toFixed(6)}, ${location.lng.toFixed(6)}`;
+      await this.updateLocation(userId, location.lat, location.lng);
+    }
+    if (!trimmed && files.length === 0) {
+      throw new BadRequestException('Message must include text, an attachment, or a location');
+    }
+
+    for (const file of files) {
+      if (file.size > FAMILY_CHAT_MAX_FILE_BYTES) {
+        throw new BadRequestException(`File "${file.originalname}" exceeds 25 MB limit`);
+      }
+    }
 
     const ctx = await this.requireFamilyMessaging(userId);
     const conversation = await this.getOrCreateFamilyConversation(tenantId, ctx.familyId);
 
     const message = await this.prisma.message.create({
-      data: { conversationId: conversation.id, senderUserId: userId, content: trimmed },
-      include: {
-        sender: { select: { id: true, firstName: true, lastName: true, role: true } },
+      data: {
+        conversationId: conversation.id,
+        senderUserId: userId,
+        content:
+          trimmed ||
+          (files.length === 1
+            ? `Sent ${files[0].originalname}`
+            : `Sent ${files.length} attachments`),
       },
     });
 
+    if (replyToId) {
+      const quoted = await this.prisma.message.findFirst({
+        where: { id: replyToId, conversationId: conversation.id },
+        include: {
+          sender: { select: { firstName: true, lastName: true } },
+          attachments: { take: 1, orderBy: { createdAt: 'asc' } },
+        },
+      });
+      if (quoted) {
+        const wrapped = this.wrapFamilyReplyContent(message.content, {
+          id: quoted.id,
+          name: `${quoted.sender.firstName} ${quoted.sender.lastName}`.trim(),
+          text: this.previewFamilyMessage(quoted.content, quoted.attachments[0]?.kind, quoted.attachments[0]?.fileName),
+        });
+        await this.prisma.message.update({
+          where: { id: message.id },
+          data: { content: wrapped },
+        });
+      }
+    }
+
+    if (files.length) {
+      const tenantDir = join(FAMILY_CHAT_UPLOAD_ROOT, tenantId);
+      await mkdir(tenantDir, { recursive: true });
+      const apiBase = process.env.API_PUBLIC_URL ?? 'http://localhost:4010';
+
+      await this.prisma.messageAttachment.createMany({
+        data: await Promise.all(
+          files.map(async (file) => {
+            const safeName = file.originalname.replace(/[^\w.\-()+ ]/g, '_');
+            const storedName = `${message.id}-${crypto.randomUUID()}${extname(safeName)}`;
+            const diskPath = join(tenantDir, storedName);
+            await writeFile(diskPath, file.buffer);
+            return {
+              messageId: message.id,
+              fileName: safeName,
+              fileType: file.mimetype,
+              fileUrl: `${apiBase}/uploads/chat/${tenantId}/${storedName}`,
+              fileSize: file.size,
+              kind: this.resolveFamilyAttachmentKind(file.mimetype),
+            };
+          }),
+        ),
+      });
+    }
+
+    const full = await this.prisma.message.findUniqueOrThrow({
+      where: { id: message.id },
+      include: {
+        sender: { select: { id: true, firstName: true, lastName: true, role: true, phone: true } },
+        attachments: { orderBy: { createdAt: 'asc' } },
+      },
+    });
+    const payload = this.formatFamilyMessage(full);
+
     this.realtime.emitFamilyChatMessage(tenantId, ctx.familyId, {
-      id: message.id,
-      content: message.content,
-      createdAt: message.createdAt.toISOString(),
-      sender: message.sender,
+      ...payload,
+      familyId: ctx.familyId,
     });
 
-    return { success: true, data: message };
+    return { success: true, data: payload };
   }
 
   async getMessages(userId: string, tenantId: string) {
@@ -1266,6 +1363,10 @@ export class ClientService {
       where: { id: propertyId },
       data: { alarmStatus: AlarmStatus.TRIGGERED },
     });
+    await this.prisma.sensor.updateMany({
+      where: { propertyId, sensorType: SensorType.SIREN },
+      data: { status: SensorStatus.ALARM, lastTriggeredAt: new Date() },
+    });
 
     return { success: true, data: incident };
   }
@@ -1558,6 +1659,66 @@ export class ClientService {
     return conversation;
   }
 
+  private wrapFamilyReplyContent(
+    content: string,
+    quote: { id: string; name: string; text: string },
+  ) {
+    const id = quote.id.replace(/[|«»]/g, '');
+    const name = quote.name.replace(/[|«»\n]/g, ' ').trim().slice(0, 40);
+    const text = quote.text.replace(/[«»]/g, ' ').replace(/\n/g, ' ').trim().slice(0, 80);
+    return `«reply:${id}|${name}|${text}»\n${content}`;
+  }
+
+  private previewFamilyMessage(
+    content: string,
+    attachmentKind?: MessageAttachmentKind,
+    fileName?: string,
+  ) {
+    const body = content.replace(/^«reply:[^»]*»\n?/, '').trim();
+    if (body.startsWith('📍 Live location')) return 'Live location';
+    if (attachmentKind === MessageAttachmentKind.IMAGE) return 'Photo';
+    if (attachmentKind === MessageAttachmentKind.VIDEO) return 'Video';
+    if (fileName) return fileName;
+    if (body.startsWith('Sent ')) return 'Attachment';
+    return body.replace(/\s+/g, ' ').slice(0, 80) || 'Message';
+  }
+
+  private resolveFamilyAttachmentKind(mime: string): MessageAttachmentKind {
+    if (mime.startsWith('image/')) return MessageAttachmentKind.IMAGE;
+    if (mime.startsWith('video/')) return MessageAttachmentKind.VIDEO;
+    return MessageAttachmentKind.FILE;
+  }
+
+  private formatFamilyMessage(message: {
+    id: string;
+    content: string;
+    createdAt: Date;
+    sender: { id: string; firstName: string; lastName: string; role: string; phone?: string | null };
+    attachments: {
+      id: string;
+      fileName: string;
+      fileType: string;
+      fileUrl: string;
+      fileSize: number;
+      kind: MessageAttachmentKind;
+    }[];
+  }) {
+    return {
+      id: message.id,
+      content: message.content,
+      createdAt: message.createdAt.toISOString(),
+      sender: message.sender,
+      attachments: message.attachments.map((a) => ({
+        id: a.id,
+        fileName: a.fileName,
+        fileType: a.fileType,
+        fileUrl: a.fileUrl,
+        fileSize: a.fileSize,
+        kind: a.kind,
+      })),
+    };
+  }
+
   private async requireFamilyMessaging(userId: string) {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
@@ -1581,6 +1742,7 @@ export class ClientService {
                     id: true,
                     firstName: true,
                     lastName: true,
+                    phone: true,
                     familyMessagingEnabled: true,
                   },
                 },
@@ -1599,6 +1761,7 @@ export class ClientService {
       .map((m) => ({
         id: m.user.id,
         name: `${m.user.firstName} ${m.user.lastName}`,
+        phone: m.user.phone,
       }));
 
     return {

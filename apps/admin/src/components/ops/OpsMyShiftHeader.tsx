@@ -1,5 +1,7 @@
 'use client';
 
+import Link from 'next/link';
+
 type Chip = {
   id: string;
   label: string;
@@ -10,6 +12,9 @@ type Chip = {
 export function OpsMyShiftHeader({
   title,
   subtitle,
+  subtitleHref,
+  subtitleAction,
+  sectionLabel,
   chips,
   activeChip,
   onChip,
@@ -17,6 +22,9 @@ export function OpsMyShiftHeader({
 }: {
   title: string;
   subtitle: string;
+  subtitleHref?: string;
+  subtitleAction?: string;
+  sectionLabel?: string;
   chips: Chip[];
   activeChip: string;
   onChip: (id: string) => void;
@@ -34,8 +42,20 @@ export function OpsMyShiftHeader({
       <p className="ops-shift__date">{today}</p>
       <div className="ops-shift__intro">
         <h1 className="ops-shift__title">{title}</h1>
-        <p className={`ops-shift__sub ${urgent ? 'ops-shift__sub--alert' : ''}`}>{subtitle}</p>
+        {subtitleHref ? (
+          <Link
+            href={subtitleHref}
+            className={`ops-shift__sub ${urgent ? 'ops-shift__sub--alert' : ''} ops-shift__sub--link`}
+          >
+            {urgent ? <span className="ops-shift__pulse" aria-hidden /> : null}
+            <span>{subtitle}</span>
+            <span className="ops-shift__sub-go">{subtitleAction ?? 'View alerts'}</span>
+          </Link>
+        ) : (
+          <p className={`ops-shift__sub ${urgent ? 'ops-shift__sub--alert' : ''}`}>{subtitle}</p>
+        )}
       </div>
+      {sectionLabel ? <p className="ops-shift__section">{sectionLabel}</p> : null}
       <div className="ops-shift__chips" role="tablist" aria-label="Filter priorities">
         {chips.map((c) => (
           <button

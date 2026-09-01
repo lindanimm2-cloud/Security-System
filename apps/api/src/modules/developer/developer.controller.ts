@@ -44,9 +44,15 @@ export class DeveloperController {
   updateReport(
     @CurrentUser() user: AuthUser,
     @Param('id') id: string,
-    @Body() body: { status: ErrorReportStatus },
+    @Body()
+    body: {
+      status?: ErrorReportStatus;
+      workflowStatus?: string;
+      context?: string;
+      mergeDuplicates?: boolean;
+    },
   ) {
-    return this.developerService.updateReportStatus(user, id, body.status);
+    return this.developerService.updateReport(user, id, body);
   }
 
   @Get('desk')

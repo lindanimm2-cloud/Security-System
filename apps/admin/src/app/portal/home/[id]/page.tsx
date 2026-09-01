@@ -119,6 +119,19 @@ function SiteContent() {
     }
   }
 
+  async function soundSiren() {
+    setLoadingId('siren');
+    setOptimisticStatus('TRIGGERED');
+    try {
+      await clientApi.post(`/client/properties/${id}/siren`);
+      reload();
+    } catch {
+      setOptimisticStatus(null);
+    } finally {
+      setLoadingId(null);
+    }
+  }
+
   async function setInteriorShare(share: boolean) {
     setLoadingId('privacy');
     try {
@@ -234,6 +247,19 @@ function SiteContent() {
           disabled={!!loadingId}
           onActivate={() => void homePanic()}
         />
+        {displayStatus === 'TRIGGERED' ? (
+          <p className="home-alarm-card__hint">Siren sounding on the property. Disarm to silence.</p>
+        ) : (
+          <HoldToActivate
+            className="hold-activate--inline"
+            label="Sound siren on property"
+            holdLabel="Hold to sound siren…"
+            holdMs={1200}
+            loading={loadingId === 'siren'}
+            disabled={!!loadingId}
+            onActivate={() => void soundSiren()}
+          />
+        )}
       </section>
 
       {(site.gateCode || site.keyHolder || site.accessNotes) && (

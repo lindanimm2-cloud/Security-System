@@ -11,6 +11,7 @@ export type OpsMenuItem = {
   href?: string;
   active?: boolean;
   disabled?: boolean;
+  heading?: boolean;
   tone?: 'default' | 'danger' | 'ok';
   meta?: string;
   description?: string;
@@ -23,6 +24,7 @@ type OpsMenuDropdownProps = {
   items: OpsMenuItem[];
   className?: string;
   triggerClassName?: string;
+  panelClassName?: string;
   align?: 'left' | 'right';
   summary?: string;
   compact?: boolean;
@@ -31,7 +33,34 @@ type OpsMenuDropdownProps = {
   leading?: ReactNode;
   showCount?: boolean;
   hideCaret?: boolean;
+  searchable?: boolean;
+  searchPlaceholder?: string;
 };
+
+function isHeadingItem(item: OpsMenuItem) {
+  return Boolean(item.heading);
+}
+
+function filterMenuItems(items: OpsMenuItem[], query: string): OpsMenuItem[] {
+  const needle = query.trim().toLowerCase();
+  if (!needle) return items;
+  const out: OpsMenuItem[] = [];
+  let pendingHeading: OpsMenuItem | null = null;
+  for (const item of items) {
+    if (isHeadingItem(item)) {
+      pendingHeading = item;
+      continue;
+    }
+    const hay = `${item.label} ${item.meta ?? ''} ${item.description ?? ''}`.toLowerCase();
+    if (!hay.includes(needle)) continue;
+    if (pendingHeading) {
+      out.push(pendingHeading);
+      pendingHeading = null;
+    }
+    out.push(item);
+  }
+  return out;
+}
 
 /** Compact enterprise dropdown — panel is portaled so mobile cards cannot clip it. */
 export function OpsMenuDropdown({
@@ -39,6 +68,7 @@ export function OpsMenuDropdown({
   items,
   className = '',
   triggerClassName = '',
+  panelClassName = '',
   align = 'left',
   summary,
   compact = false,
@@ -47,10 +77,14 @@ export function OpsMenuDropdown({
   leading,
   showCount = false,
   hideCaret = false,
+  searchable = false,
+  searchPlaceholder = 'Search',
 }: OpsMenuDropdownProps) {
   const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState('');
   const [mounted, setMounted] = useState(false);
   const [pos, setPos] = useState({ top: 0, left: 0, width: 260, maxHeight: 320, ready: false });
+  const visibleItems = searchable ? filterMenuItems(items, query) : items;
   const rootRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
@@ -60,6 +94,10 @@ export function OpsMenuDropdown({
     setMounted(true);
   }, []);
 
+  useEffect(() => {
+    if (!open) setQuery('');
+  }, [open]);
+
   useLayoutEffect(() => {
     if (!open || !triggerRef.current) return;
 
@@ -68,7 +106,7 @@ export function OpsMenuDropdown({
       if (!trigger) return;
       const rect = trigger.getBoundingClientRect();
       const width = Math.min(
-        Math.max(rect.width, 280),
+        Math.max(rect.width, searchable ? 320 : 280),
         window.innerWidth - 24,
       );
       let left = align === 'right' ? rect.right - width : rect.left;
@@ -79,7 +117,7 @@ export function OpsMenuDropdown({
       const bottomSafe =
         12 + (window.matchMedia('(max-width: 900px)').matches ? 88 : 0);
       const measured = panelRef.current?.offsetHeight ?? 0;
-      const estimated = Math.min(16 + items.length * 48, 360);
+      const estimated = Math.min((searchable ? 56 : 12) + visibleItems.length * 44, 520);
       const height = measured > 8 ? measured : estimated;
       const below = rect.bottom + gap;
       const spaceBelow = window.innerHeight - bottomSafe - below;
@@ -108,7 +146,7 @@ export function OpsMenuDropdown({
       window.removeEventListener('resize', place);
       window.removeEventListener('scroll', place, true);
     };
-  }, [open, align, items.length]);
+  }, [open, align, visibleItems.length, searchable]);
 
   useEffect(() => {
     if (!open) return;
@@ -138,11 +176,12 @@ export function OpsMenuDropdown({
   const activeCount = items.filter((item) => item.active).length;
 
   function renderItem(item: OpsMenuItem) {
+    const heading = isHeadingItem(item);
     const classNameItem = [
       'ops-menu__item',
       item.active ? 'ops-menu__item--active' : '',
-      item.disabled ? 'ops-menu__item--disabled' : '',
-      item.disabled && !item.onClick && !item.href ? 'ops-menu__item--heading' : '',
+      item.disabled && !heading ? 'ops-menu__item--disabled' : '',
+      heading ? 'ops-menu__item--heading' : '',
       item.tone === 'danger' ? 'ops-menu__item--danger' : '',
       item.tone === 'ok' ? 'ops-menu__item--ok' : '',
       item.className ?? '',
@@ -163,6 +202,14 @@ export function OpsMenuDropdown({
         {item.active ? <span className="ops-menu__check" aria-hidden>✓</span> : null}
       </>
     );
+
+    if (heading) {
+      return (
+        <div key={item.id} className={classNameItem} role="presentation">
+          {body}
+        </div>
+      );
+    }
 
     if (item.href) {
       const external =
@@ -231,7 +278,7 @@ export function OpsMenuDropdown({
           setPos({
             top: rect.bottom + 6,
             left: rect.left,
-            width: Math.min(Math.max(rect.width, 280), window.innerWidth - 24),
+            width: Math.min(Math.max(rect.width, searchable ? 320 : 280), window.innerWidth - 24),
             maxHeight: Math.max(120, window.innerHeight - rect.bottom - 24),
             ready: false,
           });
@@ -258,7 +305,15 @@ export function OpsMenuDropdown({
               <div
                 ref={panelRef}
                 id={menuId}
-                className={`ops-menu__panel ops-menu__panel--fixed ops-menu__panel--${align}`}
+                className={[
+                  'ops-menu__panel',
+                  'ops-menu__panel--fixed',
+                  `ops-menu__panel--${align}`,
+                  searchable ? 'ops-menu__panel--searchable' : '',
+                  panelClassName,
+                ]
+                  .filter(Boolean)
+                  .join(' ')}
                 role="menu"
                 style={{
                   position: 'fixed',
@@ -270,7 +325,27 @@ export function OpsMenuDropdown({
                   pointerEvents: pos.ready ? 'auto' : 'none',
                 }}
               >
-                {items.map(renderItem)}
+                {searchable ? (
+                  <div className="ops-menu__search">
+                    <input
+                      type="search"
+                      value={query}
+                      placeholder={searchPlaceholder}
+                      aria-label="Filter menu"
+                      autoFocus
+                      onChange={(e) => setQuery(e.target.value)}
+                      onKeyDown={(e) => {
+                        e.stopPropagation();
+                        if (e.key === 'Escape') setOpen(false);
+                      }}
+                    />
+                  </div>
+                ) : null}
+                {visibleItems.length === 0 ? (
+                  <div className="ops-menu__empty">No matches</div>
+                ) : (
+                  visibleItems.map(renderItem)
+                )}
               </div>
             </>,
             document.body,

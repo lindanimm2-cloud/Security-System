@@ -127,6 +127,8 @@ type SlideCarouselCardProps = {
   title: string;
   href?: string;
   expandLabel?: string;
+  action?: string;
+  status?: 'ok' | 'alert' | 'warn' | 'off';
   tone?: 'default' | 'alert' | 'ok' | 'warn' | 'muted';
   wide?: boolean;
   className?: string;
@@ -137,6 +139,8 @@ export function SlideCarouselCard({
   title,
   href,
   expandLabel,
+  action,
+  status,
   tone = 'default',
   wide,
   className = '',
@@ -146,7 +150,10 @@ export function SlideCarouselCard({
   const inner = (
     <>
       <div className="slide-carousel__card-top">
-        <h3>{title}</h3>
+        <h3>
+          {status ? <span className={`slide-carousel__led slide-carousel__led--${status}`} aria-hidden /> : null}
+          {title}
+        </h3>
         {href ? (
           <span className="slide-carousel__expand" aria-hidden>
             <ExpandIcon />
@@ -154,6 +161,7 @@ export function SlideCarouselCard({
         ) : null}
       </div>
       <div className="slide-carousel__card-body">{children}</div>
+      {action ? <p className="slide-carousel__action">{action}</p> : null}
     </>
   );
 

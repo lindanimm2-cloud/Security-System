@@ -1,6 +1,7 @@
 import { clientApi } from './api-client';
 import { getSession, type AuthPortal } from './auth';
 import { resolveStaffSession, submitDeveloperErrorReport } from './developer-notify';
+import { buildReportContext } from './error-snapshot';
 import { REPORT_NEEDS_SIGN_IN_MESSAGE } from './friendly-error';
 import { isLoginPath } from './login-path';
 
@@ -11,16 +12,13 @@ export type ErrorReportPayload = {
   digest?: string;
   name?: string;
   componentStack?: string;
+  apiEndpoint?: string;
+  httpStatus?: number;
+  requestId?: string;
 };
 
 function buildContext(input: ErrorReportPayload): string {
-  return JSON.stringify({
-    name: input.name,
-    stack: input.stack?.slice(0, 1200),
-    digest: input.digest,
-    componentStack: input.componentStack?.slice(0, 800),
-    reportedAt: new Date().toISOString(),
-  }).slice(0, 2000);
+  return buildReportContext(input);
 }
 
 async function copyReportToClipboard(input: ErrorReportPayload): Promise<void> {

@@ -2,9 +2,9 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { DashboardLiveCctv } from '@/components/portal/DashboardLiveCctv';
 import { VehicleRemotePad } from '@/components/vehicle/VehicleRemotePad';
 import { clientApi, type ApiResponse } from '@/lib/api-client';
-import { friendlyErrorMessage } from '@/lib/friendly-error';
 import type { VehicleRemoteAction, VehicleRemoteState } from '@/lib/vehicle-remote';
 
 export type ClientVehicleRemoteVehicle = {
@@ -30,7 +30,6 @@ export function ClientVehicleRemote({
   onUpdated,
 }: Props) {
   const [busy, setBusy] = useState<VehicleRemoteAction | null>(null);
-  const [note, setNote] = useState('');
   const [local, setLocal] = useState<VehicleRemoteState>(() => ({
     doorsLocked: vehicle.doorsLocked ?? true,
     immobiliserOn: vehicle.immobiliserOn ?? false,
@@ -47,9 +46,8 @@ export function ClientVehicleRemote({
     });
   }, [vehicle.doorsLocked, vehicle.hornActive, vehicle.immobiliserOn, vehicle.theftRecovery]);
 
-  async function send(action: VehicleRemoteAction) {
+  async function send(action: VehicleRemoteAction): Promise<boolean> {
     setBusy(action);
-    setNote('');
     try {
       const res = await clientApi.post<ApiResponse<{ message?: string }>>(
         `/client/vehicles/${vehicle.id}/remote`,
@@ -61,10 +59,10 @@ export function ClientVehicleRemote({
         theftRecovery: prev.theftRecovery,
         hornActive: action === 'horn' ? !prev.hornActive : prev.hornActive,
       }));
-      setNote(res.data?.message ?? 'Command sent.');
       onUpdated?.();
-    } catch (e) {
-      setNote(friendlyErrorMessage(e, 'action'));
+      return true;
+    } catch {
+      return false;
     } finally {
       setBusy(null);
     }
@@ -77,18 +75,15 @@ export function ClientVehicleRemote({
         busyAction={busy}
         compact={compact}
         hidePanic={hidePanic}
-        onCommand={(action) => void send(action)}
-      />
+        onCommand={(action) => send(action)}
+      >
+        <DashboardLiveCctv embedded kind="vehicle" vehicleId={vehicle.id} />
+      </VehicleRemotePad>
       <p className="vehicle-remote__dash-link">
         <Link href={`/portal/vehicles/${vehicle.id}`} className="link-sm">
           {vehicle.registration ? `${vehicle.registration} · vehicle` : 'Open vehicle'}
         </Link>
       </p>
-      {note ? (
-        <p className="vehicle-remote__hint" role="status">
-          {note}
-        </p>
-      ) : null}
     </section>
   );
 }

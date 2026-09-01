@@ -4,8 +4,9 @@ import Link from 'next/link';
 import { useState, type ReactNode } from 'react';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { SketchIcon } from '@/components/icons/SketchIcon';
-import { clientApi } from '@/lib/api-client';
+import { clientApi, type ApiResponse } from '@/lib/api-client';
 import { ARM_MODE_OPTIONS, alarmStatusLabel, isArmedStatus, type ArmMode } from '@/lib/sa-alarm';
+import { HoldToActivate } from '@/components/ops/EmergencyMode';
 import { portalAmbientFromAlarm } from '@/lib/portal-ambient';
 import { usePortalAmbientOptional } from '@/components/portal/PortalAmbientProvider';
 
@@ -65,6 +66,35 @@ export function HomeAlarmControl({
       if (property.id === properties[0]?.id) {
         ambientCtx?.setAmbientOverride(null);
       }
+    } finally {
+      setLoadingId(null);
+    }
+  }
+
+  async function soundSiren(property: Property) {
+    if (!hasAccess) return;
+    setLoadingId(`${property.id}-siren`);
+    setMsg('');
+    setOptimisticStatus((prev) => ({ ...prev, [property.id]: 'TRIGGERED' }));
+    if (property.id === properties[0]?.id) {
+      ambientCtx?.setAmbientOverride(portalAmbientFromAlarm('TRIGGERED'));
+    }
+    try {
+      const res = await clientApi.post<ApiResponse<{ message?: string }>>(
+        `/client/properties/${property.id}/siren`,
+      );
+      setMsg(res.data?.message ?? `Siren sounding at ${property.name}. Disarm to silence.`);
+      onUpdated?.();
+    } catch {
+      setOptimisticStatus((prev) => {
+        const next = { ...prev };
+        delete next[property.id];
+        return next;
+      });
+      if (property.id === properties[0]?.id) {
+        ambientCtx?.setAmbientOverride(null);
+      }
+      setMsg('Siren command failed.');
     } finally {
       setLoadingId(null);
     }
@@ -180,10 +210,22 @@ export function HomeAlarmControl({
   const hint = (
     <p className="home-alarm-card__hint">
       {isTriggered
-        ? 'Alarm triggered · responders notified'
+        ? 'Siren sounding · responders notified. Disarm to silence.'
         : activeOpt?.hint ?? alarmStatusLabel(primaryStatus)}
       {primary.alarmLinked === false ? ' · Panel not linked' : ''}
     </p>
+  );
+
+  const sirenControl = isTriggered ? null : (
+    <HoldToActivate
+      className="hold-activate--inline home-alarm-card__siren"
+      label="Sound siren on property"
+      holdLabel="Hold to sound siren…"
+      holdMs={1200}
+      loading={loadingId === `${primary.id}-siren`}
+      disabled={!!loadingId}
+      onActivate={() => void soundSiren(primary)}
+    />
   );
 
   const pad = (
@@ -191,6 +233,12 @@ export function HomeAlarmControl({
       <p className="alarm-mode-pad__kicker">Alarm mode</p>
       {renderModeButtons()}
       {hint}
+      {sirenControl}
+      {!isTriggered ? (
+        <p className="home-alarm-card__hint">
+          Rings the outdoor siren even if the panel is disarmed — use when CCTV shows a break-in.
+        </p>
+      ) : null}
     </section>
   );
 
@@ -234,6 +282,7 @@ export function HomeAlarmControl({
         <>
           {renderModeButtons()}
           {hint}
+          {sirenControl}
         </>
       )}
 

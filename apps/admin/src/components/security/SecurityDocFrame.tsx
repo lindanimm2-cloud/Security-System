@@ -1,14 +1,21 @@
 'use client';
 
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
+import { useEffect, useState, type ReactNode } from 'react';
 import { CONSENT_VERSION, POLICY_VERSION } from '@/lib/device-security';
-import type { ReactNode } from 'react';
 
 export type SecurityDocTocItem = {
   id: string;
   label: string;
   href?: string;
 };
+
+function formatConsentDate(value: string) {
+  const parsed = new Date(`${value}T00:00:00`);
+  if (Number.isNaN(parsed.getTime())) return value;
+  return parsed.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+}
 
 export function SecurityDocFrame({
   docId,
@@ -27,21 +34,49 @@ export function SecurityDocFrame({
   toc: SecurityDocTocItem[];
   children: ReactNode;
 }) {
+  const pathname = usePathname();
+  const [hash, setHash] = useState('');
+
+  useEffect(() => {
+    const sync = () => setHash(window.location.hash.replace(/^#/, ''));
+    sync();
+    window.addEventListener('hashchange', sync);
+    return () => window.removeEventListener('hashchange', sync);
+  }, [pathname]);
+
+  function isTocActive(item: SecurityDocTocItem, index: number) {
+    if (item.href) return pathname === item.href;
+    if (hash) return hash === item.id;
+    const firstLocal = toc.find((entry) => !entry.href);
+    return firstLocal?.id === item.id || (!firstLocal && index === 0);
+  }
+
   return (
     <div className="sec-doc">
       <aside className="sec-doc__rail" aria-label="File index">
         <p className="sec-doc__rail-kicker">Index</p>
         <ol>
-          {toc.map((item, i) => (
-            <li key={item.id}>
-              <span>{String(i + 1).padStart(2, '0')}</span>
-              {item.href ? (
-                <Link href={item.href}>{item.label}</Link>
-              ) : (
-                <a href={`#${item.id}`}>{item.label}</a>
-              )}
-            </li>
-          ))}
+          {toc.map((item, i) => {
+            const active = isTocActive(item, i);
+            return (
+              <li key={item.id} className={active ? 'sec-doc__rail-item--on' : undefined}>
+                <span>{String(i + 1).padStart(2, '0')}</span>
+                {item.href ? (
+                  <Link href={item.href} aria-current={active ? 'page' : undefined}>
+                    {item.label}
+                  </Link>
+                ) : (
+                  <a
+                    href={`#${item.id}`}
+                    aria-current={active ? 'location' : undefined}
+                    onClick={() => setHash(item.id)}
+                  >
+                    {item.label}
+                  </a>
+                )}
+              </li>
+            );
+          })}
         </ol>
       </aside>
 
@@ -62,11 +97,11 @@ export function SecurityDocFrame({
             </div>
             <div>
               <dt>Consent</dt>
-              <dd>{CONSENT_VERSION}</dd>
+              <dd>{formatConsentDate(CONSENT_VERSION)}</dd>
             </div>
             <div>
               <dt>Silent Panic</dt>
-              <dd>Available in the dock</dd>
+              <dd>Available in dock</dd>
             </div>
           </dl>
         </header>

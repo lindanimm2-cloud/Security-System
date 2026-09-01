@@ -1,6 +1,6 @@
 'use client';
 
-import { OpsMenuDropdown } from '@/components/ops/OpsMenuDropdown';
+import { OpsMenuDropdown, type OpsMenuItem } from '@/components/ops/OpsMenuDropdown';
 
 type UiSelectOption = {
   value: string;
@@ -8,6 +8,8 @@ type UiSelectOption = {
   meta?: string;
   description?: string;
   disabled?: boolean;
+  group?: string;
+  tone?: 'default' | 'danger' | 'ok';
 };
 
 type UiSelectProps = {
@@ -17,8 +19,12 @@ type UiSelectProps = {
   disabled?: boolean;
   ariaLabel?: string;
   className?: string;
+  panelClassName?: string;
   compact?: boolean;
   align?: 'left' | 'right';
+  placeholder?: string;
+  searchable?: boolean;
+  searchPlaceholder?: string;
 };
 
 export function UiSelect({
@@ -28,28 +34,50 @@ export function UiSelect({
   disabled,
   ariaLabel,
   className,
+  panelClassName,
   compact = true,
   align = 'left',
+  placeholder = 'Select',
+  searchable,
+  searchPlaceholder,
 }: UiSelectProps) {
-  const current = options.find((o) => o.value === value)?.label ?? value;
+  const current = options.find((o) => o.value === value)?.label ?? (value || placeholder);
+  const items: OpsMenuItem[] = [];
+  let lastGroup: string | undefined;
+
+  for (const option of options) {
+    if (option.group && option.group !== lastGroup) {
+      items.push({
+        id: `__group:${option.group}`,
+        label: option.group,
+        heading: true,
+      });
+      lastGroup = option.group;
+    }
+    items.push({
+      id: option.value || `__empty:${option.label}`,
+      label: option.label,
+      meta: option.meta,
+      description: option.description,
+      disabled: option.disabled,
+      tone: option.tone,
+      active: option.value === value,
+      onClick: option.disabled ? undefined : () => onChange(option.value),
+    });
+  }
 
   return (
     <OpsMenuDropdown
-      label={current || 'Select'}
+      label={current || placeholder}
       className={`ui-select ${compact ? '' : 'ui-select--field'} ${className ?? ''}`.trim()}
+      panelClassName={panelClassName}
       compact={compact}
       align={align}
       ariaLabel={ariaLabel}
       disabled={disabled}
-      items={options.map((o) => ({
-        id: o.value,
-        label: o.label,
-        meta: o.meta,
-        description: o.description,
-        disabled: o.disabled,
-        active: o.value === value,
-        onClick: o.disabled ? undefined : () => onChange(o.value),
-      }))}
+      searchable={searchable ?? options.length >= 12}
+      searchPlaceholder={searchPlaceholder}
+      items={items}
     />
   );
 }

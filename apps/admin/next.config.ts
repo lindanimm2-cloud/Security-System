@@ -12,6 +12,8 @@ const nextConfig: NextConfig = {
   env: {
     NEXT_PUBLIC_DEMO_MODE: demoMode,
   },
+  /* Keep the HMR badge off the mobile dock; in-app toasts use --app-toast-bottom. */
+  devIndicators: false,
 };
 
 export default nextConfig;

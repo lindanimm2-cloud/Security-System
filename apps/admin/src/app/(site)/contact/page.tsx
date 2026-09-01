@@ -3,6 +3,7 @@
 import { FormEvent, useState } from 'react';
 import Link from 'next/link';
 import { SiteDispatchStrip } from '@/components/site/SiteDispatchStrip';
+import { UiSelect } from '@/components/ui/UiSelect';
 
 export default function ContactPage() {
   const [sent, setSent] = useState(false);
@@ -121,18 +122,19 @@ export default function ContactPage() {
               </label>
               <label>
                 I am interested in
-                <select
+                <UiSelect
+                  compact={false}
+                  ariaLabel="I am interested in"
                   value={form.interest}
-                  onChange={(e) =>
-                    setForm({ ...form, interest: e.target.value })
-                  }
-                >
-                  <option value="protection">Personal / family protection</option>
-                  <option value="fleet">Fleet &amp; recovery</option>
-                  <option value="install">CCTV / alarm install</option>
-                  <option value="supply">Corporate gear supply</option>
-                  <option value="other">Something else</option>
-                </select>
+                  onChange={(interest) => setForm({ ...form, interest })}
+                  options={[
+                    { value: 'protection', label: 'Personal / family protection' },
+                    { value: 'fleet', label: 'Fleet & recovery' },
+                    { value: 'install', label: 'CCTV / alarm install' },
+                    { value: 'supply', label: 'Corporate gear supply' },
+                    { value: 'other', label: 'Something else' },
+                  ]}
+                />
               </label>
               <label>
                 Message

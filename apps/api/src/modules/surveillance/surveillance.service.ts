@@ -17,7 +17,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
 import { IncidentKernelService } from '../incident-kernel/incident-kernel.service';
-import { PlatformEvent } from '../incident-kernel/incident-events';
+import { PlatformEvent, type EventSource } from '../incident-kernel/incident-events';
 
 const DURBAN = { lat: -29.8587, lng: 31.0218 };
 
@@ -440,6 +440,14 @@ export class SurveillanceService {
     };
   }
 
+  async controlRoomSetArmMode(tenantId: string, propertyId: string, mode: ArmMode) {
+    const property = await this.prisma.property.findFirst({
+      where: { id: propertyId, tenantId },
+    });
+    if (!property) throw new NotFoundException('Property not found');
+    return this.setArmMode(property.userId, tenantId, propertyId, mode);
+  }
+
   async setArmMode(userId: string, tenantId: string, propertyId: string, mode: ArmMode) {
     if (!ARM_MODES.includes(mode)) {
       throw new BadRequestException('Invalid arm mode. Use ARMED, STAY, NIGHT, or DISARMED.');
@@ -453,6 +461,13 @@ export class SurveillanceService {
       where: { id: propertyId },
       data: { alarmStatus: mode, alarmLinked: true },
     });
+
+    if (mode === AlarmStatus.DISARMED) {
+      await this.prisma.sensor.updateMany({
+        where: { propertyId, tenantId, sensorType: SensorType.SIREN },
+        data: { status: SensorStatus.NORMAL },
+      });
+    }
 
     const title =
       mode === AlarmStatus.DISARMED
@@ -478,6 +493,97 @@ export class SurveillanceService {
     });
 
     return { success: true, data: final };
+  }
+
+  /** Ring the outdoor siren even if the panel is disarmed — CCTV visual confirmation. */
+  async soundOnSiteSiren(
+    tenantId: string,
+    propertyId: string,
+    actorUserId: string,
+    source: EventSource,
+    ownerUserId?: string,
+  ) {
+    const property = await this.prisma.property.findFirst({
+      where: {
+        id: propertyId,
+        tenantId,
+        ...(ownerUserId ? { userId: ownerUserId } : {}),
+      },
+    });
+    if (!property) throw new NotFoundException('Property not found');
+
+    await this.prisma.sensor.updateMany({
+      where: { propertyId, tenantId, sensorType: SensorType.SIREN },
+      data: { status: SensorStatus.ALARM, lastTriggeredAt: new Date() },
+    });
+
+    if (property.alarmStatus === AlarmStatus.TRIGGERED) {
+      return {
+        success: true,
+        data: {
+          alarmStatus: AlarmStatus.TRIGGERED,
+          message: `Siren already sounding at ${property.name}. Disarm to silence.`,
+        },
+      };
+    }
+
+    const visualNote =
+      source === 'control-room'
+        ? 'Control room sounded the site siren after visual confirmation on CCTV. A beam or zone may have failed to trip.'
+        : 'Client sounded the site siren after seeing a break-in on CCTV.';
+
+    const event = await this.prisma.alarmEvent.create({
+      data: {
+        tenantId,
+        propertyId,
+        type: AlarmEventType.PANIC,
+        severity: IncidentPriority.CRITICAL,
+        status: AlarmEventStatus.NEW,
+        title: 'On-site siren — CCTV visual',
+        description: visualNote,
+        cidCode: '120',
+      },
+    });
+
+    await this.prisma.property.update({
+      where: { id: propertyId },
+      data: { alarmStatus: AlarmStatus.TRIGGERED, alarmLinked: true },
+    });
+
+    const incident = await this.kernel.createFromEmergency({
+      tenantId,
+      userId: property.userId,
+      type: IncidentType.PANIC,
+      title: `CCTV siren — ${property.name}`,
+      description: `${visualNote} · ${property.address}`,
+      lat: Number(property.lat ?? DURBAN.lat),
+      lng: Number(property.lng ?? DURBAN.lng),
+      address: property.address,
+      priority: IncidentPriority.CRITICAL,
+      propertyId,
+      source,
+      actorUserId,
+      kind: 'home-panic',
+      autoDispatch: true,
+      alarmEventId: event.id,
+    });
+
+    await this.prisma.alarmEvent.update({
+      where: { id: event.id },
+      data: {
+        status: AlarmEventStatus.DISPATCHED,
+        incidentId: incident.id,
+      },
+    });
+
+    return {
+      success: true,
+      data: {
+        alarmStatus: AlarmStatus.TRIGGERED,
+        incidentId: incident.id,
+        message: `Siren sounding at ${property.name}. Disarm to silence.`,
+      },
+    };
   }
 
   async setSensorBypass(

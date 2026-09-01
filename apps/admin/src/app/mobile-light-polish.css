@@ -6,13 +6,13 @@
 /* ── Light mode: control-room tokens ─────────────────────── */
 
 html[data-theme='light'] {
-  --cr-surface: rgba(255, 255, 255, 0.72);
-  --cr-surface-hover: rgba(255, 255, 255, 0.88);
-  --cr-surface-active: rgba(255, 255, 255, 0.96);
-  --cr-edge: rgba(92, 104, 120, 0.16);
-  --cr-edge-strong: rgba(92, 104, 120, 0.24);
-  --cr-shadow: 8px 8px 18px rgba(92, 104, 120, 0.18);
-  --cr-shadow-soft: 4px 4px 12px rgba(92, 104, 120, 0.14);
+  --cr-surface: color-mix(in srgb, var(--surface) 88%, transparent);
+  --cr-surface-hover: color-mix(in srgb, var(--surface) 72%, var(--surface-2));
+  --cr-surface-active: var(--surface);
+  --cr-edge: rgba(72, 82, 96, 0.18);
+  --cr-edge-strong: rgba(72, 82, 96, 0.28);
+  --cr-shadow: 8px 8px 18px rgba(72, 82, 96, 0.2);
+  --cr-shadow-soft: 4px 4px 12px rgba(72, 82, 96, 0.16);
 }
 
 html[data-theme='light'] .dash-live-map__hud,
@@ -77,8 +77,8 @@ html[data-theme='light'] .ops-strip__chip--on {
 
 html[data-theme='light'] .eye-lens {
   --eye-ink: #eef1f5;
-  --eye-slate: #ffffff;
-  --eye-edge: rgba(92, 104, 120, 0.18);
+  --eye-slate: var(--surface);
+  --eye-edge: rgba(72, 82, 96, 0.22);
   --eye-fog: #2a3340;
   background: color-mix(in srgb, var(--surface) 94%, transparent);
   border-color: var(--cr-edge-strong);
@@ -340,14 +340,19 @@ html[data-theme='light'] .shell--admin .mobile-bottom-nav__item--active .mobile-
 /* ── Global mobile shell polish ──────────────────────────── */
 
 @media (max-width: 900px) {
-  .shell--with-bottom-nav .shell-content {
-    padding-bottom: calc(var(--ops-nav-height, 4.25rem) + 1rem + env(safe-area-inset-bottom, 0px));
+  .shell--with-bottom-nav .shell-content,
+  .shell--with-bottom-nav .portal-main,
+  .shell--with-bottom-nav .officer-content {
+    padding-bottom: var(--app-content-pad-bottom);
+  }
+
+  .shell--portal.shell--with-bottom-nav .portal-main.portal-main--with-call-bar {
+    padding-bottom: var(--app-content-pad-bottom);
   }
 
   .page-content,
   .page-section {
     min-width: 0;
-    overflow-x: clip;
   }
 
   .mobile-shell-header--admin {
@@ -404,11 +409,12 @@ html[data-theme='light'] .shell--admin .mobile-bottom-nav__item--active .mobile-
   }
 
   .alert-toast-stack {
-    bottom: calc(var(--ops-nav-height, 4.25rem) + 0.75rem + env(safe-area-inset-bottom, 0px));
-    left: 0.65rem;
-    right: 0.65rem;
-    width: auto;
-    max-width: none;
+    bottom: var(--app-toast-bottom);
+    left: auto;
+    right: 0.85rem;
+    width: min(20rem, calc(100vw - 1.7rem));
+    max-width: 320px;
+    z-index: 160;
   }
 }
 
@@ -453,4 +459,323 @@ html[data-theme='light'] .btn-secondary {
 
 html[data-theme='light'] .link-sm {
   color: var(--accent-text);
+}
+
+/* ── Light mode: clean canvas, white cards, readable chrome ─ */
+
+html[data-theme='light'] {
+  --cr-surface: #ffffff;
+  --cr-surface-hover: #f4f6f8;
+  --cr-surface-active: #eef1f5;
+  --cr-edge: rgba(15, 23, 42, 0.1);
+  --cr-edge-strong: rgba(15, 23, 42, 0.16);
+  --cr-shadow: 0 10px 28px rgba(15, 23, 42, 0.08);
+  --cr-shadow-soft: 0 4px 14px rgba(15, 23, 42, 0.06);
+  --glass: rgba(255, 255, 255, 0.9);
+  --glass-border: rgba(15, 23, 42, 0.08);
+  --topbar-bg: rgba(255, 255, 255, 0.82);
+  --menu-bg: #ffffff;
+  --monitor: #d5dae1;
+  --neu-raised-sm:
+    0 1px 2px rgba(15, 23, 42, 0.05),
+    0 4px 12px rgba(15, 23, 42, 0.04);
+  --neu-raised:
+    0 1px 2px rgba(15, 23, 42, 0.04),
+    0 10px 28px rgba(15, 23, 42, 0.07);
+}
+
+html[data-theme='light'] .page-content,
+html[data-theme='light'] .page-section,
+html[data-theme='light'] .sec-page,
+html[data-theme='light'] .portal-main,
+html[data-theme='light'] .officer-content,
+html[data-theme='light'] .shell-content {
+  background: transparent;
+  color: var(--text);
+}
+
+html[data-theme='light'] .portal-card,
+html[data-theme='light'] .panel,
+html[data-theme='light'] .card,
+html[data-theme='light'] .card-panel,
+html[data-theme='light'] .stat-card,
+html[data-theme='light'] .entity-card,
+html[data-theme='light'] .feature-card,
+html[data-theme='light'] .landing-card,
+html[data-theme='light'] .feature-hub__tile,
+html[data-theme='light'] .ds-job,
+html[data-theme='light'] .ds-metric,
+html[data-theme='light'] .ds-empty,
+html[data-theme='light'] .svc-req__quick-card,
+html[data-theme='light'] .settings-hub__section,
+html[data-theme='light'] .psim-card,
+html[data-theme='light'] .empty-state,
+html[data-theme='light'] .login-card,
+html[data-theme='light'] .form-card,
+html[data-theme='light'] .form-card--request {
+  background: var(--surface);
+  border-color: var(--border);
+  box-shadow: var(--neu-raised);
+  color: var(--text);
+}
+
+html[data-theme='light'] .sec-doc__folio {
+  background: #ffffff;
+  border-color: var(--border);
+  box-shadow:
+    var(--neu-raised),
+    inset 3px 0 0 0 rgba(185, 28, 28, 0.45);
+}
+
+html[data-theme='light'] .sec-doc__folio::before {
+  color: rgba(17, 24, 39, 0.05);
+}
+
+html[data-theme='light'] .sec-sheet::before {
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+}
+
+html[data-theme='light'] .sec-clauses li,
+html[data-theme='light'] .sec-clauses li:first-child {
+  border-color: rgba(15, 23, 42, 0.08);
+}
+
+html[data-theme='light'] .sec-activity {
+  background: var(--surface);
+  border-color: var(--border);
+}
+
+html[data-theme='light'] .sec-flow li {
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+html[data-theme='light'] .theme-toggle {
+  background: var(--surface-2);
+  box-shadow: var(--neu-inset);
+  color: var(--text);
+}
+
+html[data-theme='light'] .theme-toggle-track {
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: var(--neu-knob);
+}
+
+html[data-theme='light'] .mobile-shell-header,
+html[data-theme='light'] .topbar,
+html[data-theme='light'] .officer-topbar {
+  background: var(--glass);
+  border-color: var(--border);
+  box-shadow: 0 1px 0 var(--border);
+}
+
+html[data-theme='light'] .mobile-shell-header .notification-bell,
+html[data-theme='light'] .mobile-shell-header--portal .portal-status-light--compact,
+html[data-theme='light'] .mobile-shell-header .menu-toggle {
+  background: var(--surface);
+  border-color: var(--border);
+  box-shadow: var(--neu-raised-sm);
+}
+
+html[data-theme='light'] .mobile-bottom-nav__pill,
+html[data-theme='light'] .shell--admin .mobile-bottom-nav__pill,
+html[data-theme='light'] .shell--portal .mobile-bottom-nav__pill,
+html[data-theme='light'] .shell--officer .mobile-bottom-nav__pill {
+  background: rgba(255, 255, 255, 0.94);
+  border-color: var(--border);
+  box-shadow:
+    0 8px 28px rgba(15, 23, 42, 0.1),
+    0 1px 0 rgba(255, 255, 255, 0.8);
+}
+
+html[data-theme='light'] .ops-board--console .ops-board__queue,
+html[data-theme='light'] .ops-board--console .ops-board__detail,
+html[data-theme='light'] .ops-board--console .ops-board__avail,
+html[data-theme='light'] .ops-board--console .ops-board__vehicles,
+html[data-theme='light'] .ops-board--console .ops-board__cctv,
+html[data-theme='light'] .psim-hub__tabs,
+html[data-theme='light'] .table-wrap,
+html[data-theme='light'] .data-table,
+html[data-theme='light'] .nx-form-card,
+html[data-theme='light'] .nx-account-card,
+html[data-theme='light'] .nx-rail-card {
+  background: var(--surface);
+  border-color: var(--border);
+}
+
+html[data-theme='light'] .panic-neu {
+  --panic-neu-bg: var(--surface-2);
+  --panic-neu-well: color-mix(in srgb, var(--surface-2) 78%, var(--bg));
+  --panic-neu-knob: var(--surface);
+  --panic-neu-knob-hi: #ffffff;
+  --panic-neu-knob-lo: var(--surface-2);
+  --panic-neu-icon: rgba(17, 24, 39, 0.78);
+}
+
+html[data-theme='light'] .form-field input:focus,
+html[data-theme='light'] .form-field textarea:focus,
+html[data-theme='light'] .stack-form input:focus,
+html[data-theme='light'] .stack-form textarea:focus {
+  background: #ffffff;
+}
+
+html[data-theme='light'] .page-tabs,
+html[data-theme='light'] .chip,
+html[data-theme='light'] .filter-chip,
+html[data-theme='light'] .ops-strip__chip {
+  background: var(--surface);
+  border-color: var(--border);
+  color: var(--text);
+}
+
+@media (max-width: 860px) {
+  html[data-theme='light'] .sec-doc__rail li {
+    background: #ffffff;
+    border-color: var(--border);
+    box-shadow: var(--neu-raised-sm);
+    color: var(--text);
+  }
+
+  html[data-theme='light'] .sec-doc__rail-item--on {
+    background: rgba(15, 23, 42, 0.08);
+    border-color: rgba(15, 23, 42, 0.18);
+    box-shadow: none;
+  }
+
+  html[data-theme='light'] .sec-doc__folio {
+    box-shadow:
+      var(--neu-raised),
+      inset 3px 0 0 0 rgba(185, 28, 28, 0.45);
+  }
+}
+
+html[data-theme='light'] .table-wrap,
+html[data-theme='light'] table,
+html[data-theme='light'] .data-table {
+  background: var(--surface);
+  color: var(--text);
+  border-color: var(--border);
+}
+
+html[data-theme='light'] thead th,
+html[data-theme='light'] .data-table th {
+  background: var(--surface-2);
+  color: var(--muted);
+  border-color: var(--border);
+}
+
+html[data-theme='light'] tbody td,
+html[data-theme='light'] .data-table td {
+  border-color: var(--border);
+  color: var(--text);
+}
+
+html[data-theme='light'] .nx-site,
+html[data-theme='light'] .nx-band,
+html[data-theme='light'] .nx-page-hero,
+html[data-theme='light'] .nx-footer,
+html[data-theme='light'] .nx-header {
+  background: var(--nx-paper, var(--bg));
+  color: var(--nx-ink, var(--text));
+}
+
+html[data-theme='light'] .nx-header,
+html[data-theme='light'] .nx-footer,
+html[data-theme='light'] .nx-rail-card,
+html[data-theme='light'] .nx-product,
+html[data-theme='light'] .nx-form-card,
+html[data-theme='light'] .nx-account-card {
+  background: var(--nx-card, var(--surface));
+}
+
+html[data-theme='light'] .page-tabs,
+html[data-theme='light'] .chip,
+html[data-theme='light'] .store-filters {
+  background: var(--surface);
+  border-color: var(--border);
+}
+
+html[data-theme='light'] .page-tabs__tab--active,
+html[data-theme='light'] .chip--active {
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+/* Light-mode portal loading — matches the pale protection UI, not the dark boot splash */
+html[data-theme='light'] .loading-screen--v2,
+html[data-theme='light'] .loading-screen--brand {
+  background:
+    linear-gradient(180deg, rgba(185, 28, 28, 0.08) 0%, transparent 28%),
+    radial-gradient(ellipse 80% 50% at 50% -8%, rgba(185, 28, 28, 0.1), transparent 58%),
+    var(--bg, #eef1f5);
+  color: var(--text);
+}
+
+html[data-theme='light'] .loading-screen__glow {
+  background: radial-gradient(circle, rgba(185, 28, 28, 0.12), transparent 70%);
+}
+
+html[data-theme='light'] .loading-screen__scan {
+  opacity: 0.22;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 3px,
+    rgba(15, 23, 42, 0.03) 3px,
+    rgba(15, 23, 42, 0.03) 4px
+  );
+}
+
+html[data-theme='light'] .loader-orbit__track {
+  border-color: rgba(15, 23, 42, 0.08);
+  background: radial-gradient(circle at 50% 50%, rgba(185, 28, 28, 0.06), transparent 68%);
+}
+
+html[data-theme='light'] .loader-orbit__ring--b {
+  border-bottom-color: rgba(15, 23, 42, 0.28);
+  border-left-color: rgba(15, 23, 42, 0.08);
+}
+
+html[data-theme='light'] .loading-screen__label {
+  color: var(--text);
+}
+
+html[data-theme='light'] .loading-screen__hint {
+  color: var(--muted);
+}
+
+html[data-theme='light'] .loading-screen__bar {
+  background: rgba(15, 23, 42, 0.08);
+}
+
+html[data-theme='light'] .chat-box--family .chat-bubble--self {
+  background: color-mix(in srgb, #b91c1c 16%, #fff);
+  color: #3f0d12;
+  border-color: color-mix(in srgb, #b91c1c 22%, transparent);
+}
+
+html[data-theme='light'] .chat-box--family .chat-bubble--self .chat-time {
+  color: rgba(63, 13, 18, 0.55);
+}
+
+html[data-theme='light'] .chat-box--family .chat-bubble--self .fam-chat-loc__links a {
+  color: #9b1c1c;
+}
+
+html[data-theme='light'] .chat-box--family .chat-bubble--self .fam-chat-quote {
+  background: rgba(185, 28, 28, 0.1);
+}
+
+html[data-theme='light'] .fam-chat-thread {
+  background:
+    radial-gradient(ellipse at top, rgba(185, 28, 28, 0.06), transparent 42%),
+    #ece5dd;
+}
+
+html[data-theme='light'] .fam-chat-head,
+html[data-theme='light'] .fam-chat-composer {
+  background: #f0f2f5;
 }

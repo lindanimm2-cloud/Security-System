@@ -772,23 +772,39 @@ function writeRevenueFlag(enabled: boolean) {
 let demoClientLocation = { lat: -29.7267, lng: 31.0857 };
 
 let demoFamilyMessagingEnabled = true;
+function demoFamilyEligible() {
+  return [
+    { id: 'demo-fam-1', name: 'Thandi Client', phone: '+27821234568' },
+    { id: 'demo-fam-2', name: 'Lerato Client', phone: '+27821234569' },
+  ];
+}
 const demoFamilyMessages: {
   id: string;
   content: string;
   createdAt: string;
   sender: { id: string; firstName: string; lastName: string };
+  attachments: {
+    id: string;
+    fileName: string;
+    fileType: string;
+    fileUrl: string;
+    fileSize: number;
+    kind: 'IMAGE' | 'VIDEO' | 'FILE';
+  }[];
 }[] = [
   {
     id: 'demo-fam-msg-1',
     content: 'At school pickup — all good.',
     createdAt: new Date(Date.now() - 600000).toISOString(),
     sender: { id: 'demo-fam-1', firstName: 'Thandi', lastName: 'Client' },
+    attachments: [],
   },
   {
     id: 'demo-fam-msg-2',
     content: 'On my way. Share live location if you leave early.',
     createdAt: new Date(Date.now() - 420000).toISOString(),
     sender: { id: 'demo-user-client-demo-local', firstName: 'Nomsa', lastName: 'Client' },
+    attachments: [],
   },
 ];
 
@@ -1289,12 +1305,104 @@ function readDemoErrorReports(): DemoErrorReport[] {
   if (typeof window === 'undefined') return [];
   try {
     const raw = localStorage.getItem(DEMO_ERROR_REPORTS_KEY);
-    if (!raw) return [];
+    if (!raw) {
+      const seeded = seedDemoErrorReports();
+      writeDemoErrorReports(seeded);
+      return seeded;
+    }
     const parsed = JSON.parse(raw) as DemoErrorReport[];
     return Array.isArray(parsed) ? parsed : [];
   } catch {
     return [];
   }
+}
+
+function seedDemoErrorReports(): DemoErrorReport[] {
+  const checklistContext = JSON.stringify({
+    workflowStatus: 'REPORTED',
+    severity: 'P1',
+    errorFingerprint: 'fp_test_check_required',
+    snapshot: {
+      error: {
+        errorCode: 'TEST_CHECK_REQUIRED',
+        requestId: 'req_8F29K2M1',
+        apiEndpoint: '/api/camera-tests/complete',
+        httpStatus: 422,
+        reportedAt: new Date(Date.now() - 2 * 3600000).toISOString(),
+        stack: 'ValidationError: Complete the test checklist, or enter an override reason.\n  at completeTest (camera-test.ts:142)',
+      },
+      environment: {
+        appVersion: '2.4.18',
+        buildNumber: '8421',
+        browser: 'Chrome 140',
+        os: 'Windows 11',
+        screenSize: '1920×1080',
+        online: true,
+      },
+      user: { role: 'TECHNICIAN', feature: 'Camera testing', sessionId: 'sess_camtech' },
+      system: { deploymentVersion: '2.4.18', serviceHealth: 'operational' },
+    },
+    reproduction: {
+      steps: [
+        'Login as Technician',
+        'Open Camera Installation',
+        'Select Camera Tech',
+        'Complete test',
+        'Submit without checklist',
+        'Error appears',
+      ],
+    },
+    affected: { totalUsers: 5, byRole: { TECHNICIAN: 4, SUPERVISOR: 1 }, feature: 'Camera testing' },
+    deployment: {
+      firstDetectedAfter: '2.4.18',
+      minutesAfterDeploy: 14,
+      relatedFiles: ['camera-test.ts', 'TestChecklist.tsx', '/api/tests/complete'],
+    },
+    audit: [
+      { at: new Date(Date.now() - 2 * 3600000).toISOString(), action: 'Error reported by Technician' },
+      { at: new Date(Date.now() - 1.9 * 3600000).toISOString(), action: 'Ticket automatically created' },
+    ],
+  });
+
+  return [
+    {
+      id: 'err-demo-checklist-1014',
+      message: 'Complete the test checklist, or enter an override reason.',
+      path: '/technician/camera-test',
+      context: checklistContext,
+      status: 'OPEN',
+      createdAt: new Date(Date.now() - 2 * 3600000).toISOString(),
+      reporter: {
+        id: 'demo-tech-1',
+        name: 'Camera Tech',
+        role: 'TECHNICIAN',
+        email: 'tech@4ds.local',
+      },
+    },
+    {
+      id: 'err-demo-gps-timeout',
+      message: 'GPS timeout while updating vehicle position',
+      path: '/control-room/map',
+      context: JSON.stringify({
+        workflowStatus: 'IN_PROGRESS',
+        severity: 'P2',
+        errorFingerprint: 'fp_gps_timeout',
+        snapshot: {
+          error: { errorCode: 'GPS_TIMEOUT', httpStatus: 504, apiEndpoint: '/control-room/map/vehicles' },
+          environment: { appVersion: '2.4.18', buildNumber: '8421', browser: 'Chrome 139', os: 'Windows 10' },
+        },
+        audit: [{ at: new Date(Date.now() - 86400000).toISOString(), action: 'Developer assigned' }],
+      }),
+      status: 'ACKNOWLEDGED',
+      createdAt: new Date(Date.now() - 86400000).toISOString(),
+      reporter: {
+        id: 'demo-dispatch-1',
+        name: 'Dispatch Operator',
+        role: 'DISPATCHER',
+        email: 'dispatch@4ds.local',
+      },
+    },
+  ];
 }
 
 function writeDemoErrorReports(reports: DemoErrorReport[], created?: DemoErrorReport) {
@@ -2177,10 +2285,13 @@ function writeDemoCall(call: DemoCallSession | null) {
   }
 }
 
+const DEMO_CHAT_KEY = '4ds-demo-internal-chat';
+
 const demoChatMessages: {
   id: string;
   content: string;
   createdAt: string;
+  toUserId?: string | null;
   sender: { id: string; firstName: string; lastName: string; role: string; phone: string | null };
   attachments: { id: string; fileName: string; fileType: string; fileUrl: string; fileSize: number; kind: 'IMAGE' | 'VIDEO' | 'FILE' }[];
 }[] = [
@@ -2198,6 +2309,28 @@ const demoChatMessages: {
     attachments: [],
   },
 ];
+
+function loadDemoChatMessages() {
+  if (typeof window === 'undefined') return;
+  try {
+    const raw = window.localStorage.getItem(DEMO_CHAT_KEY);
+    if (!raw) return;
+    const parsed = JSON.parse(raw) as typeof demoChatMessages;
+    if (!Array.isArray(parsed) || parsed.length === 0) return;
+    demoChatMessages.splice(0, demoChatMessages.length, ...parsed);
+  } catch {
+    /* ignore */
+  }
+}
+
+function saveDemoChatMessages() {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.setItem(DEMO_CHAT_KEY, JSON.stringify(demoChatMessages));
+  } catch {
+    /* ignore */
+  }
+}
 
 function participantFromUser(user?: AuthSession['user'] | null) {
   return {
@@ -3318,6 +3451,30 @@ export async function handleDemoRequest<T>({
       return ok({ created: true, incidentId: demoIncidents[0].id }) as T;
     }
   }
+  {
+    const sirenMatch = clean.match(/^\/client\/properties\/([^/]+)\/siren$/);
+    if (sirenMatch && m === 'POST') {
+      const siteId = sirenMatch[1];
+      const site = demoSurveillanceSites.find((s) => s.id === siteId);
+      demoIncidents.unshift({
+        id: `demo-inc-${Date.now()}`,
+        type: 'PANIC',
+        status: 'OPEN',
+        title: `CCTV siren — ${site?.name ?? 'Property'}`,
+        isSilent: false,
+        time: 'Just now',
+        priority: 'CRITICAL',
+        user: user ? `${user.firstName ?? ''} ${user.lastName ?? ''}`.trim() || user.email : 'Nomsa Client',
+        location: site?.address ?? 'Home',
+      });
+      setDemoAlarmStatus(siteId, 'TRIGGERED');
+      return ok({
+        alarmStatus: 'TRIGGERED',
+        incidentId: demoIncidents[0].id,
+        message: `Siren sounding at ${site?.name ?? 'the property'}. Disarm to silence.`,
+      }) as T;
+    }
+  }
   if (clean === '/client/notifications' && m === 'GET') {
     return ok({
       notifications: demoClientNotifications.map((n) => ({ ...n })),
@@ -3588,10 +3745,7 @@ export async function handleDemoRequest<T>({
       familyMessagingEnabled: demoFamilyMessagingEnabled,
       familyId: 'demo-family-1',
       controlRoomAlwaysOn: true,
-      eligibleMembers: [
-        { id: 'demo-fam-1', name: 'Thandi Client' },
-        { id: 'demo-fam-2', name: 'Lerato Client' },
-      ],
+      eligibleMembers: demoFamilyEligible(),
     }) as T;
   }
   if (clean === '/client/communication-settings' && m === 'PATCH') {
@@ -3602,10 +3756,7 @@ export async function handleDemoRequest<T>({
       familyMessagingEnabled: demoFamilyMessagingEnabled,
       familyId: 'demo-family-1',
       controlRoomAlwaysOn: true,
-      eligibleMembers: [
-        { id: 'demo-fam-1', name: 'Thandi Client' },
-        { id: 'demo-fam-2', name: 'Lerato Client' },
-      ],
+      eligibleMembers: demoFamilyEligible(),
     }) as T;
   }
   if (clean === '/client/family/messages' && m === 'GET') {
@@ -3613,15 +3764,64 @@ export async function handleDemoRequest<T>({
       familyId: 'demo-family-1',
       familyMessagingEnabled: demoFamilyMessagingEnabled,
       messages: [...demoFamilyMessages],
-      eligibleMembers: [
-        { id: 'demo-fam-1', name: 'Thandi Client' },
-        { id: 'demo-fam-2', name: 'Lerato Client' },
-      ],
+      eligibleMembers: demoFamilyEligible(),
     }) as T;
   }
   if (clean === '/client/family/messages' && m === 'POST') {
-    const content = String(payload.content ?? '').trim();
-    if (!content) return { success: false as const, message: 'Message cannot be empty' } as T;
+    const lat = Number(payload.lat);
+    const lng = Number(payload.lng);
+    const hasLocation = Number.isFinite(lat) && Number.isFinite(lng);
+    let content = String(payload.content ?? '').trim();
+    if (hasLocation) {
+      content = `📍 Live location\n${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+      demoClientLocation = { lat, lng };
+    }
+    const incoming = Array.isArray(payload.attachments)
+      ? (payload.attachments as {
+          fileName?: string;
+          fileType?: string;
+          fileUrl?: string;
+          fileSize?: number;
+          kind?: 'IMAGE' | 'VIDEO' | 'FILE';
+        }[])
+      : [];
+    const attachments = incoming
+      .filter((a) => a.fileUrl)
+      .slice(0, 5)
+      .map((a, index) => ({
+        id: `demo-fam-att-${Date.now()}-${index}`,
+        fileName: String(a.fileName ?? 'file'),
+        fileType: String(a.fileType ?? 'application/octet-stream'),
+        fileUrl: String(a.fileUrl),
+        fileSize: Number(a.fileSize ?? 0),
+        kind: a.kind === 'IMAGE' || a.kind === 'VIDEO' ? a.kind : ('FILE' as const),
+      }));
+    if (!content && attachments.length === 0) {
+      return { success: false as const, message: 'Message cannot be empty' } as T;
+    }
+    if (!content && attachments.length) {
+      content =
+        attachments.length === 1
+          ? `Sent ${attachments[0].fileName}`
+          : `Sent ${attachments.length} attachments`;
+    }
+    const replyToId = typeof payload.replyToId === 'string' ? payload.replyToId : '';
+    if (replyToId) {
+      const quoted = demoFamilyMessages.find((item) => item.id === replyToId);
+      if (quoted) {
+        const quotedBody = quoted.content.replace(/^«reply:[^»]*»\n?/, '').trim();
+        const preview = quotedBody.startsWith('📍 Live location')
+          ? 'Live location'
+          : quoted.attachments[0]?.kind === 'IMAGE'
+            ? 'Photo'
+            : quoted.attachments[0]?.kind === 'VIDEO'
+              ? 'Video'
+              : quoted.attachments[0]?.fileName ||
+                (quotedBody.startsWith('Sent ') ? 'Attachment' : quotedBody.replace(/\s+/g, ' ').slice(0, 80) || 'Message');
+        const name = `${quoted.sender.firstName} ${quoted.sender.lastName}`.trim();
+        content = `«reply:${quoted.id}|${name}|${preview}»\n${content}`;
+      }
+    }
     const msg = {
       id: `demo-fam-msg-${Date.now()}`,
       content,
@@ -3631,6 +3831,7 @@ export async function handleDemoRequest<T>({
         firstName: user?.firstName ?? 'Nomsa',
         lastName: user?.lastName ?? 'Client',
       },
+      attachments,
     };
     demoFamilyMessages.push(msg);
     return ok(msg) as T;
@@ -3864,6 +4065,14 @@ export async function handleDemoRequest<T>({
     const reports = readDemoErrorReports();
     const openCount = reports.filter((r) => r.status === 'OPEN').length;
     const canViewRevenue = developerRevenueVisible();
+    const critical = reports.filter((r) => {
+      try {
+        const ctx = JSON.parse(r.context ?? '{}') as { severity?: string };
+        return (ctx.severity === 'P0' || ctx.severity === 'P1') && r.status !== 'RESOLVED';
+      } catch {
+        return false;
+      }
+    }).length;
     return ok({
       tenantName: DEMO_TENANT.name,
       canViewRevenue,
@@ -3871,15 +4080,98 @@ export async function handleDemoRequest<T>({
         ? 'Revenue figures are visible for this demo session.'
         : 'Revenue figures are hidden until the owner unlocks developer access.',
       openErrorReports: openCount,
-      recentReports: reports.slice(0, 8).map((r) => ({
-        id: r.id,
-        message: r.message,
-        path: r.path,
-        status: r.status,
-        createdAt: r.createdAt,
-        reporter: `${r.reporter.name} · ${r.reporter.role}`,
-        ticketCode: developerTicketCode(r.id),
-      })),
+      systemStatus: critical > 0 ? 'incident' : openCount > 0 ? 'degraded' : 'operational',
+      systemMessage:
+        critical > 0
+          ? 'Critical issues require immediate attention'
+          : 'Production monitoring active',
+      production: {
+        version: '2.4.18',
+        build: '8421',
+        deployedAt: new Date(Date.now() - 9 * 60 * 60 * 1000).toISOString(),
+        status: 'healthy',
+        environment: 'production',
+      },
+      recentDeployments: [
+        {
+          version: '2.4.18',
+          build: '8421',
+          deployedAt: new Date(Date.now() - 9 * 60 * 60 * 1000).toISOString(),
+          status: 'healthy',
+          environment: 'production',
+        },
+        {
+          version: '2.4.17',
+          build: '8410',
+          deployedAt: new Date(Date.now() - 3 * 86400000).toISOString(),
+          status: 'healthy',
+          environment: 'production',
+        },
+      ],
+      platformHealth: [
+        { id: 'api', label: 'API', status: 'operational', href: '/control-room' },
+        { id: 'database', label: 'Database', status: 'operational' },
+        { id: 'auth', label: 'Authentication', status: 'operational', href: '/control-room/device-security' },
+        { id: 'map', label: 'Live map', status: 'operational', href: '/control-room/map' },
+        { id: 'cctv', label: 'CCTV', status: 'operational', href: '/control-room/surveillance' },
+        { id: 'dispatch', label: 'Dispatch', status: 'operational', href: '/control-room/dispatch' },
+        { id: 'notifications', label: 'Notifications', status: 'degraded', detail: 'Delayed delivery' },
+        { id: 'payments', label: 'Payments', status: 'operational', href: '/control-room/customers' },
+      ],
+      analytics: {
+        total24h: reports.length,
+        unique24h: new Set(reports.map((r) => r.message)).size,
+        affectedUsers24h: new Set(reports.map((r) => r.reporter.id)).size,
+        critical24h: critical,
+        resolved24h: reports.filter((r) => r.status === 'RESOLVED').length,
+        topErrors: Object.entries(
+          reports.reduce<Record<string, { label: string; count: number }>>((acc, r) => {
+            const key = r.message.slice(0, 40);
+            acc[key] = acc[key] ? { label: key, count: acc[key].count + 1 } : { label: key, count: 1 };
+            return acc;
+          }, {}),
+        )
+          .map(([fingerprint, v]) => ({ fingerprint, label: v.label, count: v.count }))
+          .sort((a, b) => b.count - a.count)
+          .slice(0, 5),
+      },
+      duplicateGroups: Object.entries(
+        reports.reduce<Record<string, string[]>>((acc, r) => {
+          let fp = r.message;
+          try {
+            const ctx = JSON.parse(r.context ?? '{}') as { errorFingerprint?: string };
+            if (ctx.errorFingerprint) fp = ctx.errorFingerprint;
+          } catch {
+            /* ignore */
+          }
+          acc[fp] = acc[fp] ? [...acc[fp], r.id] : [r.id];
+          return acc;
+        }, {}),
+      )
+        .filter(([, ids]) => ids.length > 1)
+        .map(([fingerprint, ticketIds]) => ({ fingerprint, ticketIds, count: ticketIds.length })),
+      recentReports: reports.slice(0, 8).map((r) => {
+        let workflowStatus = 'REPORTED';
+        let severity = 'P3';
+        try {
+          const ctx = JSON.parse(r.context ?? '{}') as { workflowStatus?: string; severity?: string };
+          if (ctx.workflowStatus) workflowStatus = ctx.workflowStatus;
+          if (ctx.severity) severity = ctx.severity;
+        } catch {
+          /* ignore */
+        }
+        return {
+          id: r.id,
+          message: r.message,
+          path: r.path,
+          status: r.status,
+          workflowStatus,
+          severity,
+          createdAt: r.createdAt,
+          reporter: `${r.reporter.name} · ${r.reporter.role}`,
+          ticketCode: developerTicketCode(r.id),
+        };
+      }),
       developers: [
         {
           id: user?.id ?? 'demo-user-developer-4ds-local',
@@ -3889,6 +4181,14 @@ export async function handleDemoRequest<T>({
           phone: user?.phone ?? '+27 82 100 0099',
         },
       ],
+      developerAccess: {
+        production: true,
+        staging: true,
+        database: false,
+        serverLogs: true,
+        deployments: true,
+        monitoring: true,
+      },
       platformLinks: [
         { label: 'Ops Board', href: '/control-room' },
         { label: 'Live map', href: '/control-room/map' },
@@ -3913,12 +4213,64 @@ export async function handleDemoRequest<T>({
       const idx = reports.findIndex((r) => r.id === id);
       if (idx < 0) return { success: false as const, message: 'Report not found' } as T;
       const next = String(payload.status ?? '').toUpperCase();
+      let context = reports[idx].context;
+      if (typeof payload.context === 'string') {
+        context = payload.context;
+      } else if (payload.workflowStatus) {
+        try {
+          const meta = JSON.parse(context ?? '{}') as Record<string, unknown>;
+          meta.workflowStatus = payload.workflowStatus;
+          meta.audit = [
+            ...((meta.audit as { at: string; action: string }[]) ?? []),
+            { at: new Date().toISOString(), action: `Status → ${payload.workflowStatus}` },
+          ];
+          context = JSON.stringify(meta);
+        } catch {
+          /* ignore */
+        }
+      }
       if (next === 'ACKNOWLEDGED' || next === 'RESOLVED' || next === 'OPEN') {
         reports[idx] = {
           ...reports[idx],
           status: next as DemoErrorReport['status'],
+          context,
         };
         writeDemoErrorReports(reports);
+      } else if (payload.workflowStatus || payload.context) {
+        reports[idx] = { ...reports[idx], context };
+        if (payload.workflowStatus === 'RESOLVED' || payload.workflowStatus === 'VERIFIED') {
+          reports[idx].status = 'RESOLVED';
+        } else if (
+          payload.workflowStatus === 'IN_PROGRESS' ||
+          payload.workflowStatus === 'TRIAGED' ||
+          payload.workflowStatus === 'TESTING' ||
+          payload.workflowStatus === 'FIX_READY'
+        ) {
+          reports[idx].status = 'ACKNOWLEDGED';
+        }
+        writeDemoErrorReports(reports);
+      }
+      if (payload.mergeDuplicates) {
+        try {
+          const meta = JSON.parse(reports[idx].context ?? '{}') as { errorFingerprint?: string };
+          const fp = meta.errorFingerprint;
+          if (fp) {
+            for (let i = 0; i < reports.length; i += 1) {
+              if (i === idx || reports[i].status === 'RESOLVED') continue;
+              try {
+                const other = JSON.parse(reports[i].context ?? '{}') as { errorFingerprint?: string };
+                if (other.errorFingerprint === fp) {
+                  reports[i] = { ...reports[i], status: 'RESOLVED' };
+                }
+              } catch {
+                /* ignore */
+              }
+            }
+            writeDemoErrorReports(reports);
+          }
+        } catch {
+          /* ignore */
+        }
       }
       return ok({
         id: reports[idx].id,
@@ -4120,6 +4472,42 @@ export async function handleDemoRequest<T>({
         },
       ],
     }) as T;
+  }
+  {
+    const crAlarm = clean.match(/^\/control-room\/surveillance\/sites\/([^/]+)\/alarm$/);
+    if (crAlarm && m === 'PATCH') {
+      const status = typeof payload.status === 'string' ? payload.status : 'DISARMED';
+      setDemoAlarmStatus(crAlarm[1], status);
+      const site = demoSurveillanceSites.find((s) => s.id === crAlarm[1]);
+      return ok({
+        id: crAlarm[1],
+        alarmStatus: site?.alarmStatus ?? status,
+      }) as T;
+    }
+  }
+  {
+    const crSiren = clean.match(/^\/control-room\/surveillance\/sites\/([^/]+)\/siren$/);
+    if (crSiren && m === 'POST') {
+      const siteId = crSiren[1];
+      const site = demoSurveillanceSites.find((s) => s.id === siteId);
+      setDemoAlarmStatus(siteId, 'TRIGGERED');
+      demoIncidents.unshift({
+        id: `demo-inc-${Date.now()}`,
+        type: 'PANIC',
+        status: 'OPEN',
+        title: `CCTV siren — ${site?.name ?? 'Property'}`,
+        isSilent: false,
+        time: 'Just now',
+        priority: 'CRITICAL',
+        user: 'Control room',
+        location: site?.address ?? 'Site',
+      });
+      return ok({
+        alarmStatus: 'TRIGGERED',
+        incidentId: demoIncidents[0].id,
+        message: `Siren sounding at ${site?.name ?? 'the property'}. Disarm to silence.`,
+      }) as T;
+    }
   }
   if (clean === '/control-room/surveillance' && m === 'GET') {
     const sites = demoSurveillanceSites.map((s) => ({
@@ -6105,6 +6493,7 @@ export async function handleDemoRequest<T>({
     (clean === '/chat/internal' || clean === '/chat/tech-team' || clean === '/chat/dev-support') &&
     m === 'GET'
   ) {
+    loadDemoChatMessages();
     const me = participantFromUser(user);
     return ok({
       conversationId: `demo-chat-${clean.slice(6)}`,
@@ -6114,7 +6503,7 @@ export async function handleDemoRequest<T>({
         { id: 'demo-off-1', firstName: 'Sipho', lastName: 'Ndlovu', role: 'OFFICER', phone: '+27831110001' },
         { id: DEMO_DISPATCHER.id, firstName: DEMO_DISPATCHER.firstName, lastName: DEMO_DISPATCHER.lastName, role: 'DISPATCHER', phone: '+27860000000' },
       ],
-      messages: demoChatMessages,
+      messages: demoChatMessages.map((message) => ({ ...message, attachments: [...message.attachments] })),
     }) as T;
   }
   if (
@@ -6122,10 +6511,12 @@ export async function handleDemoRequest<T>({
     m === 'POST'
   ) {
     const me = participantFromUser(user);
+    const toUserId = typeof payload.toUserId === 'string' && payload.toUserId ? payload.toUserId : null;
     const msg = {
       id: `demo-chat-${Date.now()}`,
       content: String(payload.content ?? '').trim() || 'Message sent',
       createdAt: new Date().toISOString(),
+      toUserId,
       sender: {
         id: me.id,
         firstName: me.firstName,
@@ -6136,7 +6527,8 @@ export async function handleDemoRequest<T>({
       attachments: [] as { id: string; fileName: string; fileType: string; fileUrl: string; fileSize: number; kind: 'IMAGE' | 'VIDEO' | 'FILE' }[],
     };
     demoChatMessages.push(msg);
-    return ok(msg) as T;
+    saveDemoChatMessages();
+    return ok({ ...msg }) as T;
   }
 
   if (clean === '/auth/me' && m === 'GET') {

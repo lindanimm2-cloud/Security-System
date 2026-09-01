@@ -13,7 +13,7 @@ import { Roles } from '../../common/decorators/roles.decorator';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { ADMIN_PORTAL_ROLES, OPS_ROLES } from '../../common/developer-access';
-import { SurveillanceService } from '../surveillance/surveillance.service';
+import { SurveillanceService, type ArmMode } from '../surveillance/surveillance.service';
 import { ClientService } from '../client/client.service';
 import { ControlRoomService } from './control-room.service';
 
@@ -50,6 +50,27 @@ export class ControlRoomController {
   @Roles(...OPS_ROLES)
   surveillanceSite(@CurrentUser() user: AuthUser, @Param('id') id: string) {
     return this.surveillanceService.controlRoomSite(user.tenantId, id);
+  }
+
+  @Patch('surveillance/sites/:id/alarm')
+  @Roles(...OPS_ROLES)
+  setSiteAlarm(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Body() body: { status?: string },
+  ) {
+    return this.surveillanceService.controlRoomSetArmMode(user.tenantId, id, body?.status as ArmMode);
+  }
+
+  @Post('surveillance/sites/:id/siren')
+  @Roles(...OPS_ROLES)
+  soundSiteSiren(@CurrentUser() user: AuthUser, @Param('id') id: string) {
+    return this.surveillanceService.soundOnSiteSiren(
+      user.tenantId,
+      id,
+      user.id,
+      'control-room',
+    );
   }
 
   @Post('surveillance/events/:id/ack')

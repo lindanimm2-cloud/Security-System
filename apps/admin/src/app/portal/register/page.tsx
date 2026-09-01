@@ -593,18 +593,17 @@ function RegisterWizard() {
                 <label className="login-field">
                   <span>Blood type</span>
                   <span className="login-input-wrap">
-                    <select
+                    <UiSelect
                       value={form.bloodType}
-                      onChange={(e) => patch({ bloodType: e.target.value })}
-                      className="register-select"
-                    >
-                      <option value="">Prefer not to say</option>
-                      {BLOOD_TYPES.map((t) => (
-                        <option key={t} value={t}>
-                          {t}
-                        </option>
-                      ))}
-                    </select>
+                      onChange={(bloodType) => patch({ bloodType })}
+                      compact={false}
+                      className="form-field-select"
+                      ariaLabel="Blood type"
+                      options={[
+                        { value: '', label: 'Prefer not to say' },
+                        ...BLOOD_TYPES.map((type) => ({ value: type, label: type })),
+                      ]}
+                    />
                   </span>
                 </label>
                 <label className="login-field">

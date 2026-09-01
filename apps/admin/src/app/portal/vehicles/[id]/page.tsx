@@ -9,6 +9,7 @@ import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { PortalLayout } from '@/components/portal/PortalLayout';
 import { PortalVehicleMap, VehicleMapIdle } from '@/components/portal/PortalVehicleMap';
 import { UpgradeBanner } from '@/components/portal/UpgradeBanner';
+import { DashboardLiveCctv } from '@/components/portal/DashboardLiveCctv';
 import { VehicleRemotePad } from '@/components/vehicle/VehicleRemotePad';
 import { useSubscriptionAccess } from '@/hooks/useSubscriptionAccess';
 import { useApi } from '@/hooks/useApi';
@@ -151,7 +152,7 @@ function VehicleProfileContent() {
     }
   }
 
-  async function sendRemote(action: VehicleRemoteAction) {
+  async function sendRemote(action: VehicleRemoteAction): Promise<boolean> {
     setRemoteBusy(action);
     setMsg('');
     try {
@@ -160,9 +161,11 @@ function VehicleProfileContent() {
         { action },
       );
       setMsg(res.data?.message ?? 'Remote command sent.');
-      reload();
+      void reload({ silent: true });
+      return true;
     } catch (e) {
       setMsg(friendlyErrorMessage(e, 'action'));
+      return false;
     } finally {
       setRemoteBusy(null);
     }
@@ -236,8 +239,10 @@ function VehicleProfileContent() {
             theftRecovery: v.theftRecovery,
           }}
           busyAction={remoteBusy}
-          onCommand={(action) => void sendRemote(action)}
-        />
+          onCommand={(action) => sendRemote(action)}
+        >
+          <DashboardLiveCctv embedded kind="vehicle" vehicleId={v.id} />
+        </VehicleRemotePad>
       </section>
 
       <section className="portal-card vehicle-profile__map-section">

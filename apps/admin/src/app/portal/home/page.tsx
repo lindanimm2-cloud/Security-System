@@ -224,7 +224,7 @@ function HomeContent() {
             {access?.vehicle !== false && primaryVehicle ? (
               <ClientVehicleRemote
                 vehicle={primaryVehicle}
-                onUpdated={() => void reloadVehicles()}
+                onUpdated={() => void reloadVehicles({ silent: true })}
               />
             ) : null}
           </div>

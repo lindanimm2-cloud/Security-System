@@ -1,4 +1,16 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
+  UploadedFiles,
+  UseGuards,
+  UseInterceptors,
+} from '@nestjs/common';
+import { FilesInterceptor } from '@nestjs/platform-express';
 import { UserRole } from '@prisma/client';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
@@ -130,8 +142,30 @@ export class ClientController {
   }
 
   @Post('family/messages')
-  sendFamilyMessage(@CurrentUser() user: AuthUser, @Body() body: { content: string }) {
-    return this.clientService.sendFamilyMessage(user.id, user.tenantId, body.content);
+  @UseInterceptors(
+    FilesInterceptor('files', 5, {
+      limits: { fileSize: 25 * 1024 * 1024 },
+    }),
+  )
+  sendFamilyMessage(
+    @CurrentUser() user: AuthUser,
+    @Body('content') content: string,
+    @Body('lat') lat?: string,
+    @Body('lng') lng?: string,
+    @Body('replyToId') replyToId?: string,
+    @UploadedFiles()
+    files?: { originalname: string; mimetype: string; size: number; buffer: Buffer }[],
+  ) {
+    const latN = lat != null && lat !== '' ? Number(lat) : NaN;
+    const lngN = lng != null && lng !== '' ? Number(lng) : NaN;
+    return this.clientService.sendFamilyMessage(
+      user.id,
+      user.tenantId,
+      content ?? '',
+      files ?? [],
+      Number.isFinite(latN) && Number.isFinite(lngN) ? { lat: latN, lng: lngN } : null,
+      replyToId || null,
+    );
   }
 
   @Get('messages')
@@ -303,6 +337,17 @@ export class ClientController {
   @Post('properties/:id/panic')
   homePanic(@CurrentUser() user: AuthUser, @Param('id') id: string) {
     return this.clientService.triggerHomePanic(user.id, user.tenantId, id);
+  }
+
+  @Post('properties/:id/siren')
+  soundSiren(@CurrentUser() user: AuthUser, @Param('id') id: string) {
+    return this.surveillanceService.soundOnSiteSiren(
+      user.tenantId,
+      id,
+      user.id,
+      'portal',
+      user.id,
+    );
   }
 
   @Get('medical')

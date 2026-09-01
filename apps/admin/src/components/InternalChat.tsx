@@ -38,6 +38,7 @@ export type ChatMessage = {
   content: string;
   createdAt: string;
   sender: ChatParticipant;
+  toUserId?: string | null;
   attachments?: ChatAttachment[];
 };
 
@@ -235,8 +236,10 @@ export function InternalChat({
   const [mobileShowThread, setMobileShowThread] = useState(false);
   const [callBusy, setCallBusy] = useState<string | null>(null);
   const [receipts, setReceipts] = useState<Record<string, string>>({});
+  const [sendError, setSendError] = useState('');
 
   const bottomRef = useRef<HTMLDivElement>(null);
+  const messagesRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const receiptsKey = currentUserId
@@ -245,7 +248,7 @@ export function InternalChat({
 
   useEffect(() => {
     if (data?.data) {
-      setMessages(data.data.messages);
+      setMessages(data.data.messages.map((message) => ({ ...message })));
       setParticipants(data.data.participants);
     }
   }, [data]);
@@ -256,7 +259,9 @@ export function InternalChat({
   }, [receiptsKey]);
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+    const el = messagesRef.current;
+    if (!el) return;
+    el.scrollTop = el.scrollHeight;
   }, [messages, activeId]);
 
   useEffect(() => {
@@ -371,8 +376,17 @@ export function InternalChat({
 
   const visibleMessages = useMemo(() => {
     if (!activeThread || activeThread.kind === 'team') return messages;
-    return messages.filter((m) => m.sender.id === activeThread.id);
-  }, [messages, activeThread]);
+    const otherId = activeThread.id;
+    const mention = activeThread.participant
+      ? `@${activeThread.participant.firstName}`
+      : '';
+    return messages.filter((m) => {
+      if (m.sender.id === otherId) return true;
+      if (m.sender.id !== currentUserId) return false;
+      if (m.toUserId && m.toUserId === otherId) return true;
+      return Boolean(mention && m.content.trim().startsWith(mention));
+    });
+  }, [messages, activeThread, currentUserId]);
 
   const messageGroups = useMemo(() => {
     const groups: { date: string; items: ChatMessage[] }[] = [];
@@ -402,28 +416,36 @@ export function InternalChat({
   const sendMessage = useCallback(async () => {
     if ((!content.trim() && pendingFiles.length === 0) || sending) return;
     setSending(true);
+    setSendError('');
     try {
       let body = content;
+      const toUserId = activeThread?.kind === 'direct' ? activeThread.id : null;
       if (activeThread?.kind === 'direct' && activeThread.participant) {
         const mention = `@${activeThread.participant.firstName}`;
         if (!body.trim().startsWith(mention)) {
           body = body.trim() ? `${mention} ${body.trim()}` : mention;
         }
       }
-      const res = await sendInternalChatMessage(portal, body, pendingFiles, channel);
+      const res = await sendInternalChatMessage(portal, body, pendingFiles, channel, toUserId);
+      if (!res?.data?.id) {
+        throw new Error("Couldn't send that message. Try again.");
+      }
+      const sent = { ...res.data, toUserId: res.data.toUserId ?? toUserId };
       setMessages((prev) => {
-        if (prev.some((m) => m.id === res.data.id)) return prev;
-        return [...prev, res.data];
+        if (prev.some((m) => m.id === sent.id)) {
+          return prev.map((m) => (m.id === sent.id ? sent : m));
+        }
+        return [...prev, sent];
       });
       setContent('');
       setPendingFiles([]);
       setEmojiOpen(false);
-    } catch {
-      reload();
+    } catch (err) {
+      setSendError(friendlyErrorMessage(err, 'save'));
     } finally {
       setSending(false);
     }
-  }, [activeThread, channel, content, pendingFiles, portal, reload, sending]);
+  }, [activeThread, channel, content, pendingFiles, portal, sending]);
 
   async function handleSend(e: FormEvent) {
     e.preventDefault();
@@ -707,7 +729,7 @@ export function InternalChat({
             </div>
           </div>
 
-          <div className="team-chat__messages">
+          <div className="team-chat__messages" ref={messagesRef}>
             {visibleMessages.length === 0 ? (
               <p className="chat-empty text-muted">
                 {activeThread?.kind === 'direct'
@@ -727,7 +749,7 @@ export function InternalChat({
                         key={m.id}
                         className={`chat-bubble team-chat__bubble ${isSelf ? 'chat-bubble--self' : 'chat-bubble--other'}`}
                       >
-                        {!isSelf && (
+                        {!isSelf ? (
                           <div className="chat-bubble__header">
                             <span className="chat-sender">
                               {fullName(m.sender)}
@@ -748,6 +770,10 @@ export function InternalChat({
                                 <PhoneIcon />
                               </button>
                             )}
+                          </div>
+                        ) : (
+                          <div className="chat-bubble__header">
+                            <span className="chat-sender">You</span>
                           </div>
                         )}
                         {m.content && <p>{m.content}</p>}
@@ -785,6 +811,12 @@ export function InternalChat({
                 </div>
               ))}
             </div>
+          )}
+
+          {sendError && (
+            <p className="team-chat__send-error" role="alert">
+              {sendError}
+            </p>
           )}
 
           <form className="chat-composer team-chat__composer" onSubmit={handleSend}>

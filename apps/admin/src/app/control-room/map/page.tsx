@@ -287,9 +287,14 @@ function MapContent() {
     });
   }, [rawMapData?.vehicles, reload]);
 
-  async function sendVehicleRemote(vehicleId: string, action: VehicleRemoteAction) {
-    await adminApi.post(`/control-room/client-vehicles/${vehicleId}/remote`, { action });
-    void reload({ silent: true });
+  async function sendVehicleRemote(vehicleId: string, action: VehicleRemoteAction): Promise<boolean> {
+    try {
+      await adminApi.post(`/control-room/client-vehicles/${vehicleId}/remote`, { action });
+      void reload({ silent: true });
+      return true;
+    } catch {
+      return false;
+    }
   }
 
   function returnToOverview() {
@@ -580,7 +585,7 @@ function MapContent() {
               if (incident) selectIncident(incident);
             }}
             onDispatchAssigned={() => void reload({ silent: true })}
-            onVehicleRemote={(vehicleId, action) => void sendVehicleRemote(vehicleId, action)}
+            onVehicleRemote={(vehicleId, action) => sendVehicleRemote(vehicleId, action)}
           />
         </div>
       </div>

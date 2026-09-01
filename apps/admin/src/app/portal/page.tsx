@@ -3,7 +3,7 @@
 import { ErrorAlert } from '@/components/ErrorAlert';
 
 import Link from 'next/link';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { PortalLayout } from '@/components/portal/PortalLayout';
 import { useApi } from '@/hooks/useApi';
@@ -122,9 +122,12 @@ function OverviewDashboard() {
     [],
   );
 
+  const didInitialScroll = useRef(false);
+
   useEffect(() => {
-    if (!loading) {
+    if (!loading && !didInitialScroll.current) {
       window.scrollTo(0, 0);
+      didInitialScroll.current = true;
     }
   }, [loading]);
 
@@ -318,13 +321,13 @@ function OverviewDashboard() {
         properties={d.properties ?? []}
         hasAccess={!!access?.home}
         onUpdated={reload}
-        feeds={<DashboardLiveCctv embedded />}
+        feeds={<DashboardLiveCctv embedded kind="home" />}
       />
 
       {access?.vehicle !== false && primaryVehicle ? (
         <ClientVehicleRemote
           vehicle={primaryVehicle}
-          onUpdated={() => void reload()}
+          onUpdated={() => void reload({ silent: true })}
         />
       ) : null}
 
@@ -380,6 +383,9 @@ function OverviewDashboard() {
             ? `${d.stats.activeIncidents} active · action needed`
             : 'You are covered — protect stays one hold away'
         }
+        subtitleHref={hasAlert ? '/portal/incidents' : '/portal/protect'}
+        subtitleAction={hasAlert ? 'View alerts' : 'Open Protect'}
+        sectionLabel="Today"
         chips={[
           {
             id: 'all',
@@ -429,9 +435,9 @@ function OverviewDashboard() {
 
       {(filter === 'all' || filter === 'urgent') && (
       <SlideCarousel
-        title="Coverage"
+        title="Protection status"
         seeAllHref="/portal/incidents"
-        seeAllLabel="All alerts"
+        seeAllLabel="View alerts"
         layout="grid"
         className="slide-carousel--brief"
       >
@@ -439,22 +445,26 @@ function OverviewDashboard() {
           title="Alerts"
           href="/portal/incidents"
           tone={hasAlert ? 'alert' : 'ok'}
+          status={hasAlert ? 'alert' : 'ok'}
+          action="View alerts"
         >
           <strong className="slide-carousel__stat">{d.stats.activeIncidents}</strong>
           <p className="text-muted">
-            {hasAlert ? 'Open alerts — tap for updates' : 'No open alerts · you are clear'}
+            {hasAlert ? 'Open alerts' : 'No open alerts'}
           </p>
         </SlideCarouselCard>
         <SlideCarouselCard
           title="Live tracking"
           href="/portal/location"
           tone={d.user.trackingEnabled ? 'ok' : 'warn'}
+          status={d.user.trackingEnabled ? 'ok' : 'warn'}
+          action="View tracking"
         >
-          <strong className="slide-carousel__stat">{d.user.trackingEnabled ? 'ON' : 'OFF'}</strong>
+          <strong className="slide-carousel__stat">{d.user.trackingEnabled ? 'On' : 'Off'}</strong>
           <p className="text-muted">
             {d.user.trackingEnabled
-              ? 'GPS sharing active for response'
-              : 'Enable tracking so responders can find you'}
+              ? 'GPS sharing active'
+              : 'Enable tracking for response'}
           </p>
         </SlideCarouselCard>
         <SlideCarouselCard
@@ -467,19 +477,37 @@ function OverviewDashboard() {
                 : 'ok'
               : 'muted'
           }
+          status={
+            primaryAlarm?.alarmStatus === 'TRIGGERED'
+              ? 'alert'
+              : primaryAlarm && ['ARMED', 'STAY', 'NIGHT'].includes(primaryAlarm.alarmStatus)
+                ? 'ok'
+                : 'off'
+          }
+          action="Manage alarm"
         >
           <strong className="slide-carousel__stat slide-carousel__stat--sm">
-            {primaryAlarm ? alarmStatusLabel(primaryAlarm.alarmStatus) : '—'}
+            {primaryAlarm
+              ? ['ARMED', 'STAY', 'NIGHT'].includes(primaryAlarm.alarmStatus)
+                ? 'Armed'
+                : alarmStatusLabel(primaryAlarm.alarmStatus)
+              : '—'}
           </strong>
           <p className="text-muted">
             {primaryAlarm
-              ? primaryAlarm.name
+              ? `${primaryAlarm.alarmStatus === 'ARMED' ? 'Away' : primaryAlarm.alarmStatus === 'STAY' ? 'Stay' : primaryAlarm.alarmStatus === 'NIGHT' ? 'Night' : alarmStatusLabel(primaryAlarm.alarmStatus)} · ${primaryAlarm.name.replace(/^Home — /, '')}`
               : access?.home
                 ? 'Add a property to arm'
                 : 'Upgrade for home security'}
           </p>
         </SlideCarouselCard>
-        <SlideCarouselCard title="Family" href="/portal/family" tone={d.stats.familyCount > 0 ? 'ok' : 'muted'}>
+        <SlideCarouselCard
+          title="Family"
+          href="/portal/family"
+          tone={d.stats.familyCount > 0 ? 'ok' : 'muted'}
+          status={d.stats.familyCount > 0 ? 'ok' : 'off'}
+          action="View family"
+        >
           <strong className="slide-carousel__stat">{d.stats.familyCount}</strong>
           <p className="text-muted">
             {family.filter((m) => m.trackingEnabled).length} tracking · {d.safeZoneCount} safe zones
@@ -490,6 +518,8 @@ function OverviewDashboard() {
             title="Vehicle"
             href={`/portal/vehicles/${primaryVehicle.id}`}
             tone={primaryVehicle.theftRecovery ? 'alert' : 'ok'}
+            status={primaryVehicle.theftRecovery ? 'alert' : 'ok'}
+            action="Open vehicle"
           >
             <strong className="slide-carousel__stat slide-carousel__stat--sm">
               {primaryVehicle.registration}
@@ -503,39 +533,6 @@ function OverviewDashboard() {
       </SlideCarousel>
       )}
       </div>
-
-      <SlideCarousel
-        title="Your services"
-        seeAllHref="/portal/subscription"
-        seeAllLabel="Manage plan"
-        layout="grid"
-      >
-        {Object.entries(d.services ?? {})
-          .filter(([key]) => key !== 'communications')
-          .map(([key, status]) => (
-            <SlideCarouselCard
-              key={key}
-              title={SERVICE_LABELS[key] ?? key}
-              href={
-                status === 'upgrade'
-                  ? `/portal/subscription/upgrade?addon=${key === 'home' ? 'HOME_SECURITY' : key === 'vehicle' ? 'VEHICLE_RESPONSE' : key === 'family' ? 'FAMILY' : ''}`
-                  : (SERVICE_HREFS[key] ?? '/portal')
-              }
-              tone={status === 'active' || status === 'monitoring' ? 'ok' : status === 'upgrade' ? 'warn' : 'muted'}
-            >
-              <span className={`service-status-badge service-status-badge--${status}`}>
-                {status === 'upgrade' ? 'Upgrade' : status === 'monitoring' ? 'Monitoring' : status === 'active' ? 'Active' : status}
-              </span>
-              <p className="text-muted">
-                {status === 'upgrade'
-                  ? 'Add to your plan'
-                  : status === 'monitoring'
-                    ? 'Control room watching'
-                    : 'On your plan'}
-              </p>
-            </SlideCarouselCard>
-          ))}
-      </SlideCarousel>
 
       <OpsNeedsYou
         items={[

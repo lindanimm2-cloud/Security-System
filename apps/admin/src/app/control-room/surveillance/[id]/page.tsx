@@ -11,6 +11,7 @@ import { adminApi, type ApiResponse } from '@/lib/api-client';
 import { dispatchIncidentHref, CONTROL_ROOM_ROUTES } from '@/lib/control-room-routes';
 import { SensorZonePanel, type SensorRow } from '@/components/portal/SensorZonePanel';
 import { CctvLiveFeed } from '@/components/portal/CctvLiveFeed';
+import { HoldToActivate } from '@/components/ops/EmergencyMode';
 import { alarmStatusLabel } from '@/lib/sa-alarm';
 
 type SiteDetail = {
@@ -174,6 +175,32 @@ function SiteContent() {
             <span className="status-pill status-pill--open" style={{ background: 'rgba(220,38,38,0.15)', color: '#dc2626' }}>
               {openEvents.length} open event{openEvents.length !== 1 ? 's' : ''}
             </span>
+          )}
+          {site.alarmStatus === 'TRIGGERED' ? (
+            <button
+              type="button"
+              className="btn-secondary btn-sm"
+              disabled={busy != null}
+              onClick={() =>
+                void run('disarm', () =>
+                  adminApi.patch(`/control-room/surveillance/sites/${id}/alarm`, { status: 'DISARMED' }),
+                )
+              }
+            >
+              {busy === 'disarm' ? 'Silencing…' : 'Silence siren'}
+            </button>
+          ) : (
+            <HoldToActivate
+              className="hold-activate--inline"
+              label="Sound siren"
+              holdLabel="Hold to sound siren…"
+              holdMs={1200}
+              loading={busy === 'siren'}
+              disabled={busy != null}
+              onActivate={() =>
+                void run('siren', () => adminApi.post(`/control-room/surveillance/sites/${id}/siren`))
+              }
+            />
           )}
         </div>
       </div>

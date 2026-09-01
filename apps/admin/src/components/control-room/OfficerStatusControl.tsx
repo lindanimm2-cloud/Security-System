@@ -46,7 +46,8 @@ export function OfficerStatusControl({
     return (
       <div className="officer-status-select-wrap">
         <OpsMenuDropdown
-          className="officer-status-menu"
+          className={`officer-status-menu officer-status-menu--${officerStatusSlug(status)}`}
+          triggerClassName={`officer-status-menu__trigger officer-status-menu__trigger--${officerStatusSlug(status)}`}
           compact
           align="right"
           ariaLabel="Officer status"

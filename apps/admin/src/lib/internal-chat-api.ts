@@ -67,6 +67,7 @@ export async function sendInternalChatMessage(
   content: string,
   files: File[],
   channel: ChatChannel = 'internal',
+  toUserId?: string | null,
 ): Promise<ApiResponse<ChatMessage>> {
   const session = getSession(portal);
   if (!session) throw new Error('Not authenticated');
@@ -76,13 +77,14 @@ export async function sendInternalChatMessage(
       portal,
       path: channelPath(channel),
       method: 'POST',
-      body: JSON.stringify({ content }),
+      body: JSON.stringify({ content, toUserId: toUserId || undefined }),
       session,
     });
   }
 
   const form = new FormData();
   form.append('content', content);
+  if (toUserId) form.append('toUserId', toUserId);
   for (const file of files) {
     form.append('files', file);
   }

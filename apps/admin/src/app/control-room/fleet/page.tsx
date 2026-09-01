@@ -12,10 +12,12 @@ import { OpsKpi } from '@/components/ops/OpsKpi';
 import { OpsDialog } from '@/components/ops/OpsDialog';
 import { UiSelect } from '@/components/ui/UiSelect';
 import { ListSearch } from '@/components/ui/ListSearch';
+import { LayoutViewToggle } from '@/components/ui/LayoutViewToggle';
 import { CctvLiveFeed, type CctvCamera } from '@/components/portal/CctvLiveFeed';
 import { friendlyErrorMessage } from '@/lib/friendly-error';
 import { FLEET_TEAMS, fleetTeamDuty, fleetTeamLabel } from '@/lib/fleet-teams';
 import { matchesSearch } from '@/lib/list-search';
+import { useLayoutView } from '@/hooks/useLayoutView';
 
 type CrewMember = {
   officerId: string;
@@ -92,6 +94,7 @@ function FleetContent() {
   const [saving, setSaving] = useState(false);
   const [filter, setFilter] = useState<'all' | 'active' | 'ready' | 'maintenance'>('all');
   const [search, setSearch] = useState('');
+  const [layoutView, setLayoutView] = useLayoutView('control-room-fleet');
   const [notice, setNotice] = useState<{ tone: 'success' | 'warning' | 'error'; text: string } | null>(null);
   const [dialog, setDialog] = useState<'add' | FleetVehicle | null>(null);
 
@@ -294,14 +297,17 @@ function FleetContent() {
         />
       </div>
 
-      <div className="list-search-bar">
-        <ListSearch
-          value={search}
-          onChange={setSearch}
-          placeholder="Search call sign, registration, crew…"
-          resultCount={visibleFleet.length}
-          totalCount={statusFiltered.length}
-        />
+      <div className="list-toolbar">
+        <div className="list-search-bar">
+          <ListSearch
+            value={search}
+            onChange={setSearch}
+            placeholder="Search call sign, registration, crew…"
+            resultCount={visibleFleet.length}
+            totalCount={statusFiltered.length}
+          />
+        </div>
+        <LayoutViewToggle value={layoutView} onChange={setLayoutView} label="Fleet layout" />
       </div>
 
       {visibleFleet.length === 0 ? (
@@ -318,7 +324,7 @@ function FleetContent() {
             )}
         </div>
       ) : (
-      <div className="fleet-grid">
+      <div className={`fleet-grid ${layoutView === 'list' ? 'fleet-grid--list' : ''}`}>
         {visibleFleet.map((v) => (
           <article key={v.id} className={`fleet-card fleet-card--${v.vehicleType.toLowerCase().replace(/_/g, '-')}`}>
             <div className="fleet-card__header">
