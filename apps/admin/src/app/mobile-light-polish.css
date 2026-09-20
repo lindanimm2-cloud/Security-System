@@ -6,13 +6,15 @@
 /* ── Light mode: control-room tokens ─────────────────────── */
 
 html[data-theme='light'] {
-  --cr-surface: color-mix(in srgb, var(--surface) 88%, transparent);
-  --cr-surface-hover: color-mix(in srgb, var(--surface) 72%, var(--surface-2));
-  --cr-surface-active: var(--surface);
-  --cr-edge: rgba(72, 82, 96, 0.18);
-  --cr-edge-strong: rgba(72, 82, 96, 0.28);
-  --cr-shadow: 8px 8px 18px rgba(72, 82, 96, 0.2);
-  --cr-shadow-soft: 4px 4px 12px rgba(72, 82, 96, 0.16);
+  --cr-surface: #ffffff;
+  --cr-surface-hover: #f7f8fa;
+  --cr-surface-active: #eef2ff;
+  --cr-edge: #dde2e7;
+  --cr-edge-strong: #c8d0d8;
+  --cr-shadow: none;
+  --cr-shadow-soft: none;
+  --cr-blur: none;
+  --cr-panel: #ffffff;
 }
 
 html[data-theme='light'] .dash-live-map__hud,
@@ -170,48 +172,177 @@ html[data-theme='light'] .shell--admin .mobile-bottom-nav__item--active .mobile-
     outline-offset: 1px;
   }
 
-  /* Single-pane mobile ops board */
+  /* Single-pane mobile ops board — never show desktop side-rails */
+  .shell--admin .ops-board--v2 .ops-board__rail,
+  .ops-board--console .ops-board__rail,
+  .ops-board__rail {
+    display: none !important;
+    height: auto !important;
+    min-height: 0 !important;
+  }
+
+  .ops-board__pane-collapse {
+    display: none !important;
+  }
+
+  .dash-ops--ops-board .ops-board-hero {
+    display: none;
+  }
+
+  .dash-ops--ops-board .ops-strip--command {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 0.55rem;
+    width: 100%;
+    margin: 0 0 0.55rem;
+    padding: 0.55rem;
+  }
+
+  .dash-ops--ops-board .ops-kpi-bar,
+  .shell--admin .ops-kpi-bar {
+    display: grid !important;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.4rem;
+    width: 100%;
+    flex-wrap: unset;
+  }
+
+  .dash-ops--ops-board .ops-kpi,
+  .shell--admin .ops-kpi,
+  html[data-theme='dark'] .shell--ops .ops-kpi {
+    min-width: 0 !important;
+    width: 100% !important;
+    min-height: 3.25rem !important;
+    padding: 0.45rem 0.35rem !important;
+    gap: 0.12rem !important;
+  }
+
+  .dash-ops--ops-board .ops-kpi__label,
+  html[data-theme='dark'] .shell--ops .ops-kpi__label {
+    font-size: 0.58rem !important;
+    letter-spacing: 0.04em;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .dash-ops--ops-board .ops-kpi__value,
+  html[data-theme='dark'] .shell--ops .ops-kpi__value {
+    font-size: 1.15rem !important;
+  }
+
+  .dash-ops--ops-board .ops-strip__chip,
+  .shell--admin .ops-strip--command .ops-strip__chip {
+    flex: 0 0 auto;
+    min-height: 2rem;
+    padding: 0.28rem 0.62rem;
+    font-size: 0.68rem;
+  }
+
+  .dash-ops--ops-board .ops-strip__owner .btn-sm {
+    flex: 1 1 calc(33.333% - 0.35rem);
+    min-width: 5.5rem;
+    justify-content: center;
+    text-align: center;
+  }
+
+  .dash-ops--ops-board .ops-compact-stats {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.45rem;
+    margin: 0.65rem 0 0;
+    width: 100%;
+  }
+
+  .dash-ops--ops-board .ops-compact-stats__cell:last-child:nth-child(odd) {
+    grid-column: 1 / -1;
+  }
+
   .ops-board--console[data-mobile-pane='queue'] .ops-board__center,
   .ops-board--console[data-mobile-pane='queue'] .ops-board__detail,
   .ops-board--console[data-mobile-pane='queue'] .ops-board__vehicles,
-  .ops-board--console[data-mobile-pane='queue'] .ops-board__avail {
+  .ops-board--console[data-mobile-pane='queue'] .ops-board__avail,
+  .ops-board--console[data-mobile-pane='queue'] .ops-board__sites,
+  .ops-board--console[data-mobile-pane='queue'] .ops-board__rail--detail {
     display: none !important;
   }
 
   .ops-board--console[data-mobile-pane='map'] .ops-board__queue,
   .ops-board--console[data-mobile-pane='map'] .ops-board__detail,
   .ops-board--console[data-mobile-pane='map'] .ops-board__vehicles,
-  .ops-board--console[data-mobile-pane='map'] .ops-board__avail {
+  .ops-board--console[data-mobile-pane='map'] .ops-board__avail,
+  .ops-board--console[data-mobile-pane='map'] .ops-board__sites,
+  .ops-board--console[data-mobile-pane='map'] .ops-board__rail {
+    display: none !important;
+  }
+
+  .ops-board--console[data-mobile-pane='map'] .ops-board__cctv {
+    display: none !important;
+  }
+
+  .ops-board--console[data-mobile-pane='cctv'] .ops-board__queue,
+  .ops-board--console[data-mobile-pane='cctv'] .ops-board__detail,
+  .ops-board--console[data-mobile-pane='cctv'] .ops-board__vehicles,
+  .ops-board--console[data-mobile-pane='cctv'] .ops-board__avail,
+  .ops-board--console[data-mobile-pane='cctv'] .ops-board__sites,
+  .ops-board--console[data-mobile-pane='cctv'] .ops-board__rail {
+    display: none !important;
+  }
+
+  .ops-board--console[data-mobile-pane='cctv'] .ops-board__map,
+  .ops-board--console[data-mobile-pane='cctv'] .ops-live-head {
     display: none !important;
   }
 
   .ops-board--console[data-mobile-pane='detail'] .ops-board__queue,
   .ops-board--console[data-mobile-pane='detail'] .ops-board__center,
   .ops-board--console[data-mobile-pane='detail'] .ops-board__vehicles,
-  .ops-board--console[data-mobile-pane='detail'] .ops-board__avail {
+  .ops-board--console[data-mobile-pane='detail'] .ops-board__avail,
+  .ops-board--console[data-mobile-pane='detail'] .ops-board__sites,
+  .ops-board--console[data-mobile-pane='detail'] .ops-board__rail--queue {
     display: none !important;
   }
 
   .ops-board--console[data-mobile-pane='more'] .ops-board__queue,
   .ops-board--console[data-mobile-pane='more'] .ops-board__center,
-  .ops-board--console[data-mobile-pane='more'] .ops-board__detail {
+  .ops-board--console[data-mobile-pane='more'] .ops-board__detail,
+  .ops-board--console[data-mobile-pane='more'] .ops-board__rail {
     display: none !important;
   }
 
-  .ops-board--console {
+  .ops-board--console,
+  .shell--admin .ops-board--v2,
+  .shell--admin .ops-board--v2.ops-board--queue-collapsed.ops-board--detail-collapsed,
+  .shell--admin .ops-board--v2.ops-board--dash-main.ops-board--queue-collapsed.ops-board--detail-collapsed,
+  .shell--admin .ops-board--v2.ops-board--queue-collapsed.ops-board--detail-open,
+  .shell--admin .ops-board--v2.ops-board--queue-open.ops-board--detail-collapsed {
     grid-template-columns: 1fr !important;
+    grid-template-rows: auto !important;
     gap: 0.5rem;
+    width: 100%;
+    min-width: 0;
   }
 
   .ops-board--console .ops-board__queue,
   .ops-board--console .ops-board__center,
   .ops-board--console .ops-board__detail,
   .ops-board--console .ops-board__vehicles,
-  .ops-board--console .ops-board__avail {
-    grid-column: 1 !important;
+  .ops-board--console .ops-board__avail,
+  .shell--admin .ops-board--v2 .ops-board__queue,
+  .shell--admin .ops-board--v2 .ops-board__center,
+  .shell--admin .ops-board--v2 .ops-board__detail,
+  .shell--admin .ops-board--v2 .ops-board__vehicles,
+  .shell--admin .ops-board--v2 .ops-board__avail,
+  .shell--admin .ops-board--v2 .ops-board__sites {
+    grid-column: 1 / -1 !important;
     grid-row: auto !important;
     max-height: none !important;
+    height: auto !important;
+    min-height: 0 !important;
     overflow: visible !important;
+    width: 100%;
+    min-width: 0;
   }
 
   .ops-board--console .ops-board__queue-list {
@@ -225,6 +356,10 @@ html[data-theme='light'] .shell--admin .mobile-bottom-nav__item--active .mobile-
 
   .ops-board--console[data-mobile-pane='map'] .ops-board__map {
     min-height: min(52vh, 420px);
+  }
+
+  .ops-board--console[data-mobile-pane='cctv'] .ops-board__cctv {
+    min-height: min(62vh, 520px);
   }
 
   .ops-board--console[data-mobile-pane='detail'] .ops-board__detail-body {
@@ -287,12 +422,11 @@ html[data-theme='light'] .shell--admin .mobile-bottom-nav__item--active .mobile-
   }
 
   .ops-board__detail-foot {
-    position: sticky;
-    bottom: 0;
-    z-index: 2;
+    position: static;
+    z-index: auto;
     background: color-mix(in srgb, var(--surface) 94%, transparent);
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
     padding-top: 0.5rem;
     margin-top: 0.35rem;
     border-top: 1px solid var(--cr-edge);
@@ -353,6 +487,67 @@ html[data-theme='light'] .shell--admin .mobile-bottom-nav__item--active .mobile-
   .page-content,
   .page-section {
     min-width: 0;
+  }
+
+  /* Shared shell: stop horizontal bleed / cramped grids */
+  .shell--admin,
+  .shell--officer,
+  .shell--portal,
+  .shell--ops {
+    overflow-x: hidden;
+  }
+
+  .shell--admin .shell-content,
+  .shell--officer .officer-content,
+  .shell--portal .portal-main,
+  .shell--ops .shell-content {
+    min-width: 0;
+    max-width: 100%;
+    overflow-x: clip;
+  }
+
+  .shell--admin .shell-content > *,
+  .shell--officer .officer-content > *,
+  .shell--portal .portal-main > *,
+  .dash-ops,
+  .dash-ops--ops-board,
+  .ops-compact-stats,
+  .ops-quick-work,
+  .ops-section,
+  .panel,
+  .list-card,
+  .portal-card {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .ops-compact-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    width: 100%;
+  }
+
+  .ops-compact-stats__cell:last-child:nth-child(odd) {
+    grid-column: 1 / -1;
+  }
+
+  .ops-quick-work__row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+  }
+
+  .ops-quick-work__btn {
+    flex: 1 1 auto;
+    min-width: min(100%, 8.5rem);
+  }
+
+  .data-table-wrap,
+  .table-scroll,
+  .responding-resources,
+  .entity-table-wrap {
+    max-width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
   }
 
   .mobile-shell-header--admin {
@@ -507,7 +702,6 @@ html[data-theme='light'] .ds-job,
 html[data-theme='light'] .ds-metric,
 html[data-theme='light'] .ds-empty,
 html[data-theme='light'] .svc-req__quick-card,
-html[data-theme='light'] .settings-hub__section,
 html[data-theme='light'] .psim-card,
 html[data-theme='light'] .empty-state,
 html[data-theme='light'] .login-card,
@@ -704,9 +898,9 @@ html[data-theme='light'] .chip--active {
   color: var(--text);
 }
 
-/* Light-mode portal loading — matches the pale protection UI, not the dark boot splash */
-html[data-theme='light'] .loading-screen--v2,
-html[data-theme='light'] .loading-screen--brand {
+/* Light-mode loading + login — keep iOS black loader card; soft page wash for login only */
+html[data-theme='light'] .login-page,
+html[data-theme='light'] .login-page--v2 {
   background:
     linear-gradient(180deg, rgba(185, 28, 28, 0.08) 0%, transparent 28%),
     radial-gradient(ellipse 80% 50% at 50% -8%, rgba(185, 28, 28, 0.1), transparent 58%),
@@ -714,41 +908,33 @@ html[data-theme='light'] .loading-screen--brand {
   color: var(--text);
 }
 
-html[data-theme='light'] .loading-screen__glow {
-  background: radial-gradient(circle, rgba(185, 28, 28, 0.12), transparent 70%);
+html[data-theme='light'] .loading-screen--v2,
+html[data-theme='light'] .loading-screen--brand {
+  background: #0a0a0a;
+  color: #ffffff;
 }
 
-html[data-theme='light'] .loading-screen__scan {
-  opacity: 0.22;
-  background: repeating-linear-gradient(
-    0deg,
-    transparent,
-    transparent 3px,
-    rgba(15, 23, 42, 0.03) 3px,
-    rgba(15, 23, 42, 0.03) 4px
-  );
+html[data-theme='light'] .loading-screen__label,
+html[data-theme='light'] .loading-screen--ios .loading-screen__label {
+  color: #ffffff;
 }
 
-html[data-theme='light'] .loader-orbit__track {
-  border-color: rgba(15, 23, 42, 0.08);
-  background: radial-gradient(circle at 50% 50%, rgba(185, 28, 28, 0.06), transparent 68%);
+html[data-theme='light'] .loading-screen__hint,
+html[data-theme='light'] .loading-screen--ios .loading-screen__hint {
+  color: rgba(255, 255, 255, 0.55);
 }
 
-html[data-theme='light'] .loader-orbit__ring--b {
-  border-bottom-color: rgba(15, 23, 42, 0.28);
-  border-left-color: rgba(15, 23, 42, 0.08);
+html[data-theme='light'] .login-card,
+html[data-theme='light'] .login-card--v2 {
+  background: var(--surface);
+  border-color: var(--border);
+  box-shadow: var(--neu-raised);
 }
 
-html[data-theme='light'] .loading-screen__label {
-  color: var(--text);
-}
-
-html[data-theme='light'] .loading-screen__hint {
-  color: var(--muted);
-}
-
-html[data-theme='light'] .loading-screen__bar {
-  background: rgba(15, 23, 42, 0.08);
+html[data-theme='light'] .login-input-wrap {
+  background: #fff;
+  border-color: rgba(92, 104, 120, 0.18);
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
 }
 
 html[data-theme='light'] .chat-box--family .chat-bubble--self {
@@ -778,4 +964,748 @@ html[data-theme='light'] .fam-chat-thread {
 html[data-theme='light'] .fam-chat-head,
 html[data-theme='light'] .fam-chat-composer {
   background: #f0f2f5;
+}
+
+html[data-theme='light'] .portal-cmd__head--secure .portal-cmd__state {
+  color: #15803d;
+  text-shadow: none;
+}
+
+html[data-theme='light'] .portal-cmd__head--warning .portal-cmd__state {
+  color: #b45309;
+}
+
+html[data-theme='light'] .portal-cmd__head--critical .portal-cmd__state {
+  color: #b91c1c;
+}
+
+html[data-theme='light'] .portal-cmd__hero.is-ok h2 {
+  color: #14532d;
+}
+
+html[data-theme='light'] .portal-cmd__systems .is-ok {
+  color: #15803d;
+}
+
+html[data-theme='light'] .portal-cmd__grid a,
+html[data-theme='light'] .portal-cmd__alerts {
+  background: var(--surface);
+}
+
+/* ============================================================
+   Light Ops Board � bright premium control-room balance
+   ============================================================ */
+
+html[data-theme='light'] .shell--admin:not(.shell--ops) {
+  background: var(--bg);
+  color: var(--text);
+}
+
+html[data-theme='light'] .shell--admin:not(.shell--ops) .sidebar {
+  background: #ffffff;
+  border-right: 1px solid var(--cr-edge);
+  box-shadow: none;
+}
+
+html[data-theme='light'] .shell--admin:not(.shell--ops) .sidebar-link {
+  color: #334155;
+  border-radius: 10px;
+}
+
+html[data-theme='light'] .shell--admin:not(.shell--ops) .sidebar-link:hover {
+  background: #f1f5f9;
+  color: #0f172a;
+}
+
+html[data-theme='light'] .shell--admin:not(.shell--ops) .sidebar-link--active {
+  background: color-mix(in srgb, #2563eb 12%, #ffffff);
+  color: #1e3a8a;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, #2563eb 28%, transparent);
+}
+
+html[data-theme='light'] .shell--admin:not(.shell--ops) .sidebar-nav-section-title {
+  color: #94a3b8;
+}
+
+html[data-theme='light'] .shell--admin:not(.shell--ops) .shell-content {
+  background: var(--bg);
+}
+
+html[data-theme='light'] .dash-ops--command,
+html[data-theme='light'] .dash-ops--ops-board {
+  color: var(--text);
+}
+
+html[data-theme='light'] .ops-board-hero__title {
+  color: #0f172a;
+  letter-spacing: 0.02em;
+}
+
+html[data-theme='light'] .ops-board-hero__sub,
+html[data-theme='light'] .ops-board-hero__clock {
+  color: #64748b;
+}
+
+html[data-theme='light'] .ops-board-hero__live,
+html[data-theme='light'] .ops-live-head__live {
+  color: #15803d;
+}
+
+html[data-theme='light'] .ops-board-hero__pulse {
+  background: #22c55e;
+  box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.18);
+}
+
+html[data-theme='light'] .ops-strip--command,
+html[data-theme='light'] .ops-strip {
+  background: #ffffff;
+  border: 1px solid var(--cr-edge);
+  border-radius: 12px;
+  box-shadow: none;
+  backdrop-filter: none;
+}
+
+html[data-theme='light'] .ops-kpi {
+  background: transparent;
+  border: 0;
+  color: #0f172a;
+  box-shadow: none;
+}
+
+html[data-theme='light'] .ops-kpi__label {
+  color: #64748b;
+}
+
+html[data-theme='light'] .ops-kpi__icon {
+  color: #64748b;
+}
+
+html[data-theme='light'] .ops-kpi__value {
+  color: #0f172a;
+}
+
+html[data-theme='light'] .ops-kpi--live .ops-kpi__value {
+  color: #15803d;
+}
+
+html[data-theme='light'] .ops-kpi--live .ops-kpi__dot {
+  background: #15803d;
+}
+
+html[data-theme='light'] .ops-kpi--p1,
+html[data-theme='light'] .ops-kpi--sla {
+  border: 0;
+  background: transparent;
+}
+
+html[data-theme='light'] .ops-kpi--p1 .ops-kpi__value {
+  color: #b91c1c;
+}
+
+html[data-theme='light'] .ops-kpi--sla .ops-kpi__value {
+  color: #b45309;
+}
+
+html[data-theme='light'] .ops-strip__chip {
+  background: transparent;
+  border: 1px solid transparent;
+  color: #64748b;
+  border-radius: 8px;
+  min-height: 1.85rem;
+  font-size: 0.74rem;
+}
+
+html[data-theme='light'] .ops-strip__chip:hover {
+  background: #f1f5f9;
+  color: #0f172a;
+}
+
+html[data-theme='light'] .ops-strip__chip--on {
+  background: color-mix(in srgb, #2563eb 12%, #ffffff);
+  border-color: color-mix(in srgb, #2563eb 35%, transparent);
+  color: #1d4ed8;
+  box-shadow: none;
+}
+
+html[data-theme='light'] .ops-board--console .ops-board__queue,
+html[data-theme='light'] .ops-board--console .ops-board__detail,
+html[data-theme='light'] .ops-board--console .ops-board__avail,
+html[data-theme='light'] .ops-board--console .ops-board__vehicles,
+html[data-theme='light'] .ops-board--v2 .ops-board__queue,
+html[data-theme='light'] .ops-board--v2 .ops-board__detail,
+html[data-theme='light'] .ops-board--v2 .ops-board__avail,
+html[data-theme='light'] .ops-board--v2 .ops-board__vehicles {
+  background: #ffffff;
+  border: 1px solid var(--cr-edge);
+  border-radius: 12px;
+  box-shadow: none;
+}
+
+html[data-theme='light'] .ops-board--v2 .ops-board__center {
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  padding: 0;
+}
+
+html[data-theme='light'] .ops-board--v2 .ops-board__map,
+html[data-theme='light'] .ops-board--console .ops-board__map {
+  background: #ffffff;
+  border: 1px solid var(--cr-edge);
+  border-radius: 12px;
+  box-shadow: none;
+}
+
+html[data-theme='light'] .ops-live-head {
+  background: #ffffff;
+  border: 1px solid var(--cr-edge);
+  border-radius: 12px;
+  padding: 0.45rem 0.7rem;
+}
+
+html[data-theme='light'] .ops-live-head__counts {
+  color: #64748b;
+}
+
+html[data-theme='light'] .ops-live-head__map {
+  color: #2563eb;
+}
+
+/* CCTV: dark media well only — outer panel stays white via polish overrides */
+html[data-theme='light'] .ops-cctv,
+html[data-theme='light'] .ops-cctv--empty {
+  background: #111827;
+  border: 1px solid #1f2937;
+  border-radius: 10px;
+  color: #e5e7eb;
+  box-shadow: none;
+}
+
+html[data-theme='light'] .ops-cctv__tabs,
+html[data-theme='light'] .ops-cctv__meta,
+html[data-theme='light'] .ops-cctv__chip {
+  color: #98a2b3;
+}
+
+html[data-theme='light'] .ops-cctv__tab--on,
+html[data-theme='light'] .ops-cctv__chip--on {
+  background: #eef2ff;
+  color: #1e3a8a;
+  border-color: #c7d2fe;
+}
+
+html[data-theme='light'] .ops-cctv__dock {
+  background: #f7f8fa;
+  border: 1px solid #dde2e7;
+  border-radius: 10px;
+  color: #172033;
+}
+
+/* Incident cards � clear P1 without flooding the board */
+html[data-theme='light'] .ops-inc {
+  background: #ffffff;
+  border: 1px solid var(--cr-edge);
+  border-radius: 12px;
+  box-shadow: none;
+}
+
+html[data-theme='light'] .ops-inc--on {
+  border-color: color-mix(in srgb, #2563eb 40%, var(--cr-edge));
+  box-shadow: inset 3px 0 0 #2563eb;
+}
+
+html[data-theme='light'] .ops-inc--panic.ops-inc--on,
+html[data-theme='light'] .ops-inc--p1.ops-inc--on {
+  border-color: rgba(185, 28, 28, 0.35);
+  box-shadow: inset 3px 0 0 #b91c1c;
+  background: color-mix(in srgb, #b91c1c 3%, #ffffff);
+}
+
+html[data-theme='light'] .ops-inc__who {
+  color: #0f172a;
+}
+
+html[data-theme='light'] .ops-inc__where,
+html[data-theme='light'] .ops-inc__unit {
+  color: #64748b;
+}
+
+html[data-theme='light'] .ops-act {
+  min-height: 1.85rem;
+  padding: 0.28rem 0.55rem;
+  border-radius: 8px;
+  border: 1px solid var(--cr-edge);
+  background: #ffffff;
+  color: #334155;
+  font-size: 0.72rem;
+  font-weight: 650;
+}
+
+html[data-theme='light'] .ops-act:hover {
+  background: #f8fafc;
+  border-color: var(--cr-edge-strong);
+}
+
+html[data-theme='light'] .ops-act--dispatch {
+  background: color-mix(in srgb, #2563eb 10%, #ffffff);
+  border-color: color-mix(in srgb, #2563eb 30%, transparent);
+  color: #1d4ed8;
+}
+
+html[data-theme='light'] .ops-act--danger {
+  background: color-mix(in srgb, #b91c1c 6%, #ffffff);
+  border-color: rgba(185, 28, 28, 0.28);
+  color: #b91c1c;
+}
+
+html[data-theme='light'] .ops-act--resolve {
+  background: rgba(22, 163, 74, 0.08);
+  border-color: rgba(22, 163, 74, 0.28);
+  color: #15803d;
+}
+
+html[data-theme='light'] .ops-detail-hero .cmd-drawer__client,
+html[data-theme='light'] .cmd-drawer__client {
+  color: #0f172a;
+}
+
+html[data-theme='light'] .ops-detail-facts dt,
+html[data-theme='light'] .ops-response__title {
+  color: #94a3b8;
+}
+
+html[data-theme='light'] .ops-detail-facts dd {
+  color: #0f172a;
+}
+
+html[data-theme='light'] .ops-response,
+html[data-theme='light'] .ops-responder {
+  background: #f8fafc;
+  border: 1px solid var(--cr-edge);
+  box-shadow: none;
+}
+
+html[data-theme='light'] .ops-safety-note,
+html[data-theme='light'] .ops-safety-note--board {
+  background: #fffbeb;
+  border-color: rgba(180, 83, 9, 0.22);
+  color: #92400e;
+}
+
+html[data-theme='light'] .ops-safety-note strong {
+  color: #78350f;
+}
+
+html[data-theme='light'] .ops-fleet__item {
+  background: #ffffff;
+  border: 1px solid var(--cr-edge);
+  border-radius: 10px;
+}
+
+html[data-theme='light'] .btn-primary,
+html[data-theme='light'] .btn-ok {
+  background: #2563eb;
+  border-color: #1d4ed8;
+  color: #ffffff;
+}
+
+html[data-theme='light'] .btn-primary:hover,
+html[data-theme='light'] .btn-ok:hover {
+  background: #1d4ed8;
+}
+
+html[data-theme='light'] .btn-secondary,
+html[data-theme='light'] .btn-ghost,
+html[data-theme='light'] .btn-sm {
+  border-radius: 8px;
+}
+
+html[data-theme='light'] .btn-danger,
+html[data-theme='light'] .ops-act--danger {
+  color: #b91c1c;
+}
+
+html[data-theme='light'] .dash-live-map,
+html[data-theme='light'] .dash-live-map__canvas,
+html[data-theme='light'] .leaflet-map-container {
+  background: #eef2f7;
+}
+
+html[data-theme='light'] .dash-live-map__hud,
+html[data-theme='light'] .dash-live-map__full-btn {
+  background: rgba(255, 255, 255, 0.94);
+  border: 1px solid var(--cr-edge);
+  color: #0f172a;
+  box-shadow: none;
+  border-radius: 10px;
+}
+
+html[data-theme='light'] .shell--admin .ops-board-hero__title {
+  color: #0f172a;
+}
+
+html[data-theme='light'] .badge--live {
+  background: rgba(22, 163, 74, 0.1);
+  color: #15803d;
+  border-color: rgba(22, 163, 74, 0.25);
+}
+
+/* Mobile/stacked: panels grow with content. Desktop equal-height is in control-room-polish. */
+@media (max-width: 1100px) {
+  .shell--admin .ops-board--console .ops-board__queue,
+  .shell--admin .ops-board--console .ops-board__detail,
+  .shell--admin .ops-board--console .ops-board__queue-list,
+  .shell--admin .ops-board--console .ops-board__detail-body,
+  .shell--admin .ops-board--v2 .ops-board__queue,
+  .shell--admin .ops-board--v2 .ops-board__detail,
+  .shell--admin .ops-board--v2 .ops-board__queue-list,
+  .shell--admin .ops-board--v2 .ops-board__detail-body {
+    max-height: none !important;
+    height: auto !important;
+    min-height: min-content !important;
+    flex: 0 0 auto !important;
+    overflow: visible !important;
+    overflow-x: visible !important;
+    overflow-y: visible !important;
+    align-self: stretch !important;
+  }
+}
+
+/* ============================================================
+   Dark ops lock — DJI charcoal console (beats leftover light forces)
+   Last in cascade so control-room / officer / portal / tech match
+   ============================================================ */
+
+html[data-theme='dark'] .shell--ops {
+  color-scheme: dark !important;
+  --bg: #050505 !important;
+  --surface: #1c1c1e !important;
+  --surface-2: #121212 !important;
+  --border: transparent !important;
+  --text: #ffffff !important;
+  --muted: #8e8e93 !important;
+  --accent: #ef4444 !important;
+  --accent-soft: rgba(239, 68, 68, 0.14) !important;
+  --accent-text: #fb7185 !important;
+  --accent-hover: #dc2626 !important;
+  --accent-muted: rgba(239, 68, 68, 0.28) !important;
+  --success: #34d399 !important;
+  --warning: #fdd835 !important;
+  --danger: #ef4444 !important;
+  --data-accent: #fdd835 !important;
+  --input-bg: #2a2a2c !important;
+  --field-bg: #2a2a2c !important;
+  --field-border: rgba(255, 255, 255, 0.08) !important;
+  --topbar-bg: rgba(5, 5, 5, 0.96) !important;
+  --glass: rgba(28, 28, 30, 0.55) !important;
+  --menu-bg: #1c1c1e !important;
+  --cr-panel: #1c1c1e !important;
+  --cr-surface: #2a2a2c !important;
+  --cr-surface-hover: #323234 !important;
+  --cr-surface-active: #3a3a3c !important;
+  --cr-edge: transparent !important;
+  --cr-edge-strong: rgba(255, 255, 255, 0.1) !important;
+  --cr-shadow: none !important;
+  --cr-shadow-soft: none !important;
+  --shadow-sm: none !important;
+  --shadow-md: none !important;
+  --panel-radius: 26px !important;
+  --module-gap: 0.85rem !important;
+  --btn-metal: linear-gradient(180deg, #3a3a3c 0%, #2c2c2e 48%, #1f1f21 100%) !important;
+  --btn-metal-hover: linear-gradient(180deg, #48484a 0%, #363638 48%, #2a2a2c 100%) !important;
+  --btn-metal-active: linear-gradient(180deg, #242426 0%, #1a1a1c 100%) !important;
+  --btn-metal-border: rgba(255, 255, 255, 0.1) !important;
+  --btn-metal-inset: inset 0 1px 0 rgba(255, 255, 255, 0.14), inset 0 -1px 0 rgba(0, 0, 0, 0.45) !important;
+  --btn-metal-text: #f5f5f7 !important;
+  background: #050505 !important;
+  background-color: #050505 !important;
+  background-image: none !important;
+  color: #ffffff !important;
+}
+
+html[data-theme='dark'] .shell--ops .shell-main,
+html[data-theme='dark'] .shell--ops .shell-content,
+html[data-theme='dark'] .shell--ops .portal-main,
+html[data-theme='dark'] .shell--ops .portal-shell-main,
+html[data-theme='dark'] .shell--ops .officer-main,
+html[data-theme='dark'] .shell--ops .officer-content {
+  background: transparent !important;
+  background-color: transparent !important;
+  color: #ffffff !important;
+}
+
+html[data-theme='dark'] .shell--ops .sidebar,
+html[data-theme='dark'] .shell--ops .portal-sidebar,
+html[data-theme='dark'] .shell--ops .officer-sidebar,
+html[data-theme='dark'] .shell--ops .mobile-shell-header,
+html[data-theme='dark'] .shell--ops .mobile-shell-header--admin,
+html[data-theme='dark'] .shell--ops .mobile-shell-header--portal,
+html[data-theme='dark'] .shell--ops .mobile-shell-header--officer,
+html[data-theme='dark'] .shell--ops .topbar {
+  background: #121212 !important;
+  border-color: transparent !important;
+  color: #ffffff !important;
+  box-shadow: none !important;
+}
+
+html[data-theme='dark'] .shell--ops .sidebar-link,
+html[data-theme='dark'] .shell--ops .portal-sidebar-link,
+html[data-theme='dark'] .shell--ops .officer-sidebar-link {
+  color: #8e8e93 !important;
+  background: transparent !important;
+}
+
+html[data-theme='dark'] .shell--ops .sidebar-link:hover,
+html[data-theme='dark'] .shell--ops .portal-sidebar-link:hover {
+  background: rgba(255, 255, 255, 0.04) !important;
+  color: #ffffff !important;
+}
+
+html[data-theme='dark'] .shell--ops .sidebar-link--active,
+html[data-theme='dark'] .shell--ops .portal-sidebar-link--active,
+html[data-theme='dark'] .shell--ops .officer-sidebar-link--active {
+  background: rgba(255, 255, 255, 0.06) !important;
+  color: #ffffff !important;
+  box-shadow: inset 3px 0 0 rgba(255, 255, 255, 0.35) !important;
+  border: 0 !important;
+}
+
+html[data-theme='dark'] .shell--ops .panel,
+html[data-theme='dark'] .shell--ops .card,
+html[data-theme='dark'] .shell--ops .card-panel,
+html[data-theme='dark'] .shell--ops .stat-card,
+html[data-theme='dark'] .shell--ops .entity-card,
+html[data-theme='dark'] .shell--ops .ops-mini__card,
+html[data-theme='dark'] .shell--ops .ops-panel,
+html[data-theme='dark'] .shell--ops .portal-card,
+html[data-theme='dark'] .shell--ops .ops-board__queue,
+html[data-theme='dark'] .shell--ops .ops-board__detail,
+html[data-theme='dark'] .shell--ops .ops-board__avail,
+html[data-theme='dark'] .shell--ops .ops-board__vehicles,
+html[data-theme='dark'] .shell--ops .ops-board__cctv,
+html[data-theme='dark'] .shell--ops .ops-board__map,
+html[data-theme='dark'] .shell--ops .settings-hero,
+html[data-theme='dark'] .shell--ops .settings-nav-card,
+html[data-theme='dark'] .shell--ops .settings-panel,
+html[data-theme='dark'] .shell--ops .ops-section,
+html[data-theme='dark'] .shell--ops .ops-queue-card,
+html[data-theme='dark'] .shell--ops .officer-standby {
+  background: #1c1c1e !important;
+  border: 0 !important;
+  border-color: transparent !important;
+  border-radius: 26px !important;
+  color: #ffffff !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+}
+
+html[data-theme='dark'] .shell--ops .ops-board-hero__title,
+html[data-theme='dark'] .shell--ops .ops-inc__who,
+html[data-theme='dark'] .shell--ops .officer-name,
+html[data-theme='dark'] .shell--ops .cmd-drawer__client {
+  color: #ffffff !important;
+}
+
+html[data-theme='dark'] .shell--ops .ops-board-hero__clock {
+  color: #fdd835 !important;
+}
+
+html[data-theme='dark'] .shell--ops .ops-kpi {
+  background: #1c1c1e !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  border-radius: 10px !important;
+  color: #ffffff !important;
+  box-shadow: none !important;
+  min-height: 0 !important;
+  padding: 0.32rem 0.5rem 0.3rem !important;
+  gap: 0.05rem !important;
+}
+
+html[data-theme='dark'] .shell--ops .ops-kpi__label {
+  color: #8e8e93 !important;
+  font-size: 0.54rem !important;
+}
+
+html[data-theme='dark'] .shell--ops .ops-kpi__icon,
+html[data-theme='dark'] .shell--ops .ops-kpi--p1 .ops-kpi__icon,
+html[data-theme='dark'] .shell--ops .ops-kpi--sla .ops-kpi__icon {
+  color: #8e8e93 !important;
+  height: 0.85rem !important;
+  margin: 0 !important;
+}
+
+html[data-theme='dark'] .shell--ops .ops-kpi__icon svg {
+  width: 0.78rem !important;
+  height: 0.78rem !important;
+}
+
+html[data-theme='dark'] .shell--ops .ops-kpi__value {
+  color: #ffffff !important;
+  font-size: 1rem !important;
+  line-height: 1 !important;
+}
+
+html[data-theme='dark'] .shell--ops .ops-kpi--live .ops-kpi__value {
+  color: #34d399 !important;
+}
+
+html[data-theme='dark'] .shell--ops .ops-kpi--live .ops-kpi__dot {
+  background: #34d399 !important;
+}
+
+html[data-theme='dark'] .shell--ops .ops-kpi--p1 .ops-kpi__value {
+  color: #f87171 !important;
+}
+
+html[data-theme='dark'] .shell--ops .ops-kpi--sla .ops-kpi__value {
+  color: #fbbf24 !important;
+}
+
+html[data-theme='dark'] .shell--ops .ops-kpi--hot .ops-kpi__value {
+  color: #f87171 !important;
+}
+
+html[data-theme='dark'] .shell--ops .ops-board-hero__sub,
+html[data-theme='dark'] .shell--ops .ops-kpi__label,
+html[data-theme='dark'] .shell--ops .text-muted,
+html[data-theme='dark'] .shell--ops .ops-inc__where,
+html[data-theme='dark'] .shell--ops .officer-meta {
+  color: #8e8e93 !important;
+}
+
+html[data-theme='dark'] .shell--ops .ops-cctv__chip--on,
+html[data-theme='dark'] .shell--ops .ops-cctv__tab--on {
+  background: rgba(255, 255, 255, 0.08) !important;
+  border-color: rgba(255, 255, 255, 0.12) !important;
+  color: #f5f5f5 !important;
+  box-shadow: none !important;
+}
+
+html[data-theme='dark'] .shell--ops .sidebar-nav-section-title {
+  color: #6b6b6b !important;
+}
+
+html[data-theme='dark'] .shell--ops .ops-act,
+html[data-theme='dark'] .shell--ops .btn-primary:not(.btn-primary--accent):not(.btn-primary--calm):not(.btn-primary--danger):not(.btn-primary--filled),
+html[data-theme='dark'] .shell--ops .btn-secondary,
+html[data-theme='dark'] .shell--ops .btn-ghost,
+html[data-theme='dark'] .shell--ops .btn-sm:not(.btn-ok):not(.btn-danger):not(.btn-sm--resolve) {
+  background: #2b2b2b !important;
+  color: #ffffff !important;
+  border: 1.5px solid #4a4a4a !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04) !important;
+}
+
+html[data-theme='dark'] .shell--ops .ops-act {
+  color: #22d3ee !important;
+  border-color: color-mix(in srgb, #22d3ee 55%, transparent) !important;
+}
+
+html[data-theme='dark'] .shell--ops .ops-act--dispatch {
+  background: linear-gradient(180deg, #e09a45 0%, #d68f3e 42%, #a66a2e 100%) !important;
+  color: #ffffff !important;
+  border: 0 !important;
+  border-radius: 999px !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.28), 0 4px 14px rgba(214, 143, 62, 0.4) !important;
+}
+
+html[data-theme='dark'] .shell--ops .ops-act--resolve,
+html[data-theme='dark'] .shell--ops .btn-ok {
+  background: #2d3e33 !important;
+  color: #76c091 !important;
+  border: 1.5px solid #76c091 !important;
+  box-shadow: none !important;
+}
+
+html[data-theme='dark'] .shell--ops .ops-act--warn {
+  color: #fbbf24 !important;
+  border-color: color-mix(in srgb, #fbbf24 55%, transparent) !important;
+  background: #2b2b2b !important;
+}
+
+html[data-theme='dark'] .shell--ops .ops-act--danger,
+html[data-theme='dark'] .shell--ops .btn-danger {
+  background: #3a2222 !important;
+  color: #f87171 !important;
+  border: 1.5px solid color-mix(in srgb, #f87171 55%, transparent) !important;
+  box-shadow: none !important;
+}
+
+html[data-theme='dark'] .shell--ops .btn-primary--accent,
+html[data-theme='dark'] .shell--ops .btn-primary--danger,
+html[data-theme='dark'] .shell--ops .btn-primary--filled {
+  background: linear-gradient(180deg, #f05252 0%, #ef4444 42%, #dc2626 100%) !important;
+  color: #fff !important;
+  border: none !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18) !important;
+}
+
+html[data-theme='dark'] .shell--ops .vehicle-remote__btn {
+  background: #2b2b2b !important;
+  border: 1.5px solid #4a4a4a !important;
+  color: #ffffff !important;
+}
+
+html[data-theme='dark'] .shell--ops .vehicle-remote__btn--on {
+  background: #2d3e33 !important;
+  border-color: #76c091 !important;
+  color: #76c091 !important;
+}
+
+html[data-theme='dark'] .shell--ops .vehicle-remote__btn--cut,
+html[data-theme='dark'] .shell--ops .vehicle-remote__btn--cut.hold-activate {
+  background: linear-gradient(180deg, #e09a45 0%, #d68f3e 42%, #a66a2e 100%) !important;
+  border: 0 !important;
+  color: #ffffff !important;
+  border-radius: 999px !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.28), 0 4px 16px rgba(214, 143, 62, 0.45) !important;
+}
+
+/* Light ops admin — Security Light (daytime ops centre) */
+html[data-theme='light'] .shell--admin.shell--ops {
+  background: var(--field-bg, #f3f6f8) !important;
+  color: var(--field-text, #17212b) !important;
+}
+
+html[data-theme='light'] .shell--admin.shell--ops .sidebar,
+html[data-theme='light'] .shell--admin.shell--ops .mobile-shell-header,
+html[data-theme='light'] .shell--admin.shell--ops .topbar {
+  background: var(--field-bg-2, #eef2f5) !important;
+  border-color: var(--field-border, #cbd4dc) !important;
+  color: var(--field-text, #17212b) !important;
+  box-shadow: none !important;
+}
+
+html[data-theme='light'] .shell--admin.shell--ops .shell-content,
+html[data-theme='light'] .shell--admin.shell--ops .shell-main {
+  background: transparent !important;
+  color: var(--field-text, #17212b) !important;
+}
+
+html[data-theme='light'] .shell--admin.shell--ops .sidebar-link {
+  color: var(--field-muted, #66727d) !important;
+}
+
+html[data-theme='light'] .shell--admin.shell--ops .sidebar-link:hover {
+  background: rgba(23, 33, 43, 0.04) !important;
+  color: var(--field-text, #17212b) !important;
+}
+
+html[data-theme='light'] .shell--admin.shell--ops .sidebar-link--active {
+  background: rgba(23, 43, 58, 0.08) !important;
+  color: var(--field-text, #17212b) !important;
+  box-shadow: inset 3px 0 0 var(--field-navy, #172b3a) !important;
+}
+
+html[data-theme='light'] .shell--admin.shell--ops .ops-cctv__chip--on,
+html[data-theme='light'] .shell--admin.shell--ops .ops-cctv__tab--on {
+  background: rgba(40, 120, 181, 0.12) !important;
+  border-color: var(--field-info, #2878b5) !important;
+  color: var(--field-navy, #172b3a) !important;
+}
+
+html[data-theme='light'] .shell--admin.shell--ops .btn-primary {
+  background: var(--field-navy, #172b3a) !important;
+  border-color: var(--field-navy, #172b3a) !important;
+  color: #ffffff !important;
 }

@@ -15,7 +15,7 @@ import { clientApi, type ApiResponse } from '@/lib/api-client';
 import { friendlyErrorMessage } from '@/lib/friendly-error';
 import { useSubscriptionAccess } from '@/hooks/useSubscriptionAccess';
 import { activityHref } from '@/lib/portal-routes';
-import { OpsMyShiftHeader } from '@/components/ops/OpsMyShiftHeader';
+import { PortalCommandBrief } from '@/components/portal/PortalCommandBrief';
 import { OpsNeedsYou } from '@/components/ops/OpsQuickWork';
 import { OpsUndoToast, useUndoToast } from '@/components/ops/OpsUndoToast';
 import {
@@ -25,13 +25,10 @@ import {
 import { PanicNeuConsole, type PanicNeuBusy } from '@/components/portal/PanicNeuConsole';
 import { DashboardLiveCctv } from '@/components/portal/DashboardLiveCctv';
 import { IncidentTimeline } from '@/components/incident/IncidentTimeline';
-import { SlideCarousel, SlideCarouselCard } from '@/components/portal/SlideCarousel';
 import { SlidingSection } from '@/components/portal/SlidingSection';
-import { protectionStatusTone } from '@/lib/portal-priority';
 import { FamilyProfilePopup, type FamilyProfilePerson } from '@/components/portal/FamilyProfilePopup';
 import { EmergencyProtectionBanner } from '@/components/security/EmergencyProtectionBanner';
 import { CONTROL_ROOM_LINE } from '@/lib/control-room-line';
-import { alarmStatusLabel } from '@/lib/sa-alarm';
 
 type Overview = {
   user: { firstName: string; trackingEnabled: boolean; address: string | null };
@@ -43,12 +40,14 @@ type Overview = {
     registration: string;
     make: string;
     model: string;
+    year?: number | null;
+    color?: string | null;
     theftRecovery: boolean;
     immobiliserOn?: boolean;
     doorsLocked?: boolean;
     hornActive?: boolean;
   }[];
-  properties: { id: string; name: string; alarmStatus: string; alarmLinked: boolean }[];
+  properties: { id: string; name: string; alarmStatus: string; alarmLinked: boolean; propertyType?: string }[];
   family: { id: string; name: string; trackingEnabled: boolean; phone?: string }[];
   contacts: { id: string; name: string; phone: string; relationship: string | null; priority: number }[];
   recentIncidents: { id: string; type: string; status: string; title: string; isSilent: boolean; time: string }[];
@@ -96,7 +95,6 @@ function OverviewDashboard() {
   const [fireLoading, setFireLoading] = useState(false);
   const [vehicleLoading, setVehicleLoading] = useState(false);
   const [alertMsg, setAlertMsg] = useState('');
-  const [filter, setFilter] = useState('all');
   const [selectedFamily, setSelectedFamily] = useState<FamilyProfilePerson | null>(null);
   const undo = useUndoToast();
   const { data, loading, error, reload } = useApi(
@@ -254,11 +252,13 @@ function OverviewDashboard() {
   const hasAlert = d.stats.activeIncidents > 0 || activeIncidents.length > 0;
   const primaryAlarm = d.properties?.[0];
   const primaryVehicle = d.vehicles?.[0];
-  const tone = protectionStatusTone({
-    activeIncidents: d.stats.activeIncidents,
-    criticalIncidents: hasAlert ? d.stats.activeIncidents : 0,
-    alarmFault: primaryAlarm ? !['ARMED', 'STAY', 'NIGHT', 'DISARMED'].includes(primaryAlarm.alarmStatus) : false,
-  });
+  const tone =
+    primaryAlarm?.alarmStatus === 'TRIGGERED' ||
+    activeIncidents.some((i) => /panic|fire|medical|intrusion/i.test(`${i.type} ${i.title}`))
+      ? 'emergency'
+      : hasAlert
+        ? 'attention'
+        : 'ok';
 
   return (
     <div className="portal-dash">
@@ -375,163 +375,24 @@ function OverviewDashboard() {
       </div>
 
       <div className="portal-brief">
-      <OpsMyShiftHeader
-        title={`Hello, ${d.user.firstName}`}
-        urgent={hasAlert}
-        subtitle={
-          hasAlert
-            ? `${d.stats.activeIncidents} active · action needed`
-            : 'You are covered — protect stays one hold away'
-        }
-        subtitleHref={hasAlert ? '/portal/incidents' : '/portal/protect'}
-        subtitleAction={hasAlert ? 'View alerts' : 'Open Protect'}
-        sectionLabel="Today"
-        chips={[
-          {
-            id: 'all',
-            label: 'Overview',
-            count:
-              d.stats.activeIncidents +
-              d.stats.unreadNotifications +
-              (primaryAlarm ? 1 : 0),
-          },
-          {
-            id: 'urgent',
-            label: 'Alerts',
-            count: d.stats.activeIncidents,
-            tone: hasAlert ? 'urgent' : 'ok',
-          },
-          {
-            id: 'alarm',
-            label: 'Alarm',
-            count: primaryAlarm ? alarmStatusLabel(primaryAlarm.alarmStatus).replace(' armed', '') : '—',
-            tone:
-              primaryAlarm?.alarmStatus === 'TRIGGERED'
-                ? 'urgent'
-                : primaryAlarm && ['ARMED', 'STAY', 'NIGHT'].includes(primaryAlarm.alarmStatus)
-                  ? 'ok'
-                  : 'warn',
-          },
-          {
-            id: 'messages',
-            label: 'Updates',
-            count: d.stats.unreadNotifications,
-            tone: d.stats.unreadNotifications > 0 ? 'warn' : 'neutral',
-          },
-        ]}
-        activeChip={filter}
-        onChip={(id) => {
-          if (id === 'messages') {
-            window.location.href = '/portal/updates';
-            return;
+        <PortalCommandBrief
+          firstName={d.user.firstName}
+          address={d.user.address}
+          eventsCount={
+            d.stats.activeIncidents + d.stats.unreadNotifications + (primaryAlarm ? 1 : 0)
           }
-          if (id === 'alarm') {
-            window.location.href = '/portal/home';
-            return;
-          }
-          setFilter(id);
-        }}
-      />
-
-      {(filter === 'all' || filter === 'urgent') && (
-      <SlideCarousel
-        title="Protection status"
-        seeAllHref="/portal/incidents"
-        seeAllLabel="View alerts"
-        layout="grid"
-        className="slide-carousel--brief"
-      >
-        <SlideCarouselCard
-          title="Alerts"
-          href="/portal/incidents"
-          tone={hasAlert ? 'alert' : 'ok'}
-          status={hasAlert ? 'alert' : 'ok'}
-          action="View alerts"
-        >
-          <strong className="slide-carousel__stat">{d.stats.activeIncidents}</strong>
-          <p className="text-muted">
-            {hasAlert ? 'Open alerts' : 'No open alerts'}
-          </p>
-        </SlideCarouselCard>
-        <SlideCarouselCard
-          title="Live tracking"
-          href="/portal/location"
-          tone={d.user.trackingEnabled ? 'ok' : 'warn'}
-          status={d.user.trackingEnabled ? 'ok' : 'warn'}
-          action="View tracking"
-        >
-          <strong className="slide-carousel__stat">{d.user.trackingEnabled ? 'On' : 'Off'}</strong>
-          <p className="text-muted">
-            {d.user.trackingEnabled
-              ? 'GPS sharing active'
-              : 'Enable tracking for response'}
-          </p>
-        </SlideCarouselCard>
-        <SlideCarouselCard
-          title="Home alarm"
-          href="/portal/home"
-          tone={
-            primaryAlarm && ['ARMED', 'STAY', 'NIGHT', 'TRIGGERED'].includes(primaryAlarm.alarmStatus)
-              ? primaryAlarm.alarmStatus === 'TRIGGERED'
-                ? 'alert'
-                : 'ok'
-              : 'muted'
-          }
-          status={
-            primaryAlarm?.alarmStatus === 'TRIGGERED'
-              ? 'alert'
-              : primaryAlarm && ['ARMED', 'STAY', 'NIGHT'].includes(primaryAlarm.alarmStatus)
-                ? 'ok'
-                : 'off'
-          }
-          action="Manage alarm"
-        >
-          <strong className="slide-carousel__stat slide-carousel__stat--sm">
-            {primaryAlarm
-              ? ['ARMED', 'STAY', 'NIGHT'].includes(primaryAlarm.alarmStatus)
-                ? 'Armed'
-                : alarmStatusLabel(primaryAlarm.alarmStatus)
-              : '—'}
-          </strong>
-          <p className="text-muted">
-            {primaryAlarm
-              ? `${primaryAlarm.alarmStatus === 'ARMED' ? 'Away' : primaryAlarm.alarmStatus === 'STAY' ? 'Stay' : primaryAlarm.alarmStatus === 'NIGHT' ? 'Night' : alarmStatusLabel(primaryAlarm.alarmStatus)} · ${primaryAlarm.name.replace(/^Home — /, '')}`
-              : access?.home
-                ? 'Add a property to arm'
-                : 'Upgrade for home security'}
-          </p>
-        </SlideCarouselCard>
-        <SlideCarouselCard
-          title="Family"
-          href="/portal/family"
-          tone={d.stats.familyCount > 0 ? 'ok' : 'muted'}
-          status={d.stats.familyCount > 0 ? 'ok' : 'off'}
-          action="View family"
-        >
-          <strong className="slide-carousel__stat">{d.stats.familyCount}</strong>
-          <p className="text-muted">
-            {family.filter((m) => m.trackingEnabled).length} tracking · {d.safeZoneCount} safe zones
-          </p>
-        </SlideCarouselCard>
-        {primaryVehicle ? (
-          <SlideCarouselCard
-            title="Vehicle"
-            href={`/portal/vehicles/${primaryVehicle.id}`}
-            tone={primaryVehicle.theftRecovery ? 'alert' : 'ok'}
-            status={primaryVehicle.theftRecovery ? 'alert' : 'ok'}
-            action="Open vehicle"
-          >
-            <strong className="slide-carousel__stat slide-carousel__stat--sm">
-              {primaryVehicle.registration}
-            </strong>
-            <p className="text-muted">
-              {primaryVehicle.make} {primaryVehicle.model} ·{' '}
-              {primaryVehicle.theftRecovery ? 'Recovery mode' : 'Secure'}
-            </p>
-          </SlideCarouselCard>
-        ) : null}
-      </SlideCarousel>
-      )}
+          alertsCount={d.stats.activeIncidents}
+          updatesCount={d.stats.unreadNotifications}
+          trackingOn={d.user.trackingEnabled}
+          familyCount={d.stats.familyCount}
+          familyTrackingCount={family.filter((m) => m.trackingEnabled).length}
+          safeZoneCount={d.safeZoneCount}
+          homeAccess={access?.home !== false}
+          cctvReady={access?.home !== false}
+          property={primaryAlarm ?? null}
+          incidents={activeIncidents.length ? activeIncidents : recentIncidents}
+          activity={d.recentActivity ?? []}
+        />
       </div>
 
       <OpsNeedsYou

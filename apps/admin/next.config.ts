@@ -9,6 +9,7 @@ const demoMode =
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
+  transpilePackages: ['three'],
   env: {
     NEXT_PUBLIC_DEMO_MODE: demoMode,
   },

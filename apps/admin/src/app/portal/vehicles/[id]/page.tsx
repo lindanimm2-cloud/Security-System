@@ -11,6 +11,7 @@ import { PortalVehicleMap, VehicleMapIdle } from '@/components/portal/PortalVehi
 import { UpgradeBanner } from '@/components/portal/UpgradeBanner';
 import { DashboardLiveCctv } from '@/components/portal/DashboardLiveCctv';
 import { VehicleRemotePad } from '@/components/vehicle/VehicleRemotePad';
+import { VehicleRemoteVisual } from '@/components/vehicle/VehicleRemoteVisual';
 import { useSubscriptionAccess } from '@/hooks/useSubscriptionAccess';
 import { useApi } from '@/hooks/useApi';
 import { clientApi, type ApiResponse } from '@/lib/api-client';
@@ -232,6 +233,22 @@ function VehicleProfileContent() {
       {msg && <div className="alert alert--success">{msg}</div>}
 
       <section className="portal-card">
+        <VehicleRemoteVisual
+          variant="full"
+          state={{
+            doorsLocked: v.doorsLocked ?? true,
+            immobiliserOn: v.immobiliserOn,
+            theftRecovery: v.theftRecovery,
+          }}
+          model={{
+            make: v.make,
+            model: v.model,
+            year: v.year,
+            colour: v.color,
+          }}
+          busyAction={remoteBusy}
+          onCommand={(action) => sendRemote(action)}
+        />
         <VehicleRemotePad
           state={{
             doorsLocked: v.doorsLocked ?? true,
@@ -239,6 +256,9 @@ function VehicleProfileContent() {
             theftRecovery: v.theftRecovery,
           }}
           busyAction={remoteBusy}
+          layout="command"
+          vehicleLabel={[v.make, v.model].filter(Boolean).join(' ') || null}
+          registration={v.registration ?? null}
           onCommand={(action) => sendRemote(action)}
         >
           <DashboardLiveCctv embedded kind="vehicle" vehicleId={v.id} />

@@ -32,6 +32,7 @@ import {
   propertyIcon,
   fleetIcon,
   vehicleIcon,
+  clusterCountIcon,
 } from './map-icons';
 import { AnimatedMarker } from './AnimatedMarker';
 import {
@@ -165,6 +166,7 @@ function ClusterLayer({
         spiderfyOnMaxZoom: true,
         disableClusteringAtZoom: 16,
         chunkedLoading: true,
+        iconCreateFunction: (cluster) => clusterCountIcon(cluster.getChildCount()),
       } as L.MarkerClusterGroupOptions);
       map.addLayer(clusterRef.current);
     }

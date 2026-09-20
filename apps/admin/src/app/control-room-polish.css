@@ -5,16 +5,17 @@
    ============================================================ */
 
 :root {
-  --cr-radius: 12px;
-  --cr-radius-sm: 10px;
-  --cr-radius-xs: 8px;
-  --cr-surface: rgba(255, 255, 255, 0.025);
-  --cr-surface-hover: rgba(255, 255, 255, 0.045);
-  --cr-surface-active: rgba(255, 255, 255, 0.06);
-  --cr-edge: rgba(255, 255, 255, 0.06);
+  --cr-radius: 26px;
+  --cr-radius-sm: 14px;
+  --cr-radius-xs: 10px;
+  --cr-panel: var(--surface);
+  --cr-surface: #2a2a2c;
+  --cr-surface-hover: #323234;
+  --cr-surface-active: #3a3a3c;
+  --cr-edge: transparent;
   --cr-edge-strong: rgba(255, 255, 255, 0.1);
-  --cr-shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
-  --cr-shadow-soft: 0 4px 20px rgba(0, 0, 0, 0.32);
+  --cr-shadow: none;
+  --cr-shadow-soft: none;
   --cr-blur: blur(18px) saturate(1.25);
   --cr-transition: 0.18s cubic-bezier(0.4, 0, 0.2, 1);
   --cr-btn-h: 2.125rem;
@@ -24,11 +25,11 @@
 /* ── Ops board canvas ─────────────────────────────────────── */
 
 .dash-ops--ops-board {
-  gap: 0.65rem;
+  gap: var(--module-gap, 0.85rem);
 }
 
 .dash-ops--ops-board .ops-board.ops-board--console {
-  gap: 0.65rem;
+  gap: var(--module-gap, 0.85rem);
 }
 
 /* Soft surfaces instead of nested boxes */
@@ -37,15 +38,10 @@
 .ops-board--console .ops-board__avail,
 .ops-board--console .ops-board__vehicles,
 .ops-board--console .ops-board__cctv {
-  border: 1px solid var(--cr-edge);
+  border: 0;
   border-radius: var(--cr-radius);
-  background:
-    linear-gradient(
-      165deg,
-      color-mix(in srgb, var(--surface-2) 92%, transparent),
-      color-mix(in srgb, var(--surface) 96%, transparent)
-    );
-  box-shadow: var(--cr-shadow-soft);
+  background: var(--surface);
+  box-shadow: none;
 }
 
 .ops-board--console .ops-board__center {
@@ -53,17 +49,21 @@
   border-radius: var(--cr-radius);
   background: transparent;
   box-shadow: none;
-  gap: 0.55rem;
+  gap: 0.75rem;
 }
 
 .ops-board--console .ops-board__map {
   border-radius: var(--cr-radius);
   overflow: hidden;
-  box-shadow: var(--cr-shadow);
-  border: 1px solid var(--cr-edge);
+  box-shadow: none;
+  border: 0;
 }
 
 .ops-board__pane-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.5rem;
   padding: 0.85rem 1rem 0.65rem;
   border-bottom: 1px solid color-mix(in srgb, var(--cr-edge) 80%, transparent);
 }
@@ -118,15 +118,15 @@
   border-radius: var(--cr-radius-xs);
   border-color: var(--cr-edge);
   background: color-mix(in srgb, var(--bg) 65%, transparent);
-  padding: 0.2rem;
+  padding: 0.1rem;
 }
 
 .ops-strip__chip {
-  min-height: 1.85rem;
-  padding: 0.22rem 0.65rem;
+  min-height: 1.4rem;
+  padding: 0.1rem 0.45rem;
   border-radius: var(--cr-radius-xs);
-  font-size: 0.7rem;
-  font-weight: 600;
+  font-size: 0.62rem;
+  font-weight: 700;
   transition: background var(--cr-transition), color var(--cr-transition);
 }
 
@@ -296,67 +296,102 @@
   min-width: 2.75rem;
 }
 
-/* ── Action buttons ───────────────────────────────────────── */
+/* ── Action buttons (skeuomorphic well) ───────────────────── */
 
 .ops-act {
-  min-height: var(--cr-btn-h-sm);
-  padding: 0.3rem 0.65rem;
-  border-radius: var(--cr-radius-xs);
-  border: 1px solid transparent;
-  background: var(--cr-surface);
-  font-size: 0.68rem;
-  font-weight: 600;
-  letter-spacing: 0.04em;
+  --ops-well-pad: 0.2rem;
+  min-height: 2.05rem;
+  padding: 0.4rem 0.72rem;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.1) 0%, transparent 40%),
+    linear-gradient(180deg, #3e3e3e 0%, #2d2d2d 52%, #242424 100%);
+  color: #d6d6d6;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.14),
+    inset 0 -2px 5px rgba(0, 0, 0, 0.42),
+    1px 2px 5px rgba(0, 0, 0, 0.38),
+    0 0 0 var(--ops-well-pad) #121212,
+    0 0 0 calc(var(--ops-well-pad) + 1px) rgba(0, 0, 0, 0.75);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.62rem;
+  font-weight: 650;
+  letter-spacing: 0.07em;
   transition:
     background var(--cr-transition),
     border-color var(--cr-transition),
     color var(--cr-transition),
-    transform 0.14s ease,
+    filter 0.14s ease,
     box-shadow var(--cr-transition);
 }
 
 .ops-act:hover:not(:disabled) {
-  background: var(--cr-surface-active);
-  border-color: var(--cr-edge);
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.22);
+  filter: brightness(1.06);
+  transform: none;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.14),
+    inset 0 -2px 5px rgba(0, 0, 0, 0.42),
+    1px 2px 5px rgba(0, 0, 0, 0.38),
+    0 0 0 var(--ops-well-pad) #121212,
+    0 0 0 calc(var(--ops-well-pad) + 1px) rgba(0, 0, 0, 0.75);
+  color: #efefef;
 }
 
 .ops-act svg {
-  width: 0.85rem;
-  height: 0.85rem;
-  opacity: 0.85;
+  width: 0.9rem;
+  height: 0.9rem;
+  opacity: 1;
+  color: inherit;
+  stroke: currentColor;
 }
 
 .ops-act--dispatch {
-  border: 0;
-  background: linear-gradient(180deg, #f97316 0%, #c2410c 100%);
-  color: #fff;
-  font-weight: 600;
-  box-shadow: 0 4px 14px color-mix(in srgb, #ea580c 35%, transparent);
+  border: 1px solid rgba(255, 210, 150, 0.18);
+  border-radius: 8px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.16) 0%, transparent 38%),
+    linear-gradient(180deg, #e2a456 0%, #c98538 48%, #9a6228 100%);
+  color: #fff8ef;
+  font-weight: 650;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.28),
+    inset 0 -2px 5px rgba(0, 0, 0, 0.35),
+    1px 2px 6px rgba(0, 0, 0, 0.4),
+    0 0 0 var(--ops-well-pad) #121212,
+    0 0 0 calc(var(--ops-well-pad) + 1px) rgba(0, 0, 0, 0.75);
 }
 
 .ops-act--dispatch:hover:not(:disabled) {
-  background: linear-gradient(180deg, #fb923c 0%, #ea580c 100%);
-  border-color: transparent;
-  transform: translateY(-1px);
+  filter: brightness(1.05);
+  transform: none;
+  color: #fff;
 }
 
 .ops-act--resolve {
-  border-color: color-mix(in srgb, #4ade80 25%, transparent);
-  background: color-mix(in srgb, #166534 35%, transparent);
-  color: #86efac;
+  border-color: rgba(118, 192, 145, 0.28);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.08) 0%, transparent 40%),
+    linear-gradient(180deg, #35483c 0%, #2a3930 55%, #223028 100%);
+  color: #8fd4a8;
 }
 
 .ops-act--resolve:hover:not(:disabled) {
-  background: color-mix(in srgb, #166534 50%, transparent);
-  border-color: color-mix(in srgb, #4ade80 40%, transparent);
+  filter: brightness(1.06);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.1),
+    inset 0 -2px 5px rgba(0, 0, 0, 0.4),
+    1px 2px 5px rgba(0, 0, 0, 0.35),
+    0 0 0 var(--ops-well-pad) #121212,
+    0 0 0 calc(var(--ops-well-pad) + 1px) rgba(0, 0, 0, 0.75);
 }
 
 .ops-act--danger {
-  border-color: color-mix(in srgb, #f87171 30%, transparent);
-  background: color-mix(in srgb, #7f1d1d 35%, transparent);
-  color: #fca5a5;
+  border-color: rgba(248, 113, 113, 0.3);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.08) 0%, transparent 40%),
+    linear-gradient(180deg, #422828 0%, #322020 55%, #281818 100%);
+  color: #f87171;
 }
 
 /* ── Map hero ─────────────────────────────────────────────── */
@@ -371,8 +406,19 @@
   position: relative;
   flex: 1;
   min-height: 280px;
+  height: 100%;
   border-radius: inherit;
   overflow: hidden;
+}
+
+.dash-live-map--hero .dash-live-map__canvas .leaflet-map-container,
+.dash-live-map--hero .dash-live-map__canvas .leaflet-map,
+.dash-live-map--hero .dash-live-map__canvas .leaflet-container {
+  position: absolute;
+  inset: 0;
+  width: 100% !important;
+  height: 100% !important;
+  min-height: 100% !important;
 }
 
 .dash-live-map--hero .dash-live-map__toolbar {
@@ -813,14 +859,14 @@
 
 .ops-board.ops-board--console .ops-cctv .cctv-feed--featured {
   height: 100%;
-  min-height: 180px;
+  min-height: 96px;
   max-height: none;
   flex: none;
 }
 
 .ops-board.ops-board--console .ops-cctv__strip .cctv-feed {
   height: 100%;
-  min-height: 88px;
+  min-height: 64px;
   max-height: none;
 }
 
@@ -845,21 +891,87 @@
 }
 
 .ops-board.ops-board--console .ops-cctv__siren.hold-activate {
-  min-height: 2.35rem;
-  padding: 0.35rem 0.65rem;
-  font-size: 0.72rem;
+  min-height: 2.7rem;
+  padding: 0.28rem;
+  font-size: 0.68rem;
+}
+
+/*
+  Remote pad must never be clipped under Fleet.
+  Feeds shrink; dock is reserved height inside the CCTV column.
+  Ops board v2 grows with content (no nested center scroll).
+*/
+.ops-board--console:not(.ops-board--v2) .ops-board__center {
+  overflow: hidden;
+}
+
+.ops-board--console.ops-board--v2 .ops-board__center {
+  overflow: visible;
+  max-height: none;
+}
+
+.ops-board--console .ops-board__map {
+  flex: 0 0 150px;
+  min-height: 132px;
+  max-height: 160px;
 }
 
 .ops-board--console .ops-board__center > .ops-board__cctv {
-  padding-bottom: 0.75rem;
+  flex: 1 1 0;
+  min-height: 0;
+  overflow: hidden;
+  padding-bottom: 0;
+}
+
+.ops-board.ops-board--console .ops-board__cctv {
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.ops-board.ops-board--console .ops-cctv {
+  flex: 1 1 0;
+  min-height: 96px;
+  overflow: hidden;
+  grid-template-rows: minmax(96px, 1fr);
+}
+
+.ops-board.ops-board--console .ops-cctv > .cctv-feed-link:first-child,
+.ops-board.ops-board--console .ops-cctv .cctv-feed--featured {
+  min-height: 96px;
+}
+
+.ops-board.ops-board--console .ops-cctv__strip .cctv-feed {
+  min-height: 64px;
 }
 
 .ops-board.ops-board--console .ops-cctv__dock {
-  padding-bottom: 1.2rem;
+  flex: 0 0 auto;
+  flex-shrink: 0;
+  min-height: 22rem;
+  margin-top: 0;
+  padding: 0.5rem 0.55rem 1.15rem;
+  overflow: visible;
+}
+
+.ops-board.ops-board--console .ops-cctv__dock .vehicle-remote {
+  gap: 0.5rem;
 }
 
 .ops-board.ops-board--console .ops-cctv__dock .vehicle-remote--ops {
-  padding-bottom: 0.7rem;
+  padding: 0.2rem 0.1rem 0.35rem;
+}
+
+.ops-board.ops-board--console .ops-cctv__dock .vehicle-remote__grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.4rem;
+  padding-bottom: 0.15rem;
+}
+
+.ops-board.ops-board--console .ops-cctv__dock .vehicle-remote__btn,
+.ops-board.ops-board--console .ops-cctv__dock .vehicle-remote__hold.hold-activate {
+  min-height: 2.85rem;
 }
 
 .cctv-feed {
@@ -878,7 +990,7 @@
 }
 
 .cctv-feed--featured {
-  min-height: 200px;
+  min-height: 96px;
 }
 
 .cctv-feed__overlay {
@@ -1038,12 +1150,50 @@
   );
 }
 
+/* Command dock: compact bottom-right so it never covers page content */
+.shell--admin .eye-lens-dock:not(.eye-lens-dock--placed),
+.shell--admin .eye-lens-dock--bottom:not(.eye-lens-dock--placed) {
+  left: auto;
+  right: 1rem;
+  bottom: 1rem;
+  top: auto;
+  transform: none;
+  align-items: flex-end;
+}
+
+.shell--admin:has(.eye-lens-dock--bottom:not(.eye-lens-dock--placed)) .shell-content,
+.shell--admin:has(.eye-lens-dock:not(.eye-lens-dock--top):not(.eye-lens-dock--placed)) .shell-content {
+  padding-bottom: max(5.5rem, calc(4.25rem + env(safe-area-inset-bottom, 0px)));
+}
+
+.shell--admin .eye-lens {
+  padding: 0.28rem 0.32rem 0.28rem 0.22rem;
+  gap: 0.12rem;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  max-width: min(22rem, calc(100vw - 1.5rem));
+}
+
+.shell--admin .eye-lens-dock--mini .eye-lens {
+  max-width: min(16.5rem, calc(100vw - 1.5rem));
+}
+
+.shell--admin:not(.shell--ops) .sidebar-link--active {
+  background: color-mix(in srgb, #3b82f6 18%, transparent);
+  color: #e8eef8;
+}
+
+.shell--admin .sidebar-nav-section-title {
+  letter-spacing: 0.1em;
+}
+
 .shell--admin .panel,
 .shell--admin .card,
 .shell--admin .card-panel {
-  border-color: var(--cr-edge);
-  border-radius: var(--cr-radius);
-  box-shadow: var(--cr-shadow-soft);
+  border: 0;
+  border-color: transparent;
+  border-radius: var(--panel-radius, var(--cr-radius));
+  background: var(--cr-panel, #1a1a1a);
+  box-shadow: none;
 }
 
 .shell--admin .panel-header h2,
@@ -1098,7 +1248,7 @@
 
   .ops-board.ops-board--console .ops-cctv .cctv-feed--featured {
     height: 100%;
-    min-height: 200px;
+    min-height: 120px;
     max-height: none;
   }
 }
@@ -1126,6 +1276,11 @@
   box-shadow:
     0 0 0 2px color-mix(in srgb, var(--success) 35%, transparent),
     0 2px 10px rgba(0, 0, 0, 0.4);
+}
+
+.dash-live-map .map-cluster,
+.command-map-wrap .map-cluster {
+  border-width: 2.5px;
 }
 
 @keyframes cr-marker-pulse {
@@ -1211,4 +1366,2119 @@
 .shell--admin .list-search-bar input {
   border-radius: var(--cr-radius-xs);
   border-color: var(--cr-edge);
+}
+
+.shell--admin .sidebar-nav-section + .sidebar-nav-section {
+  border-top-color: var(--cr-edge);
+}
+
+.shell--admin .sidebar-nav-section--dev + .sidebar-nav-section {
+  border-top-color: color-mix(in srgb, var(--accent) 28%, var(--cr-edge));
+}
+
+.shell--admin .sidebar-nav-section-title {
+  color: color-mix(in srgb, var(--text-disabled) 88%, var(--accent));
+  letter-spacing: 0.12em;
+}
+
+.shell--admin .sidebar-nav-pin {
+  border-top-color: var(--cr-edge-strong);
+}
+
+/* ===== Ops redesign: Officers + Vehicle Control ===== */
+.shell--admin .ops-page {
+  display: grid;
+  gap: 0.9rem;
+  padding-bottom: 1.25rem;
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+.shell--admin .ops-page-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.shell--admin .ops-page-kicker {
+  margin: 0 0 0.2rem;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--accent) 72%, var(--text-muted));
+}
+
+.shell--admin .ops-page-title {
+  margin: 0;
+  font-size: clamp(1.35rem, 1.1rem + 0.7vw, 1.85rem);
+  font-weight: 750;
+  letter-spacing: 0.02em;
+  color: #f4f7fb;
+  line-height: 1.15;
+}
+
+.shell--admin .ops-page-sub {
+  margin: 0.35rem 0 0;
+  max-width: 42rem;
+  color: color-mix(in srgb, var(--text-muted) 88%, #9bb0c8);
+  font-size: 0.88rem;
+  line-height: 1.45;
+}
+
+.shell--admin .ops-metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.55rem;
+}
+
+.shell--admin .ops-metric {
+  display: grid;
+  gap: 0.2rem;
+  padding: 0.7rem 0.8rem;
+  border-radius: 12px;
+  border: 1px solid color-mix(in srgb, var(--cr-edge) 88%, transparent);
+  background: var(--surface);
+  min-width: 0;
+}
+
+.shell--admin .ops-metric__label {
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--text-muted) 85%, #9bb0c8);
+}
+
+.shell--admin .ops-metric__value {
+  font-size: 1.35rem;
+  font-weight: 750;
+  color: var(--text);
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+
+.shell--admin .ops-metric--ok .ops-metric__value { color: var(--success); }
+.shell--admin .ops-metric--info .ops-metric__value { color: var(--accent); }
+.shell--admin .ops-metric--muted .ops-metric__value { color: var(--muted); }
+
+.shell--admin .ops-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.65rem 0.7rem;
+  border-radius: 12px;
+  border: 1px solid var(--cr-edge);
+  background: color-mix(in srgb, var(--cr-panel) 94%, transparent);
+}
+
+.shell--admin .ops-toolbar__search {
+  flex: 1 1 220px;
+  min-width: 180px;
+  margin: 0;
+}
+
+.shell--admin .ops-toolbar__search input {
+  width: 100%;
+  min-height: 2.35rem;
+  border-radius: 10px;
+  border: 1px solid var(--cr-edge);
+  background: var(--surface-2);
+  color: var(--text);
+  padding: 0.45rem 0.7rem;
+  font-size: 0.86rem;
+}
+
+.shell--admin .ops-toolbar__filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  align-items: center;
+}
+
+.shell--admin .ops-toolbar__filters .ui-select,
+.shell--admin .ops-toolbar__filters .ops-menu {
+  min-width: 7.5rem;
+}
+
+.shell--admin .ops-view-toggle {
+  display: inline-flex;
+  gap: 0.2rem;
+  padding: 0.18rem;
+  border-radius: 10px;
+  border: 1px solid var(--cr-edge);
+  background: color-mix(in srgb, var(--cr-surface) 88%, transparent);
+  margin-left: auto;
+}
+
+.shell--admin .ops-view-toggle__btn {
+  min-height: 2rem;
+  padding: 0.28rem 0.7rem;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.shell--admin .ops-view-toggle__btn.is-active {
+  background: var(--accent-soft);
+  color: var(--accent-text);
+}
+
+.shell--admin .ops-officer-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.shell--admin .officer-ops-card {
+  display: grid;
+  gap: 0.7rem;
+  padding: 0.85rem 0.9rem;
+  border-radius: 12px;
+  border: 1px solid color-mix(in srgb, var(--cr-edge) 90%, transparent);
+  background: var(--surface);
+  min-width: 0;
+}
+
+.shell--admin .officer-ops-card__top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.65rem;
+}
+
+.shell--admin .officer-ops-card__identity {
+  display: flex;
+  gap: 0.65rem;
+  min-width: 0;
+  flex: 1;
+}
+
+.shell--admin .officer-ops-card__avatar {
+  width: 2.55rem;
+  height: 2.55rem;
+  border-radius: 999px;
+  object-fit: cover;
+  border: 1px solid var(--cr-edge);
+  flex: 0 0 auto;
+}
+
+.shell--admin .officer-ops-card__avatar--fallback {
+  display: grid;
+  place-items: center;
+  background: var(--accent-soft);
+  color: var(--accent-text);
+  font-weight: 700;
+  font-size: 0.85rem;
+}
+
+.shell--admin .officer-ops-card__name {
+  margin: 0;
+  font-size: 0.98rem;
+  font-weight: 700;
+  color: var(--text);
+  line-height: 1.2;
+}
+
+.shell--admin .officer-ops-card__role,
+.shell--admin .officer-ops-card__zone {
+  margin: 0.12rem 0 0;
+  font-size: 0.78rem;
+  color: color-mix(in srgb, var(--text-muted) 90%, #9bb0c8);
+}
+
+.shell--admin .officer-ops-card__body {
+  display: grid;
+  gap: 0.35rem;
+  padding-top: 0.15rem;
+  border-top: 1px solid color-mix(in srgb, var(--cr-edge) 75%, transparent);
+}
+
+.shell--admin .officer-ops-card__row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+  font-size: 0.8rem;
+}
+
+.shell--admin .officer-ops-card__label {
+  color: color-mix(in srgb, var(--text-muted) 88%, #9bb0c8);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 650;
+}
+
+.shell--admin .officer-ops-card__value {
+  color: var(--text);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.shell--admin .officer-ops-card__meta {
+  margin: 0.15rem 0 0;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+.shell--admin .officer-ops-card__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  align-items: center;
+  padding-top: 0.15rem;
+}
+
+.shell--admin .officer-ops-card__actions .btn {
+  min-height: 2rem;
+  padding: 0.28rem 0.65rem;
+  border-radius: 8px;
+  font-size: 0.78rem;
+}
+
+.shell--admin .officer-ops-card__more {
+  margin-left: auto;
+}
+
+.shell--admin .officer-table-wrap {
+  border-radius: 12px;
+  border: 1px solid var(--cr-edge);
+  overflow: auto;
+  background: color-mix(in srgb, var(--cr-panel) 94%, transparent);
+}
+
+.shell--admin .officer-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.84rem;
+}
+
+.shell--admin .officer-table th,
+.shell--admin .officer-table td {
+  padding: 0.65rem 0.75rem;
+  text-align: left;
+  border-bottom: 1px solid color-mix(in srgb, var(--cr-edge) 80%, transparent);
+  vertical-align: middle;
+}
+
+.shell--admin .officer-table th {
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  font-weight: 700;
+  background: color-mix(in srgb, var(--cr-surface) 70%, transparent);
+  position: sticky;
+  top: 0;
+}
+
+.shell--admin .officer-table__name {
+  font-weight: 650;
+  color: var(--text);
+}
+
+.shell--admin .officer-table__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+
+.shell--admin .ops-empty {
+  padding: 1.5rem 1rem;
+  text-align: center;
+  color: var(--text-muted);
+  border: 1px dashed var(--cr-edge);
+  border-radius: 12px;
+}
+
+.shell--admin .ops-safety-note {
+  margin: 0;
+  padding: 0.65rem 0.8rem;
+  border-radius: 10px;
+  border: 1px solid color-mix(in srgb, var(--cr-edge) 85%, transparent);
+  background: color-mix(in srgb, var(--cr-surface) 70%, transparent);
+  color: color-mix(in srgb, var(--text-muted) 92%, #9bb0c8);
+  font-size: 0.78rem;
+  line-height: 1.45;
+}
+
+.shell--admin .ops-safety-note strong {
+  color: var(--text);
+  font-weight: 650;
+}
+
+@media (max-width: 1100px) {
+  .shell--admin .ops-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .shell--admin .ops-officer-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 720px) {
+  .shell--admin .ops-metrics {
+    grid-template-columns: 1fr 1fr;
+  }
+  .shell--admin .ops-view-toggle {
+    margin-left: 0;
+    width: 100%;
+  }
+  .shell--admin .ops-view-toggle__btn {
+    flex: 1;
+  }
+}
+
+/* ===== Live Ops Board command-centre v2 ===== */
+.shell--admin .dash-ops--command {
+  gap: 0.55rem;
+  padding-bottom: 4.75rem;
+  overflow-x: hidden;
+}
+
+.shell--admin .ops-board-hero {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 0.85rem;
+  flex-wrap: wrap;
+}
+
+.shell--admin .ops-board-hero__title {
+  margin: 0;
+  font-size: clamp(1.2rem, 1.05rem + 0.5vw, 1.55rem);
+  font-weight: 750;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--text);
+}
+
+.shell--admin .ops-board-hero__sub {
+  margin: 0.2rem 0 0;
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+
+.shell--admin .ops-board-hero__meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.shell--admin .ops-board-hero__live,
+.shell--admin .ops-live-head__live {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--success);
+}
+
+.shell--admin .ops-board-hero__pulse {
+  width: 0.45rem;
+  height: 0.45rem;
+  border-radius: 999px;
+  background: var(--success);
+  box-shadow: 0 0 0 3px var(--success-soft);
+}
+
+.shell--admin .ops-board-hero__clock {
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+
+.shell--admin .ops-strip--command {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.55rem;
+  padding: 0.45rem 0.55rem;
+  border-radius: 12px;
+  border: 1px solid var(--cr-edge);
+  background: var(--surface);
+}
+
+.shell--admin .ops-kpi-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  gap: 0.35rem;
+}
+
+.shell--admin .ops-kpi {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.05rem;
+  min-width: 2.85rem;
+  min-height: 0;
+  padding: 0.32rem 0.5rem 0.3rem;
+  border-radius: 10px;
+  border: 0;
+  background: transparent;
+  text-align: center;
+  font-size: 0.68rem;
+  box-shadow: none;
+}
+
+.shell--admin .ops-kpi__label {
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  font-weight: 700;
+  font-size: 0.54rem;
+  line-height: 1.1;
+}
+
+.shell--admin .ops-kpi__value {
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+  font-size: 1rem;
+  font-weight: 750;
+  line-height: 1;
+}
+
+.shell--admin .ops-kpi__dot {
+  width: 0.4rem;
+  height: 0.4rem;
+  margin: 0.05rem 0 0.08rem;
+  border-radius: 999px;
+  background: var(--success);
+  flex-shrink: 0;
+}
+
+.shell--admin .ops-kpi__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 0.85rem;
+  margin: 0 0 0.02rem;
+  color: var(--text-muted);
+}
+
+.shell--admin .ops-kpi__icon svg {
+  width: 0.78rem;
+  height: 0.78rem;
+  display: block;
+}
+
+.shell--admin .ops-kpi--live .ops-kpi__value { color: var(--success); }
+.shell--admin .ops-kpi--live .ops-kpi__dot { background: var(--success); }
+.shell--admin .ops-kpi--p1,
+.shell--admin .ops-kpi--sla {
+  background: transparent;
+  border-color: transparent;
+}
+.shell--admin .ops-kpi--p1 .ops-kpi__icon,
+.shell--admin .ops-kpi--sla .ops-kpi__icon {
+  color: var(--text-muted);
+}
+.shell--admin .ops-kpi--p1 .ops-kpi__value { color: var(--danger); }
+.shell--admin .ops-kpi--sla .ops-kpi__value { color: var(--warning); }
+
+.shell--admin .ops-strip--command .ops-strip__filters {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+}
+
+.shell--admin .ops-strip--command .ops-strip__chip {
+  min-height: 1.45rem;
+  padding: 0.12rem 0.48rem;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.64rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+}
+
+.shell--admin .ops-strip--command .ops-strip__chip--on {
+  background: var(--accent-soft);
+  border-color: color-mix(in srgb, var(--accent) 35%, var(--cr-edge));
+  color: var(--accent-text);
+}
+
+.shell--admin .ops-board--v2 {
+  grid-template-columns: minmax(240px, 22%) minmax(0, 1fr) minmax(260px, 28%);
+  grid-template-rows: auto auto;
+  gap: 0.55rem;
+  align-items: stretch;
+}
+
+/* Idle / collapsed rails — middle column becomes the main dash */
+.shell--admin .ops-board--v2.ops-board--queue-collapsed.ops-board--detail-collapsed,
+.shell--admin .ops-board--v2.ops-board--dash-main.ops-board--queue-collapsed.ops-board--detail-collapsed {
+  grid-template-columns: 2.75rem minmax(0, 1fr) 2.75rem;
+}
+
+.shell--admin .ops-board--v2.ops-board--queue-collapsed.ops-board--detail-open {
+  grid-template-columns: 2.75rem minmax(0, 1fr) minmax(260px, 28%);
+}
+
+.shell--admin .ops-board--v2.ops-board--queue-open.ops-board--detail-collapsed {
+  grid-template-columns: minmax(240px, 22%) minmax(0, 1fr) 2.75rem;
+}
+
+.shell--admin .ops-board--v2 .ops-board__rail {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 0.65rem;
+  grid-row: 1;
+  align-self: stretch;
+  height: 0;
+  min-height: 100%;
+  padding: 0.75rem 0.35rem;
+  border: 1px solid var(--cr-edge);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--muted);
+  cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    color 0.15s ease,
+    background 0.15s ease;
+}
+
+.shell--admin .ops-board--v2 .ops-board__rail:hover {
+  border-color: color-mix(in srgb, var(--accent) 40%, var(--cr-edge));
+  color: var(--text);
+  background: color-mix(in srgb, var(--accent) 6%, var(--surface));
+}
+
+.shell--admin .ops-board--v2 .ops-board__rail--queue {
+  grid-column: 1;
+}
+
+.shell--admin .ops-board--v2 .ops-board__rail--detail {
+  grid-column: 3;
+}
+
+.shell--admin .ops-board--v2 .ops-board__rail-label {
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  line-height: 1;
+}
+
+.shell--admin .ops-board--v2 .ops-board__rail-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.35rem;
+  height: 1.35rem;
+  padding: 0 0.25rem;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  background: var(--cr-surface);
+  color: var(--text);
+}
+
+.shell--admin .ops-board--v2 .ops-board__rail-count.is-hot {
+  background: color-mix(in srgb, #ef4444 28%, transparent);
+  color: #fecaca;
+}
+
+.shell--admin .ops-board--v2 .ops-board__pane-collapse {
+  flex-shrink: 0;
+  margin-left: auto;
+  padding: 0.28rem 0.55rem;
+  border: 1px solid var(--cr-edge);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.shell--admin .ops-board--v2 .ops-board__pane-collapse:hover {
+  color: var(--text);
+  border-color: color-mix(in srgb, var(--accent) 35%, var(--cr-edge));
+}
+
+.shell--admin .ops-board--v2 .ops-board__pane-head-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin-left: auto;
+}
+
+.shell--admin .ops-board--v2.ops-board--dash-main .ops-board__map,
+.shell--admin .ops-board--v2.ops-board--queue-collapsed.ops-board--detail-collapsed .ops-board__map {
+  min-height: clamp(320px, 52vh, 620px) !important;
+  height: clamp(320px, 52vh, 620px);
+}
+
+/* Keep bottom strips out of the thin rail columns */
+.shell--admin .ops-board--v2.ops-board--queue-collapsed.ops-board--detail-collapsed,
+.shell--admin .ops-board--v2.ops-board--dash-main.ops-board--queue-collapsed.ops-board--detail-collapsed {
+  grid-template-rows: auto auto auto auto;
+}
+
+.shell--admin .ops-board--v2.ops-board--detail-collapsed .ops-board__vehicles {
+  grid-column: 1 / 3;
+}
+
+.shell--admin .ops-board--v2.ops-board--detail-collapsed .ops-board__avail {
+  grid-column: 1 / 3;
+  grid-row: 3;
+  max-height: min(18rem, 34vh);
+}
+
+.shell--admin .ops-board--v2.ops-board--detail-collapsed .ops-board__sites {
+  grid-column: 1 / -1;
+  grid-row: 4;
+}
+
+.shell--admin .ops-board--v2.ops-board--queue-collapsed.ops-board--detail-open .ops-board__vehicles {
+  grid-column: 2 / 4;
+}
+
+.shell--admin .ops-board--v2.ops-board--queue-collapsed.ops-board--detail-open .ops-board__avail {
+  grid-column: 3;
+}
+
+.shell--admin .ops-board--v2.ops-board--queue-collapsed.ops-board--detail-collapsed .ops-board__vehicles,
+.shell--admin .ops-board--v2.ops-board--dash-main .ops-board__vehicles {
+  grid-column: 1 / -1;
+}
+
+.shell--admin .ops-board--v2.ops-board--queue-collapsed.ops-board--detail-collapsed .ops-board__avail,
+.shell--admin .ops-board--v2.ops-board--dash-main .ops-board__avail {
+  grid-column: 1 / -1;
+  grid-row: 3;
+  max-height: min(18rem, 34vh);
+}
+
+.shell--admin .ops-board--v2.ops-board--queue-collapsed.ops-board--detail-collapsed .ops-board__sites,
+.shell--admin .ops-board--v2.ops-board--dash-main .ops-board__sites {
+  grid-column: 1 / -1;
+  grid-row: 4;
+}
+
+.shell--admin .ops-board--v2.ops-board--dash-main:not(:has(.ops-board__vehicles)) .ops-board__avail,
+.shell--admin
+  .ops-board--v2.ops-board--queue-collapsed.ops-board--detail-collapsed:not(:has(.ops-board__vehicles))
+  .ops-board__avail {
+  grid-column: 1 / -1;
+  grid-row: 2;
+}
+
+.shell--admin
+  .ops-board--v2.ops-board--dash-main:not(:has(.ops-board__vehicles))
+  .ops-board__sites,
+.shell--admin
+  .ops-board--v2.ops-board--queue-collapsed.ops-board--detail-collapsed:not(:has(.ops-board__vehicles))
+  .ops-board__sites {
+  grid-row: 3;
+}
+
+/* Side rails match middle (Live map + Dash cams) height; inner lists scroll */
+.shell--admin .ops-board--v2 .ops-board__queue,
+.shell--admin .ops-board--v2 .ops-board__detail {
+  grid-row: 1;
+  align-self: stretch !important;
+  height: 0 !important;
+  min-height: 100% !important;
+  max-height: none !important;
+  overflow: hidden !important;
+  display: flex !important;
+  flex-direction: column !important;
+  border: 1px solid var(--cr-edge);
+  background: var(--surface);
+}
+
+.shell--admin .ops-board--v2 .ops-board__queue {
+  grid-column: 1;
+}
+
+.shell--admin .ops-board--v2 .ops-board__queue-list,
+.shell--admin .ops-board--v2 .ops-board__detail-body {
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  max-height: none !important;
+  height: auto !important;
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
+}
+
+.shell--admin .ops-board--v2 .ops-board__center {
+  grid-column: 2;
+  grid-row: 1;
+  align-self: start;
+  height: auto;
+  min-height: 0;
+  max-height: none;
+  overflow: visible;
+  overscroll-behavior: auto;
+  touch-action: pan-y;
+  gap: 0.5rem;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  border-radius: 12px;
+}
+
+.shell--admin .ops-board--v2 .ops-board__detail {
+  grid-column: 3;
+}
+
+.shell--admin .ops-board--v2 .ops-board__vehicles {
+  grid-column: 1 / 3;
+  grid-row: 2;
+  max-height: none;
+  border: 1px solid var(--cr-edge);
+  background: var(--surface);
+  border-radius: 12px;
+  padding: 0.45rem 0.55rem 0.65rem;
+}
+
+.shell--admin .ops-board--v2 .ops-board__sites {
+  grid-column: 1 / -1;
+  grid-row: 3;
+  max-height: none;
+  border: 1px solid var(--cr-edge);
+  background: var(--surface);
+  border-radius: 12px;
+  padding: 0.45rem 0.55rem 0.65rem;
+}
+
+.shell--admin .ops-board--v2 .ops-board__avail {
+  grid-column: 3;
+  grid-row: 2;
+  max-height: min(22rem, 40vh);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--cr-edge);
+  background: var(--surface);
+  border-radius: 12px;
+}
+
+.shell--admin .ops-board--v2:not(:has(.ops-board__vehicles)) .ops-board__avail {
+  grid-column: 1 / -1;
+}
+
+.shell--admin .ops-board--v2:not(:has(.ops-board__vehicles)) .ops-board__sites {
+  grid-row: 2;
+}
+
+.shell--admin .ops-board--v2:not(:has(.ops-board__vehicles)):has(.ops-board__sites) .ops-board__avail {
+  grid-row: 3;
+}
+
+.shell--admin .ops-sites {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 0.55rem;
+  list-style: none;
+  margin: 0;
+  padding: 0.15rem 0.1rem 0.25rem;
+}
+
+.shell--admin .ops-sites__item {
+  display: grid;
+  gap: 0.4rem;
+  min-width: 0;
+  padding: 0.35rem;
+  border-radius: 10px;
+  border: 1px solid color-mix(in srgb, var(--cr-edge) 80%, transparent);
+  background: color-mix(in srgb, var(--cr-panel) 88%, transparent);
+}
+
+.shell--admin .ops-sites__stage {
+  display: block;
+  min-height: 9.5rem;
+  border-radius: 8px;
+  overflow: hidden;
+  text-decoration: none;
+}
+
+.shell--admin .ops-sites__placeholder {
+  display: grid;
+  place-items: center;
+  min-height: 9.5rem;
+  border-radius: 8px;
+  background:
+    radial-gradient(ellipse at 50% 30%, rgba(90, 110, 130, 0.28), transparent 60%),
+    linear-gradient(165deg, #2a313a 0%, #15191e 100%);
+  color: var(--muted);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.shell--admin .ops-sites__stage .building-3d {
+  min-height: 9.5rem;
+  border-radius: 8px;
+}
+
+.shell--admin .ops-sites__stage .building-3d--compact {
+  min-height: 9.5rem;
+}
+
+.shell--admin .ops-sites__meta {
+  display: grid;
+  gap: 0.12rem;
+  padding: 0 0.2rem 0.15rem;
+}
+
+.shell--admin .ops-sites__name {
+  font-size: 0.82rem;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  line-height: 1.25;
+}
+
+.shell--admin .ops-sites__type,
+.shell--admin .ops-sites__client {
+  font-size: 0.68rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.shell--admin .ops-sites__status {
+  width: fit-content;
+  margin-top: 0.1rem;
+  padding: 0.12rem 0.4rem;
+  border-radius: 4px;
+  font-size: 0.62rem;
+  font-weight: 700;
+  font-style: normal;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  background: var(--cr-surface);
+  color: var(--muted);
+}
+
+.shell--admin .ops-sites__status--online {
+  background: color-mix(in srgb, #3d9b5f 22%, transparent);
+  color: #b7efc5;
+}
+
+.shell--admin .ops-sites__status--offline {
+  background: color-mix(in srgb, #94a3b8 18%, transparent);
+  color: #cbd5e1;
+}
+
+.shell--admin .ops-sites__status--commissioning {
+  background: color-mix(in srgb, #fbbf24 16%, transparent);
+  color: #fde68a;
+}
+
+.shell--admin .ops-sites--compact {
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 0.35rem;
+}
+
+.shell--admin .ops-sites--compact .ops-sites__stage,
+.shell--admin .ops-sites--compact .ops-sites__stage .building-3d,
+.shell--admin .ops-sites--compact .ops-sites__stage .building-3d--compact {
+  min-height: 7.5rem;
+}
+
+.shell--admin .ops-board--v2 .ops-board__avail-list {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+
+.shell--admin .ops-board--v2 .ops-board__map {
+  flex: 0 0 auto !important;
+  min-height: clamp(240px, 38vh, 420px) !important;
+  max-height: none !important;
+  height: clamp(240px, 38vh, 420px);
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid var(--cr-edge);
+  background: var(--surface);
+}
+
+.shell--admin .ops-board--v2 .ops-board__center > .ops-board__cctv {
+  flex: 0 0 auto !important;
+  min-height: 0;
+  overflow: visible;
+  max-height: none;
+}
+
+.shell--admin .ops-board--v2.ops-board--console .ops-board__cctv,
+.shell--admin .ops-board--v2.ops-board--console .ops-cctv {
+  overflow: visible !important;
+  min-height: auto;
+}
+
+.shell--admin .ops-board--v2 .ops-cctv {
+  min-height: 220px;
+  grid-template-rows: minmax(180px, 260px) auto;
+}
+
+.shell--admin .ops-board--v2 .ops-cctv .cctv-feed--featured {
+  min-height: 180px;
+  max-height: none;
+}
+
+.shell--admin .ops-board--v2 .ops-cctv__strip .cctv-feed {
+  min-height: 88px;
+  max-height: none;
+}
+
+.shell--admin .ops-live-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.15rem 0.2rem 0.35rem;
+}
+
+.shell--admin .ops-live-head__counts {
+  flex: 1 1 auto;
+  font-size: 0.76rem;
+  color: var(--text-muted);
+}
+
+.shell--admin .ops-live-head__map {
+  font-size: 0.75rem;
+  font-weight: 650;
+  color: #93c5fd;
+  text-decoration: none;
+}
+
+.shell--admin .ops-board--v2 .ops-cctv__dock {
+  min-height: 0 !important;
+  padding: 0.45rem 0.5rem 0.65rem !important;
+}
+
+.shell--admin .ops-board__vehicles--compact {
+  border-radius: 10px;
+  border: 1px solid color-mix(in srgb, var(--cr-edge) 70%, transparent);
+  background: color-mix(in srgb, var(--cr-surface) 80%, transparent);
+  padding: 0.35rem 0.45rem 0.55rem;
+}
+
+.shell--admin .ops-fleet--compact {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 0.35rem;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.shell--admin .ops-fleet--compact .ops-fleet__item {
+  display: grid;
+  gap: 0.1rem;
+  padding: 0.45rem 0.55rem;
+  border-radius: 8px;
+  border: 1px solid color-mix(in srgb, var(--cr-edge) 70%, transparent);
+  background: color-mix(in srgb, var(--cr-panel) 88%, transparent);
+}
+
+.shell--admin .ops-fleet--compact .ops-fleet__reg {
+  font-size: 0.68rem;
+  color: var(--text-muted);
+}
+
+.shell--admin .ops-detail-hero {
+  display: grid;
+  gap: 0.25rem;
+  margin-bottom: 0.55rem;
+}
+
+.shell--admin .ops-detail-facts {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.35rem;
+  margin: 0 0 0.75rem;
+  padding: 0.55rem 0;
+  border-top: 1px solid color-mix(in srgb, var(--cr-edge) 70%, transparent);
+  border-bottom: 1px solid color-mix(in srgb, var(--cr-edge) 70%, transparent);
+}
+
+.shell--admin .ops-detail-facts dt {
+  margin: 0;
+  font-size: 0.65rem;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.shell--admin .ops-detail-facts dd {
+  margin: 0.1rem 0 0;
+  font-size: 0.86rem;
+  font-weight: 600;
+}
+
+.shell--admin .ops-response,
+.shell--admin .ops-responder {
+  margin: 0.75rem 0;
+  padding: 0.55rem 0.6rem;
+  border-radius: 10px;
+  border: 1px solid color-mix(in srgb, var(--cr-edge) 75%, transparent);
+  background: color-mix(in srgb, var(--cr-surface) 70%, transparent);
+}
+
+.shell--admin .ops-response__title,
+.shell--admin .ops-board__pane-title {
+  margin: 0 0 0.45rem;
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  font-weight: 700;
+}
+
+.shell--admin .ops-responder__unit {
+  display: block;
+  font-size: 0.95rem;
+}
+
+.shell--admin .ops-responder__driver {
+  margin: 0.25rem 0 0.55rem;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  align-items: center;
+}
+
+.shell--admin .ops-responder__status {
+  color: #fbbf24;
+  font-weight: 650;
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.shell--admin .ops-board__avail--inline {
+  margin-top: 0.85rem;
+  padding-top: 0.65rem;
+  border-top: 1px solid color-mix(in srgb, var(--cr-edge) 75%, transparent);
+}
+
+.shell--admin .ops-board__avail--inline .ops-board__avail-list {
+  max-height: 12rem;
+  overflow: auto;
+}
+
+.shell--admin .ops-safety-note--board {
+  margin-top: 0.75rem;
+}
+
+.shell--admin .dash-ops--command .eye-lens-dock:not(.eye-lens-dock--placed),
+.shell--admin:has(.dash-ops--command) .eye-lens-dock:not(.eye-lens-dock--placed) {
+  left: auto !important;
+  right: 0.85rem !important;
+  bottom: 0.85rem !important;
+  top: auto !important;
+  transform: none !important;
+  align-items: flex-end;
+}
+
+.shell--admin:has(.dash-ops--command) .eye-lens-dock--mini .eye-lens {
+  max-width: min(15.5rem, calc(100vw - 1.5rem));
+  padding: 0.22rem 0.28rem;
+}
+
+@media (max-width: 1200px) {
+  .shell--admin .ops-board--v2 {
+    grid-template-columns: minmax(220px, 26%) minmax(0, 1fr);
+  }
+  .shell--admin .ops-board--v2 .ops-board__detail {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    max-height: none;
+  }
+  .shell--admin .ops-board--v2 .ops-board__vehicles {
+    grid-column: 1 / -1;
+    grid-row: 3;
+  }
+  .shell--admin .ops-board--v2 .ops-board__avail {
+    grid-column: 1 / -1;
+    grid-row: 4;
+    max-height: 18rem;
+  }
+  .shell--admin .ops-board--v2 .ops-board__queue,
+  .shell--admin .ops-board--v2 .ops-board__center {
+    max-height: none;
+  }
+}
+
+@media (max-width: 900px) {
+  .shell--admin .ops-board--v2 {
+    grid-template-columns: 1fr;
+  }
+  .shell--admin .ops-board--v2 .ops-board__map {
+    height: min(42vh, 320px);
+    min-height: 200px !important;
+  }
+}
+
+/* Allow page/sidebar scroll while hovering nav links, chips, and action buttons */
+.shell--admin .sidebar-nav,
+.shell--admin .sidebar-link,
+.shell--admin .ops-strip__chip,
+.shell--admin .ops-kpi,
+.shell--admin .ops-act,
+.shell--admin .ops-inc__hit,
+.shell--admin .ops-inc__acts,
+.shell--admin .btn-sm,
+.shell--admin .btn-ghost {
+  touch-action: pan-y;
+}
+
+.shell--admin .ops-board__queue-list,
+.shell--admin .ops-board__detail-body,
+.shell--admin .ops-board__avail-list {
+  overscroll-behavior: auto;
+  touch-action: pan-y;
+}
+
+/* ============================================================
+   Light enterprise SOC (control room always — not full-app dark mode)
+   White control surfaces + light workspace + dark CCTV media only
+   ============================================================ */
+
+html[data-theme='light'] .shell--admin:not(.shell--ops) {
+  color-scheme: light;
+  --bg: #f3f5f7;
+  --surface: #ffffff;
+  --surface-2: #f7f8fa;
+  --border: #dde2e7;
+  --text: #172033;
+  --muted: #667085;
+  --loader-color: #98a2b3;
+  --text-disabled: #98a2b3;
+  --text-muted: #667085;
+  --accent: #2f5bff;
+  --accent-hover: #2448d6;
+  --accent-soft: rgba(47, 91, 255, 0.1);
+  --accent-muted: rgba(47, 91, 255, 0.16);
+  --accent-text: #1e3a8a;
+  --on-accent: #ffffff;
+  --success: #12b76a;
+  --success-soft: rgba(18, 183, 106, 0.12);
+  --warning: #f79009;
+  --warning-soft: rgba(247, 144, 9, 0.12);
+  --danger: #d92d20;
+  --danger-soft: rgba(217, 45, 32, 0.08);
+  --input-bg: #ffffff;
+  --field-bg: #ffffff;
+  --field-border: #dde2e7;
+  --topbar-bg: #ffffff;
+  --glass: #ffffff;
+  --glass-border: #dde2e7;
+  --glow-accent: transparent;
+  --status-live: #12b76a;
+  --menu-bg: #ffffff;
+  --monitor: #111827;
+  --cr-panel: #ffffff;
+  --cr-surface: #ffffff;
+  --cr-surface-hover: #f7f8fa;
+  --cr-surface-active: #eef2ff;
+  --cr-edge: #dde2e7;
+  --cr-edge-strong: #c8d0d8;
+  --cr-shadow: none;
+  --cr-shadow-soft: none;
+  --shadow-sm: none;
+  --shadow-md: none;
+  background: #f3f5f7 !important;
+  color: #172033;
+}
+
+html[data-theme='light'] .shell--admin:not(.shell--ops) .shell-content,
+html[data-theme='light'] .shell--admin:not(.shell--ops) .shell-main {
+  background: #f3f5f7 !important;
+  color: #172033;
+}
+
+html[data-theme='light'] .shell--admin:not(.shell--ops) .sidebar,
+html[data-theme='light'] .shell--admin:not(.shell--ops) .mobile-shell-header {
+  background: #ffffff !important;
+  border-color: #dde2e7 !important;
+  color: #172033;
+  box-shadow: none !important;
+}
+
+html[data-theme='light'] .shell--admin:not(.shell--ops) .sidebar-link {
+  color: #667085;
+}
+
+html[data-theme='light'] .shell--admin:not(.shell--ops) .sidebar-link:hover {
+  background: #f7f8fa;
+  color: #172033;
+}
+
+html[data-theme='light'] .shell--admin:not(.shell--ops) .sidebar-link--active {
+  background: #eef2ff !important;
+  color: #1e3a8a !important;
+  box-shadow: none !important;
+}
+
+html[data-theme='light'] .shell--admin:not(.shell--ops) .ops-board-hero__title,
+html[data-theme='light'] .shell--admin:not(.shell--ops) .cmd-drawer__client,
+html[data-theme='light'] .shell--admin:not(.shell--ops) .ops-inc__who,
+html[data-theme='light'] .shell--admin:not(.shell--ops) .officer-name {
+  color: #172033 !important;
+}
+
+html[data-theme='light'] .shell--admin:not(.shell--ops) .ops-board-hero__sub,
+html[data-theme='light'] .shell--admin:not(.shell--ops) .ops-board-hero__clock,
+html[data-theme='light'] .shell--admin:not(.shell--ops) .ops-kpi__label,
+html[data-theme='light'] .shell--admin:not(.shell--ops) .ops-live-head__counts,
+html[data-theme='light'] .shell--admin:not(.shell--ops) .text-muted,
+html[data-theme='light'] .shell--admin:not(.shell--ops) .ops-inc__where,
+html[data-theme='light'] .shell--admin:not(.shell--ops) .officer-meta {
+  color: #667085 !important;
+}
+
+html[data-theme='light'] .shell--admin:not(.shell--ops) .ops-strip--command,
+html[data-theme='light'] .shell--admin:not(.shell--ops) .ops-live-head,
+html[data-theme='light'] .shell--admin:not(.shell--ops) .ops-board--v2 .ops-board__queue,
+html[data-theme='light'] .shell--admin:not(.shell--ops) .ops-board--v2 .ops-board__detail,
+html[data-theme='light'] .shell--admin:not(.shell--ops) .ops-board--v2 .ops-board__vehicles,
+html[data-theme='light'] .shell--admin:not(.shell--ops) .ops-board--v2 .ops-board__avail,
+html[data-theme='light'] .shell--admin:not(.shell--ops) .ops-board--v2 .ops-board__map,
+html[data-theme='light'] .shell--admin:not(.shell--ops) .ops-board--console .ops-board__queue,
+html[data-theme='light'] .shell--admin:not(.shell--ops) .ops-board--console .ops-board__detail,
+html[data-theme='light'] .shell--admin:not(.shell--ops) .ops-board--console .ops-board__avail,
+html[data-theme='light'] .shell--admin:not(.shell--ops) .ops-board--console .ops-board__vehicles,
+html[data-theme='light'] .shell--admin:not(.shell--ops) .ops-board--console .ops-board__cctv,
+html[data-theme='light'] .shell--admin:not(.shell--ops) .ops-inc,
+html[data-theme='light'] .shell--admin:not(.shell--ops) .ops-response,
+html[data-theme='light'] .shell--admin:not(.shell--ops) .ops-responder,
+html[data-theme='light'] .shell--admin:not(.shell--ops) .ops-fleet__item {
+  background: #ffffff !important;
+  border: 1px solid #dde2e7 !important;
+  box-shadow: none !important;
+  color: #172033;
+}
+
+html[data-theme='light'] .shell--admin:not(.shell--ops) .ops-kpi,
+html[data-theme='light'] .shell--admin:not(.shell--ops) .ops-kpi--p1,
+html[data-theme='light'] .shell--admin:not(.shell--ops) .ops-kpi--sla,
+html[data-theme='light'] .shell--admin:not(.shell--ops) .ops-kpi--live {
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+
+html[data-theme='light'] .shell--admin:not(.shell--ops) .ops-board--v2 .ops-board__center {
+  background: transparent !important;
+  border: 0 !important;
+  padding: 0 !important;
+}
+
+html[data-theme='light'] .shell--admin:not(.shell--ops) .ops-kpi__value {
+  color: #172033 !important;
+}
+
+html[data-theme='light'] .shell--admin:not(.shell--ops) .ops-kpi--p1 .ops-kpi__value {
+  color: #b91c1c !important;
+}
+
+html[data-theme='light'] .shell--admin:not(.shell--ops) .ops-kpi--sla .ops-kpi__value {
+  color: #b45309 !important;
+}
+
+html[data-theme='light'] .shell--admin:not(.shell--ops) .ops-kpi--live .ops-kpi__value,
+html[data-theme='light'] .shell--admin:not(.shell--ops) .ops-board-hero__live,
+html[data-theme='light'] .shell--admin:not(.shell--ops) .ops-live-head__live {
+  color: #15803d !important;
+}
+
+html[data-theme='light'] .shell--admin:not(.shell--ops) .ops-kpi__icon {
+  color: #64748b !important;
+}
+
+html[data-theme='light'] .shell--admin:not(.shell--ops) .ops-kpi__dot {
+  background: #15803d !important;
+}
+
+html[data-theme='light'] .shell--admin:not(.shell--ops) .ops-strip--command .ops-strip__chip--on {
+  background: #eef2ff !important;
+  border-color: #c7d2fe !important;
+  color: #1e3a8a !important;
+}
+
+html[data-theme='light'] .shell--admin:not(.shell--ops) .ops-inc--panic,
+html[data-theme='light'] .shell--admin:not(.shell--ops) .ops-inc--p1.ops-inc--on,
+html[data-theme='light'] .shell--admin:not(.shell--ops) .ops-inc--panic.ops-inc--on {
+  background: rgba(217, 45, 32, 0.04) !important;
+  border-color: rgba(217, 45, 32, 0.35) !important;
+  box-shadow: inset 3px 0 0 #d92d20 !important;
+}
+
+html[data-theme='light'] .shell--admin:not(.shell--ops) .ops-inc--on:not(.ops-inc--panic):not(.ops-inc--p1) {
+  box-shadow: inset 3px 0 0 #2f5bff !important;
+  border-color: #c7d2fe !important;
+}
+
+/* CCTV: white card shell, dark media well only */
+html[data-theme='light'] .shell--admin:not(.shell--ops) .ops-board__cctv {
+  background: #ffffff !important;
+  border: 1px solid #dde2e7 !important;
+  padding: 0.55rem;
+}
+
+html[data-theme='light'] .shell--admin:not(.shell--ops) .ops-cctv,
+html[data-theme='light'] .shell--admin:not(.shell--ops) .ops-cctv--empty {
+  background: #111827 !important;
+  border: 1px solid #1f2937 !important;
+  border-radius: 10px;
+  color: #e5e7eb;
+}
+
+html[data-theme='light'] .shell--admin:not(.shell--ops) .ops-cctv__dock {
+  background: #f7f8fa !important;
+  border: 1px solid #dde2e7 !important;
+  border-radius: 10px;
+  margin-top: 0.55rem;
+  color: #172033 !important;
+}
+
+html[data-theme='light'] .shell--admin:not(.shell--ops) .ops-cctv__tabs,
+html[data-theme='light'] .shell--admin:not(.shell--ops) .ops-cctv__chip,
+html[data-theme='light'] .shell--admin:not(.shell--ops) .ops-cctv__meta {
+  color: #667085;
+}
+
+html[data-theme='light'] .shell--admin:not(.shell--ops) .ops-cctv__tab--on,
+html[data-theme='light'] .shell--admin:not(.shell--ops) .ops-cctv__chip--on {
+  background: #eef2ff !important;
+  color: #1e3a8a !important;
+  border-color: #c7d2fe !important;
+}
+
+html[data-theme='light'] .shell--admin:not(.shell--ops) .dash-live-map,
+html[data-theme='light'] .shell--admin:not(.shell--ops) .dash-live-map__canvas,
+html[data-theme='light'] .shell--admin:not(.shell--ops) .leaflet-map-container {
+  background: #eef2f6 !important;
+}
+
+html[data-theme='light'] .shell--admin:not(.shell--ops) .dash-live-map__hud,
+html[data-theme='light'] .shell--admin:not(.shell--ops) .dash-live-map__full-btn {
+  background: #ffffff !important;
+  border: 1px solid #dde2e7 !important;
+  color: #172033 !important;
+  box-shadow: none !important;
+}
+
+html[data-theme='light'] .shell--admin:not(.shell--ops) .ops-act {
+  background: #ffffff !important;
+  border: 1px solid #dde2e7 !important;
+  color: #344054 !important;
+}
+
+html[data-theme='light'] .shell--admin:not(.shell--ops) .ops-act--dispatch {
+  background: #eef2ff !important;
+  border-color: #c7d2fe !important;
+  color: #1e3a8a !important;
+}
+
+html[data-theme='light'] .shell--admin:not(.shell--ops) .ops-act--danger {
+  background: rgba(217, 45, 32, 0.06) !important;
+  border-color: rgba(217, 45, 32, 0.25) !important;
+  color: #d92d20 !important;
+}
+
+html[data-theme='light'] .shell--admin:not(.shell--ops) .ops-act--resolve {
+  background: rgba(18, 183, 106, 0.08) !important;
+  border-color: rgba(18, 183, 106, 0.25) !important;
+  color: #039855 !important;
+}
+
+html[data-theme='light'] .shell--admin:not(.shell--ops) .ops-safety-note,
+html[data-theme='light'] .shell--admin:not(.shell--ops) .ops-safety-note--board {
+  background: #fffaeb !important;
+  border: 1px solid rgba(247, 144, 9, 0.25) !important;
+  color: #b54708 !important;
+}
+
+/* Officers + Vehicle Control — same light enterprise surfaces */
+html[data-theme='light'] .shell--admin:not(.shell--ops) .ops-page .ops-metric,
+html[data-theme='light'] .shell--admin:not(.shell--ops) .ops-page .ops-officer-card,
+html[data-theme='light'] .shell--admin:not(.shell--ops) .ops-page .officer-ops-card,
+html[data-theme='light'] .shell--admin:not(.shell--ops) .ops-page .ops-panel,
+html[data-theme='light'] .shell--admin:not(.shell--ops) .ops-page .ops-vehicle-rail__item,
+html[data-theme='light'] .shell--admin:not(.shell--ops) .ops-page .ops-vehicle-hero,
+html[data-theme='light'] .shell--admin:not(.shell--ops) .ops-page .ops-cmd-tile,
+html[data-theme='light'] .shell--admin:not(.shell--ops) .ops-page .ops-toolbar,
+html[data-theme='light'] .shell--admin:not(.shell--ops) .ops-page .officer-table-wrap {
+  background: #ffffff !important;
+  border: 1px solid #dde2e7 !important;
+  box-shadow: none !important;
+  color: #172033;
+}
+
+html[data-theme='light'] .shell--admin:not(.shell--ops) .ops-page .ops-vehicle-rail__item--on,
+html[data-theme='light'] .shell--admin:not(.shell--ops) .ops-page .ops-tabs__btn--on {
+  background: #eef2ff !important;
+  border-color: #c7d2fe !important;
+  color: #1e3a8a !important;
+}
+
+html[data-theme='light'] .shell--admin:not(.shell--ops) .ops-page .ops-tabs__btn--on {
+  background: transparent !important;
+  border-bottom-color: #2f5bff !important;
+}
+
+html[data-theme='light'] .shell--admin:not(.shell--ops) .ops-page .ops-telemetry__item {
+  background: #f7f8fa !important;
+  border: 1px solid #dde2e7 !important;
+}
+
+html[data-theme='light'] .shell--admin:not(.shell--ops) .ops-page .ops-telemetry__bar {
+  background: #e4e7ec !important;
+}
+
+html[data-theme='light'] .shell--admin:not(.shell--ops) .ops-page .ops-cmd-tile__icon {
+  background: #f7f8fa !important;
+}
+
+html[data-theme='light'] .shell--admin:not(.shell--ops) .ops-page .ops-kill-confirm {
+  background: rgba(217, 45, 32, 0.04) !important;
+  border: 1px solid rgba(217, 45, 32, 0.28) !important;
+  color: #172033;
+}
+
+html[data-theme='light'] .shell--admin:not(.shell--ops) .ops-page .ops-kill-confirm__head strong {
+  color: #d92d20 !important;
+}
+
+html[data-theme='light'] .shell--admin:not(.shell--ops) .topbar,
+html[data-theme='light'] .shell--admin:not(.shell--ops) .shell-topbar,
+html[data-theme='light'] .shell--admin:not(.shell--ops) header.topbar {
+  background: #ffffff !important;
+  border-color: #dde2e7 !important;
+  color: #172033 !important;
+  box-shadow: none !important;
+}
+
+/* CCTV kit registration — keep modern field chrome (do not reset to native Win inputs) */
+html[data-theme='light'] .shell--admin:not(.shell--ops) .cctv-systems-page {
+  gap: 1rem;
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: clip;
+}
+
+html[data-theme='light'] .shell--admin:not(.shell--ops) .cctv-reg-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.15rem;
+  padding: 1.35rem 1.4rem 1.45rem;
+  border-radius: 18px;
+  min-width: 0;
+  max-width: 100%;
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid color-mix(in srgb, var(--border) 78%, transparent);
+  background:
+    linear-gradient(
+      160deg,
+      color-mix(in srgb, var(--accent) 7%, transparent),
+      transparent 46%
+    ),
+    var(--surface);
+  box-shadow: var(--cr-shadow-soft, 0 8px 28px rgba(15, 23, 42, 0.08));
+}
+
+html[data-theme='light'] .shell--admin:not(.shell--ops) .cctv-reg-form .ops-panel__title {
+  margin: 0;
+  font-size: 1.08rem;
+  font-weight: 750;
+  letter-spacing: -0.02em;
+}
+
+html[data-theme='light'] .shell--admin:not(.shell--ops) .cctv-reg-form__section {
+  margin: 0.2rem 0 0;
+  padding: 0.85rem 0 0;
+  border-top: 1px solid color-mix(in srgb, var(--border) 72%, transparent);
+  font-size: 0.7rem;
+  font-weight: 750;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+html[data-theme='light'] .shell--admin:not(.shell--ops) .cctv-reg-form__section--first {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: none;
+}
+
+html[data-theme='light'] .shell--admin:not(.shell--ops) .cctv-reg-form__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.95rem 1.05rem;
+  min-width: 0;
+  width: 100%;
+}
+
+html[data-theme='light'] .shell--admin:not(.shell--ops) .cctv-reg-form__span2,
+html[data-theme='light'] .shell--admin:not(.shell--ops) .cctv-reg-form .form-field--full {
+  grid-column: 1 / -1;
+}
+
+html[data-theme='light'] .shell--admin:not(.shell--ops) .cctv-reg-form .form-field {
+  min-width: 0;
+  gap: 0.4rem;
+}
+
+html[data-theme='light'] .shell--admin:not(.shell--ops) .cctv-reg-form .form-field > span:first-child {
+  font-size: 0.76rem;
+  font-weight: 650;
+  letter-spacing: 0.01em;
+  color: var(--muted);
+}
+
+html[data-theme='light'] .shell--admin:not(.shell--ops) .cctv-reg-form .form-field input,
+html[data-theme='light'] .shell--admin:not(.shell--ops) .cctv-reg-form .form-field textarea,
+html[data-theme='light'] .shell--admin:not(.shell--ops) .cctv-reg-form .form-field select,
+html[data-theme='light'] .shell--admin:not(.shell--ops) .cctv-reg-form .ops-menu__trigger {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 100%;
+  min-height: 44px;
+  box-sizing: border-box;
+  padding: 0.7rem 0.95rem;
+  border: 1px solid color-mix(in srgb, var(--border) 88%, transparent);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--surface-2, var(--surface)) 55%, var(--input-bg, var(--surface)));
+  color: var(--text);
+  font: inherit;
+  font-size: 0.9rem;
+  font-weight: 600;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35);
+  transition:
+    border-color 0.16s ease,
+    box-shadow 0.16s ease,
+    background 0.16s ease;
+}
+
+html[data-theme='light'] .shell--admin:not(.shell--ops) .cctv-reg-form .form-field textarea {
+  min-height: 5.5rem;
+  resize: vertical;
+  line-height: 1.45;
+}
+
+html[data-theme='light'] .shell--admin:not(.shell--ops) .cctv-reg-form .form-field input::placeholder,
+html[data-theme='light'] .shell--admin:not(.shell--ops) .cctv-reg-form .form-field textarea::placeholder {
+  color: color-mix(in srgb, var(--muted) 78%, transparent);
+  font-weight: 500;
+}
+
+html[data-theme='light'] .shell--admin:not(.shell--ops) .cctv-reg-form .form-field input:hover,
+html[data-theme='light'] .shell--admin:not(.shell--ops) .cctv-reg-form .form-field textarea:hover,
+html[data-theme='light'] .shell--admin:not(.shell--ops) .cctv-reg-form .ops-menu__trigger:hover {
+  border-color: color-mix(in srgb, var(--accent) 28%, var(--border));
+}
+
+html[data-theme='light'] .shell--admin:not(.shell--ops) .cctv-reg-form .form-field input:focus,
+html[data-theme='light'] .shell--admin:not(.shell--ops) .cctv-reg-form .form-field textarea:focus,
+html[data-theme='light'] .shell--admin:not(.shell--ops) .cctv-reg-form .ops-menu__trigger:focus-visible,
+html[data-theme='light'] .shell--admin:not(.shell--ops) .cctv-reg-form .ops-menu__trigger[aria-expanded='true'] {
+  outline: none;
+  border-color: var(--accent);
+  background: var(--surface);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+html[data-theme='light'] .shell--admin:not(.shell--ops) .cctv-reg-form .form-field input:disabled,
+html[data-theme='light'] .shell--admin:not(.shell--ops) .cctv-reg-form .form-field textarea:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  background: color-mix(in srgb, var(--surface-2, var(--surface)) 70%, transparent);
+}
+
+html[data-theme='light'] .shell--admin:not(.shell--ops) .cctv-reg-form .ui-select,
+html[data-theme='light'] .shell--admin:not(.shell--ops) .cctv-reg-form .ops-menu {
+  width: 100%;
+  display: block;
+}
+
+html[data-theme='light'] .shell--admin:not(.shell--ops) .cctv-reg-form .ops-menu__trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  cursor: pointer;
+}
+
+html[data-theme='light'] .shell--admin:not(.shell--ops) .cctv-reg-form__check {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-height: 44px;
+  padding: 0.7rem 0.95rem;
+  border-radius: 12px;
+  border: 1px solid color-mix(in srgb, var(--border) 88%, transparent);
+  background: color-mix(in srgb, var(--surface-2, var(--surface)) 55%, var(--input-bg, var(--surface)));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35);
+  cursor: pointer;
+  font-size: 0.84rem;
+  font-weight: 600;
+  color: var(--text);
+  transition:
+    border-color 0.16s ease,
+    background 0.16s ease;
+}
+
+html[data-theme='light'] .shell--admin:not(.shell--ops) .cctv-reg-form__check:hover {
+  border-color: color-mix(in srgb, var(--accent) 32%, var(--border));
+  background: color-mix(in srgb, var(--accent) 5%, var(--surface));
+}
+
+html[data-theme='light'] .shell--admin:not(.shell--ops) .cctv-reg-form__check input[type='checkbox'] {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 1.15rem;
+  height: 1.15rem;
+  flex-shrink: 0;
+  margin: 0;
+  border-radius: 6px;
+  border: 1.5px solid color-mix(in srgb, var(--border) 65%, var(--text));
+  background: var(--surface);
+  display: grid;
+  place-content: center;
+  cursor: pointer;
+}
+
+html[data-theme='light'] .shell--admin:not(.shell--ops) .cctv-reg-form__check input[type='checkbox']::before {
+  content: '';
+  width: 0.55rem;
+  height: 0.55rem;
+  transform: scale(0);
+  transition: transform 0.12s ease;
+  clip-path: polygon(14% 44%, 0 65%, 50% 100%, 100% 16%, 80% 0, 43% 62%);
+  background: var(--on-accent, #fff);
+}
+
+html[data-theme='light'] .shell--admin:not(.shell--ops) .cctv-reg-form__check input[type='checkbox']:checked {
+  border-color: var(--accent);
+  background: var(--accent);
+}
+
+html[data-theme='light'] .shell--admin:not(.shell--ops) .cctv-reg-form__check input[type='checkbox']:checked::before {
+  transform: scale(1);
+}
+
+html[data-theme='light'] .shell--admin:not(.shell--ops) .cctv-reg-form__check span {
+  line-height: 1.35;
+  font-size: 0.84rem;
+}
+
+html[data-theme='light'] .shell--admin:not(.shell--ops) .cctv-reg-form__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.55rem;
+  margin-top: 0.15rem;
+  padding-top: 0.95rem;
+  border-top: 1px solid color-mix(in srgb, var(--border) 72%, transparent);
+}
+
+html[data-theme='light'] .shell--admin:not(.shell--ops) .cctv-reg-form__actions .btn {
+  min-height: 42px;
+  border-radius: 12px;
+  padding: 0.55rem 1.15rem;
+  font-weight: 650;
+}
+
+html[data-theme='light'] .shell--admin:not(.shell--ops) .cctv-cam-table-wrap {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  max-width: 100%;
+  min-width: 0;
+  border-radius: 14px;
+  border: 1px solid color-mix(in srgb, var(--border) 78%, transparent);
+  background: color-mix(in srgb, var(--surface-2, var(--surface)) 55%, transparent);
+}
+
+html[data-theme='light'] .shell--admin:not(.shell--ops) .cctv-cam-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 720px;
+  font-size: 0.84rem;
+}
+
+html[data-theme='light'] .shell--admin:not(.shell--ops) .cctv-cam-table th,
+html[data-theme='light'] .shell--admin:not(.shell--ops) .cctv-cam-table td {
+  padding: 0.55rem 0.6rem;
+  text-align: left;
+  vertical-align: middle;
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 65%, transparent);
+}
+
+html[data-theme='light'] .shell--admin:not(.shell--ops) .cctv-cam-table th {
+  font-size: 0.68rem;
+  font-weight: 750;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--muted);
+  background: color-mix(in srgb, var(--surface) 88%, transparent);
+  white-space: nowrap;
+}
+
+html[data-theme='light'] .shell--admin:not(.shell--ops) .cctv-cam-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+html[data-theme='light'] .shell--admin:not(.shell--ops) .cctv-cam-table tbody tr:hover td {
+  background: color-mix(in srgb, var(--accent) 5%, transparent);
+}
+
+html[data-theme='light'] .shell--admin:not(.shell--ops) .cctv-cam-table td:first-child {
+  width: 2.4rem;
+  font-weight: 700;
+  color: var(--muted);
+  text-align: center;
+}
+
+html[data-theme='light'] .shell--admin:not(.shell--ops) .cctv-cam-table input,
+html[data-theme='light'] .shell--admin:not(.shell--ops) .cctv-cam-table select {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 100%;
+  min-width: 4.5rem;
+  box-sizing: border-box;
+  min-height: 38px;
+  padding: 0.45rem 0.65rem;
+  border: 1px solid color-mix(in srgb, var(--border) 88%, transparent);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.84rem;
+  font-weight: 600;
+  box-shadow: none;
+}
+
+html[data-theme='light'] .shell--admin:not(.shell--ops) .cctv-cam-table select {
+  padding-right: 1.75rem;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8' fill='none'><path d='M1 1.5 6 6.5 11 1.5' stroke='%2394a3b8' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/></svg>");
+  background-repeat: no-repeat;
+  background-position: right 0.65rem center;
+  background-size: 0.65rem;
+}
+
+html[data-theme='light'] .shell--admin:not(.shell--ops) .cctv-cam-table input:focus,
+html[data-theme='light'] .shell--admin:not(.shell--ops) .cctv-cam-table select:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+html[data-theme='light'] .shell--admin:not(.shell--ops) .cctv-system-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 0.9rem;
+}
+
+html[data-theme='light'] .shell--admin:not(.shell--ops) .cctv-system-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+html[data-theme='light'] .shell--admin:not(.shell--ops) .cctv-system-card__head {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  align-items: flex-start;
+}
+
+html[data-theme='light'] .shell--admin:not(.shell--ops) .cctv-system-card__head h3 {
+  margin: 0;
+  font-size: 0.98rem;
+  font-weight: 750;
+  letter-spacing: -0.01em;
+}
+
+html[data-theme='light'] .shell--admin:not(.shell--ops) .cctv-system-card__facts {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.55rem 0.75rem;
+  margin: 0;
+}
+
+html[data-theme='light'] .shell--admin:not(.shell--ops) .cctv-system-card__facts dt {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+html[data-theme='light'] .shell--admin:not(.shell--ops) .cctv-system-card__facts dd {
+  margin: 0.15rem 0 0;
+  font-size: 0.84rem;
+  font-weight: 600;
+  line-height: 1.35;
+  word-break: break-word;
+}
+
+html[data-theme='light'] .shell--admin:not(.shell--ops) .cctv-system-card__cams ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+html[data-theme='light'] .shell--admin:not(.shell--ops) .cctv-system-card__cams li {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.65rem;
+  padding: 0.4rem 0.55rem;
+  border-radius: 10px;
+  border-bottom: none;
+  background: color-mix(in srgb, var(--surface-2, var(--surface)) 75%, transparent);
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+@media (max-width: 800px) {
+  html[data-theme='light'] .shell--admin:not(.shell--ops) .cctv-reg-form__grid {
+    grid-template-columns: 1fr;
+  }
+
+  html[data-theme='light'] .shell--admin:not(.shell--ops) .cctv-reg-form .form-field--full,
+  html[data-theme='light'] .shell--admin:not(.shell--ops) .cctv-reg-form__span2 {
+    grid-column: auto;
+  }
+
+  html[data-theme='light'] .shell--admin:not(.shell--ops) .cctv-system-card__facts {
+    grid-template-columns: 1fr;
+  }
+}
+
+html[data-theme='light'] .shell--admin:not(.shell--ops) .cctv-reg-form .form-field input,
+html[data-theme='light'] .shell--admin:not(.shell--ops) .cctv-reg-form .form-field textarea,
+html[data-theme='light'] .shell--admin:not(.shell--ops) .cctv-reg-form .ops-menu__trigger,
+html[data-theme='light'] .shell--admin:not(.shell--ops) .cctv-reg-form__check,
+html[data-theme='light'] .shell--admin:not(.shell--ops) .cctv-cam-table input,
+html[data-theme='light'] .shell--admin:not(.shell--ops) .cctv-cam-table select {
+  background: #fff;
+  border-color: rgba(92, 104, 120, 0.18);
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+
+html[data-theme='light'] .shell--admin:not(.shell--ops) .cctv-reg-form .form-field input:focus,
+html[data-theme='light'] .shell--admin:not(.shell--ops) .cctv-reg-form .form-field textarea:focus,
+html[data-theme='light'] .shell--admin:not(.shell--ops) .cctv-reg-form .ops-menu__trigger[aria-expanded='true'],
+html[data-theme='light'] .shell--admin:not(.shell--ops) .cctv-cam-table input:focus,
+html[data-theme='light'] .shell--admin:not(.shell--ops) .cctv-cam-table select:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+/* ============================================================
+   Settings hub — light enterprise (beats dark .portal-card #0a0a0a)
+   ============================================================ */
+
+/* Any portal-card inside control room must stay white enterprise */
+html[data-theme='light'] .shell--admin:not(.shell--ops) .portal-card,
+html[data-theme='light'] .shell--admin:not(.shell--ops) .panel,
+html[data-theme='light'] .shell--admin:not(.shell--ops) .card,
+html[data-theme='light'] .shell--admin:not(.shell--ops) .card-panel {
+  background: #ffffff !important;
+  border: 1px solid #dde2e7 !important;
+  box-shadow: none !important;
+  color: #172033 !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+html[data-theme='light'] .shell--admin:not(.shell--ops) .settings-hero,
+html[data-theme='light'] .shell--admin:not(.shell--ops) .settings-nav-card,
+html[data-theme='light'] .shell--admin:not(.shell--ops) .settings-panel,
+html[data-theme='light'] .shell--admin:not(.shell--ops) .portal-card.settings-panel,
+html[data-theme='light'] .shell--admin:not(.shell--ops) .page-content--settings .portal-card {
+  background: #ffffff !important;
+  border: 1px solid #dde2e7 !important;
+  box-shadow: none !important;
+  color: #172033 !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+html[data-theme='light'] .shell--admin:not(.shell--ops) .settings-hero h1,
+html[data-theme='light'] .shell--admin:not(.shell--ops) .settings-panel h2,
+html[data-theme='light'] .shell--admin:not(.shell--ops) .settings-nav-card__head h2,
+html[data-theme='light'] .shell--admin:not(.shell--ops) .settings-panel strong,
+html[data-theme='light'] .shell--admin:not(.shell--ops) .settings-inline-field,
+html[data-theme='light'] .shell--admin:not(.shell--ops) .settings-inline-field > span {
+  color: #172033 !important;
+}
+
+html[data-theme='light'] .shell--admin:not(.shell--ops) .settings-panel__eyebrow,
+html[data-theme='light'] .shell--admin:not(.shell--ops) .settings-hero__eyebrow {
+  color: #2f5bff !important;
+}
+
+html[data-theme='light'] .shell--admin:not(.shell--ops) .settings-panel .text-muted,
+html[data-theme='light'] .shell--admin:not(.shell--ops) .settings-hero .text-muted,
+html[data-theme='light'] .shell--admin:not(.shell--ops) .settings-status-card__label,
+html[data-theme='light'] .shell--admin:not(.shell--ops) .settings-connector-list .text-muted,
+html[data-theme='light'] .shell--admin:not(.shell--ops) .settings-theme-tile__hint {
+  color: #667085 !important;
+}
+
+html[data-theme='light'] .shell--admin:not(.shell--ops) .settings-status-card,
+html[data-theme='light'] .shell--admin:not(.shell--ops) .settings-inline-field,
+html[data-theme='light'] .shell--admin:not(.shell--ops) .settings-escalation-card,
+html[data-theme='light'] .shell--admin:not(.shell--ops) .settings-alert-card,
+html[data-theme='light'] .shell--admin:not(.shell--ops) .settings-activity-item,
+html[data-theme='light'] .shell--admin:not(.shell--ops) .settings-connector-list li,
+html[data-theme='light'] .shell--admin:not(.shell--ops) .settings-theme-tile {
+  background: #f7f8fa !important;
+  border: 1px solid #dde2e7 !important;
+  color: #172033 !important;
+  box-shadow: none !important;
+}
+
+html[data-theme='light'] .shell--admin:not(.shell--ops) .settings-theme-tile--active,
+html[data-theme='light'] .shell--admin:not(.shell--ops) .settings-nav-item--active {
+  background: #eef2ff !important;
+  border-color: #c7d2fe !important;
+  color: #1e3a8a !important;
+}
+
+html[data-theme='light'] .shell--admin:not(.shell--ops) .settings-nav-item {
+  color: #667085 !important;
+}
+
+html[data-theme='light'] .shell--admin:not(.shell--ops) .settings-nav-item:hover {
+  background: #f7f8fa !important;
+  color: #172033 !important;
+  border-color: #dde2e7 !important;
+}
+
+html[data-theme='light'] .shell--admin:not(.shell--ops) .settings-search input,
+html[data-theme='light'] .shell--admin:not(.shell--ops) .settings-inline-field input,
+html[data-theme='light'] .shell--admin:not(.shell--ops) .settings-key-row input,
+html[data-theme='light'] .shell--admin:not(.shell--ops) .settings-time-row input,
+html[data-theme='light'] .shell--admin:not(.shell--ops) .settings-time-row select,
+html[data-theme='light'] .shell--admin:not(.shell--ops) .page-content--settings input,
+html[data-theme='light'] .shell--admin:not(.shell--ops) .page-content--settings select,
+html[data-theme='light'] .shell--admin:not(.shell--ops) .page-content--settings textarea {
+  background: #ffffff !important;
+  border: 1px solid #dde2e7 !important;
+  color: #172033 !important;
+  box-shadow: none !important;
+}
+
+html[data-theme='light'] .shell--admin:not(.shell--ops) .settings-key-row .btn-secondary,
+html[data-theme='light'] .shell--admin:not(.shell--ops) .settings-panel .btn-secondary,
+html[data-theme='light'] .shell--admin:not(.shell--ops) .settings-panel .btn-ghost {
+  background: #ffffff !important;
+  border: 1px solid #dde2e7 !important;
+  color: #172033 !important;
+}
+
+html[data-theme='light'] .shell--admin:not(.shell--ops) .settings-kv > div {
+  border-bottom-color: #eef1f4 !important;
+}
+
+html[data-theme='light'] .shell--admin:not(.shell--ops) .settings-roles-table,
+html[data-theme='light'] .shell--admin:not(.shell--ops) .settings-matrix-table,
+html[data-theme='light'] .shell--admin:not(.shell--ops) .page-content--settings .data-table {
+  background: #ffffff !important;
+  color: #172033 !important;
+}
+
+html[data-theme='light'] .shell--admin:not(.shell--ops) .page-content--settings .data-table th {
+  background: #f7f8fa !important;
+  color: #667085 !important;
+  border-color: #dde2e7 !important;
+}
+
+html[data-theme='light'] .shell--admin:not(.shell--ops) .page-content--settings .data-table td {
+  border-color: #eef1f4 !important;
+  color: #172033 !important;
+}
+
+html[data-theme='light'] .shell--admin:not(.shell--ops) .page-content--settings .portal-card,
+html[data-theme='light'] .shell--admin:not(.shell--ops) .page-content--settings .panel,
+html[data-theme='light'] .shell--admin:not(.shell--ops) .page-content--settings .card {
+  background: #ffffff !important;
+  border-color: #dde2e7 !important;
+  color: #172033 !important;
+}
+
+/* Desktop ops board: side panels match middle column length (theme-agnostic layout) */
+@media (min-width: 1101px) {
+  .shell--admin:not(.shell--ops) .ops-board--console.ops-board--v2 .ops-board__queue,
+  .shell--admin:not(.shell--ops) .ops-board--console.ops-board--v2 .ops-board__detail,
+  .shell--admin:not(.shell--ops) .ops-board--v2 .ops-board__queue,
+  .shell--admin:not(.shell--ops) .ops-board--v2 .ops-board__detail {
+    align-self: stretch !important;
+    height: 0 !important;
+    min-height: 100% !important;
+    max-height: none !important;
+    overflow: hidden !important;
+  }
+
+  .shell--admin:not(.shell--ops) .ops-board--console.ops-board--v2 .ops-board__queue-list,
+  .shell--admin:not(.shell--ops) .ops-board--console.ops-board--v2 .ops-board__detail-body,
+  .shell--admin:not(.shell--ops) .ops-board--v2 .ops-board__queue-list,
+  .shell--admin:not(.shell--ops) .ops-board--v2 .ops-board__detail-body {
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    height: auto !important;
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
+  }
+
+  .shell--admin:not(.shell--ops) .ops-board--console.ops-board--v2 .ops-board__center,
+  .shell--admin:not(.shell--ops) .ops-board--v2 .ops-board__center {
+    align-self: start !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    overflow: visible !important;
+  }
+}
+
+.shell--admin:not(.shell--ops):has(.dash-ops--ops-board),
+.shell--admin:not(.shell--ops):has(.dash-ops--ops-board) .shell-main,
+.shell--admin:not(.shell--ops):has(.dash-ops--ops-board) .shell-content,
+.shell--admin:not(.shell--ops):has(.dash-ops--ops-board) .dash-ops--ops-board,
+.shell--admin:not(.shell--ops):has(.dash-ops--ops-board) .ops-board--console,
+.shell--admin:not(.shell--ops):has(.dash-ops--ops-board) .ops-board--v2 {
+  height: auto !important;
+  max-height: none !important;
+  overflow: visible !important;
 }

@@ -4,12 +4,19 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { DashboardLiveCctv } from '@/components/portal/DashboardLiveCctv';
 import { VehicleRemotePad } from '@/components/vehicle/VehicleRemotePad';
+import { VehicleRemoteVisual } from '@/components/vehicle/VehicleRemoteVisual';
 import { clientApi, type ApiResponse } from '@/lib/api-client';
 import type { VehicleRemoteAction, VehicleRemoteState } from '@/lib/vehicle-remote';
 
 export type ClientVehicleRemoteVehicle = {
   id: string;
   registration?: string;
+  make?: string;
+  model?: string;
+  year?: number | null;
+  color?: string | null;
+  colour?: string | null;
+  modelAsset?: string | null;
   doorsLocked?: boolean;
   immobiliserOn?: boolean;
   theftRecovery?: boolean;
@@ -56,7 +63,8 @@ export function ClientVehicleRemote({
       setLocal((prev) => ({
         doorsLocked: action === 'lock' ? true : action === 'unlock' ? false : prev.doorsLocked,
         immobiliserOn: action === 'immobilise' ? true : action === 'release' ? false : prev.immobiliserOn,
-        theftRecovery: prev.theftRecovery,
+        theftRecovery:
+          action === 'panic' ? true : action === 'clearRecovery' ? false : prev.theftRecovery,
         hornActive: action === 'horn' ? !prev.hornActive : prev.hornActive,
       }));
       onUpdated?.();
@@ -70,11 +78,28 @@ export function ClientVehicleRemote({
 
   return (
     <section className="vehicle-remote--dash" aria-label="Remote vehicle">
+      <VehicleRemoteVisual
+        variant={compact ? 'compact' : 'full'}
+        state={local}
+        model={{
+          make: vehicle.make,
+          model: vehicle.model,
+          year: vehicle.year,
+          colour: vehicle.colour ?? vehicle.color,
+          assetUrl: vehicle.modelAsset,
+        }}
+        busyAction={busy}
+        hidePanic={hidePanic}
+        onCommand={(action) => send(action)}
+      />
       <VehicleRemotePad
         state={local}
         busyAction={busy}
+        layout="command"
         compact={compact}
         hidePanic={hidePanic}
+        vehicleLabel={[vehicle.make, vehicle.model].filter(Boolean).join(' ') || null}
+        registration={vehicle.registration ?? null}
         onCommand={(action) => send(action)}
       >
         <DashboardLiveCctv embedded kind="vehicle" vehicleId={vehicle.id} />

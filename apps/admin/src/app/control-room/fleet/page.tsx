@@ -1,23 +1,25 @@
 'use client';
 
+import Link from 'next/link';
+import { useEffect, useMemo, useState } from 'react';
 import { ErrorAlert } from '@/components/ErrorAlert';
-
-import { useMemo, useState } from 'react';
 import { ControlRoomLayout } from '@/components/control-room/ControlRoomLayout';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
+import { OpsDialog } from '@/components/ops/OpsDialog';
+import { OpsActivityRow, OpsStatusBadge } from '@/components/ops/OpsUi';
+import { CctvLiveFeed, type CctvCamera } from '@/components/portal/CctvLiveFeed';
+import { VehicleRemotePad } from '@/components/vehicle/VehicleRemotePad';
+import { VehicleRemoteVisual } from '@/components/vehicle/VehicleRemoteVisual';
+import { ListSearch } from '@/components/ui/ListSearch';
+import { UiSelect } from '@/components/ui/UiSelect';
 import { useApi } from '@/hooks/useApi';
 import { adminApi, type ApiResponse } from '@/lib/api-client';
-import { officerStatusLabel } from '@/lib/officer-status';
-import { OpsKpi } from '@/components/ops/OpsKpi';
-import { OpsDialog } from '@/components/ops/OpsDialog';
-import { UiSelect } from '@/components/ui/UiSelect';
-import { ListSearch } from '@/components/ui/ListSearch';
-import { LayoutViewToggle } from '@/components/ui/LayoutViewToggle';
-import { CctvLiveFeed, type CctvCamera } from '@/components/portal/CctvLiveFeed';
-import { friendlyErrorMessage } from '@/lib/friendly-error';
+import { CONTROL_ROOM_ROUTES } from '@/lib/control-room-routes';
 import { FLEET_TEAMS, fleetTeamDuty, fleetTeamLabel } from '@/lib/fleet-teams';
+import { friendlyErrorMessage } from '@/lib/friendly-error';
 import { matchesSearch } from '@/lib/list-search';
-import { useLayoutView } from '@/hooks/useLayoutView';
+import { officerStatusLabel } from '@/lib/officer-status';
+import type { VehicleRemoteAction, VehicleRemoteState } from '@/lib/vehicle-remote';
 
 type CrewMember = {
   officerId: string;
@@ -42,6 +44,28 @@ type FleetVehicle = {
   cameras?: CctvCamera[];
 };
 
+type TrackedVehicle = {
+  id: string;
+  registration: string;
+  make: string;
+  model: string;
+  color?: string | null;
+  owner?: string;
+  trackerLinked?: boolean;
+  theftRecovery?: boolean;
+  immobiliserOn?: boolean;
+  doorsLocked?: boolean;
+  hornActive?: boolean;
+  lat?: number | null;
+  lng?: number | null;
+  updatedAt?: string | null;
+  status?: string;
+  callSign?: string;
+  speed?: number;
+  batteryPct?: number | null;
+  cameras?: CctvCamera[];
+};
+
 type Officer = {
   id: string;
   firstName: string;
@@ -60,6 +84,19 @@ type VehicleDraft = {
   teamName: string;
 };
 
+type VehicleTab = 'commands' | 'tracking' | 'info' | 'history';
+
+type Selection =
+  | { kind: 'fleet'; id: string }
+  | { kind: 'tracked'; id: string };
+
+type ActivityEntry = {
+  id: string;
+  time: string;
+  title: string;
+  actor: string;
+};
+
 const EMPTY_DRAFT: VehicleDraft = {
   callSign: '',
   registration: '',
@@ -70,9 +107,41 @@ const EMPTY_DRAFT: VehicleDraft = {
   teamName: 'Armed response',
 };
 
+function normReg(value: string) {
+  return value.replace(/[\s-]/g, '').toUpperCase();
+}
+
+function formatClock(iso?: string | null) {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '—';
+  return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+}
+
+function relativeUpdated(iso?: string | null) {
+  if (!iso) return '—';
+  const ms = Date.now() - new Date(iso).getTime();
+  if (Number.isNaN(ms) || ms < 0) return 'Just now';
+  const mins = Math.floor(ms / 60_000);
+  if (mins < 1) return 'Just now';
+  if (mins === 1) return '1 min ago';
+  if (mins < 60) return `${mins} min ago`;
+  const hours = Math.floor(mins / 60);
+  return hours === 1 ? '1h ago' : `${hours}h ago`;
+}
+
+function fleetStatusTone(status: string): 'ok' | 'info' | 'warn' | 'danger' | 'muted' {
+  const s = status.toUpperCase();
+  if (s === 'AVAILABLE' || s === 'ON_DUTY') return 'ok';
+  if (s === 'EN_ROUTE') return 'info';
+  if (s === 'MAINTENANCE' || s === 'RECOVERY') return 'warn';
+  if (s === 'OFFLINE') return 'muted';
+  return 'muted';
+}
+
 export default function FleetPage() {
   return (
-    <ControlRoomLayout title="Company Fleet">
+    <ControlRoomLayout title="Vehicle Control">
       <FleetContent />
     </ControlRoomLayout>
   );
@@ -87,6 +156,10 @@ function FleetContent() {
     () => adminApi.get<ApiResponse<Officer[]>>('/control-room/officers'),
     [],
   );
+  const {
+    data: trackedData,
+    reload: reloadTracked,
+  } = useApi(() => adminApi.get<ApiResponse<TrackedVehicle[]>>('/control-room/client-vehicles'), []);
 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingVehicle, setEditingVehicle] = useState<FleetVehicle | null>(null);
@@ -94,12 +167,18 @@ function FleetContent() {
   const [saving, setSaving] = useState(false);
   const [filter, setFilter] = useState<'all' | 'active' | 'ready' | 'maintenance'>('all');
   const [search, setSearch] = useState('');
-  const [layoutView, setLayoutView] = useLayoutView('control-room-fleet');
   const [notice, setNotice] = useState<{ tone: 'success' | 'warning' | 'error'; text: string } | null>(null);
   const [dialog, setDialog] = useState<'add' | FleetVehicle | null>(null);
+  const [selection, setSelection] = useState<Selection | null>(null);
+  const [tab, setTab] = useState<VehicleTab>('commands');
+  const [busyAction, setBusyAction] = useState<VehicleRemoteAction | null>(null);
+  const [remoteState, setRemoteState] = useState<VehicleRemoteState | null>(null);
+  const [activity, setActivity] = useState<ActivityEntry[]>([]);
 
   const fleet = fleetData?.data ?? [];
   const officers = officersData?.data ?? [];
+  const tracked = trackedData?.data ?? [];
+
   const statusFiltered = useMemo(
     () =>
       fleet.filter((v) => {
@@ -110,6 +189,7 @@ function FleetContent() {
       }),
     [fleet, filter],
   );
+
   const visibleFleet = useMemo(
     () =>
       statusFiltered.filter((v) =>
@@ -128,6 +208,51 @@ function FleetContent() {
       ),
     [statusFiltered, search],
   );
+
+  const visibleTracked = useMemo(
+    () =>
+      tracked.filter((v) =>
+        matchesSearch(search, v.registration, v.make, v.model, v.owner, v.status, v.callSign),
+      ),
+    [tracked, search],
+  );
+
+  const selectedFleet =
+    selection?.kind === 'fleet' ? fleet.find((v) => v.id === selection.id) ?? null : null;
+  const selectedTracked =
+    selection?.kind === 'tracked'
+      ? tracked.find((v) => v.id === selection.id) ?? null
+      : selectedFleet
+        ? tracked.find((t) => normReg(t.registration) === normReg(selectedFleet.registration)) ?? null
+        : null;
+
+  useEffect(() => {
+    if (selection) return;
+    if (visibleFleet[0]) {
+      setSelection({ kind: 'fleet', id: visibleFleet[0].id });
+      return;
+    }
+    if (visibleTracked[0]) setSelection({ kind: 'tracked', id: visibleTracked[0].id });
+  }, [selection, visibleFleet, visibleTracked]);
+
+  useEffect(() => {
+    if (!selectedTracked) {
+      setRemoteState(null);
+      return;
+    }
+    setRemoteState({
+      doorsLocked: selectedTracked.doorsLocked ?? true,
+      immobiliserOn: selectedTracked.immobiliserOn ?? false,
+      theftRecovery: selectedTracked.theftRecovery ?? false,
+      hornActive: selectedTracked.hornActive ?? false,
+    });
+  }, [
+    selectedTracked?.id,
+    selectedTracked?.doorsLocked,
+    selectedTracked?.immobiliserOn,
+    selectedTracked?.theftRecovery,
+    selectedTracked?.hornActive,
+  ]);
 
   function officerName(officerId: string) {
     const o = officers.find((x) => x.id === officerId);
@@ -149,12 +274,15 @@ function FleetContent() {
     setNotice({ tone: 'warning', text });
   }
 
+  function pushActivity(title: string, actor = 'Control room') {
+    const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    setActivity((prev) => [{ id: `${Date.now()}-${title}`, time, title, actor }, ...prev].slice(0, 12));
+  }
+
   function startEdit(vehicle: FleetVehicle) {
     setEditingId(vehicle.id);
     setEditingVehicle(vehicle);
-    setSelectedCrew(
-      vehicle.crew.map((c) => ({ officerId: c.officerId, role: c.role })),
-    );
+    setSelectedCrew(vehicle.crew.map((c) => ({ officerId: c.officerId, role: c.role })));
     setNotice(null);
   }
 
@@ -235,6 +363,7 @@ function FleetContent() {
       setEditingId(null);
       setEditingVehicle(null);
       setNotice({ tone: 'success', text: 'Crew updated.' });
+      pushActivity('Crew assignment updated', 'Control room');
       reload();
     } catch (ex) {
       setNotice({ tone: 'error', text: friendlyErrorMessage(ex, 'save') });
@@ -243,18 +372,79 @@ function FleetContent() {
     }
   }
 
+  async function sendRemote(action: VehicleRemoteAction): Promise<boolean> {
+    if (!selectedTracked) return false;
+    setBusyAction(action);
+    try {
+      const res = await adminApi.post<
+        ApiResponse<{
+          message?: string;
+          doorsLocked?: boolean;
+          immobiliserOn?: boolean;
+          theftRecovery?: boolean;
+          hornActive?: boolean;
+        }>
+      >(`/control-room/client-vehicles/${selectedTracked.id}/remote`, { action });
+      const data = res?.data;
+      setRemoteState((prev) => ({
+        doorsLocked:
+          data?.doorsLocked ??
+          (action === 'lock' ? true : action === 'unlock' ? false : prev?.doorsLocked ?? true),
+        immobiliserOn:
+          data?.immobiliserOn ??
+          (action === 'immobilise' ? true : action === 'release' ? false : prev?.immobiliserOn ?? false),
+        theftRecovery:
+          data?.theftRecovery ??
+          (action === 'panic' ? true : action === 'clearRecovery' ? false : prev?.theftRecovery ?? false),
+        hornActive: data?.hornActive ?? (action === 'horn' ? !(prev?.hornActive ?? false) : prev?.hornActive),
+      }));
+      const actionLabel: Record<VehicleRemoteAction, string> = {
+        lock: 'Doors locked',
+        unlock: 'Doors unlocked',
+        immobilise: 'Ignition disabled',
+        release: 'Ignition released',
+        horn: 'Horn / lights pulsed',
+        panic: 'Vehicle panic / recovery',
+        clearRecovery: 'Recovery cleared',
+      };
+      pushActivity(data?.message ?? actionLabel[action], 'Control room');
+      setNotice({ tone: 'success', text: data?.message ?? 'Command sent.' });
+      void reloadTracked({ silent: true });
+      return true;
+    } catch (ex) {
+      setNotice({ tone: 'error', text: friendlyErrorMessage(ex, 'action') });
+      return false;
+    } finally {
+      setBusyAction(null);
+    }
+  }
+
   if (loading) return <LoadingSpinner label="Loading fleet..." fullScreen />;
   if (error) return <ErrorAlert error={error} onRetry={reload} />;
 
+  const overviewTitle = selectedFleet?.callSign ?? selectedTracked?.registration ?? 'Select a unit';
+  const overviewReg = selectedFleet?.registration ?? selectedTracked?.registration ?? '';
+  const overviewMake = selectedFleet
+    ? `${selectedFleet.make} ${selectedFleet.model}`
+    : selectedTracked
+      ? `${selectedTracked.make} ${selectedTracked.model}`
+      : '';
+  const overviewTeam = selectedFleet
+    ? fleetTeamLabel(selectedFleet.vehicleType, selectedFleet.teamName)
+    : 'Tracked client vehicle';
+  const driver = selectedFleet?.crew.find((c) => c.role === 'DRIVER') ?? selectedFleet?.crew[0];
+  const online =
+    selectedTracked?.trackerLinked !== false &&
+    (selectedFleet ? selectedFleet.status !== 'MAINTENANCE' : Boolean(selectedTracked));
+
   return (
-    <div className="page-content">
-      <header className="page-header">
+    <div className="page-content ops-page">
+      <header className="ops-page-header">
         <div>
-          <p className="text-muted">
-            Vehicle-first board — active, dispatch, and maintenance.
-          </p>
+          <h1 className="ops-page-header__title">Vehicle Control</h1>
+          <p className="ops-page-header__subtitle">Remote commands &amp; vehicle management</p>
         </div>
-        <div className="page-header__actions">
+        <div className="ops-page-header__actions">
           <button
             type="button"
             className={`btn-ghost ${filter === 'all' ? 'btn-ghost--active' : ''}`}
@@ -264,129 +454,422 @@ function FleetContent() {
             Show all
           </button>
           <button type="button" className="btn-ok" onClick={() => setDialog('add')}>
-            Add vehicle
+            + Add vehicle
           </button>
         </div>
       </header>
 
-      {notice && (
+      {notice ? (
         <div className={`alert alert--${notice.tone === 'error' ? 'error' : notice.tone}`} role="status">
           {notice.text}
         </div>
-      )}
+      ) : null}
 
-      <div className="ops-board__kpi" style={{ marginBottom: '1rem' }}>
-        <OpsKpi
-          label="Active"
-          value={fleet.filter((v) => v.status === 'ON_DUTY').length}
-          active={filter === 'active'}
+      <div className="ops-metrics" aria-label="Fleet summary">
+        <article className="ops-metric">
+          <strong className="ops-metric__value">{fleet.length}</strong>
+          <span className="ops-metric__label">Total units</span>
+        </article>
+        <button
+          type="button"
+          className={`ops-metric ops-status--ok ${filter === 'active' ? 'ops-metric--active' : ''}`}
           onClick={() => setFilter(filter === 'active' ? 'all' : 'active')}
-        />
-        <OpsKpi
-          label="Dispatch ready"
-          value={fleet.filter((v) => ['AVAILABLE', 'ON_DUTY'].includes(v.status)).length}
-          active={filter === 'ready'}
+        >
+          <strong className="ops-metric__value">{fleet.filter((v) => v.status === 'ON_DUTY').length}</strong>
+          <span className="ops-metric__label">
+            <span className="ops-status__dot" aria-hidden />
+            Active
+          </span>
+        </button>
+        <button
+          type="button"
+          className={`ops-metric ops-status--info ${filter === 'ready' ? 'ops-metric--active' : ''}`}
           onClick={() => setFilter(filter === 'ready' ? 'all' : 'ready')}
-        />
-        <OpsKpi
-          label="Maintenance"
-          value={fleet.filter((v) => v.status === 'MAINTENANCE').length}
-          hot={fleet.some((v) => v.status === 'MAINTENANCE')}
-          active={filter === 'maintenance'}
+        >
+          <strong className="ops-metric__value">
+            {fleet.filter((v) => ['AVAILABLE', 'ON_DUTY'].includes(v.status)).length}
+          </strong>
+          <span className="ops-metric__label">
+            <span className="ops-status__dot" aria-hidden />
+            Dispatch ready
+          </span>
+        </button>
+        <button
+          type="button"
+          className={`ops-metric ops-status--warn ${filter === 'maintenance' ? 'ops-metric--active' : ''}`}
           onClick={() => setFilter(filter === 'maintenance' ? 'all' : 'maintenance')}
-        />
+        >
+          <strong className="ops-metric__value">
+            {fleet.filter((v) => v.status === 'MAINTENANCE').length}
+          </strong>
+          <span className="ops-metric__label">
+            <span className="ops-status__dot" aria-hidden />
+            Maintenance
+          </span>
+        </button>
       </div>
 
-      <div className="list-toolbar">
+      <div className="ops-toolbar">
         <div className="list-search-bar">
           <ListSearch
             value={search}
             onChange={setSearch}
             placeholder="Search call sign, registration, crew…"
-            resultCount={visibleFleet.length}
-            totalCount={statusFiltered.length}
+            resultCount={visibleFleet.length + visibleTracked.length}
+            totalCount={fleet.length + tracked.length}
           />
         </div>
-        <LayoutViewToggle value={layoutView} onChange={setLayoutView} label="Fleet layout" />
       </div>
 
-      {visibleFleet.length === 0 ? (
-        <div className="empty-state">
-          {search.trim()
-            ? 'No units match this search.'
-            : (
-              <>
-                No units in this filter.{' '}
-                <button type="button" className="interactive-text" onClick={() => setFilter('all')}>
-                  Show all
-                </button>
-              </>
-            )}
-        </div>
-      ) : (
-      <div className={`fleet-grid ${layoutView === 'list' ? 'fleet-grid--list' : ''}`}>
-        {visibleFleet.map((v) => (
-          <article key={v.id} className={`fleet-card fleet-card--${v.vehicleType.toLowerCase().replace(/_/g, '-')}`}>
-            <div className="fleet-card__header">
-              <div>
-                <strong>{v.callSign}</strong>
-                <span className="text-muted">{v.registration}</span>
-              </div>
-              <span className={`badge badge--fleet badge--fleet-${v.status.toLowerCase().replace(/_/g, '-')}`}>
-                {v.status.replace(/_/g, ' ')}
-              </span>
-            </div>
-            <p className="fleet-card__vehicle">
-              {v.make} {v.model}{v.color ? ` · ${v.color}` : ''}
+      <div className="ops-vehicle-layout">
+        <aside className="ops-vehicle-rail" aria-label="Vehicle list">
+          <p className="ops-vehicle-rail__section">Company fleet</p>
+          {visibleFleet.length === 0 ? (
+            <p className="text-muted" style={{ margin: 0, fontSize: '0.8rem' }}>
+              {search.trim() ? 'No fleet units match.' : 'No units in this filter.'}
             </p>
-            <div className="fleet-card__team">
-              <strong>{fleetTeamLabel(v.vehicleType, v.teamName)}</strong>
-              <span>{fleetTeamDuty(v.vehicleType)}</span>
-            </div>
+          ) : (
+            visibleFleet.map((v) => (
+              <button
+                key={v.id}
+                type="button"
+                className={`ops-vehicle-rail__item ${
+                  selection?.kind === 'fleet' && selection.id === v.id ? 'ops-vehicle-rail__item--on' : ''
+                }`}
+                onClick={() => {
+                  setSelection({ kind: 'fleet', id: v.id });
+                  setTab('commands');
+                }}
+              >
+                <strong>{v.callSign}</strong>
+                <span>
+                  {v.registration} · {v.make} {v.model}
+                </span>
+                <span>{v.status.replace(/_/g, ' ')} · {v.crewCount} crew</span>
+              </button>
+            ))
+          )}
 
-            {v.cameras && v.cameras.length > 0 ? (
-              <div className="fleet-card__cams" aria-label={`${v.callSign} dash cams`}>
-                {v.cameras.slice(0, 3).map((c) => (
-                  <CctvLiveFeed key={c.id} camera={c} compact />
+          {visibleTracked.length > 0 ? (
+            <>
+              <p className="ops-vehicle-rail__section">Tracked vehicles</p>
+              {visibleTracked.map((v) => (
+                <button
+                  key={v.id}
+                  type="button"
+                  className={`ops-vehicle-rail__item ${
+                    selection?.kind === 'tracked' && selection.id === v.id
+                      ? 'ops-vehicle-rail__item--on'
+                      : ''
+                  }`}
+                  onClick={() => {
+                    setSelection({ kind: 'tracked', id: v.id });
+                    setTab('commands');
+                  }}
+                >
+                  <strong>{v.registration}</strong>
+                  <span>
+                    {v.make} {v.model}
+                    {v.owner ? ` · ${v.owner}` : ''}
+                  </span>
+                  <span>{v.status?.replace(/_/g, ' ') ?? 'Tracked'}</span>
+                </button>
+              ))}
+            </>
+          ) : null}
+        </aside>
+
+        <div className="ops-vehicle-main">
+          {!selectedFleet && !selectedTracked ? (
+            <div className="ops-panel">
+              <p className="text-muted" style={{ margin: 0 }}>
+                Select a unit to open vehicle control.
+              </p>
+            </div>
+          ) : (
+            <>
+              <section className="ops-vehicle-hero ops-vehicle-hero--viz">
+                <div className="ops-vehicle-hero__visual">
+                  {remoteState && selectedTracked ? (
+                    <VehicleRemoteVisual
+                      variant="full"
+                      appearance="ops"
+                      state={remoteState}
+                      meta={{
+                        title: overviewMake || overviewTitle,
+                        registration: overviewReg,
+                        online,
+                        gpsLive: selectedTracked.lat != null && selectedTracked.lng != null,
+                        speedKph: typeof selectedTracked.speed === 'number' ? selectedTracked.speed : null,
+                        batteryPct: selectedTracked.batteryPct ?? null,
+                        lastUpdate: relativeUpdated(selectedTracked?.updatedAt),
+                      }}
+                      model={{
+                        make: selectedFleet?.make ?? selectedTracked.make,
+                        model: selectedFleet?.model ?? selectedTracked.model,
+                        colour: selectedFleet?.color ?? selectedTracked.color,
+                      }}
+                      busyAction={busyAction}
+                      hidePanic={false}
+                      onCommand={(action) => sendRemote(action)}
+                    />
+                  ) : (
+                    <div className="text-muted" style={{ padding: '1rem', textAlign: 'center', fontSize: '0.85rem' }}>
+                      {selectedFleet
+                        ? 'No linked tracker for remote visualization on this fleet unit.'
+                        : 'Vehicle visualization unavailable.'}
+                    </div>
+                  )}
+                </div>
+
+                <div className="ops-vehicle-hero__meta">
+                  <OpsStatusBadge
+                    label={online ? 'ONLINE' : 'OFFLINE'}
+                    tone={online ? 'ok' : 'muted'}
+                  />
+                  <h2 className="ops-vehicle-hero__title">{overviewTitle}</h2>
+                  <p className="ops-vehicle-hero__sub">
+                    {overviewReg}
+                    {overviewMake ? ` · ${overviewMake}` : ''}
+                    {overviewTeam ? ` · ${overviewTeam}` : ''}
+                  </p>
+
+                  <dl className="ops-vehicle-hero__facts">
+                    <div>
+                      <dt>Driver</dt>
+                      <dd>{driver?.name ?? selectedTracked?.owner ?? '—'}</dd>
+                    </div>
+                    <div>
+                      <dt>Zone</dt>
+                      <dd>{driver?.zone ?? '—'}</dd>
+                    </div>
+                    <div>
+                      <dt>Location</dt>
+                      <dd>
+                        {selectedTracked?.lat != null && selectedTracked?.lng != null ? (
+                          <Link href={CONTROL_ROOM_ROUTES.map} className="link-sm">
+                            {selectedTracked.lat.toFixed(5)}, {selectedTracked.lng.toFixed(5)}
+                          </Link>
+                        ) : (
+                          '—'
+                        )}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt>Last update</dt>
+                      <dd>{relativeUpdated(selectedTracked?.updatedAt)}</dd>
+                    </div>
+                  </dl>
+
+                  {selectedFleet ? (
+                    <div className="ops-officer-card__actions" style={{ marginTop: '0.35rem' }}>
+                      <button type="button" className="btn-sm btn-primary" onClick={() => startEdit(selectedFleet)}>
+                        Edit crew
+                      </button>
+                      <button type="button" className="btn-sm btn-ghost" onClick={() => setDialog(selectedFleet)}>
+                        Edit unit
+                      </button>
+                      <Link href={CONTROL_ROOM_ROUTES.map} className="btn-sm btn-secondary">
+                        View on Map
+                      </Link>
+                    </div>
+                  ) : null}
+
+                  {activity.length > 0 ? (
+                    <div className="ops-vehicle-hero__activity">
+                      <p className="ops-vehicle-hero__activity-kicker">Activity</p>
+                      <ul className="ops-activity ops-activity--compact">
+                        {activity.slice(0, 5).map((row) => (
+                          <li key={row.id}>
+                            <time>{row.time}</time>
+                            <span>{row.title}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ) : null}
+                </div>
+              </section>
+
+              <div className="ops-tabs" role="tablist" aria-label="Vehicle control sections">
+                {(
+                  [
+                    ['commands', 'Remote Commands'],
+                    ['tracking', 'Live Tracking'],
+                    ['info', 'Vehicle Info'],
+                    ['history', 'History'],
+                  ] as const
+                ).map(([id, label]) => (
+                  <button
+                    key={id}
+                    type="button"
+                    role="tab"
+                    aria-selected={tab === id}
+                    className={`ops-tabs__btn ${tab === id ? 'ops-tabs__btn--on' : ''}`}
+                    onClick={() => setTab(id)}
+                  >
+                    {label}
+                  </button>
                 ))}
               </div>
-            ) : null}
 
-            <div className="fleet-card__crew">
-              <h4>Crew ({v.crewCount})</h4>
-              {v.crew.length === 0 ? (
-                <p className="text-muted">No officers assigned</p>
-              ) : (
-                <ul>
-                  {v.crew.map((c) => {
-                    const clash = assignmentElsewhere(c.officerId, v.id);
-                    return (
-                      <li key={c.officerId}>
-                        <strong>{c.name}</strong>
-                        <span>{c.role.replace(/_/g, ' ')}</span>
-                        <span className="text-muted">{officerStatusLabel(c.status)}</span>
-                        {clash ? (
-                          <span className="fleet-crew-clash">Also on {clash.callSign}</span>
-                        ) : null}
-                      </li>
-                    );
-                  })}
-                </ul>
-              )}
-            </div>
+              {tab === 'commands' ? (
+                <section className="ops-panel">
+                  {selectedTracked && remoteState ? (
+                    <VehicleRemotePad
+                      variant="ops"
+                      layout="command"
+                      state={remoteState}
+                      busyAction={busyAction}
+                      vehicleLabel={overviewMake || overviewTitle}
+                      registration={overviewReg}
+                      onCommand={(action) => sendRemote(action)}
+                    />
+                  ) : (
+                    <p className="text-muted" style={{ margin: 0 }}>
+                      Remote commands require a linked tracked vehicle. Select a tracked unit, or match this
+                      fleet registration to a client tracker.
+                    </p>
+                  )}
+                </section>
+              ) : null}
 
-            <div className="fleet-card__edit-actions">
-              <button type="button" className="btn-primary btn-sm" onClick={() => startEdit(v)}>
-                Edit crew
-              </button>
-              <button type="button" className="btn-ghost btn-sm" onClick={() => setDialog(v)}>
-                Edit unit
-              </button>
-            </div>
-          </article>
-        ))}
+              {tab === 'tracking' ? (
+                <section className="ops-panel">
+                  <h3 className="ops-panel__title">Live tracking</h3>
+                  {selectedTracked?.lat != null && selectedTracked?.lng != null ? (
+                    <p style={{ margin: 0 }}>
+                      GPS {selectedTracked.lat.toFixed(5)}, {selectedTracked.lng.toFixed(5)} · updated{' '}
+                      {relativeUpdated(selectedTracked.updatedAt)} ({formatClock(selectedTracked.updatedAt)})
+                    </p>
+                  ) : (
+                    <p className="text-muted" style={{ margin: 0 }}>
+                      No live GPS fix available for this unit.
+                    </p>
+                  )}
+                  <div style={{ marginTop: '0.75rem' }}>
+                    <Link href={CONTROL_ROOM_ROUTES.map} className="btn-sm btn-secondary">
+                      Open Live Map
+                    </Link>
+                  </div>
+                  {(selectedFleet?.cameras?.length || selectedTracked?.cameras?.length) ? (
+                    <div className="fleet-card__cams" style={{ marginTop: '1rem' }} aria-label="Vehicle cameras">
+                      {(selectedFleet?.cameras ?? selectedTracked?.cameras ?? []).slice(0, 3).map((c) => (
+                        <CctvLiveFeed key={c.id} camera={c} compact />
+                      ))}
+                    </div>
+                  ) : null}
+                </section>
+              ) : null}
+
+              {tab === 'info' ? (
+                <section className="ops-panel">
+                  <h3 className="ops-panel__title">Vehicle info</h3>
+                  {selectedFleet ? (
+                    <>
+                      <dl className="ops-vehicle-hero__facts">
+                        <div>
+                          <dt>Call sign</dt>
+                          <dd>{selectedFleet.callSign}</dd>
+                        </div>
+                        <div>
+                          <dt>Registration</dt>
+                          <dd>{selectedFleet.registration}</dd>
+                        </div>
+                        <div>
+                          <dt>Type</dt>
+                          <dd>{fleetTeamLabel(selectedFleet.vehicleType, selectedFleet.teamName)}</dd>
+                        </div>
+                        <div>
+                          <dt>Duty</dt>
+                          <dd>{fleetTeamDuty(selectedFleet.vehicleType)}</dd>
+                        </div>
+                        <div>
+                          <dt>Status</dt>
+                          <dd>
+                            <OpsStatusBadge
+                              label={selectedFleet.status.replace(/_/g, ' ')}
+                              tone={fleetStatusTone(selectedFleet.status)}
+                            />
+                          </dd>
+                        </div>
+                        <div>
+                          <dt>Colour</dt>
+                          <dd>{selectedFleet.color || '—'}</dd>
+                        </div>
+                      </dl>
+                      <div className="fleet-card__crew" style={{ marginTop: '1rem' }}>
+                        <h4>Crew ({selectedFleet.crewCount})</h4>
+                        {selectedFleet.crew.length === 0 ? (
+                          <p className="text-muted">No officers assigned</p>
+                        ) : (
+                          <ul>
+                            {selectedFleet.crew.map((c) => {
+                              const clash = assignmentElsewhere(c.officerId, selectedFleet.id);
+                              return (
+                                <li key={c.officerId}>
+                                  <strong>{c.name}</strong>
+                                  <span>{c.role.replace(/_/g, ' ')}</span>
+                                  <span className="text-muted">{officerStatusLabel(c.status)}</span>
+                                  {clash ? (
+                                    <span className="fleet-crew-clash">Also on {clash.callSign}</span>
+                                  ) : null}
+                                </li>
+                              );
+                            })}
+                          </ul>
+                        )}
+                      </div>
+                    </>
+                  ) : selectedTracked ? (
+                    <dl className="ops-vehicle-hero__facts">
+                      <div>
+                        <dt>Registration</dt>
+                        <dd>{selectedTracked.registration}</dd>
+                      </div>
+                      <div>
+                        <dt>Owner</dt>
+                        <dd>{selectedTracked.owner ?? '—'}</dd>
+                      </div>
+                      <div>
+                        <dt>Tracker</dt>
+                        <dd>{selectedTracked.trackerLinked === false ? 'Not linked' : 'Linked'}</dd>
+                      </div>
+                      <div>
+                        <dt>Status</dt>
+                        <dd>{selectedTracked.status?.replace(/_/g, ' ') ?? '—'}</dd>
+                      </div>
+                    </dl>
+                  ) : null}
+                </section>
+              ) : null}
+
+              {tab === 'history' ? (
+                <section className="ops-panel">
+                  <h3 className="ops-panel__title">Recent activity</h3>
+                  {activity.length === 0 ? (
+                    <p className="text-muted" style={{ margin: 0 }}>
+                      Commands and crew changes from this session appear here. No fabricated history.
+                    </p>
+                  ) : (
+                    <ul className="ops-activity">
+                      {activity.map((row) => (
+                        <OpsActivityRow key={row.id} time={row.time} title={row.title} actor={row.actor} />
+                      ))}
+                    </ul>
+                  )}
+                </section>
+              ) : null}
+
+              <p className="ops-safety-note">
+                <strong>Safety first</strong>
+                All remote commands are logged and monitored. Use remote controls responsibly and only when
+                authorized.
+              </p>
+            </>
+          )}
+        </div>
       </div>
-      )}
 
       {dialog ? (
         <VehicleDialog
@@ -395,6 +878,7 @@ function FleetContent() {
           onSaved={(text) => {
             setDialog(null);
             setNotice({ tone: 'success', text });
+            pushActivity(text);
             reload();
           }}
         />
@@ -404,13 +888,20 @@ function FleetContent() {
         <OpsDialog
           title={`Edit crew — ${editingVehicle.callSign}`}
           subtitle="Assign officers and their roles for this unit. Each unit needs exactly one driver."
-          onClose={() => { setEditingId(null); setEditingVehicle(null); }}
+          onClose={() => {
+            setEditingId(null);
+            setEditingVehicle(null);
+          }}
         >
-          {notice && (
-            <div className={`alert alert--${notice.tone === 'error' ? 'error' : notice.tone}`} role="status" style={{ marginBottom: '0.75rem' }}>
+          {notice ? (
+            <div
+              className={`alert alert--${notice.tone === 'error' ? 'error' : notice.tone}`}
+              role="status"
+              style={{ marginBottom: '0.75rem' }}
+            >
               {notice.text}
             </div>
-          )}
+          ) : null}
           <div className="fleet-card__edit">
             {selectedCrew.map((slot, idx) => (
               <div key={idx} className="fleet-crew-row">
@@ -465,13 +956,30 @@ function FleetContent() {
               </div>
             ))}
             <div className="fleet-form__actions" style={{ marginTop: '0.75rem' }}>
-              <button type="button" className="btn-ok btn-sm" onClick={addCrewSlot} disabled={selectedCrew.length >= 4}>
+              <button
+                type="button"
+                className="btn-ok btn-sm"
+                onClick={addCrewSlot}
+                disabled={selectedCrew.length >= 4}
+              >
                 Add officer
               </button>
-              <button type="button" className="btn-ghost btn-sm" onClick={() => { setEditingId(null); setEditingVehicle(null); }}>
+              <button
+                type="button"
+                className="btn-ghost btn-sm"
+                onClick={() => {
+                  setEditingId(null);
+                  setEditingVehicle(null);
+                }}
+              >
                 Cancel
               </button>
-              <button type="button" className="btn-primary btn-sm" disabled={saving} onClick={() => void saveCrew(editingVehicle.id)}>
+              <button
+                type="button"
+                className="btn-primary btn-sm"
+                disabled={saving}
+                onClick={() => void saveCrew(editingVehicle.id)}
+              >
                 {saving ? 'Saving…' : 'Save crew'}
               </button>
             </div>

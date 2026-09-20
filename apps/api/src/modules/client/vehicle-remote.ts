@@ -5,6 +5,7 @@ export const VEHICLE_REMOTE_ACTIONS = [
   'release',
   'horn',
   'panic',
+  'clearRecovery',
 ] as const;
 
 export type VehicleRemoteAction = (typeof VEHICLE_REMOTE_ACTIONS)[number];

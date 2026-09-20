@@ -2,12 +2,15 @@
 
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Building3DViewer } from '@/components/building/Building3DViewer';
 import { CctvLiveFeed, type CctvCamera } from '@/components/portal/CctvLiveFeed';
-import { HoldToActivate } from '@/components/ops/EmergencyMode';
+import { HoldToActivate, OpsDisarmIcon, OpsSirenIcon } from '@/components/ops/EmergencyMode';
 import { UiSelect } from '@/components/ui/UiSelect';
 import { VehicleRemotePad } from '@/components/vehicle/VehicleRemotePad';
+import { VehicleRemoteVisual } from '@/components/vehicle/VehicleRemoteVisual';
 import { useApi } from '@/hooks/useApi';
 import { usePlatformEvents } from '@/hooks/usePlatformEvents';
+import { resolveBuildingKind } from '@/lib/building-model-assets';
 import { shouldBackgroundPoll } from '@/lib/demo/is-demo-mode';
 import { adminApi, type ApiResponse } from '@/lib/api-client';
 import { CONTROL_ROOM_ROUTES } from '@/lib/control-room-routes';
@@ -24,6 +27,7 @@ import {
 type SitePreview = {
   id: string;
   name: string;
+  propertyType?: string;
   alarmStatus: string;
   cameraCount: number;
   onlineCameras: number;
@@ -56,6 +60,10 @@ type ClientVehicle = {
   doorsLocked: boolean;
   hornActive?: boolean;
   panicFocus?: boolean;
+  speed?: number;
+  batteryPct?: number | null;
+  lat?: number | null;
+  lng?: number | null;
   cameras?: CctvCamera[];
 };
 
@@ -353,7 +361,7 @@ export function DashboardCctvWall() {
         />
         {!usingDash && selectedSite && !siteHot ? (
           <HoldToActivate
-            className="hold-activate--inline ops-cctv__siren-quick"
+            className="hold-activate--inline ops-cctv__siren-quick hold-activate--ops-well hold-activate--ops-well-sm"
             label="Siren"
             holdLabel="Hold…"
             holdMs={1200}
@@ -362,15 +370,19 @@ export function DashboardCctvWall() {
             loading={alarmBusy === 'SIREN'}
             disabled={alarmBusy != null}
             onActivate={() => void soundSiteSiren()}
-          />
+          >
+            <OpsSirenIcon />
+            Siren
+          </HoldToActivate>
         ) : null}
         {!usingDash && siteArmed ? (
           <button
             type="button"
-            className={`ops-cctv__disarm-quick ${siteHot ? 'ops-cctv__disarm-quick--hot' : ''}`}
+            className={`ops-cctv__disarm-quick ops-act ${siteHot ? 'ops-cctv__disarm-quick--hot ops-act--danger' : 'ops-act--resolve'}`}
             disabled={alarmBusy != null}
             onClick={() => void setSiteAlarm('DISARMED')}
           >
+            <OpsDisarmIcon />
             {alarmBusy === 'DISARMED' ? '…' : 'Disarm'}
           </button>
         ) : null}
@@ -382,7 +394,11 @@ export function DashboardCctvWall() {
         </Link>
       </div>
 
-      <div className="ops-cctv__sources" role="listbox" aria-label={usingDash ? 'Vehicles' : 'Sites'}>
+      <div
+        className={`ops-cctv__sources ${usingDash ? '' : 'ops-cctv__sources--sites'}`}
+        role="listbox"
+        aria-label={usingDash ? 'Vehicles' : 'Sites'}
+      >
         {usingDash
           ? dashUnits.map((unit) => {
               const on = selectedUnit?.id === unit.id;
@@ -406,16 +422,38 @@ export function DashboardCctvWall() {
               const on = selectedSite?.id === site.id;
               const status = alarmOverride[site.id] ?? site.alarmStatus;
               const hot = status === 'TRIGGERED';
+              const kind =
+                resolveBuildingKind({
+                  propertyType: site.propertyType,
+                  name: site.name,
+                }) ?? 'blank';
               return (
                 <button
                   key={site.id}
                   type="button"
                   role="option"
                   aria-selected={on}
-                  className={`ops-cctv__chip ${on ? 'ops-cctv__chip--on' : ''} ${hot ? 'ops-cctv__chip--hot' : ''}`}
+                  className={`ops-cctv__site-card ${on ? 'ops-cctv__site-card--on' : ''} ${hot ? 'ops-cctv__site-card--hot' : ''}`}
                   onClick={() => pickSite(site.id)}
                 >
-                  {site.name}
+                  <span className="ops-cctv__site-card-stage" aria-hidden>
+                    {on ? (
+                      <Building3DViewer
+                        compact
+                        interactive={false}
+                        className="ops-cctv__site-card-3d"
+                        model={{
+                          propertyType: site.propertyType,
+                          name: site.name,
+                        }}
+                        alarmStatus={status}
+                      />
+                    ) : (
+                      <span className={`ops-cctv__site-sil ops-cctv__site-sil--${kind}`} />
+                    )}
+                  </span>
+                  <span className="ops-cctv__site-card-name">{site.name}</span>
+                  <span className="ops-cctv__site-card-status">{alarmStatusLabel(status)}</span>
                 </button>
               );
             })}
@@ -456,9 +494,35 @@ export function DashboardCctvWall() {
         {usingDash && focusedClient ? (
           <>
             {remoteNote ? <p className="ops-cctv__dock-note">{remoteNote}</p> : null}
+            <VehicleRemoteVisual
+              variant="compact"
+              appearance="ops"
+              state={{
+                doorsLocked: focusedClient.doorsLocked ?? true,
+                immobiliserOn: focusedClient.immobiliserOn ?? false,
+                theftRecovery: focusedClient.theftRecovery ?? false,
+                hornActive: focusedClient.hornActive ?? false,
+              }}
+              meta={{
+                title: [focusedClient.make, focusedClient.model].filter(Boolean).join(' ') || focusedClient.callSign,
+                registration: focusedClient.registration,
+                online: true,
+                gpsLive: focusedClient.lat != null && focusedClient.lng != null,
+                speedKph: typeof focusedClient.speed === 'number' ? focusedClient.speed : null,
+                batteryPct: focusedClient.batteryPct ?? null,
+              }}
+              model={{
+                make: focusedClient.make,
+                model: focusedClient.model,
+              }}
+              busyAction={remoteBusy}
+              onCommand={(action) => sendRemote(action)}
+            />
             <VehicleRemotePad
               variant="ops"
+              layout="command"
               compact
+              hidePanic
               state={{
                 doorsLocked: focusedClient.doorsLocked ?? true,
                 immobiliserOn: focusedClient.immobiliserOn ?? false,
@@ -466,6 +530,12 @@ export function DashboardCctvWall() {
                 hornActive: focusedClient.hornActive ?? false,
               }}
               busyAction={remoteBusy}
+              vehicleLabel={
+                [focusedClient.make, focusedClient.model].filter(Boolean).join(' ') ||
+                focusedClient.callSign ||
+                null
+              }
+              registration={focusedClient.registration ?? null}
               onCommand={(action) => sendRemote(action)}
             />
           </>
@@ -474,7 +544,7 @@ export function DashboardCctvWall() {
         ) : selectedSite ? (
           <div className="ops-cctv__alarm">
             <div className="ops-cctv__alarm-head">
-              <p className="ops-cctv__alarm-kicker">House alarm</p>
+              <p className="ops-cctv__alarm-kicker">Property alarm</p>
               <span
                 className={`status-pill ${
                   siteHot
@@ -491,38 +561,43 @@ export function DashboardCctvWall() {
             {siteHot ? (
               <button
                 type="button"
-                className="ops-cctv__disarm ops-cctv__disarm--hot"
+                className="ops-cctv__disarm ops-cctv__disarm--hot ops-act ops-act--danger"
                 disabled={alarmBusy != null}
                 onClick={() => void setSiteAlarm('DISARMED')}
               >
+                <OpsDisarmIcon />
                 {alarmBusy === 'DISARMED' ? 'Silencing…' : 'Silence siren · Disarm'}
               </button>
             ) : (
               <>
                 <HoldToActivate
-                  className="hold-activate--inline ops-cctv__siren"
+                  className="hold-activate--inline ops-cctv__siren hold-activate--ops-well"
                   label="Sound siren on property"
                   holdLabel="Hold to sound siren…"
                   holdMs={1200}
                   hideHint
+                  keepLabel
                   loading={alarmBusy === 'SIREN'}
                   disabled={alarmBusy != null}
                   onActivate={() => void soundSiteSiren()}
-                />
+                >
+                  <OpsSirenIcon />
+                  Sound siren on property
+                </HoldToActivate>
                 <p className="ops-cctv__siren-hint">Works while disarmed if CCTV shows a break-in.</p>
               </>
             )}
             {siteArmed && !siteHot ? (
               <button
                 type="button"
-                className="ops-cctv__disarm"
+                className="ops-cctv__disarm ops-act ops-act--resolve"
                 disabled={alarmBusy != null}
                 onClick={() => void setSiteAlarm('DISARMED')}
               >
+                <OpsDisarmIcon />
                 {alarmBusy === 'DISARMED' ? 'Disarming…' : 'Disarm now'}
               </button>
             ) : null}
-            {siteHot ? null : (
             <div className="ops-cctv__alarm-row" role="group" aria-label="Alarm mode">
               {OPS_ALARM_ACTIONS.map((opt) => {
                 const active = siteStatus === opt.value;
@@ -539,7 +614,6 @@ export function DashboardCctvWall() {
                 );
               })}
             </div>
-            )}
           </div>
         ) : (
           <p className="ops-cctv__dock-empty">Select a site to arm or disarm the panel.</p>

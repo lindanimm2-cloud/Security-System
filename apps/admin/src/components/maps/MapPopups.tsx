@@ -6,6 +6,7 @@ import { IncidentDetailsMenu } from '@/components/control-room/IncidentDetailsMe
 import { QuickDispatchPanel } from '@/components/control-room/QuickDispatchPanel';
 import { isAwaitingDispatch } from '@/lib/incident-status';
 import { VehicleRemotePad } from '@/components/vehicle/VehicleRemotePad';
+import { VehicleRemoteVisual } from '@/components/vehicle/VehicleRemoteVisual';
 import type { VehicleRemoteAction } from '@/lib/vehicle-remote';
 import type { MapClient, MapFleetVehicle, MapIncident, MapOfficer, MapProperty, MapVehicle } from './map-types';
 import { customerHref } from '@/lib/control-room-routes';
@@ -226,16 +227,41 @@ export function VehiclePopup({
         <dd>{formatTime(vehicle.updatedAt)}</dd>
       </dl>
       {onRemote ? (
-        <VehicleRemotePad
-          variant="ops"
-          compact
-          state={{
-            doorsLocked: vehicle.doorsLocked ?? true,
-            immobiliserOn: Boolean(vehicle.immobiliserOn),
-            theftRecovery: Boolean(vehicle.theftRecovery || vehicle.vehicleType === 'STOLEN'),
-          }}
-          onCommand={onRemote}
-        />
+        <>
+          <VehicleRemoteVisual
+            variant="compact"
+            state={{
+              doorsLocked: vehicle.doorsLocked ?? true,
+              immobiliserOn: Boolean(vehicle.immobiliserOn),
+              theftRecovery: Boolean(vehicle.theftRecovery || vehicle.vehicleType === 'STOLEN'),
+            }}
+            model={{
+              make: vehicle.make,
+              model: vehicle.model,
+              colour: vehicle.color,
+            }}
+            meta={{
+              registration: vehicle.registration,
+              online: true,
+              gpsLive: vehicle.lat != null && vehicle.lng != null,
+              speedKph: typeof vehicle.speed === 'number' ? vehicle.speed : null,
+            }}
+            onCommand={onRemote}
+          />
+          <VehicleRemotePad
+            variant="ops"
+            layout="command"
+            compact
+            state={{
+              doorsLocked: vehicle.doorsLocked ?? true,
+              immobiliserOn: Boolean(vehicle.immobiliserOn),
+              theftRecovery: Boolean(vehicle.theftRecovery || vehicle.vehicleType === 'STOLEN'),
+            }}
+            vehicleLabel={[vehicle.make, vehicle.model].filter(Boolean).join(' ') || null}
+            registration={vehicle.registration ?? null}
+            onCommand={onRemote}
+          />
+        </>
       ) : null}
     </div>
   );

@@ -18,6 +18,11 @@ import {
   integrationsCatalog,
   psimOverviewStats,
 } from './demo-psim';
+import {
+  demoOfficerPatrolShift,
+  markPatrolStopPhoto,
+  patrolShiftSummary,
+} from './demo-patrol-shift';
 import { DEMO_DISPATCH_RULES } from '../psim/integration-catalog';
 import { DEMO_TENANT, demoRegisterSession, setDemoAccountPassword } from './users';
 import { canManageUserPasswords } from '../password-access';
@@ -35,6 +40,18 @@ import {
   syncDemoPropertyAlarm,
   type DemoSurveillanceSite,
 } from './demo-sites';
+import {
+  DEMO_CCTV_PRESETS,
+  DEMO_SITE_TYPES,
+  demoCctvSystems,
+  type DemoCctvSystem,
+} from './demo-cctv-systems';
+import {
+  DEMO_ALARM_PRESETS,
+  DEMO_ALARM_SITE_TYPES,
+  demoAlarmSystems,
+  type DemoAlarmSystem,
+} from './demo-alarm-systems';
 
 type DemoRequest = {
   portal?: AuthPortal;
@@ -905,7 +922,15 @@ function applyDemoVehicleRemote(
   trackerLinked: boolean;
   cameras: ReturnType<typeof demoClientDashCams>;
 } | null {
-  const allowed: VehicleRemoteAction[] = ['lock', 'unlock', 'immobilise', 'release', 'horn', 'panic'];
+  const allowed: VehicleRemoteAction[] = [
+    'lock',
+    'unlock',
+    'immobilise',
+    'release',
+    'horn',
+    'panic',
+    'clearRecovery',
+  ];
   if (!(allowed as string[]).includes(action)) return null;
   const typed = action as VehicleRemoteAction;
   const target = demoClientVehicles.find((v) => v.id === vehicleId) ?? demoClientVehicles.find((v) => v.id === 'demo-veh-1');
@@ -925,6 +950,9 @@ function applyDemoVehicleRemote(
     immobiliserOn = true;
     theftRecovery = true;
   }
+  if (typed === 'clearRecovery') {
+    theftRecovery = false;
+  }
 
   target.doorsLocked = doorsLocked;
   target.immobiliserOn = immobiliserOn;
@@ -934,6 +962,9 @@ function applyDemoVehicleRemote(
     demoVehicleState.immobiliserOn = immobiliserOn;
     demoVehicleState.theftRecovery = theftRecovery;
     if (typed === 'panic') demoVehicleState.trackingMode = 'THEFT_RECOVERY';
+    if (typed === 'clearRecovery' && demoVehicleState.trackingMode === 'THEFT_RECOVERY') {
+      demoVehicleState.trackingMode = 'TRACKER';
+    }
   }
 
   if (typed === 'horn') demoHornUntil.set(target.id, Date.now() + 20_000);
@@ -1006,6 +1037,7 @@ function applyDemoVehicleRemote(
     release: `${target.registration} immobiliser released.`,
     horn: `${target.registration} horn and lights pulsing.`,
     panic: `${target.registration} vehicle panic sent — control room viewing dash cameras.`,
+    clearRecovery: `${target.registration} theft recovery cleared.`,
   };
 
   return {
@@ -1230,6 +1262,16 @@ type DemoClientChatMessage = {
 };
 
 const demoClientChatByClient = new Map<string, DemoClientChatMessage[]>();
+
+type DemoIncidentChatMessage = {
+  id: string;
+  content: string;
+  createdAt: string;
+  to: string;
+  sender: { id: string; firstName: string; lastName: string; role: string };
+};
+
+const demoIncidentChatByKey = new Map<string, DemoIncidentChatMessage[]>();
 
 function ensureDemoClientChat(clientUserId: string): DemoClientChatMessage[] {
   if (!demoClientChatByClient.has(clientUserId)) {
@@ -1611,6 +1653,26 @@ const demoControlRoomNotifications: DemoCrNotification[] = [
     createdAt: new Date(Date.now() - 2 * 60 * 1000).toISOString(),
     link: '/control-room/incidents',
   },
+  {
+    id: 'demo-n-site-house',
+    category: 'ALARM',
+    title: 'House armed · Morningside',
+    body: 'Nomsa Client — mixbox PG-103 online · house 3D on Sites strip',
+    priority: 'medium',
+    isRead: false,
+    createdAt: new Date(Date.now() - 8 * 60 * 1000).toISOString(),
+    link: '/control-room/alarm-systems',
+  },
+  {
+    id: 'demo-n-site-warehouse',
+    category: 'ALARM',
+    title: 'Warehouse panel online · Prospecton',
+    body: 'Priya Naidoo — perimeter + roller doors · warehouse 3D ready',
+    priority: 'high',
+    isRead: false,
+    createdAt: new Date(Date.now() - 14 * 60 * 1000).toISOString(),
+    link: '/control-room/alarm-systems',
+  },
 ];
 
 const demoCrReadIds = new Set<string>();
@@ -1929,6 +1991,165 @@ const demoManagedUsers: DemoManagedUser[] = [
   demoStaff('tech.cameras@4ds.local', 'Camera', 'Tech', 'TECHNICIAN', { jobTitle: 'CCTV Installer' }),
   demoStaff('tech.alarms@4ds.local', 'Alarm', 'Tech', 'TECHNICIAN', { jobTitle: 'Alarm Technician' }),
 ];
+
+type DemoFamilyMemberRow = {
+  userId: string;
+  name: string;
+  email: string;
+  role: string;
+  relationship: string | null;
+  nickname: string | null;
+};
+
+type DemoFamilyRow = {
+  id: string;
+  name: string;
+  ownerUserId: string;
+  ownerName: string;
+  ownerEmail: string;
+  members: DemoFamilyMemberRow[];
+};
+
+function demoFamilyMemberFromUser(
+  user: DemoManagedUser,
+  relationship: string | null,
+): DemoFamilyMemberRow {
+  return {
+    userId: user.id,
+    name: `${user.firstName} ${user.lastName}`.trim(),
+    email: user.email,
+    role: user.role,
+    relationship,
+    nickname: user.firstName,
+  };
+}
+
+const nomsaDemo = demoManagedUsers.find((u) => u.email === 'client@demo.local')!;
+const jamesDemo = demoManagedUsers.find((u) => u.email === 'james@demo.local')!;
+
+const demoFamilies: DemoFamilyRow[] = [
+  {
+    id: 'demo-family-1',
+    name: 'Client family',
+    ownerUserId: nomsaDemo.id,
+    ownerName: `${nomsaDemo.firstName} ${nomsaDemo.lastName}`,
+    ownerEmail: nomsaDemo.email,
+    members: [
+      demoFamilyMemberFromUser(nomsaDemo, 'Account holder'),
+      {
+        userId: 'demo-fam-1',
+        name: 'Thandi Client',
+        email: 'thandi@demo.local',
+        role: 'FAMILY_MEMBER',
+        relationship: 'Child',
+        nickname: 'Thandi',
+      },
+      {
+        userId: 'demo-fam-2',
+        name: 'Lerato Client',
+        email: 'lerato.family@demo.local',
+        role: 'FAMILY_MEMBER',
+        relationship: 'Sibling',
+        nickname: 'Lerato',
+      },
+    ],
+  },
+  {
+    id: 'demo-family-2',
+    name: 'Demo Family',
+    ownerUserId: jamesDemo.id,
+    ownerName: `${jamesDemo.firstName} ${jamesDemo.lastName}`,
+    ownerEmail: jamesDemo.email,
+    members: [demoFamilyMemberFromUser(jamesDemo, 'Account holder')],
+  },
+];
+
+function formatDemoFamily(family: DemoFamilyRow) {
+  return {
+    id: family.id,
+    name: family.name,
+    ownerUserId: family.ownerUserId,
+    ownerName: family.ownerName,
+    ownerEmail: family.ownerEmail,
+    memberCount: family.members.length,
+    members: family.members,
+  };
+}
+
+function resolveDemoFamilyLink(opts: {
+  familyId?: string | null;
+  linkToClientId?: string | null;
+  createFamily?: boolean;
+  familyName?: string | null;
+  user: DemoManagedUser;
+  relationship: string | null;
+}): DemoFamilyRow | null {
+  const relationship = opts.relationship;
+  let family =
+    (opts.familyId ? demoFamilies.find((f) => f.id === opts.familyId) : null) ?? null;
+
+  if (!family && opts.linkToClientId) {
+    family =
+      demoFamilies.find((f) => f.ownerUserId === opts.linkToClientId) ??
+      demoFamilies.find((f) => f.members.some((m) => m.userId === opts.linkToClientId)) ??
+      null;
+    if (!family) {
+      const primary =
+        demoManagedUsers.find((u) => u.id === opts.linkToClientId) ??
+        demoClients.find((c) => c.id === opts.linkToClientId);
+      if (!primary) return null;
+      const ownerName =
+        'firstName' in primary
+          ? `${primary.firstName} ${primary.lastName}`.trim()
+          : String((primary as { name?: string }).name ?? 'Client');
+      const ownerEmail = 'email' in primary ? String(primary.email) : '';
+      family = {
+        id: `demo-family-${Date.now()}`,
+        name: `${ownerName} Family`,
+        ownerUserId: primary.id,
+        ownerName,
+        ownerEmail,
+        members: [
+          {
+            userId: primary.id,
+            name: ownerName,
+            email: ownerEmail,
+            role: 'role' in primary ? String(primary.role) : 'USER',
+            relationship: 'Account holder',
+            nickname: 'firstName' in primary ? primary.firstName : ownerName.split(' ')[0] ?? null,
+          },
+        ],
+      };
+      demoFamilies.unshift(family);
+    }
+  }
+
+  if (!family && opts.createFamily) {
+    family = {
+      id: `demo-family-${Date.now()}`,
+      name: opts.familyName?.trim() || `${opts.user.firstName} ${opts.user.lastName} Family`,
+      ownerUserId: opts.user.id,
+      ownerName: `${opts.user.firstName} ${opts.user.lastName}`.trim(),
+      ownerEmail: opts.user.email,
+      members: [],
+    };
+    demoFamilies.unshift(family);
+  }
+
+  if (!family) return null;
+
+  const existing = family.members.find((m) => m.userId === opts.user.id);
+  const row = demoFamilyMemberFromUser(opts.user, relationship);
+  if (existing) {
+    existing.relationship = relationship;
+    existing.name = row.name;
+    existing.email = row.email;
+    existing.role = row.role;
+  } else {
+    family.members.push(row);
+  }
+  return family;
+}
 
 const DEMO_SUBSCRIPTION_MRR_CENTS: Record<string, number> = {
   BUSINESS: 310000,
@@ -2372,6 +2593,8 @@ const demoDocumentFolders: {
   { id: 'demo-doc-folder-clients', name: 'Client Records', parentId: null as string | null, description: 'Contracts and ID copies', icon: '👤' },
   { id: 'demo-doc-folder-officers', name: 'Officer Files', parentId: null as string | null, description: 'Licenses, certifications, and reports', icon: '🛡️' },
   { id: 'demo-doc-folder-sops', name: 'Policies & SOPs', parentId: null as string | null, description: 'Operational playbooks', icon: '📘' },
+  { id: 'demo-doc-folder-manuals', name: '4DS Nexus user manuals', parentId: null as string | null, description: 'Role manuals issued by 4DS Solutions for Bololo Security', icon: '🎓' },
+  { id: 'demo-doc-folder-legal', name: 'Contracts & architecture', parentId: null as string | null, description: 'Signed commercial documents and system blueprint', icon: '⚖️' },
 ];
 
 let demoDocuments: {
@@ -2453,6 +2676,118 @@ let demoDocuments: {
     incidentId: null as string | null,
     createdAt: new Date(Date.now() - 14 * 86400000).toISOString(),
     uploadedBy: 'Demo Admin',
+  },
+  {
+    id: 'demo-doc-um-owner',
+    title: 'Owner user manual',
+    description: '4DS-BOLOLO-UM-OWN-01 · v1.0 · Owner / managing director desk on 4DS Nexus.',
+    category: 'TRAINING',
+    fileName: 'Bololo_Security_Owner_User_Manual.pdf',
+    fileType: 'application/pdf',
+    fileUrl: '/documents/Bololo_Security_Owner_User_Manual.pdf',
+    fileSizeKb: 845,
+    tags: ['manual', 'owner', '4ds', 'bololo'],
+    isPinned: true,
+    folderId: 'demo-doc-folder-manuals',
+    incidentId: null as string | null,
+    createdAt: '2026-09-05T08:00:00.000Z',
+    uploadedBy: 'Lindani Maphumulo',
+  },
+  {
+    id: 'demo-doc-um-cr',
+    title: 'Control Room user manual',
+    description: '4DS-BOLOLO-UM-CR-01 · v1.0 · Dispatcher / on-duty operator.',
+    category: 'TRAINING',
+    fileName: 'Bololo_Security_Control_Room_User_Manual.pdf',
+    fileType: 'application/pdf',
+    fileUrl: '/documents/Bololo_Security_Control_Room_User_Manual.pdf',
+    fileSizeKb: 847,
+    tags: ['manual', 'dispatch', 'control-room'],
+    isPinned: true,
+    folderId: 'demo-doc-folder-manuals',
+    incidentId: null as string | null,
+    createdAt: '2026-09-05T08:00:00.000Z',
+    uploadedBy: 'Lindani Maphumulo',
+  },
+  {
+    id: 'demo-doc-um-install',
+    title: 'Installation Team user manual',
+    description: '4DS-BOLOLO-UM-INST-01 · v1.0 · Technician / camera install app.',
+    category: 'TRAINING',
+    fileName: 'Bololo_Security_Installation_Team_User_Manual.pdf',
+    fileType: 'application/pdf',
+    fileUrl: '/documents/Bololo_Security_Installation_Team_User_Manual.pdf',
+    fileSizeKb: 830,
+    tags: ['manual', 'installation', 'technician'],
+    isPinned: false,
+    folderId: 'demo-doc-folder-manuals',
+    incidentId: null as string | null,
+    createdAt: '2026-09-05T08:00:00.000Z',
+    uploadedBy: 'Lindani Maphumulo',
+  },
+  {
+    id: 'demo-doc-um-client',
+    title: 'Client user manual',
+    description: '4DS-BOLOLO-UM-CLT-01 · v1.0 · Household / subscriber portal.',
+    category: 'TRAINING',
+    fileName: 'Bololo_Security_Client_User_Manual.pdf',
+    fileType: 'application/pdf',
+    fileUrl: '/documents/Bololo_Security_Client_User_Manual.pdf',
+    fileSizeKb: 842,
+    tags: ['manual', 'client', 'portal'],
+    isPinned: false,
+    folderId: 'demo-doc-folder-manuals',
+    incidentId: null as string | null,
+    createdAt: '2026-09-05T08:00:00.000Z',
+    uploadedBy: 'Lindani Maphumulo',
+  },
+  {
+    id: 'demo-doc-um-officer',
+    title: 'Officer user manual',
+    description: '4DS-BOLOLO-UM-OFF-01 · v1.0 · Field officer app.',
+    category: 'TRAINING',
+    fileName: 'Bololo_Security_Officer_User_Manual.pdf',
+    fileType: 'application/pdf',
+    fileUrl: '/documents/Bololo_Security_Officer_User_Manual.pdf',
+    fileSizeKb: 830,
+    tags: ['manual', 'officer', 'field'],
+    isPinned: false,
+    folderId: 'demo-doc-folder-manuals',
+    incidentId: null as string | null,
+    createdAt: '2026-09-05T08:00:00.000Z',
+    uploadedBy: 'Lindani Maphumulo',
+  },
+  {
+    id: 'demo-doc-agreement',
+    title: 'Software development & revenue-share agreement',
+    description: '4DS-BOLOLO-SRA-2026-001 · v1.0 · Confidential commercial agreement.',
+    category: 'LEGAL_COMPLIANCE',
+    fileName: 'Bololo_Security_4DS_Software_Development_Revenue_Share_Agreement.pdf',
+    fileType: 'application/pdf',
+    fileUrl: '/documents/Bololo_Security_4DS_Software_Development_Revenue_Share_Agreement.pdf',
+    fileSizeKb: 2172,
+    tags: ['contract', 'legal', 'revenue-share', '4ds'],
+    isPinned: true,
+    folderId: 'demo-doc-folder-legal',
+    incidentId: null as string | null,
+    createdAt: '2026-09-05T08:00:00.000Z',
+    uploadedBy: 'Lindani Maphumulo',
+  },
+  {
+    id: 'demo-doc-blueprint',
+    title: 'Bololo Security architecture blueprint',
+    description: 'System map: sites and devices through 4DS Nexus into control room, officer and client apps.',
+    category: 'LEGAL_COMPLIANCE',
+    fileName: 'Bololo_Security_Architecture_Blueprint.png',
+    fileType: 'image/png',
+    fileUrl: '/documents/Bololo_Security_Architecture_Blueprint.png',
+    fileSizeKb: 1200,
+    tags: ['architecture', 'blueprint', '4ds'],
+    isPinned: false,
+    folderId: 'demo-doc-folder-legal',
+    incidentId: null as string | null,
+    createdAt: '2026-09-05T08:00:00.000Z',
+    uploadedBy: 'Lindani Maphumulo',
   },
 ];
 
@@ -2971,8 +3306,10 @@ export async function handleDemoRequest<T>({
         {
           id: 'demo-veh-1',
           registration: 'ND 123-456',
-          make: 'Toyota',
-          model: 'Fortuner',
+          make: 'Mercedes-Benz',
+          model: 'C-Class',
+          year: 2024,
+          color: 'White',
           theftRecovery: demoVehicleState.theftRecovery,
           immobiliserOn: demoVehicleState.immobiliserOn,
           doorsLocked: demoVehicleState.doorsLocked,
@@ -3300,12 +3637,13 @@ export async function handleDemoRequest<T>({
       name,
       alarmStatus: 'DISARMED',
       alarmLinked: false,
+      propertyType: 'HOUSE',
     });
     demoSurveillanceSites.push({
       id: siteId,
       name,
       address,
-      propertyType: 'RESIDENTIAL',
+      propertyType: 'HOUSE',
       alarmStatus: 'DISARMED',
       alarmLinked: false,
       camerasLinked: false,
@@ -3629,12 +3967,12 @@ export async function handleDemoRequest<T>({
       const v = live ?? {
         id: vehicleId,
         registration: 'ND 123-456',
-        make: 'Toyota',
-        model: 'Fortuner',
-        variant: 'GD-6',
-        year: 2022,
+        make: 'Mercedes-Benz',
+        model: 'C-Class',
+        variant: 'W206',
+        year: 2024,
         color: 'White',
-        vin: 'JTMDN123456789012',
+        vin: 'W1KAF4HB0PR123456',
         trackerLinked: true,
         theftRecovery: demoVehicleState.theftRecovery,
         immobiliserOn: demoVehicleState.immobiliserOn,
@@ -3711,33 +4049,83 @@ export async function handleDemoRequest<T>({
     return ok(data) as T;
   }
   if (clean === '/client/family' && m === 'GET') {
+    const family = demoFamilies.find((f) => f.id === 'demo-family-1') ?? demoFamilies[0];
     return ok({
-      id: 'demo-family-1',
-      name: 'Client family',
-      owner: 'Nomsa Client',
+      id: family.id,
+      name: family.name,
+      owner: family.ownerName,
+      ownerUserId: family.ownerUserId,
+      isOwner: true,
       familyMessagingEnabled: demoFamilyMessagingEnabled,
-      members: [
-        {
-          id: 'demo-fam-1',
-          name: 'Thandi Client',
-          nickname: 'Thandi',
-          trackingEnabled: true,
-          familyMessagingEnabled: true,
-          lastLocationAt: new Date(Date.now() - 180000).toISOString(),
-          phone: '+27821234568',
-          userId: 'demo-fam-1',
-        },
-        {
-          id: 'demo-fam-2',
-          name: 'Lerato Client',
-          nickname: 'Lerato',
-          trackingEnabled: false,
-          familyMessagingEnabled: false,
-          lastLocationAt: null,
-          phone: '+27821234569',
-          userId: 'demo-fam-2',
-        },
-      ],
+      members: family.members.map((member) => ({
+        id: member.userId,
+        name: member.name,
+        nickname: member.nickname,
+        relationship: member.relationship,
+        trackingEnabled: member.userId !== 'demo-fam-2',
+        familyMessagingEnabled: member.userId !== 'demo-fam-2',
+        lastLocationAt:
+          member.userId === 'demo-fam-1'
+            ? new Date(Date.now() - 180000).toISOString()
+            : null,
+        phone:
+          member.userId === 'demo-fam-1'
+            ? '+27821234568'
+            : member.userId === 'demo-fam-2'
+              ? '+27821234569'
+              : '+27821234567',
+        userId: member.userId,
+      })),
+    }) as T;
+  }
+  if (clean === '/client/family/members' && m === 'POST') {
+    const firstName = String(payload.firstName ?? '').trim();
+    const lastName = String(payload.lastName ?? '').trim();
+    const email = String(payload.email ?? '').trim().toLowerCase();
+    const relationship = String(payload.relationship ?? '').trim();
+    const phone =
+      typeof payload.phone === 'string' ? payload.phone.trim() || null : null;
+    if (!firstName || !lastName || !email) {
+      return {
+        success: false as const,
+        message: 'First name, last name, and email are required',
+      } as T;
+    }
+    if (!relationship) {
+      return {
+        success: false as const,
+        message: 'Select a family relationship type (Spouse, Child, Parent, …)',
+      } as T;
+    }
+    if (demoManagedUsers.some((item) => item.email === email)) {
+      return { success: false as const, message: 'A user with this email already exists' } as T;
+    }
+    const family = demoFamilies.find((f) => f.id === 'demo-family-1') ?? demoFamilies[0];
+    const created = demoStaff(email, firstName, lastName, 'FAMILY_MEMBER', {
+      phone,
+      status: 'PENDING_VERIFICATION',
+      jobTitle: 'Family member',
+    });
+    demoManagedUsers.unshift(created);
+    family.members.push({
+      userId: created.id,
+      name: `${firstName} ${lastName}`.trim(),
+      email,
+      role: 'FAMILY_MEMBER',
+      relationship,
+      nickname: firstName,
+    });
+    return ok({
+      id: created.id,
+      firstName,
+      lastName,
+      email,
+      relationship,
+      familyId: family.id,
+      familyName: family.name,
+      inviteToken: 'NX-FAM001',
+      inviteCode: 'NX-FAM001',
+      inviteUrl: '/portal/register?token=NX-FAM001',
     }) as T;
   }
   if (clean === '/client/communication-settings' && m === 'GET') {
@@ -4191,12 +4579,13 @@ export async function handleDemoRequest<T>({
       },
       platformLinks: [
         { label: 'Ops Board', href: '/control-room' },
+        { label: 'Command Hub', href: '/control-room/command' },
         { label: 'Live map', href: '/control-room/map' },
+        { label: 'Dispatch', href: '/control-room/dispatch' },
+        { label: 'Incidents', href: '/control-room/incidents' },
         { label: 'CCTV', href: '/control-room/surveillance' },
         { label: 'Vehicles', href: '/control-room/fleet' },
-        { label: 'Incidents', href: '/control-room/incidents' },
         { label: 'Device security', href: '/control-room/device-security' },
-        { label: 'Dispatch', href: '/control-room/dispatch' },
         { label: 'Customers', href: '/control-room/customers' },
         { label: 'Gear store', href: '/control-room/store' },
         { label: 'Internal chat', href: '/control-room/chat' },
@@ -4285,6 +4674,27 @@ export async function handleDemoRequest<T>({
   }
 
   // ——— Control room ———
+  if (clean === '/control-room/security-settings' && m === 'GET') {
+    return ok({
+      mfaOwners: true,
+      mfaDispatchers: false,
+      sessionMinutes: '30',
+      lockoutAttempts: '5',
+      passwordDays: '90',
+      deviceHeartbeat: true,
+    }) as T;
+  }
+  if (clean === '/control-room/security-settings' && m === 'PATCH') {
+    const body = (payload ?? {}) as Record<string, unknown>;
+    return ok({
+      mfaOwners: typeof body.mfaOwners === 'boolean' ? body.mfaOwners : true,
+      mfaDispatchers: typeof body.mfaDispatchers === 'boolean' ? body.mfaDispatchers : false,
+      sessionMinutes: typeof body.sessionMinutes === 'string' ? body.sessionMinutes : '30',
+      lockoutAttempts: typeof body.lockoutAttempts === 'string' ? body.lockoutAttempts : '5',
+      passwordDays: typeof body.passwordDays === 'string' ? body.passwordDays : '90',
+      deviceHeartbeat: typeof body.deviceHeartbeat === 'boolean' ? body.deviceHeartbeat : true,
+    }) as T;
+  }
   if (clean === '/control-room/dashboard' && m === 'GET') {
     const active = activeDemoIncidents();
     return ok({
@@ -4310,6 +4720,43 @@ export async function handleDemoRequest<T>({
         const createdAt = new Date(Date.now() - mins * 60_000).toISOString();
         const dispatched = Boolean(officerName) || ['DISPATCHED', 'EN_ROUTE', 'IN_PROGRESS', 'ON_SCENE'].includes(i.status);
         const isJames = i.user.includes('James');
+        const blob = `${i.type} ${i.title} ${i.location} ${i.user}`.toUpperCase();
+        const wantDash =
+          i.type === 'THEFT' ||
+          blob.includes('VEHICLE') ||
+          blob.includes('CAR ') ||
+          blob.includes('CAR PANIC') ||
+          blob.includes('DASH') ||
+          blob.includes('TRACKER');
+        const dashFeed = demoVehicleCameraFeeds[0];
+        const site =
+          demoSurveillanceSites.find((s) =>
+            i.location.toLowerCase().includes(s.name.split('—')[0]?.trim().toLowerCase() ?? ''),
+          ) ??
+          demoSurveillanceSites.find((s) =>
+            s.owner.name.toLowerCase().includes(i.user.split(' ')[0]?.toLowerCase() ?? ''),
+          ) ??
+          demoSurveillanceSites.find((s) => s.id === 'demo-prop-1') ??
+          demoSurveillanceSites[0];
+        const previewSource = wantDash
+          ? dashFeed?.cameras ?? []
+          : site?.cameras ?? [];
+        const previewCameras = previewSource.slice(0, 4).map((c) => ({
+          id: c.id,
+          name: c.name,
+          locationLabel: c.locationLabel,
+          channel: c.channel,
+          status: c.status,
+          snapshotUrl: c.snapshotUrl ?? null,
+          isLiveCapable: c.isLiveCapable !== false,
+          isInterior: Boolean(c.isInterior),
+        }));
+        const cctvKind = wantDash ? ('dash' as const) : ('site' as const);
+        const cameraCount = previewCameras.length || (isJames ? 6 : i.type === 'OTHER' ? 4 : 4);
+        const camerasOnline = previewCameras.filter((c) => {
+          const s = (c.status ?? '').toUpperCase();
+          return s === 'ONLINE' || s === 'RECORDING';
+        }).length || (isJames ? 4 : i.type === 'OTHER' ? 2 : cameraCount);
         return {
           id: i.id,
           type: i.type,
@@ -4324,8 +4771,10 @@ export async function handleDemoRequest<T>({
           etaDueAt: dispatched ? new Date(Date.now() + 4 * 60_000 + 32_000).toISOString() : null,
           isSilent: i.isSilent,
           source: i.type === 'PANIC' ? (i.isSilent ? 'DURESS' : 'APP PANIC') : null,
-          cameraCount: isJames ? 6 : i.type === 'OTHER' ? 4 : 4,
-          camerasOnline: isJames ? 4 : i.type === 'OTHER' ? 2 : 4,
+          cameraCount,
+          camerasOnline,
+          cctvKind,
+          previewCameras,
           gpsAvailable: i.type !== 'THEFT',
           distanceKm: i.type === 'THEFT' ? null : isJames ? 1.2 : 0.8,
           userPhone:
@@ -4391,6 +4840,10 @@ export async function handleDemoRequest<T>({
       alarms: demoAlarmFeed,
       access: demoAccessDoors,
       patrols: demoPatrolRoutes,
+      patrolPhotos: {
+        shift: demoOfficerPatrolShift,
+        summary: patrolShiftSummary(demoOfficerPatrolShift),
+      },
       compliance: demoCompliance,
       watchlists: demoWatchlists,
       rules: DEMO_DISPATCH_RULES,
@@ -4546,6 +4999,215 @@ export async function handleDemoRequest<T>({
       sites,
     }) as T;
   }
+
+  if (clean === '/control-room/cctv-systems' && m === 'GET') {
+    return ok({
+      presets: DEMO_CCTV_PRESETS,
+      siteTypes: DEMO_SITE_TYPES,
+      systems: demoCctvSystems,
+    }) as T;
+  }
+
+  {
+    const kitGet = clean.match(/^\/control-room\/cctv-systems\/([^/]+)$/);
+    if (kitGet && m === 'GET') {
+      const row = demoCctvSystems.find((s) => s.id === kitGet[1]);
+      if (!row) throw new Error('CCTV system not found');
+      return ok(row) as T;
+    }
+  }
+
+  if (clean === '/control-room/cctv-systems' && m === 'POST') {
+    const body = (payload ?? {}) as {
+      propertyId?: string;
+      clientUserId?: string;
+      site?: {
+        name?: string;
+        address?: string;
+        propertyType?: string;
+        accessNotes?: string;
+        gateCode?: string;
+      };
+      system?: Partial<DemoCctvSystem> & { name?: string; channelCount?: number };
+      cameras?: Array<{
+        name?: string;
+        locationLabel?: string;
+        channel?: number;
+        serialNumber?: string;
+        model?: string;
+        resolution?: string;
+        placement?: 'EXTERIOR' | 'INTERIOR';
+        vendor?: string;
+      }>;
+    };
+    if (!body.system?.name?.trim()) throw new Error('System name is required');
+    const cams = body.cameras ?? [];
+    if (!cams.length) throw new Error('Add at least one camera channel');
+
+    const client =
+      demoClients.find((c) => c.id === body.clientUserId) ??
+      demoClients[0];
+    const existingSite = demoSurveillanceSites.find((s) => s.id === body.propertyId);
+    const stamp = new Date().toISOString();
+    const id = `demo-cctv-${Date.now()}`;
+    const created: DemoCctvSystem = {
+      id,
+      name: body.system.name.trim(),
+      brand: body.system.brand ?? null,
+      model: body.system.model ?? null,
+      kitSku: body.system.kitSku ?? null,
+      supplier: body.system.supplier ?? null,
+      recorderType: body.system.recorderType ?? 'DVR',
+      channelCount: body.system.channelCount ?? cams.length,
+      connectivity: body.system.connectivity ?? 'AHD',
+      recorderSerial: body.system.recorderSerial ?? null,
+      recorderIp: body.system.recorderIp ?? null,
+      cloudId: body.system.cloudId ?? null,
+      hddInstalled: Boolean(body.system.hddInstalled),
+      hddSerial: body.system.hddSerial ?? null,
+      hddCapacityGb: body.system.hddCapacityGb ?? null,
+      firmware: body.system.firmware ?? null,
+      mobileAppEnabled: body.system.mobileAppEnabled !== false,
+      techNotes: body.system.techNotes ?? null,
+      status: body.system.status ?? 'COMMISSIONING',
+      installedAt: body.system.status === 'ONLINE' ? stamp : null,
+      createdAt: stamp,
+      updatedAt: stamp,
+      property: existingSite
+        ? {
+            id: existingSite.id,
+            name: existingSite.name,
+            address: existingSite.address,
+            propertyType: existingSite.propertyType,
+            client: {
+              id: existingSite.owner.id,
+              name: existingSite.owner.name,
+              email: existingSite.owner.email,
+            },
+          }
+        : {
+            id: `demo-site-${Date.now()}`,
+            name: body.site?.name?.trim() || 'New site',
+            address: body.site?.address?.trim() || 'Address pending',
+            propertyType: body.site?.propertyType || 'HOUSE',
+            client: {
+              id: client.id,
+              name: `${client.firstName} ${client.lastName}`.trim(),
+              email: client.email,
+            },
+          },
+      cameras: cams.map((c, i) => ({
+        id: `${id}-cam-${i + 1}`,
+        name: c.name?.trim() || `Camera ${i + 1}`,
+        locationLabel: c.locationLabel?.trim() || `Channel ${i + 1}`,
+        channel: c.channel ?? i + 1,
+        serialNumber: c.serialNumber ?? null,
+        model: c.model ?? null,
+        resolution: c.resolution ?? null,
+        placement: c.placement === 'INTERIOR' ? 'INTERIOR' : 'EXTERIOR',
+        status: 'ONLINE',
+        vendor: c.vendor ?? body.system?.brand ?? null,
+      })),
+    };
+    demoCctvSystems.unshift(created);
+    return ok(created) as T;
+  }
+
+  if (clean === '/control-room/alarm-systems' && m === 'GET') {
+    return ok({
+      presets: DEMO_ALARM_PRESETS,
+      siteTypes: DEMO_ALARM_SITE_TYPES,
+      systems: demoAlarmSystems,
+    }) as T;
+  }
+
+  {
+    const alarmGet = clean.match(/^\/control-room\/alarm-systems\/([^/]+)$/);
+    if (alarmGet && m === 'GET') {
+      const row = demoAlarmSystems.find((s) => s.id === alarmGet[1]);
+      if (!row) throw new Error('Alarm system not found');
+      return ok(row) as T;
+    }
+  }
+
+  if (clean === '/control-room/alarm-systems' && m === 'POST') {
+    const body = (payload ?? {}) as {
+      propertyId?: string;
+      clientUserId?: string;
+      site?: {
+        name?: string;
+        address?: string;
+        propertyType?: string;
+      };
+      system?: Partial<DemoAlarmSystem> & { name?: string };
+    };
+    if (!body.system?.name?.trim()) throw new Error('Panel name is required');
+
+    const client =
+      demoClients.find((c) => c.id === body.clientUserId) ?? demoClients[0];
+    const existingSite = demoSurveillanceSites.find((s) => s.id === body.propertyId);
+    const stamp = new Date().toISOString();
+    const id = `demo-alarm-${Date.now()}`;
+    const created: DemoAlarmSystem = {
+      id,
+      name: body.system.name.trim(),
+      brand: body.system.brand ?? null,
+      model: body.system.model ?? null,
+      kitSku: body.system.kitSku ?? null,
+      supplier: body.system.supplier ?? null,
+      connectivity: body.system.connectivity ?? 'WIFI_4G',
+      panelSerial: body.system.panelSerial ?? null,
+      imei: body.system.imei ?? null,
+      simIccid: body.system.simIccid ?? null,
+      wifiMac: body.system.wifiMac ?? null,
+      wifiSsid: body.system.wifiSsid ?? null,
+      cloudId: body.system.cloudId ?? null,
+      appAccount: body.system.appAccount ?? null,
+      wirelessFrequency: body.system.wirelessFrequency ?? null,
+      wirelessCoding: body.system.wirelessCoding ?? null,
+      gsmBands: body.system.gsmBands ?? null,
+      wifiStandard: body.system.wifiStandard ?? null,
+      inputVoltage: body.system.inputVoltage ?? null,
+      backupBattery: body.system.backupBattery ?? null,
+      icasaCert: body.system.icasaCert ?? null,
+      rfidEnabled: body.system.rfidEnabled !== false,
+      touchKeypad: body.system.touchKeypad !== false,
+      mobileAppEnabled: body.system.mobileAppEnabled !== false,
+      zoneCount: body.system.zoneCount ?? 0,
+      firmware: body.system.firmware ?? null,
+      techNotes: body.system.techNotes ?? null,
+      status: body.system.status ?? 'COMMISSIONING',
+      installedAt: body.system.status === 'ONLINE' ? stamp : null,
+      createdAt: stamp,
+      updatedAt: stamp,
+      property: existingSite
+        ? {
+            id: existingSite.id,
+            name: existingSite.name,
+            address: existingSite.address,
+            propertyType: existingSite.propertyType,
+            client: {
+              id: existingSite.owner.id,
+              name: existingSite.owner.name,
+              email: existingSite.owner.email,
+            },
+          }
+        : {
+            id: `demo-site-${Date.now()}`,
+            name: body.site?.name?.trim() || 'New site',
+            address: body.site?.address?.trim() || 'Address pending',
+            propertyType: body.site?.propertyType || 'HOUSE',
+            client: {
+              id: client.id,
+              name: `${client.firstName} ${client.lastName}`.trim(),
+              email: client.email,
+            },
+          },
+    };
+    demoAlarmSystems.unshift(created);
+    return ok(created) as T;
+  }
+
   if (clean === '/control-room/map' && m === 'GET') {
     const incidentCoords: Record<string, { lat: number; lng: number }> = {
       'demo-inc-1': { lat: -29.728, lng: 31.085 },
@@ -5606,6 +6268,9 @@ export async function handleDemoRequest<T>({
     if (clean === '/control-room/users' && m === 'GET') {
       return ok(demoManagedUsers) as T;
     }
+    if (clean === '/control-room/families' && m === 'GET') {
+      return ok(demoFamilies.map(formatDemoFamily)) as T;
+    }
     if (clean === '/control-room/users' && m === 'POST') {
       const email = String(payload.email ?? '').trim().toLowerCase();
       const firstName = String(payload.firstName ?? '').trim();
@@ -5618,6 +6283,38 @@ export async function handleDemoRequest<T>({
         return { success: false as const, message: 'A user with this email already exists' } as T;
       }
       const isClientRole = role === 'USER' || role === 'FAMILY_MEMBER';
+      const familyId =
+        typeof payload.familyId === 'string' && payload.familyId.trim()
+          ? payload.familyId.trim()
+          : null;
+      const linkToClientId =
+        typeof payload.linkToClientId === 'string' && payload.linkToClientId.trim()
+          ? payload.linkToClientId.trim()
+          : null;
+      const familyRelationship =
+        typeof payload.familyRelationship === 'string' && payload.familyRelationship.trim()
+          ? payload.familyRelationship.trim()
+          : null;
+      const createFamily = payload.createFamily === true;
+      const familyName =
+        typeof payload.familyName === 'string' ? payload.familyName.trim() || null : null;
+      const wantsFamilyLink = Boolean(
+        familyId || linkToClientId || createFamily || role === 'FAMILY_MEMBER',
+      );
+
+      if (wantsFamilyLink && !isClientRole) {
+        return {
+          success: false as const,
+          message: 'Family linking is only available for client accounts',
+        } as T;
+      }
+      if ((familyId || linkToClientId || role === 'FAMILY_MEMBER') && !familyRelationship) {
+        return {
+          success: false as const,
+          message: 'Select a family relationship type (Spouse, Child, Parent, …)',
+        } as T;
+      }
+
       const password = typeof payload.password === 'string' ? payload.password.trim() : '';
       if (password && !canManageUserPasswords(user?.role)) {
         return {
@@ -5640,12 +6337,36 @@ export async function handleDemoRequest<T>({
               : 'ACTIVE',
       });
       if (typeof payload.avatarUrl === 'string') created.avatarUrl = payload.avatarUrl || null;
+
+      let family: DemoFamilyRow | null = null;
+      if (isClientRole && wantsFamilyLink) {
+        family = resolveDemoFamilyLink({
+          familyId,
+          linkToClientId,
+          createFamily,
+          familyName,
+          user: created,
+          relationship:
+            familyRelationship ||
+            (createFamily && !familyId && !linkToClientId ? 'Account holder' : null),
+        });
+        if (!family && (familyId || linkToClientId || role === 'FAMILY_MEMBER' || createFamily)) {
+          return {
+            success: false as const,
+            message: 'Choose a family group or primary client to link',
+          } as T;
+        }
+      }
+
       demoManagedUsers.unshift(created);
       if (isClientRole) {
         return ok({
           ...created,
           inviteToken: 'NX-DEMO01',
+          inviteCode: 'NX-DEMO01',
           inviteUrl: '/portal/register?token=NX-DEMO01',
+          family: family ? formatDemoFamily(family) : null,
+          familyRelationship: familyRelationship,
         }) as T;
       }
       return ok(created) as T;
@@ -6313,6 +7034,40 @@ export async function handleDemoRequest<T>({
       incidentId: payload.incidentId ?? null,
     }) as T;
   }
+  if (clean === '/officer/patrol/shift' && m === 'GET') {
+    return ok({
+      shift: demoOfficerPatrolShift,
+      summary: patrolShiftSummary(demoOfficerPatrolShift),
+    }) as T;
+  }
+  {
+    const patrolPhoto = clean.match(/^\/officer\/patrol\/stops\/([^/]+)\/photo$/);
+    if (patrolPhoto && m === 'POST') {
+      const result = markPatrolStopPhoto(patrolPhoto[1], {
+        capturedAt: String(payload.capturedAt ?? new Date().toISOString()),
+        note: typeof payload.note === 'string' ? payload.note : undefined,
+        lat: typeof payload.lat === 'number' ? payload.lat : null,
+        lng: typeof payload.lng === 'number' ? payload.lng : null,
+        dataUrl: typeof payload.dataUrl === 'string' ? payload.dataUrl : null,
+        fileName:
+          typeof payload.fileName === 'string' ? payload.fileName : `patrol-${Date.now()}.jpg`,
+      });
+      if (!result) {
+        return { success: false as const, message: 'Patrol stop not found.' } as T;
+      }
+      return ok({
+        ok: true,
+        stop: result.stop,
+        summary: result.summary,
+      }) as T;
+    }
+  }
+  if (clean === '/control-room/patrol/photos' && m === 'GET') {
+    return ok({
+      shift: demoOfficerPatrolShift,
+      summary: patrolShiftSummary(demoOfficerPatrolShift),
+    }) as T;
+  }
   if (clean.startsWith('/officer/messages') && m === 'GET') {
     return ok([
       {
@@ -6531,6 +7286,59 @@ export async function handleDemoRequest<T>({
     return ok({ ...msg }) as T;
   }
 
+  if (clean === '/auth/mfa/status' && m === 'GET') {
+    return ok({
+      mfaEnabled: Boolean((user as { mfaEnabled?: boolean } | undefined)?.mfaEnabled),
+      mfaEnrolledAt: null,
+      required: ['OWNER', 'SUPER_ADMIN', 'TENANT_ADMIN', 'DEVELOPER', 'MANAGER'].includes(
+        user?.role ?? '',
+      ),
+    }) as T;
+  }
+  if (clean === '/auth/mfa/setup/session-start' && m === 'POST') {
+    return ok({
+      secret: 'DEMOMFASECRETKEY234567',
+      otpauthUrl:
+        'otpauth://totp/4DS%20Nexus:demo@local?secret=DEMOMFASECRETKEY234567&issuer=4DS%20Nexus',
+      mfaToken: 'demo-mfa-setup-token',
+    }) as T;
+  }
+  if (clean === '/auth/mfa/setup/confirm' && m === 'POST') {
+    return ok({
+      backupCodes: ['A1B2C3D4', 'E5F6G7H8', 'I9J0K1L2', 'M3N4O5P6'],
+      user: {
+        id: user?.id ?? 'demo-user',
+        email: user?.email ?? 'admin@demo.local',
+        firstName: user?.firstName ?? 'Demo',
+        lastName: user?.lastName ?? 'Admin',
+        role: user?.role ?? 'ADMIN',
+        mfaEnabled: true,
+        tenantId: user?.tenantId ?? DEMO_TENANT.id,
+        tenant: user?.tenant ?? DEMO_TENANT,
+      },
+      tokens: {
+        accessToken: session?.accessToken ?? 'demo-token',
+      },
+    }) as T;
+  }
+  if (clean === '/auth/mfa/verify' && m === 'POST') {
+    return ok({
+      user: {
+        id: user?.id ?? 'demo-user',
+        email: user?.email ?? 'admin@demo.local',
+        firstName: user?.firstName ?? 'Demo',
+        lastName: user?.lastName ?? 'Admin',
+        role: user?.role ?? 'ADMIN',
+        mfaEnabled: true,
+        tenantId: user?.tenantId ?? DEMO_TENANT.id,
+        tenant: user?.tenant ?? DEMO_TENANT,
+      },
+      tokens: {
+        accessToken: session?.accessToken ?? 'demo-token',
+      },
+    }) as T;
+  }
+
   if (clean === '/auth/me' && m === 'GET') {
     return ok({
       id: user?.id ?? 'demo-user',
@@ -6542,6 +7350,7 @@ export async function handleDemoRequest<T>({
       tenantId: user?.tenantId ?? DEMO_TENANT.id,
       jobTitle: user?.jobTitle ?? null,
       phone: user?.phone ?? null,
+      mfaEnabled: Boolean((user as { mfaEnabled?: boolean } | undefined)?.mfaEnabled),
       tenant: user?.tenant ?? DEMO_TENANT,
     }) as T;
   }
@@ -6641,7 +7450,15 @@ export async function handleDemoRequest<T>({
       ]) as T;
     }
     if (suffix === 'chat') {
-      return ok({ conversationId: 'demo-inc-chat', incidentId: id, messages: [] }) as T;
+      const to = params.get('to') ?? 'room';
+      const key = `${id}::${to}`;
+      const messages = demoIncidentChatByKey.get(key) ?? [];
+      return ok({
+        conversationId: `demo-inc-chat-${to}`,
+        incidentId: id,
+        to,
+        messages,
+      }) as T;
     }
     return ok({
       id,
@@ -6656,12 +7473,21 @@ export async function handleDemoRequest<T>({
     return ok({ ok: true, agency: (payload as { agency?: string }).agency ?? 'SECURITY' }) as T;
   }
   if (clean.startsWith('/incidents/') && clean.endsWith('/chat') && m === 'POST') {
-    return ok({
+    const id = clean.split('/')[2] ?? 'demo-inc';
+    const body = (payload ?? {}) as { content?: string; to?: string };
+    const to = body.to ?? 'room';
+    const key = `${id}::${to}`;
+    const msg: DemoIncidentChatMessage = {
       id: `demo-msg-${Date.now()}`,
-      content: String((payload as { content?: string }).content ?? ''),
+      content: String(body.content ?? ''),
       createdAt: new Date().toISOString(),
+      to,
       sender: { id: 'demo', firstName: 'You', lastName: '', role: 'DISPATCHER' },
-    }) as T;
+    };
+    const list = demoIncidentChatByKey.get(key) ?? [];
+    list.push(msg);
+    demoIncidentChatByKey.set(key, list);
+    return ok(msg) as T;
   }
 
   // Default stub so deep pages don't hard-crash

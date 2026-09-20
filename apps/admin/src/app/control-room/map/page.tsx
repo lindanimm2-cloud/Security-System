@@ -559,13 +559,36 @@ function MapContent() {
           <div className="command-sidebar__legend">
             <h3>Map Legend</h3>
             <div className="command-legend-grid">
-              <span className="legend-chip legend-chip--panic">Panic</span>
-              <span className="legend-chip legend-chip--theft">Theft Recovery</span>
-              <span className="legend-chip legend-chip--officer">Officers</span>
-              <span className="legend-chip legend-chip--fleet">Fleet</span>
-              <span className="legend-chip legend-chip--client">Clients</span>
-              <span className="legend-chip legend-chip--vehicle">Client vehicles</span>
-              <span className="legend-chip legend-chip--property">Properties</span>
+              <span className="legend-chip legend-chip--panic">
+                <span className="legend-chip__icon" aria-hidden>
+                  !
+                </span>
+                Panic
+              </span>
+              <span className="legend-chip legend-chip--theft">
+                <span className="legend-chip__icon legend-chip__icon--car" aria-hidden />
+                Theft Recovery
+              </span>
+              <span className="legend-chip legend-chip--officer">
+                <span className="legend-chip__icon legend-chip__icon--shield" aria-hidden />
+                Officers
+              </span>
+              <span className="legend-chip legend-chip--fleet">
+                <span className="legend-chip__icon legend-chip__icon--car" aria-hidden />
+                Fleet
+              </span>
+              <span className="legend-chip legend-chip--client">
+                <span className="legend-chip__icon legend-chip__icon--person" aria-hidden />
+                Clients
+              </span>
+              <span className="legend-chip legend-chip--vehicle">
+                <span className="legend-chip__icon legend-chip__icon--car" aria-hidden />
+                Client vehicles
+              </span>
+              <span className="legend-chip legend-chip--property">
+                <span className="legend-chip__icon legend-chip__icon--house" aria-hidden />
+                Properties
+              </span>
             </div>
           </div>
         </aside>

@@ -14,7 +14,7 @@ import { CctvLiveFeed } from '@/components/portal/CctvLiveFeed';
 import { PropertyRegisterForm } from '@/components/portal/PropertyRegisterForm';
 import { HomeAlarmControl } from '@/components/portal/HomeAlarmControl';
 import { ClientVehicleRemote } from '@/components/vehicle/ClientVehicleRemote';
-import { HoldToActivate } from '@/components/ops/EmergencyMode';
+import { HoldToActivate, OpsPanicIcon } from '@/components/ops/EmergencyMode';
 import { OpsDialog } from '@/components/ops/OpsDialog';
 import { useSubscriptionAccess } from '@/hooks/useSubscriptionAccess';
 import { useApi } from '@/hooks/useApi';
@@ -196,14 +196,19 @@ function HomeContent() {
                   onUpdated={reload}
                 />
                 <HoldToActivate
-                  className="hold-activate--inline"
+                  className="hold-activate--inline hold-activate--ops-well"
                   label="Hold to panic"
                   holdLabel="Hold to panic…"
                   holdMs={1200}
+                  hideHint
+                  keepLabel
                   loading={loadingId === `${sites[0].id}-panic`}
                   disabled={!!loadingId}
                   onActivate={() => homePanic(sites[0].id)}
-                />
+                >
+                  <OpsPanicIcon />
+                  Hold to panic
+                </HoldToActivate>
                 {armMsg ? (
                   <p
                     className={`home-arm-bar__feedback ${armMsgError ? 'home-arm-bar__feedback--err' : ''}`}

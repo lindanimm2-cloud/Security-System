@@ -8,6 +8,7 @@ export const VEHICLE_REMOTE_ACTIONS = [
   'release',
   'horn',
   'panic',
+  'clearRecovery',
 ] as const;
 
 export type VehicleRemoteAction = (typeof VEHICLE_REMOTE_ACTIONS)[number];
@@ -17,6 +18,18 @@ export type VehicleRemoteState = {
   immobiliserOn: boolean;
   theftRecovery: boolean;
   hornActive?: boolean;
+  /** Panic / SOS — overrides component colours with full-vehicle red pulse. */
+  panicActive?: boolean;
+  online?: boolean;
+  /** Optional per-panel detail from telematics. */
+  doors?: {
+    frontLeft?: { open?: boolean; locked?: boolean };
+    frontRight?: { open?: boolean; locked?: boolean };
+    rearLeft?: { open?: boolean; locked?: boolean };
+    rearRight?: { open?: boolean; locked?: boolean };
+  };
+  boot?: { open?: boolean; locked?: boolean };
+  bonnet?: { open?: boolean; locked?: boolean };
 };
 
 export type VehicleFocusDetail = {
