@@ -46,6 +46,8 @@ export const VEHICLE_VISUAL = {
   unlockAmber: 0xfbbf24,
   lockGreen: 0x4ade80,
   panicRed: 0xe23b35,
+  /** Whole-car wash when immobiliser / ignition cut is engaged */
+  immobiliserRose: 0xe11d48,
   tamperRed: 0xdc2626,
   recoveryAmber: 0xd97706,
   offlineGrey: 0x6b7280,
@@ -108,7 +110,9 @@ export function deriveVehicle3DState(
 export function vehicleStateAlerts(state: Vehicle3DComponentState): string[] {
   const alerts: string[] = [];
   if (state.panic) alerts.push('PANIC ACTIVE');
-  if (state.theftRecovery && !state.panic) alerts.push('RECOVERY MODE');
+  if (state.theftRecovery && !state.panic) {
+    alerts.push('EMERGENCY · RECOVERY');
+  }
   if (state.immobiliserOn) alerts.push('IGNITION CUT');
   if (!state.online) alerts.push('OFFLINE');
   if (state.doors.frontLeft.open) alerts.push('FRONT LEFT DOOR OPEN');

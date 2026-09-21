@@ -33,6 +33,7 @@ export type SettingsProfile = {
 
 export function SettingsHub({
   title = 'Settings',
+  lede = 'Account, appearance, and workspace preferences.',
   backHref,
   backLabel = 'Back',
   profile,
@@ -40,6 +41,7 @@ export function SettingsHub({
   footer,
 }: {
   title?: string;
+  lede?: string | null;
   backHref?: string;
   backLabel?: string;
   profile: SettingsProfile;
@@ -61,7 +63,7 @@ export function SettingsHub({
         )}
         <div className="settings-hub__heading">
           <h1>{title}</h1>
-          <p className="settings-hub__lede">Account, appearance, and workspace preferences.</p>
+          {lede ? <p className="settings-hub__lede">{lede}</p> : null}
         </div>
       </header>
 

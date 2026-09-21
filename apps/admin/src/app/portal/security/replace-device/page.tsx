@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { PortalLayout } from '@/components/portal/PortalLayout';
-import { HoldToActivate } from '@/components/ops/EmergencyMode';
+import { HoldToActivate, OpsDeviceIcon } from '@/components/ops/EmergencyMode';
 import { SecurityArticle, SecurityDocFrame } from '@/components/security/SecurityDocFrame';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { useApi } from '@/hooks/useApi';
@@ -166,11 +166,15 @@ function ReplaceDevice() {
                 holdMs={3000}
                 tone="warn"
                 keepLabel
-                className="hold-activate--console hold-activate--folio"
+                hideHint
+                className="hold-activate--ops-well"
                 loading={busy}
                 disabled={!primary}
                 onActivate={() => void activate()}
-              />
+              >
+                <OpsDeviceIcon />
+                Activate new primary device
+              </HoldToActivate>
             </div>
           )}
         </SecurityArticle>

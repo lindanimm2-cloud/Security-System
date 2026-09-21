@@ -19,6 +19,12 @@ import { IncidentTimeline } from '@/components/incident/IncidentTimeline';
 import { formatClientNotificationTime } from '@/lib/client-notifications';
 import { friendlyErrorMessage } from '@/lib/friendly-error';
 import type { VehicleRemoteAction } from '@/lib/vehicle-remote';
+import {
+  VEHICLE_EMERGENCY_STATUSES,
+  vehicleEmergencyMeta,
+  type VehicleEmergencyStatus,
+} from '@/lib/vehicle-emergency-status';
+import { VehicleEmergencyStatusPicker } from '@/components/vehicle/VehicleEmergencyStatusPicker';
 
 type VehicleProfile = {
   vehicle: {
@@ -33,6 +39,7 @@ type VehicleProfile = {
     trackerLinked: boolean;
     phoneTrackingEnabled: boolean;
     theftRecovery: boolean;
+    emergencyStatus?: string | null;
     immobiliserOn: boolean;
     doorsLocked?: boolean;
     insuranceInfo: string | null;
@@ -86,6 +93,8 @@ function VehicleProfileContent() {
 
   const [trackingBusy, setTrackingBusy] = useState(false);
   const [recoveryBusy, setRecoveryBusy] = useState(false);
+  const [statusBusy, setStatusBusy] = useState(false);
+  const [activateStatus, setActivateStatus] = useState<VehicleEmergencyStatus>('STOLEN');
   const [remoteBusy, setRemoteBusy] = useState<VehicleRemoteAction | null>(null);
   const [msg, setMsg] = useState('');
 
@@ -143,13 +152,33 @@ function VehicleProfileContent() {
     setRecoveryBusy(true);
     setMsg('');
     try {
-      await clientApi.post(`/client/vehicles/${vehicleId}/theft-recovery`);
-      setMsg('Theft recovery activated — response team notified.');
+      const res = await clientApi.post<ApiResponse<{ message?: string }>>(
+        `/client/vehicles/${vehicleId}/theft-recovery`,
+        { status: activateStatus },
+      );
+      setMsg(res.data?.message ?? `${vehicleEmergencyMeta(activateStatus).notifyTitle} — response team notified.`);
       reload();
     } catch (e) {
       setMsg(friendlyErrorMessage(e, 'action'));
     } finally {
       setRecoveryBusy(false);
+    }
+  }
+
+  async function updateEmergencyStatus(status: VehicleEmergencyStatus) {
+    setStatusBusy(true);
+    setMsg('');
+    try {
+      const res = await clientApi.patch<ApiResponse<{ message?: string }>>(
+        `/client/vehicles/${vehicleId}/emergency-status`,
+        { status },
+      );
+      setMsg(res.data?.message ?? 'Situation updated — everyone stays informed.');
+      void reload({ silent: true });
+    } catch (e) {
+      setMsg(friendlyErrorMessage(e, 'action'));
+    } finally {
+      setStatusBusy(false);
     }
   }
 
@@ -193,6 +222,8 @@ function VehicleProfileContent() {
   }
 
   const v = profile.vehicle;
+  const emergencyStatus = v.emergencyStatus ?? (v.theftRecovery ? 'STOLEN' : null);
+  const emergency = vehicleEmergencyMeta(emergencyStatus);
   const t = profile.tracking ?? {
     active: false,
     mode: 'OFF' as const,
@@ -221,7 +252,7 @@ function VehicleProfileContent() {
         </div>
         <div className="vehicle-profile__badges">
           <span className={`status-pill ${v.theftRecovery ? 'status-pill--alert' : 'status-pill--ok'}`}>
-            {v.theftRecovery ? 'Recovery active' : 'Secure'}
+            {v.theftRecovery ? emergency.label : 'Secure'}
           </span>
           <span className="status-pill status-pill--muted">{MODE_LABELS[t.mode]}</span>
           {profile.responseTeam.synced && (
@@ -239,6 +270,7 @@ function VehicleProfileContent() {
             doorsLocked: v.doorsLocked ?? true,
             immobiliserOn: v.immobiliserOn,
             theftRecovery: v.theftRecovery,
+            emergencyStatus,
           }}
           model={{
             make: v.make,
@@ -246,20 +278,32 @@ function VehicleProfileContent() {
             year: v.year,
             colour: v.color,
           }}
-          busyAction={remoteBusy}
+          meta={{
+            title: [v.make, v.model].filter(Boolean).join(' ') || undefined,
+            registration: v.registration,
+            online: true,
+            stolen: Boolean(v.theftRecovery),
+            vehicleType: v.theftRecovery ? 'STOLEN' : 'CLIENT',
+            emergencyStatus,
+          }}
+          busyAction={remoteBusy ?? (statusBusy ? 'panic' : null)}
           onCommand={(action) => sendRemote(action)}
+          onEmergencyStatusChange={updateEmergencyStatus}
         />
         <VehicleRemotePad
           state={{
             doorsLocked: v.doorsLocked ?? true,
             immobiliserOn: v.immobiliserOn,
             theftRecovery: v.theftRecovery,
+            emergencyStatus,
           }}
           busyAction={remoteBusy}
           layout="command"
           vehicleLabel={[v.make, v.model].filter(Boolean).join(' ') || null}
           registration={v.registration ?? null}
+          emergencyStatus={emergencyStatus}
           onCommand={(action) => sendRemote(action)}
+          onEmergencyStatusChange={updateEmergencyStatus}
         >
           <DashboardLiveCctv embedded kind="vehicle" vehicleId={v.id} />
         </VehicleRemotePad>
@@ -336,13 +380,30 @@ function VehicleProfileContent() {
               </>
             )}
             {!v.theftRecovery && (
-              <button type="button" className="btn-danger" onClick={() => void activateRecovery()} disabled={recoveryBusy}>
-                {recoveryBusy ? <LoadingSpinner label="" size="sm" /> : 'Activate theft recovery'}
-              </button>
+              <div className="vehicle-profile__activate">
+                <VehicleEmergencyStatusPicker
+                  status={activateStatus}
+                  disabled={recoveryBusy}
+                  onChange={(next) => setActivateStatus(next)}
+                />
+                <button
+                  type="button"
+                  className="btn-danger"
+                  onClick={() => void activateRecovery()}
+                  disabled={recoveryBusy}
+                >
+                  {recoveryBusy ? (
+                    <LoadingSpinner label="" size="sm" />
+                  ) : (
+                    `Activate · ${VEHICLE_EMERGENCY_STATUSES.find((s) => s.value === activateStatus)?.short ?? 'STOLEN'}`
+                  )}
+                </button>
+              </div>
             )}
           </div>
           <p className="text-muted vehicle-profile__hint">
-            Your position is shared with our response team while tracking is active (tracker, phone relay, or theft recovery).
+            Your position is shared with our response team while tracking is active. Update the situation
+            (stolen, hijacking, accident, …) anytime so notifications stay accurate.
           </p>
         </section>
 

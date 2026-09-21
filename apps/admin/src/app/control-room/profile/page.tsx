@@ -12,7 +12,7 @@ import { UserAvatar } from '@/components/ui/UserAvatar';
 import { useApi } from '@/hooks/useApi';
 import { useActionHandoff } from '@/hooks/useActionHandoff';
 import { adminApi, type ApiResponse } from '@/lib/api-client';
-import { clearSession, getSession, updateSessionUser } from '@/lib/auth';
+import { clearSession, getSession, updateSessionUser, type AuthSession } from '@/lib/auth';
 import { roleDisplayLabel } from '@/lib/role-labels';
 
 type StaffProfile = {
@@ -23,7 +23,14 @@ type StaffProfile = {
   role: string;
   jobTitle: string | null;
   phone: string | null;
+  mfaEnabled?: boolean;
   tenant?: { name: string; slug: string };
+};
+
+type MfaStatus = {
+  mfaEnabled: boolean;
+  mfaEnrolledAt: string | null;
+  required: boolean;
 };
 
 type DeveloperDesk = {
@@ -73,9 +80,21 @@ function ProfileContent() {
   const [lastName, setLastName] = useState('');
   const [phone, setPhone] = useState('');
   const [jobTitle, setJobTitle] = useState('');
+  const [mfaBusy, setMfaBusy] = useState(false);
+  const [mfaError, setMfaError] = useState('');
+  const [mfaSecret, setMfaSecret] = useState<string | null>(null);
+  const [mfaUri, setMfaUri] = useState<string | null>(null);
+  const [mfaToken, setMfaToken] = useState<string | null>(null);
+  const [mfaCode, setMfaCode] = useState('');
+  const [backupCodes, setBackupCodes] = useState<string[] | null>(null);
 
   const profile = useApi(
     () => adminApi.get<ApiResponse<StaffProfile>>('/auth/me'),
+    [],
+  );
+
+  const mfaStatus = useApi(
+    () => adminApi.get<ApiResponse<MfaStatus>>('/auth/mfa/status'),
     [],
   );
 
@@ -158,6 +177,64 @@ function ProfileContent() {
       clearSession('admin');
       router.push(isDeveloper ? '/login?as=developer' : '/login');
     });
+  }
+
+  async function startMfaEnroll() {
+    setMfaBusy(true);
+    setMfaError('');
+    setBackupCodes(null);
+    try {
+      const res = await adminApi.post<
+        ApiResponse<{ secret: string; otpauthUrl: string; mfaToken: string }>
+      >('/auth/mfa/setup/session-start');
+      setMfaSecret(res.data.secret);
+      setMfaUri(res.data.otpauthUrl);
+      setMfaToken(res.data.mfaToken);
+      setMfaCode('');
+    } catch (err) {
+      setMfaError(err instanceof Error ? err.message : 'Could not start MFA setup');
+    } finally {
+      setMfaBusy(false);
+    }
+  }
+
+  async function confirmMfaEnroll(e: FormEvent) {
+    e.preventDefault();
+    if (!mfaToken) return;
+    setMfaBusy(true);
+    setMfaError('');
+    try {
+      const res = await adminApi.post<
+        ApiResponse<{
+          backupCodes: string[];
+          user: StaffProfile;
+          tokens?: { accessToken: string };
+        }>
+      >('/auth/mfa/setup/confirm', { mfaToken, code: mfaCode });
+      setBackupCodes(res.data.backupCodes ?? []);
+      setMfaSecret(null);
+      setMfaUri(null);
+      setMfaToken(null);
+      setMfaCode('');
+      updateSessionUser('admin', { mfaEnabled: true });
+      if (res.data.tokens?.accessToken) {
+        const current = getSession('admin');
+        if (current) {
+          const next: AuthSession = {
+            ...current,
+            accessToken: res.data.tokens.accessToken,
+            user: { ...current.user, mfaEnabled: true },
+          };
+          sessionStorage.setItem('4ds_admin_session', JSON.stringify(next));
+        }
+      }
+      mfaStatus.reload();
+      profile.reload();
+    } catch (err) {
+      setMfaError(err instanceof Error ? err.message : 'Invalid authenticator code');
+    } finally {
+      setMfaBusy(false);
+    }
   }
 
   return (
@@ -243,6 +320,99 @@ function ProfileContent() {
             </dd>
           </div>
         </dl>
+      </section>
+
+      <section className="portal-card profile-section">
+        <div className="card-header-row">
+          <h2>Authenticator MFA</h2>
+          {mfaStatus.data?.data?.mfaEnabled ? (
+            <span className="status-pill status-pill--ok">Enabled</span>
+          ) : mfaStatus.data?.data?.required ? (
+            <span className="status-pill status-pill--new">Required</span>
+          ) : (
+            <span className="status-pill">Optional</span>
+          )}
+        </div>
+        <p className="text-muted" style={{ marginBottom: '0.75rem' }}>
+          Privileged control-room roles must use an authenticator app at sign-in. Backup codes are
+          shown once after enrolment.
+        </p>
+        {mfaError && (
+          <div className="alert alert--error" role="alert">
+            {mfaError}
+          </div>
+        )}
+        {backupCodes && (
+          <div className="alert alert--success" role="status">
+            <p style={{ marginTop: 0 }}>Save these backup codes offline — each works once:</p>
+            <ul className="login-mfa-backup-list">
+              {backupCodes.map((code) => (
+                <li key={code}>
+                  <code>{code}</code>
+                </li>
+              ))}
+            </ul>
+            <button type="button" className="btn-secondary" onClick={() => setBackupCodes(null)}>
+              Done
+            </button>
+          </div>
+        )}
+        {!mfaSecret && !backupCodes && (
+          <button
+            type="button"
+            className="btn-primary"
+            disabled={mfaBusy}
+            onClick={() => void startMfaEnroll()}
+          >
+            {mfaBusy
+              ? 'Starting…'
+              : mfaStatus.data?.data?.mfaEnabled
+                ? 'Re-enrol authenticator'
+                : 'Set up authenticator'}
+          </button>
+        )}
+        {mfaSecret && (
+          <form onSubmit={confirmMfaEnroll} className="profile-mfa-form">
+            <p className="text-muted">
+              Secret key: <code>{mfaSecret}</code>
+            </p>
+            {mfaUri && (
+              <p className="text-muted">
+                <a href={mfaUri}>Open in authenticator app</a>
+              </p>
+            )}
+            <label className="form-field">
+              <span>6-digit code</span>
+              <input
+                type="text"
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                value={mfaCode}
+                onChange={(e) => setMfaCode(e.target.value.replace(/\s/g, ''))}
+                placeholder="123456"
+                required
+              />
+            </label>
+            <div className="profile-form-actions">
+              <button
+                type="button"
+                className="btn-ghost"
+                onClick={() => {
+                  setMfaSecret(null);
+                  setMfaUri(null);
+                  setMfaToken(null);
+                  setMfaCode('');
+                  setMfaError('');
+                }}
+              >
+                Cancel
+              </button>
+              <button type="submit" className="btn-primary" disabled={mfaBusy || mfaCode.length < 6}>
+                {mfaBusy ? 'Confirming…' : 'Confirm MFA'}
+              </button>
+            </div>
+          </form>
+        )}
       </section>
 
       {isDeveloper && (

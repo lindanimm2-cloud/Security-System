@@ -30,6 +30,7 @@ import {
   markAnnounced,
   shouldAnnounce,
 } from '@/lib/ops-alert-memory';
+import { acknowledgeAlert, ingestAlert } from '@/lib/alert-engine';
 import { subscribeVehicleFocus } from '@/lib/vehicle-remote';
 
 type PriorityAlertContextValue = {
@@ -37,6 +38,7 @@ type PriorityAlertContextValue = {
   criticalQueue: number;
   highToasts: PriorityAlert[];
   dismissCritical: () => void;
+  acknowledgeCritical: () => void;
   dismissToast: (id: string) => void;
 };
 
@@ -70,6 +72,7 @@ export function PriorityAlertProvider({ children }: { children: React.ReactNode 
         }
         return [alert, ...prev.filter((item) => item.id !== alert.id)];
       });
+      ingestAlert(alert, { testMode: forced && alert.id.includes('test') });
       return;
     }
 
@@ -83,6 +86,7 @@ export function PriorityAlertProvider({ children }: { children: React.ReactNode 
         const next = [alert, ...prev.filter((item) => item.id !== alert.id)];
         return next.slice(0, MAX_HIGH_TOASTS);
       });
+      ingestAlert(alert, { testMode: forced && alert.id.includes('test') });
     }
   }, []);
 
@@ -94,6 +98,7 @@ export function PriorityAlertProvider({ children }: { children: React.ReactNode 
           ? `incident:${current.incidentId}:critical`
           : `alert:${current.id}`;
         acknowledgeAnnouncement(eventId);
+        acknowledgeAlert(current.id, current.title);
       }
       if (current && !current.id.startsWith('incident-') && !current.id.startsWith('socket-')) {
         void adminApi.patch(`/control-room/notifications/${current.id}/read`).catch(() => undefined);
@@ -102,8 +107,16 @@ export function PriorityAlertProvider({ children }: { children: React.ReactNode 
     });
   }, []);
 
+  const acknowledgeCritical = useCallback(() => {
+    dismissCritical();
+  }, [dismissCritical]);
+
   const dismissToast = useCallback((id: string) => {
-    setHighToasts((prev) => prev.filter((item) => item.id !== id));
+    setHighToasts((prev) => {
+      const hit = prev.find((t) => t.id === id);
+      if (hit) acknowledgeAlert(hit.id, hit.title);
+      return prev.filter((item) => item.id !== id);
+    });
   }, []);
 
   useEffect(() => {
@@ -259,9 +272,10 @@ export function PriorityAlertProvider({ children }: { children: React.ReactNode 
       criticalQueue: criticalQueue.length,
       highToasts,
       dismissCritical,
+      acknowledgeCritical,
       dismissToast,
     }),
-    [criticalAlert, criticalQueue.length, highToasts, dismissCritical, dismissToast],
+    [criticalAlert, criticalQueue.length, highToasts, dismissCritical, acknowledgeCritical, dismissToast],
   );
 
   return <PriorityAlertContext.Provider value={value}>{children}</PriorityAlertContext.Provider>;

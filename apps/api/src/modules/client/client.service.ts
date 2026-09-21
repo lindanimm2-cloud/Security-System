@@ -12,7 +12,10 @@ import {
   SensorStatus,
   SensorType,
   UserRole,
+  UserStatus,
 } from '@prisma/client';
+import * as bcrypt from 'bcrypt';
+import { randomBytes, randomInt } from 'crypto';
 import { mkdir, writeFile } from 'fs/promises';
 import { join, extname } from 'path';
 import { PrismaService } from '../../database/prisma.service';
@@ -26,6 +29,11 @@ import {
   isVehicleRemoteAction,
   type VehicleRemoteAction,
 } from './vehicle-remote';
+import {
+  isVehicleEmergencyStatus,
+  vehicleEmergencyMeta,
+  type VehicleEmergencyStatus,
+} from './vehicle-emergency-status';
 
 type FamilyUpload = {
   originalname: string;
@@ -36,6 +44,15 @@ type FamilyUpload = {
 
 const FAMILY_CHAT_MAX_FILE_BYTES = 25 * 1024 * 1024;
 const FAMILY_CHAT_UPLOAD_ROOT = join(process.cwd(), 'uploads', 'chat');
+
+function generateFamilyInviteCode(): string {
+  const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let body = '';
+  for (let i = 0; i < 6; i += 1) {
+    body += alphabet[randomInt(alphabet.length)];
+  }
+  return `NX-${body}`;
+}
 
 @Injectable()
 export class ClientService {
@@ -162,18 +179,51 @@ export class ClientService {
           model: v.model,
           color: v.color,
           theftRecovery: v.theftRecovery,
+          emergencyStatus: v.emergencyStatus ?? (v.theftRecovery ? 'STOLEN' : null),
           trackerLinked: v.trackerLinked,
           immobiliserOn: v.immobiliserOn,
           doorsLocked: v.doorsLocked,
         })),
-        properties: properties.map((p) => ({
-          id: p.id,
-          name: p.name,
-          address: p.address,
-          alarmStatus: p.alarmStatus,
-          alarmLinked: p.alarmLinked,
-          camerasLinked: p.camerasLinked,
-        })),
+        properties: await Promise.all(
+          properties.map(async (p) => {
+            const sensors = await this.prisma.sensor.findMany({
+              where: { propertyId: p.id },
+              select: { status: true, bypassed: true },
+            });
+            let active = 0;
+            let fault = 0;
+            let alert = 0;
+            let disabled = 0;
+            for (const s of sensors) {
+              const key = s.status;
+              if (s.bypassed || key === 'BYPASSED') {
+                disabled += 1;
+              } else if (key === 'FAULT' || key === 'TAMPER' || key === 'OFFLINE') {
+                fault += 1;
+              } else if (key === 'ALARM' || key === 'OPEN') {
+                alert += 1;
+              } else {
+                active += 1;
+              }
+            }
+            return {
+              id: p.id,
+              name: p.name,
+              address: p.address,
+              alarmStatus: p.alarmStatus,
+              alarmLinked: p.alarmLinked,
+              camerasLinked: p.camerasLinked,
+              propertyType: p.propertyType,
+              zoneHealth: {
+                total: sensors.length,
+                active,
+                fault,
+                alert,
+                disabled,
+              },
+            };
+          }),
+        ),
         medicalComplete: !!medical?.bloodType,
         safeZoneCount: safeZones.length,
         recentIncidents: recentIncidents.map((i) => ({
@@ -450,6 +500,82 @@ export class ClientService {
     };
   }
 
+  async getLiveResponse(userId: string, tenantId: string, incidentId: string) {
+    const incident = await this.prisma.incident.findFirst({
+      where: { id: incidentId, userId, tenantId },
+      include: {
+        dispatches: {
+          where: { status: { notIn: ['COMPLETED', 'CANCELLED'] } },
+          orderBy: { createdAt: 'desc' },
+          take: 1,
+          include: { officer: true, companyVehicle: true },
+        },
+      },
+    });
+    if (!incident) throw new NotFoundException('Incident not found');
+
+    const dispatch = incident.dispatches[0] ?? null;
+    const timeline = await this.kernel.getTimeline(tenantId, incident.id, {
+      id: userId,
+      role: UserRole.USER,
+    });
+    const stage = this.liveStageFromIncident(incident, dispatch);
+    const unitLabel = dispatch
+      ? dispatch.companyVehicle?.callSign ??
+        (dispatch.officer
+          ? `Officer ${dispatch.officer.firstName} ${dispatch.officer.lastName}`.trim()
+          : null)
+      : null;
+    const { headline, detail } = this.liveHeadline(stage, {
+      publicRef: incident.publicRef,
+      type: incident.type,
+      isSilent: incident.isSilent,
+      unitLabel,
+      etaSeconds: dispatch?.etaSeconds ?? null,
+    });
+
+    return {
+      success: true,
+      data: {
+        id: incident.id,
+        publicRef: incident.publicRef,
+        type: incident.type,
+        status: incident.status,
+        title: incident.title,
+        address: incident.address,
+        isSilent: incident.isSilent,
+        priority: incident.priority,
+        ackedAt: incident.ackedAt?.toISOString() ?? null,
+        dispatchedAt: incident.dispatchedAt?.toISOString() ?? null,
+        onSceneAt: incident.onSceneAt?.toISOString() ?? null,
+        resolvedAt: incident.resolvedAt?.toISOString() ?? null,
+        createdAt: incident.createdAt.toISOString(),
+        lat: Number(incident.lat),
+        lng: Number(incident.lng),
+        unit: dispatch
+          ? {
+              callSign: unitLabel ?? 'Response unit',
+              kind: dispatch.companyVehicle?.vehicleType ?? dispatch.agency ?? 'SECURITY',
+              status: dispatch.status,
+              etaSeconds: dispatch.etaSeconds,
+              officerName: dispatch.officer
+                ? `${dispatch.officer.firstName} ${dispatch.officer.lastName}`.trim()
+                : null,
+            }
+          : null,
+        stage,
+        headline,
+        detail,
+        timeline: timeline.data.slice(-12).map((ev) => ({
+          id: ev.id,
+          type: ev.type,
+          createdAt: ev.createdAt,
+          source: ev.source,
+        })),
+      },
+    };
+  }
+
   async getFamily(userId: string) {
     const membership = await this.prisma.familyMember.findFirst({
       where: { userId },
@@ -464,23 +590,130 @@ export class ClientService {
       },
     });
     if (!membership) return { success: true, data: null };
+    const isOwner = membership.family.ownerUserId === userId;
     return {
       success: true,
       data: {
         id: membership.family.id,
         name: membership.family.name,
         owner: `${membership.family.owner.firstName} ${membership.family.owner.lastName}`,
+        ownerUserId: membership.family.ownerUserId,
+        isOwner,
         members: membership.family.members.map((m) => ({
           id: m.user.id,
           name: `${m.user.firstName} ${m.user.lastName}`,
           nickname: m.nickname,
+          relationship: m.relationship,
           trackingEnabled: m.user.trackingEnabled,
           familyMessagingEnabled: m.user.familyMessagingEnabled,
           lastLocationAt: m.user.lastLocationAt,
           lat: m.user.lastKnownLat,
           lng: m.user.lastKnownLng,
+          phone: m.user.phone,
+          userId: m.user.id,
         })),
         familyMessagingEnabled: membership.user.familyMessagingEnabled,
+      },
+    };
+  }
+
+  async inviteFamilyMember(
+    actorUserId: string,
+    tenantId: string,
+    body: {
+      firstName: string;
+      lastName: string;
+      email: string;
+      phone?: string | null;
+      relationship: string;
+    },
+  ) {
+    const firstName = body.firstName?.trim();
+    const lastName = body.lastName?.trim();
+    const email = body.email?.toLowerCase().trim();
+    const relationship = body.relationship?.trim();
+    if (!firstName || !lastName || !email) {
+      throw new BadRequestException('First name, last name, and email are required');
+    }
+    if (!relationship) {
+      throw new BadRequestException('Select a family relationship type (Spouse, Child, Parent, …)');
+    }
+
+    const ownedFamily = await this.prisma.family.findFirst({
+      where: { tenantId, ownerUserId: actorUserId },
+      select: { id: true, name: true },
+    });
+    if (!ownedFamily) {
+      throw new ForbiddenException('Only the household account holder can invite family members');
+    }
+
+    const existing = await this.prisma.user.findUnique({
+      where: { tenantId_email: { tenantId, email } },
+    });
+    if (existing) throw new BadRequestException('A user with this email already exists');
+
+    const passwordHash = await bcrypt.hash(randomBytes(24).toString('hex'), 10);
+    const inviteToken = generateFamilyInviteCode();
+    const inviteExpiresAt = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000);
+
+    const created = await this.prisma.$transaction(async (tx) => {
+      const user = await tx.user.create({
+        data: {
+          tenantId,
+          email,
+          passwordHash,
+          firstName,
+          lastName,
+          role: UserRole.FAMILY_MEMBER,
+          status: UserStatus.PENDING_VERIFICATION,
+          phone: body.phone?.trim() || null,
+          isProtectionClient: true,
+          inviteToken,
+          inviteExpiresAt,
+        },
+      });
+
+      const validUntil = new Date();
+      validUntil.setMonth(validUntil.getMonth() + 1);
+      await tx.subscription.create({
+        data: {
+          tenantId,
+          userId: user.id,
+          planName: '4DS Essential',
+          tierCode: 'ESSENTIAL',
+          addons: [],
+          priceMonthly: 19900,
+          memberId: `4DS-${Date.now().toString(36).toUpperCase()}`,
+          validUntil,
+          status: 'ACTIVE',
+        },
+      });
+
+      await tx.familyMember.create({
+        data: {
+          familyId: ownedFamily.id,
+          userId: user.id,
+          relationship,
+          nickname: firstName,
+        },
+      });
+
+      return user;
+    });
+
+    return {
+      success: true,
+      data: {
+        id: created.id,
+        firstName: created.firstName,
+        lastName: created.lastName,
+        email: created.email,
+        relationship,
+        familyId: ownedFamily.id,
+        familyName: ownedFamily.name,
+        inviteToken,
+        inviteCode: inviteToken,
+        inviteUrl: `/portal/register?token=${encodeURIComponent(inviteToken)}`,
       },
     };
   }
@@ -1040,6 +1273,7 @@ export class ClientService {
           trackerLinked: vehicle.trackerLinked,
           phoneTrackingEnabled: vehicle.phoneTrackingEnabled,
           theftRecovery: vehicle.theftRecovery,
+          emergencyStatus: vehicle.emergencyStatus ?? (vehicle.theftRecovery ? 'STOLEN' : null),
           immobiliserOn: vehicle.immobiliserOn,
           doorsLocked: vehicle.doorsLocked,
           insuranceInfo: vehicle.insuranceInfo,
@@ -1143,13 +1377,23 @@ export class ClientService {
     return { success: true, data: { lat, lng, updatedAt: updated.updatedAt } };
   }
 
-  async activateTheftRecovery(userId: string, tenantId: string, vehicleId: string) {
+  async activateTheftRecovery(
+    userId: string,
+    tenantId: string,
+    vehicleId: string,
+    status?: unknown,
+  ) {
     const vehicle = await this.prisma.vehicle.findFirst({ where: { id: vehicleId, userId } });
     if (!vehicle) throw new NotFoundException('Vehicle not found');
 
+    const emergencyStatus: VehicleEmergencyStatus = isVehicleEmergencyStatus(status)
+      ? status
+      : 'STOLEN';
+    const meta = vehicleEmergencyMeta(emergencyStatus);
+
     const updated = await this.prisma.vehicle.update({
       where: { id: vehicleId },
-      data: { theftRecovery: true, trackerLinked: true },
+      data: { theftRecovery: true, trackerLinked: true, emergencyStatus },
     });
 
     if (updated.lastKnownLat != null && updated.lastKnownLng != null) {
@@ -1162,13 +1406,154 @@ export class ClientService {
     }
 
     const result = await this.reportTheft(userId, tenantId, {
-      description: `Theft recovery activated for ${vehicle.registration}`,
+      description: `${meta.notifyTitle} — ${vehicle.registration}`,
       vehicleMake: vehicle.make,
       vehicleModel: vehicle.model,
       vehicleColor: vehicle.color ?? undefined,
       vehiclePlate: vehicle.registration,
     });
-    return result;
+
+    await this.prisma.notification.create({
+      data: {
+        tenantId,
+        userId,
+        incidentId: result.data?.id,
+        type: NotificationType.THEFT_ALERT,
+        priority:
+          emergencyStatus === 'HIJACKING' || emergencyStatus === 'MEDICAL'
+            ? NotificationPriority.P0
+            : NotificationPriority.P1,
+        title: `${meta.notifyTitle} — ${vehicle.registration}`,
+        body: meta.notifyBody,
+        deepLink: result.data?.id ? `/portal/response/${result.data.id}` : `/portal/vehicles/${vehicleId}`,
+      },
+    });
+
+    this.realtime.emitPlatformEvent(
+      tenantId,
+      PlatformEvent.VEHICLE_REMOTE,
+      {
+        vehicleId: updated.id,
+        registration: updated.registration,
+        action: 'emergencyStatus',
+        emergencyStatus,
+        theftRecovery: true,
+        source: 'portal',
+        incidentId: result.data?.id ?? null,
+      },
+      { incidentId: result.data?.id, userId },
+    );
+
+    return {
+      success: true,
+      data: {
+        ...result.data,
+        emergencyStatus,
+        theftRecovery: true,
+        message: `${meta.notifyTitle} — response team notified.`,
+      },
+    };
+  }
+
+  async setVehicleEmergencyStatus(opts: {
+    tenantId: string;
+    vehicleId: string;
+    status: unknown;
+    actorUserId: string;
+    source: 'portal' | 'control-room';
+    ownerUserId?: string;
+  }) {
+    if (!isVehicleEmergencyStatus(opts.status)) {
+      throw new BadRequestException('Unknown vehicle emergency status');
+    }
+    const emergencyStatus = opts.status;
+    const meta = vehicleEmergencyMeta(emergencyStatus);
+
+    const vehicle = await this.prisma.vehicle.findFirst({
+      where: {
+        id: opts.vehicleId,
+        tenantId: opts.tenantId,
+        ...(opts.ownerUserId ? { userId: opts.ownerUserId } : {}),
+      },
+      include: { user: true },
+    });
+    if (!vehicle) throw new NotFoundException('Vehicle not found');
+
+    const updated = await this.prisma.vehicle.update({
+      where: { id: vehicle.id },
+      data: {
+        theftRecovery: true,
+        trackerLinked: true,
+        emergencyStatus,
+      },
+    });
+
+    const openIncident = await this.prisma.incident.findFirst({
+      where: {
+        tenantId: opts.tenantId,
+        vehicleId: vehicle.id,
+        status: { notIn: ['RESOLVED', 'CLOSED', 'CANCELLED'] },
+        type: { in: [IncidentType.THEFT, IncidentType.PANIC, IncidentType.OTHER] },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    if (openIncident) {
+      await this.prisma.incident.update({
+        where: { id: openIncident.id },
+        data: {
+          title: `${meta.notifyTitle} — ${vehicle.registration}`,
+          description: `${meta.notifyBody}\nUpdated from ${opts.source}.`,
+        },
+      });
+    }
+
+    const notification = await this.prisma.notification.create({
+      data: {
+        tenantId: opts.tenantId,
+        userId: vehicle.userId,
+        incidentId: openIncident?.id,
+        type: NotificationType.INCIDENT_UPDATE,
+        priority:
+          emergencyStatus === 'HIJACKING' || emergencyStatus === 'MEDICAL'
+            ? NotificationPriority.P0
+            : NotificationPriority.P1,
+        title: `${meta.notifyTitle} — ${vehicle.registration}`,
+        body: `${meta.notifyBody} Status updated by ${opts.source === 'control-room' ? 'control room' : 'client'}.`,
+        deepLink: openIncident?.id
+          ? `/portal/response/${openIncident.id}`
+          : `/portal/vehicles/${vehicle.id}`,
+      },
+    });
+
+    this.realtime.emitPlatformEvent(
+      opts.tenantId,
+      PlatformEvent.VEHICLE_REMOTE,
+      {
+        vehicleId: updated.id,
+        registration: updated.registration,
+        action: 'emergencyStatus',
+        emergencyStatus,
+        theftRecovery: true,
+        source: opts.source,
+        incidentId: openIncident?.id ?? null,
+        notificationId: notification.id,
+        owner: `${vehicle.user.firstName} ${vehicle.user.lastName}`,
+      },
+      { incidentId: openIncident?.id, userId: vehicle.userId },
+    );
+
+    return {
+      success: true,
+      data: {
+        id: updated.id,
+        registration: updated.registration,
+        theftRecovery: true,
+        emergencyStatus,
+        incidentId: openIncident?.id ?? null,
+        message: `${vehicle.registration} status → ${meta.label}.`,
+      },
+    };
   }
 
   async remoteCommand(opts: {
@@ -1198,6 +1583,7 @@ export class ClientService {
       immobiliserOn?: boolean;
       theftRecovery?: boolean;
       trackerLinked?: boolean;
+      emergencyStatus?: string | null;
     } = {};
 
     if (action === 'lock') data.doorsLocked = true;
@@ -1206,9 +1592,14 @@ export class ClientService {
     if (action === 'release') data.immobiliserOn = false;
     if (action === 'panic') {
       data.doorsLocked = true;
-      data.immobiliserOn = true;
       data.theftRecovery = true;
       data.trackerLinked = true;
+      data.emergencyStatus = vehicle.emergencyStatus ?? 'STOLEN';
+      // Immobiliser is intentional only — operators / clients must press-and-hold Disable ignition
+    }
+    if (action === 'clearRecovery') {
+      data.theftRecovery = false;
+      data.emergencyStatus = null;
     }
 
     const updated =
@@ -1250,7 +1641,8 @@ export class ClientService {
           type: NotificationType.PANIC_ALERT,
           priority: NotificationPriority.P0,
           title: `Vehicle panic — ${vehicle.registration}`,
-          body: 'Dash cameras switched to this vehicle. Central locking and immobiliser engaged.',
+          body: 'Dash cameras switched to this vehicle. Central locking engaged — immobilise separately if required.',
+          deepLink: `/portal/response/${incidentId}`,
         },
       });
     }
@@ -1263,6 +1655,7 @@ export class ClientService {
       doorsLocked: updated.doorsLocked,
       immobiliserOn: updated.immobiliserOn,
       theftRecovery: updated.theftRecovery,
+      emergencyStatus: updated.emergencyStatus ?? (updated.theftRecovery ? 'STOLEN' : null),
       trackerLinked: updated.trackerLinked,
       cameras: clientVehicleDashCams(updated),
     };
@@ -1279,6 +1672,7 @@ export class ClientService {
         doorsLocked: snapshot.doorsLocked,
         immobiliserOn: snapshot.immobiliserOn,
         theftRecovery: snapshot.theftRecovery,
+        emergencyStatus: snapshot.emergencyStatus,
         owner: `${vehicle.user.firstName} ${vehicle.user.lastName}`,
         cameras: snapshot.cameras,
       },
@@ -1311,6 +1705,8 @@ export class ClientService {
         return `${registration} horn and lights pulsing.`;
       case 'panic':
         return `${registration} vehicle panic sent — control room viewing dash cameras.`;
+      case 'clearRecovery':
+        return `${registration} emergency recovery cleared.`;
     }
   }
 
@@ -1515,7 +1911,21 @@ export class ClientService {
     });
   }
 
-  private clientNotificationHref(type: NotificationType, title: string): string {
+  private clientNotificationHref(
+    type: NotificationType,
+    title: string,
+    deepLink?: string | null,
+    incidentId?: string | null,
+  ): string {
+    if (deepLink) return deepLink;
+    if (
+      incidentId &&
+      (type === NotificationType.PANIC_ALERT ||
+        type === NotificationType.INCIDENT_UPDATE ||
+        type === NotificationType.DISPATCH_ASSIGNED)
+    ) {
+      return `/portal/response/${incidentId}`;
+    }
     switch (type) {
       case NotificationType.PANIC_ALERT:
       case NotificationType.INCIDENT_UPDATE:
@@ -1562,7 +1972,8 @@ export class ClientService {
       body: n.body,
       isRead: n.isRead,
       createdAt: n.createdAt,
-      href: this.clientNotificationHref(n.type, n.title),
+      incidentId: n.incidentId,
+      href: this.clientNotificationHref(n.type, n.title, n.deepLink, n.incidentId),
     }));
 
     return {
@@ -1812,18 +2223,132 @@ export class ClientService {
     const incident = await this.prisma.incident.findFirst({
       where: { userId, status: { notIn: ['RESOLVED', 'CLOSED', 'CANCELLED'] } },
       orderBy: { createdAt: 'desc' },
+      include: {
+        dispatches: {
+          where: { status: { notIn: ['COMPLETED', 'CANCELLED'] } },
+          orderBy: { createdAt: 'desc' },
+          take: 1,
+          include: { officer: true, companyVehicle: true },
+        },
+      },
     });
     if (!incident) return null;
+    const dispatch = incident.dispatches[0] ?? null;
     const timeline = await this.kernel.getTimeline(tenantId, incident.id, {
       id: userId,
       role: UserRole.USER,
+    });
+    const stage = this.liveStageFromIncident(incident, dispatch);
+    const unitLabel = dispatch
+      ? dispatch.companyVehicle?.callSign ??
+        (dispatch.officer
+          ? `Officer ${dispatch.officer.firstName} ${dispatch.officer.lastName}`.trim()
+          : null)
+      : null;
+    const { headline, detail } = this.liveHeadline(stage, {
+      publicRef: incident.publicRef,
+      type: incident.type,
+      isSilent: incident.isSilent,
+      unitLabel,
+      etaSeconds: dispatch?.etaSeconds ?? null,
     });
     return {
       id: incident.id,
       publicRef: incident.publicRef,
       type: incident.type,
       status: incident.status,
+      stage,
+      headline,
+      detail,
+      unitLabel,
+      etaSeconds: dispatch?.etaSeconds ?? null,
       events: timeline.data.slice(-3),
+    };
+  }
+
+  private liveStageFromIncident(
+    incident: {
+      status: string;
+      ackedAt: Date | null;
+      resolvedAt: Date | null;
+    },
+    dispatch: { status: string; etaSeconds: number | null } | null,
+  ) {
+    const s = incident.status.toUpperCase();
+    const d = (dispatch?.status ?? '').toUpperCase();
+    if (s === 'CLOSED') return 'CLOSED';
+    if (s === 'RESOLVED' || s === 'CANCELLED') return 'RESOLVED';
+    if (s === 'ON_SCENE' || d === 'ON_SCENE' || d === 'ARRIVED') return 'ON_SCENE';
+    if (
+      (s === 'EN_ROUTE' || d === 'EN_ROUTE' || d === 'ACCEPTED') &&
+      dispatch?.etaSeconds != null &&
+      dispatch.etaSeconds <= 120
+    ) {
+      return 'NEARBY';
+    }
+    if (s === 'EN_ROUTE' || d === 'EN_ROUTE' || d === 'ACCEPTED') return 'EN_ROUTE';
+    if (s === 'DISPATCHED' || s === 'ASSIGNED' || d === 'ASSIGNED') return 'DISPATCHED';
+    if (incident.ackedAt || s === 'ACKNOWLEDGED') return 'ACKNOWLEDGED';
+    return 'RECEIVED';
+  }
+
+  private liveHeadline(
+    stage: string,
+    opts: {
+      publicRef: string;
+      type: string;
+      isSilent: boolean;
+      unitLabel: string | null;
+      etaSeconds: number | null;
+    },
+  ) {
+    const eta =
+      opts.etaSeconds != null
+        ? `${String(Math.floor(opts.etaSeconds / 60)).padStart(2, '0')}:${String(opts.etaSeconds % 60).padStart(2, '0')}`
+        : null;
+    if (stage === 'RESOLVED' || stage === 'CLOSED') {
+      return {
+        headline: 'Response resolved',
+        detail: `${opts.publicRef} is closed. You can review the incident file anytime.`,
+      };
+    }
+    if (stage === 'ON_SCENE') {
+      return {
+        headline: 'Officer on scene',
+        detail: opts.unitLabel
+          ? `${opts.unitLabel} is on scene for ${opts.publicRef}.`
+          : `Response team is on scene for ${opts.publicRef}.`,
+      };
+    }
+    if (stage === 'NEARBY' || stage === 'EN_ROUTE') {
+      return {
+        headline: 'Security response active',
+        detail: [
+          opts.unitLabel ? `${opts.unitLabel} is responding` : 'Unit en route',
+          stage === 'NEARBY' ? 'Nearby' : 'En route',
+          eta ? `ETA ${eta}` : null,
+        ]
+          .filter(Boolean)
+          .join(' · '),
+      };
+    }
+    if (stage === 'DISPATCHED') {
+      return {
+        headline: 'Officer being dispatched',
+        detail: opts.unitLabel
+          ? `${opts.unitLabel} assigned · ${opts.publicRef}`
+          : `Response unit assigned · ${opts.publicRef}`,
+      };
+    }
+    if (opts.isSilent) {
+      return {
+        headline: 'Silent alert received',
+        detail: 'Covert distress acknowledged. Your security team is responding discreetly.',
+      };
+    }
+    return {
+      headline: '4DS security alert',
+      detail: `Emergency response activated · ${opts.publicRef}. Your security team has been notified.`,
     };
   }
 

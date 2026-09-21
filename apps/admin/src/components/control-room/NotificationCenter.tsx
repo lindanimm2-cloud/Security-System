@@ -25,17 +25,17 @@ type NotificationData = {
 };
 
 const CATEGORY_LABELS: Record<string, string> = {
-  PANIC: 'Panic Alerts',
-  SILENT_PANIC: 'Silent Panic',
-  THEFT_RECOVERY: 'Theft Recovery',
-  OFFICER: 'Officer Updates',
-  VEHICLE: 'Vehicle Alerts',
-  ALARM: 'Alarm Events',
+  PANIC: 'Panic',
+  SILENT_PANIC: 'Silent',
   MEDICAL: 'Medical',
-  FAMILY: 'Family Safety',
+  ALARM: 'Fire / Alarm',
+  THEFT_RECOVERY: 'Vehicle',
+  OFFICER: 'Officer',
+  VEHICLE: 'Fleet',
+  FAMILY: 'Family',
   SYSTEM: 'System',
   BILLING: 'Billing',
-  DEVELOPER: 'Dev tickets',
+  DEVELOPER: 'Developer',
 };
 
 function formatTime(iso: string) {
@@ -56,6 +56,17 @@ export function NotificationCenter() {
   );
   const [open, setOpen] = useState(false);
   const [filter, setFilter] = useState<string>('ALL');
+  const [clearedIds, setClearedIds] = useState<Set<string>>(() => {
+    if (typeof window === 'undefined') return new Set();
+    try {
+      const raw = sessionStorage.getItem('cr-notif-cleared');
+      if (!raw) return new Set();
+      const parsed = JSON.parse(raw) as string[];
+      return new Set(Array.isArray(parsed) ? parsed : []);
+    } catch {
+      return new Set();
+    }
+  });
   const rootRef = useRef<HTMLDivElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const [mounted, setMounted] = useState(false);
@@ -64,8 +75,10 @@ export function NotificationCenter() {
     setMounted(true);
   }, []);
 
-  const notifications = Array.isArray(data?.data?.notifications) ? data.data.notifications : [];
-  const unreadCount = data?.data?.unreadCount ?? 0;
+  const notifications = Array.isArray(data?.data?.notifications)
+    ? data.data.notifications.filter((n) => !clearedIds.has(n.id))
+    : [];
+  const unreadCount = notifications.filter((n) => !n.isRead).length;
 
   const sorted = useMemo(
     () => sortNotificationsForOps(notifications),
@@ -101,6 +114,42 @@ export function NotificationCenter() {
     },
     [reload],
   );
+
+  const persistCleared = useCallback((next: Set<string>) => {
+    setClearedIds(next);
+    try {
+      sessionStorage.setItem('cr-notif-cleared', JSON.stringify([...next]));
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
+  const clearOne = useCallback(
+    async (id: string) => {
+      const next = new Set(clearedIds);
+      next.add(id);
+      persistCleared(next);
+      try {
+        await adminApi.patch(`/control-room/notifications/${id}/clear`);
+      } catch {
+        /* local clear still applies */
+      }
+      reload();
+    },
+    [clearedIds, persistCleared, reload],
+  );
+
+  const clearAll = useCallback(async () => {
+    const next = new Set(clearedIds);
+    for (const n of notifications) next.add(n.id);
+    persistCleared(next);
+    try {
+      await adminApi.patch('/control-room/notifications/clear-all');
+    } catch {
+      /* local clear still applies */
+    }
+    reload();
+  }, [clearedIds, notifications, persistCleared, reload]);
 
   const markAllRead = useCallback(async () => {
     await adminApi.patch('/control-room/notifications/read-all');
@@ -174,14 +223,26 @@ export function NotificationCenter() {
                   ? `${criticalUnread.length} critical need attention`
                   : unreadCount > 0
                     ? `${unreadCount} unread · prioritized by severity`
-                    : 'All clear · newest updates below'}
+                    : notifications.length === 0
+                      ? 'All clear'
+                      : 'All clear · newest updates below'}
               </p>
             </div>
-            {unreadCount > 0 && (
-              <button type="button" className="notification-mark-all" onClick={markAllRead}>
-                Mark all read
-              </button>
-            )}
+            <div className="notification-panel__header-actions">
+              {unreadCount > 0 ? (
+                <button type="button" className="notification-mark-all" onClick={() => void markAllRead()}>
+                  Mark all read
+                </button>
+              ) : null}
+              {notifications.length > 0 ? (
+                <button type="button" className="notification-mark-all" onClick={() => void clearAll()}>
+                  Clear all
+                </button>
+              ) : null}
+              <Link href="/control-room/alert-history" className="notification-mark-all" onClick={() => setOpen(false)}>
+                History
+              </Link>
+            </div>
           </div>
 
           {criticalUnread.length > 0 && filter !== 'CRITICAL' && (
@@ -252,7 +313,7 @@ export function NotificationCenter() {
                         href={n.link}
                         className="notification-action notification-action--primary"
                         onClick={() => {
-                          if (!n.isRead) markRead(n.id);
+                          if (!n.isRead) void markRead(n.id);
                           setOpen(false);
                         }}
                       >
@@ -263,11 +324,18 @@ export function NotificationCenter() {
                       <button
                         type="button"
                         className="notification-action notification-action--secondary"
-                        onClick={() => markRead(n.id)}
+                        onClick={() => void markRead(n.id)}
                       >
                         Mark read
                       </button>
                     )}
+                    <button
+                      type="button"
+                      className="notification-action notification-action--secondary"
+                      onClick={() => void clearOne(n.id)}
+                    >
+                      Clear
+                    </button>
                   </div>
                 </div>
               </li>

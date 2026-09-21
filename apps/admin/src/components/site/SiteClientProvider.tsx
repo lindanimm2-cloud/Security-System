@@ -12,6 +12,7 @@ import {
 import {
   clearSession,
   getSession,
+  isMfaChallenge,
   login as authLogin,
   type AuthSession,
 } from '@/lib/auth';
@@ -84,6 +85,9 @@ export function SiteClientProvider({ children }: { children: ReactNode }) {
       const next = await authLogin('client', email, password, tenantSlug, {
         authSource: 'site',
       });
+      if (isMfaChallenge(next)) {
+        throw new Error('This account requires authenticator setup in the client portal.');
+      }
       setSession(next);
       await loadProfile(next);
     },

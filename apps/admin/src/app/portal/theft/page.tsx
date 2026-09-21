@@ -5,7 +5,8 @@ import { useRouter } from 'next/navigation';
 import { AuthGuard } from '@/components/AuthGuard';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { PortalShell } from '@/components/PortalShell';
-import { clientApi } from '@/lib/api-client';
+import { clientApi, type ApiResponse } from '@/lib/api-client';
+import { responseHref } from '@/lib/live-response';
 
 export default function TheftPage() {
   return (
@@ -34,8 +35,8 @@ function TheftContent() {
     e.preventDefault();
     setLoading(true);
     try {
-      await clientApi.post('/client/theft', form);
-      router.push('/portal/incidents');
+      const res = await clientApi.post<ApiResponse<{ id: string }>>('/client/theft', form);
+      router.push(res.data?.id ? responseHref(res.data.id) : '/portal/incidents');
     } finally {
       setLoading(false);
     }

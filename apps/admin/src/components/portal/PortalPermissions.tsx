@@ -4,7 +4,6 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useSubscriptionAccess } from '@/hooks/useSubscriptionAccess';
 import { usePortalPermissions } from '@/hooks/usePortalPermissions';
-import { PORTAL_PERMISSIONS_PROFILE_HASH } from '@/lib/portal-permissions';
 
 function statusLabel(state: string): string {
   if (state === 'granted') return 'Allowed';
@@ -33,7 +32,9 @@ export function PortalPermissionsSection() {
         <div>
           <h2>Device permissions</h2>
           <p className="text-muted portal-permissions__lead">
-            Only permissions for your active protection features are shown.
+            Core browser grants for your plan.{' '}
+            <Link href="/portal/security/emergency-setup">Emergency setup</Link> covers vibration,
+            background alerts, and the full protection checklist.
           </p>
         </div>
         {missing.length > 0 ? (
@@ -106,24 +107,27 @@ export function PortalPermissionsBanner() {
         <strong>
           {denied.length > 0
             ? 'Some safety features need permission'
-            : 'Allow permissions for full protection'}
+            : 'Enable emergency protection'}
         </strong>
         <p className="text-muted">
           {prompt.length > 0
-            ? `${prompt.map((m) => m.label).join(', ')} — tap Allow so dispatch and alerts work properly.`
+            ? `${prompt.map((m) => m.label).join(', ')} — open Emergency Setup so alerts, vibration and location work.`
             : `${denied.map((m) => m.label).join(', ')} blocked in browser settings.`}
         </p>
       </div>
       <div className="portal-permissions-banner__actions">
+        <Link href="/portal/security/emergency-setup" className="btn-sm btn-primary">
+          Emergency setup
+        </Link>
         <button
           type="button"
-          className="btn-sm btn-primary"
+          className="btn-sm btn-secondary"
           disabled={!!requesting}
           onClick={() => void allowAll()}
         >
           {requesting ? '…' : 'Allow now'}
         </button>
-        <Link href={`/portal/profile${PORTAL_PERMISSIONS_PROFILE_HASH}`} className="btn-sm btn-secondary">
+        <Link href="/portal/security/emergency-setup" className="btn-sm btn-secondary">
           Manage
         </Link>
         <button

@@ -19,6 +19,13 @@ import { UiSelect } from '@/components/ui/UiSelect';
 import { ListSearch } from '@/components/ui/ListSearch';
 import { OpsDialog } from '@/components/ops/OpsDialog';
 import { matchesSearch } from '@/lib/list-search';
+import {
+  EMPTY_FAMILY_LINK,
+  FamilyLinkFields,
+  familyLinkToPayload,
+  validateFamilyLink,
+  type FamilyLinkState,
+} from '@/components/control-room/FamilyLinkFields';
 
 type SubscriptionSummary = {
   planName: string;
@@ -51,6 +58,21 @@ type Customer = {
   vehicleCount: number;
   propertyCount: number;
   subscription: SubscriptionSummary | null;
+};
+
+type ControlFamily = {
+  id: string;
+  name: string;
+  ownerUserId: string;
+  ownerName: string;
+  ownerEmail: string;
+  memberCount: number;
+  members: {
+    userId: string;
+    name: string;
+    email: string;
+    relationship: string | null;
+  }[];
 };
 
 type CustomersResponse = {
@@ -137,6 +159,10 @@ function CustomersContent() {
     () => adminApi.get<ApiResponse<DiscountCodeRow[]>>('/control-room/discount-codes'),
     [],
   );
+  const { data: familiesRes } = useApi(
+    () => adminApi.get<ApiResponse<ControlFamily[]>>('/control-room/families'),
+    [],
+  );
 
   const [search, setSearch] = useState('');
   const [tierFilter, setTierFilter] = useState('ALL');
@@ -159,6 +185,7 @@ function CustomersContent() {
     email: '',
     phone: '',
   });
+  const [inviteFamily, setInviteFamily] = useState<FamilyLinkState>(EMPTY_FAMILY_LINK);
   const [inviteSaving, setInviteSaving] = useState(false);
   const [inviteError, setInviteError] = useState('');
   const [showInviteDialog, setShowInviteDialog] = useState(false);
@@ -176,6 +203,16 @@ function CustomersContent() {
   const stats = data?.stats;
   const catalog = plansData?.data;
   const billing = billingRes?.data;
+  const families = familiesRes?.data ?? [];
+  const primaryOptions = useMemo(
+    () =>
+      customers.map((c) => ({
+        id: c.id,
+        label: `${c.firstName} ${c.lastName}`.trim() || c.email,
+        email: c.email,
+      })),
+    [customers],
+  );
 
   const filtered = useMemo(() => {
     return customers.filter((c) => {
@@ -199,9 +236,15 @@ function CustomersContent() {
 
   async function invitePremiumClient(e: FormEvent) {
     e.preventDefault();
+    const familyError = validateFamilyLink(inviteFamily, { role: 'USER' });
+    if (familyError) {
+      setInviteError(familyError);
+      return;
+    }
     setInviteSaving(true);
     setInviteError('');
     try {
+      const familyPayload = familyLinkToPayload(inviteFamily);
       const res = await adminApi.post<
         ApiResponse<{
           firstName: string;
@@ -218,6 +261,7 @@ function CustomersContent() {
         phone: inviteForm.phone.trim() || undefined,
         role: 'USER',
         status: 'PENDING_VERIFICATION',
+        ...familyPayload,
       });
       const code = res.data.inviteCode ?? res.data.inviteToken ?? '';
       const origin =
@@ -230,6 +274,7 @@ function CustomersContent() {
         url,
       });
       setInviteForm({ firstName: '', lastName: '', email: '', phone: '' });
+      setInviteFamily(EMPTY_FAMILY_LINK);
       setShowInviteDialog(false);
       reload();
     } catch (err) {
@@ -305,7 +350,15 @@ function CustomersContent() {
           <Link href={CONTROL_ROOM_ROUTES.dispatch} className="btn-secondary">
             Dispatch
           </Link>
-          <button type="button" className="btn-ok" onClick={() => setShowInviteDialog(true)}>
+          <button
+            type="button"
+            className="btn-ok"
+            onClick={() => {
+              setInviteError('');
+              setInviteFamily(EMPTY_FAMILY_LINK);
+              setShowInviteDialog(true);
+            }}
+          >
             Invite client
           </button>
         </div>
@@ -366,6 +419,13 @@ function CustomersContent() {
                 />
               </label>
             </div>
+            <FamilyLinkFields
+              value={inviteFamily}
+              onChange={setInviteFamily}
+              primaries={primaryOptions}
+              families={families}
+              disabled={inviteSaving}
+            />
             <div className="fleet-form__actions">
               <button type="button" className="btn-ghost" onClick={() => setShowInviteDialog(false)}>
                 Cancel

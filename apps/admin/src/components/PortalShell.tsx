@@ -138,7 +138,7 @@ function PortalShellInner({
     <>
       {handoff.overlay}
     <div
-      className="shell shell--portal shell--with-bottom-nav"
+      className="shell shell--portal shell--ops shell--with-bottom-nav"
       data-portal-ambient={ambient}
     >
       <header className="mobile-shell-header mobile-shell-header--portal">

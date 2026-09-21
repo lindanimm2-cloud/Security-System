@@ -37,10 +37,11 @@ export const PANIC_TERMINAL = new Set([
 
 export type ParsedUserAgent = {
   name: string;
-  deviceType: 'mobile' | 'tablet' | 'desktop' | 'unknown';
+  deviceType: 'mobile' | 'tablet' | 'desktop' | 'watch' | 'unknown';
   osName: string;
   osVersion: string | null;
   isBrowser: boolean;
+  platformFamily?: 'web' | 'android' | 'ios' | 'ipados' | 'watchos' | 'wearos' | 'desktop' | 'unknown';
 };
 
 export type ReadinessInput = {
@@ -51,6 +52,12 @@ export type ReadinessInput = {
   contactsConfigured: boolean;
   panicTested: boolean;
   consentRecorded: boolean;
+  /** Apple Crash Detection entitlement — never invent "ok" without OS authorization. */
+  appleCrashDetection?: 'ok' | 'warn' | 'unavailable';
+  appleCrashEntitlement?: 'ok' | 'unavailable';
+  appleWatch?: 'ok' | 'warn' | 'unavailable';
+  vehicleConnection?: 'ok' | 'warn' | 'unavailable';
+  voiceSosLinked?: 'ok' | 'warn' | 'unavailable';
 };
 
 export function generateDevicePublicId(random: () => Buffer = () => randomBytes(6)): string {
@@ -81,6 +88,29 @@ export function parseUserAgent(ua: string | null | undefined): ParsedUserAgent {
   const iphone = /iPhone/i.test(value);
   const ipad = /iPad/i.test(value);
   const samsung = value.match(/SM-[A-Z0-9]+|Samsung[^;)]+/i);
+  const wearOs = /Wear OS|WearOS/i.test(value);
+  const appleWatch = /Watch\d|, Watch\//i.test(value) || /Apple Watch/i.test(value);
+
+  if (wearOs || (android && /Watch/i.test(value))) {
+    return {
+      name: samsung ? prettySamsung(samsung[0]) : 'Wear OS watch',
+      deviceType: 'watch',
+      osName: 'Wear OS',
+      osVersion: android?.[1] ?? null,
+      isBrowser: false,
+      platformFamily: 'wearos',
+    };
+  }
+  if (appleWatch) {
+    return {
+      name: 'Apple Watch',
+      deviceType: 'watch',
+      osName: 'watchOS',
+      osVersion: ios ? `${ios[1]}.${ios[2]}` : null,
+      isBrowser: false,
+      platformFamily: 'watchos',
+    };
+  }
 
   if (android) {
     return {
@@ -89,15 +119,17 @@ export function parseUserAgent(ua: string | null | undefined): ParsedUserAgent {
       osName: 'Android',
       osVersion: android[1] ?? null,
       isBrowser: true,
+      platformFamily: 'android',
     };
   }
   if (iphone || ipad) {
     return {
       name: ipad ? 'iPad' : 'iPhone',
       deviceType: ipad ? 'tablet' : 'mobile',
-      osName: 'iOS',
+      osName: ipad ? 'iPadOS' : 'iOS',
       osVersion: ios ? `${ios[1]}.${ios[2]}` : null,
       isBrowser: true,
+      platformFamily: ipad ? 'ipados' : 'ios',
     };
   }
   if (windows) {
@@ -107,6 +139,7 @@ export function parseUserAgent(ua: string | null | undefined): ParsedUserAgent {
       osName: 'Windows',
       osVersion: null,
       isBrowser: true,
+      platformFamily: 'desktop',
     };
   }
   if (mac) {
@@ -116,6 +149,7 @@ export function parseUserAgent(ua: string | null | undefined): ParsedUserAgent {
       osName: 'macOS',
       osVersion: null,
       isBrowser: true,
+      platformFamily: 'desktop',
     };
   }
   return {
@@ -124,6 +158,7 @@ export function parseUserAgent(ua: string | null | undefined): ParsedUserAgent {
     osName: 'Unknown',
     osVersion: null,
     isBrowser: Boolean(value),
+    platformFamily: 'unknown',
   };
 }
 
@@ -169,6 +204,12 @@ export function emergencyReadinessScore(input: ReadinessInput): {
   score: number;
   items: Array<{ id: string; ok: boolean; warn?: boolean; label: string; detail?: string }>;
 } {
+  const crashState = input.appleCrashDetection ?? 'unavailable';
+  const entitlement = input.appleCrashEntitlement ?? 'unavailable';
+  const watch = input.appleWatch ?? 'warn';
+  const vehicle = input.vehicleConnection ?? 'warn';
+  const voice = input.voiceSosLinked ?? 'warn';
+
   const items = [
     { id: 'primary', ok: input.hasPrimary, label: 'Primary device registered' },
     { id: 'location', ok: input.locationConfigured, label: 'Location configured' },
@@ -185,8 +226,57 @@ export function emergencyReadinessScore(input: ReadinessInput): {
     { id: 'contacts', ok: input.contactsConfigured, label: 'Emergency contacts configured' },
     { id: 'panic-test', ok: input.panicTested, label: 'Panic tested' },
     { id: 'consent', ok: input.consentRecorded, label: 'Emergency consent recorded' },
+    {
+      id: 'crash-detection',
+      ok: crashState === 'ok',
+      warn: crashState !== 'ok',
+      label: 'Crash Detection (Apple)',
+      detail:
+        crashState === 'ok'
+          ? 'OS Crash Detection authorized'
+          : 'Crash Detection integration unavailable — Apple SafetyKit entitlement required',
+    },
+    {
+      id: 'crash-entitlement',
+      ok: entitlement === 'ok',
+      warn: entitlement !== 'ok',
+      label: 'Crash sharing entitlement',
+      detail:
+        entitlement === 'ok'
+          ? 'severe-vehicular-crash-event granted'
+          : 'Entitlement not granted — use manual SOS, vehicle panic, or telematics',
+    },
+    {
+      id: 'apple-watch',
+      ok: watch === 'ok',
+      warn: watch !== 'ok',
+      label: 'Apple Watch',
+      detail: watch === 'ok' ? 'Watch paired for SOS' : 'Watch Crash Detection not verified on this client',
+    },
+    {
+      id: 'vehicle-connection',
+      ok: vehicle === 'ok',
+      warn: vehicle !== 'ok',
+      label: 'Vehicle connection',
+      detail: vehicle === 'ok' ? 'Vehicle telemetry linked' : 'Link a vehicle for telematics crash fallback',
+    },
+    {
+      id: 'voice-sos',
+      ok: voice === 'ok',
+      warn: voice !== 'ok',
+      label: 'Voice SOS linked',
+      detail: voice === 'ok' ? 'Voice assistant linked' : 'Link Alexa / Google / Siri when available',
+    },
   ];
-  const weighted = items.filter((i) => i.id !== 'native-sos');
+  const optionalIds = new Set([
+    'native-sos',
+    'crash-detection',
+    'crash-entitlement',
+    'apple-watch',
+    'vehicle-connection',
+    'voice-sos',
+  ]);
+  const weighted = items.filter((i) => !optionalIds.has(i.id));
   const score = Math.round((weighted.filter((i) => i.ok).length / weighted.length) * 100);
   return { score, items };
 }

@@ -604,8 +604,51 @@ function statusPayload(session?: AuthSession | null) {
     { id: 'contacts', ok: true, label: 'Emergency contacts configured' },
     { id: 'panic-test', ok: panicTested, label: 'Panic tested' },
     { id: 'consent', ok: consentAccepted, label: 'Emergency consent recorded' },
+    {
+      id: 'crash-detection',
+      ok: false,
+      warn: true,
+      label: 'Crash Detection (Apple)',
+      detail: 'Crash Detection integration unavailable — Apple SafetyKit entitlement required',
+    },
+    {
+      id: 'crash-entitlement',
+      ok: false,
+      warn: true,
+      label: 'Crash sharing entitlement',
+      detail: 'Entitlement not granted — use manual SOS, vehicle panic, or telematics',
+    },
+    {
+      id: 'apple-watch',
+      ok: false,
+      warn: true,
+      label: 'Apple Watch',
+      detail: 'Watch Crash Detection not verified on this client',
+    },
+    {
+      id: 'vehicle-connection',
+      ok: false,
+      warn: true,
+      label: 'Vehicle connection',
+      detail: 'Link a vehicle for telematics crash fallback',
+    },
+    {
+      id: 'voice-sos',
+      ok: false,
+      warn: true,
+      label: 'Voice SOS linked',
+      detail: 'Link Alexa / Google / Siri when available',
+    },
   ];
-  const score = Math.round((items.filter((i) => i.id !== 'native-sos' && i.ok).length / 6) * 100);
+  const optional = new Set([
+    'native-sos',
+    'crash-detection',
+    'crash-entitlement',
+    'apple-watch',
+    'vehicle-connection',
+    'voice-sos',
+  ]);
+  const score = Math.round((items.filter((i) => !optional.has(i.id) && i.ok).length / 6) * 100);
   const activePanic = panics.find((p) =>
     ['NEW', 'ACKNOWLEDGED', 'CONTACTING_CLIENT', 'DISPATCHED', 'RESPONDING', 'ON_SCENE', 'ESCALATED'].includes(
       p.workflowStatus,

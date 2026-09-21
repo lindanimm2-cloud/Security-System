@@ -13,6 +13,10 @@ export const CONTROL_ROOM_ROUTES = {
   teams: '/control-room/teams',
   analytics: '/control-room/analytics',
   surveillance: '/control-room/surveillance',
+  cctvSystems: '/control-room/cctv-systems',
+  alarmSystems: '/control-room/alarm-systems',
+  alertHistory: '/control-room/alert-history',
+  settings: '/control-room/settings',
 } as const;
 
 export function customerHref(userId?: string): string {

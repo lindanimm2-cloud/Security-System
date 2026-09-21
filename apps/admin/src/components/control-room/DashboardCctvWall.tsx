@@ -500,7 +500,9 @@ export function DashboardCctvWall() {
               state={{
                 doorsLocked: focusedClient.doorsLocked ?? true,
                 immobiliserOn: focusedClient.immobiliserOn ?? false,
-                theftRecovery: focusedClient.theftRecovery ?? false,
+                theftRecovery:
+                  Boolean(focusedClient.theftRecovery) ||
+                  focusedClient.vehicleType === 'STOLEN',
                 hornActive: focusedClient.hornActive ?? false,
               }}
               meta={{
@@ -510,6 +512,9 @@ export function DashboardCctvWall() {
                 gpsLive: focusedClient.lat != null && focusedClient.lng != null,
                 speedKph: typeof focusedClient.speed === 'number' ? focusedClient.speed : null,
                 batteryPct: focusedClient.batteryPct ?? null,
+                vehicleType: focusedClient.vehicleType ?? null,
+                stolen:
+                  focusedClient.vehicleType === 'STOLEN' || Boolean(focusedClient.theftRecovery),
               }}
               model={{
                 make: focusedClient.make,
@@ -526,7 +531,9 @@ export function DashboardCctvWall() {
               state={{
                 doorsLocked: focusedClient.doorsLocked ?? true,
                 immobiliserOn: focusedClient.immobiliserOn ?? false,
-                theftRecovery: focusedClient.theftRecovery ?? false,
+                theftRecovery:
+                  Boolean(focusedClient.theftRecovery) ||
+                  focusedClient.vehicleType === 'STOLEN',
                 hornActive: focusedClient.hornActive ?? false,
               }}
               busyAction={remoteBusy}

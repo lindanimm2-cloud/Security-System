@@ -35,6 +35,8 @@ type Vehicle3DViewerProps = {
   /** Ops telemetry for HUD (speed, GPS, battery). */
   telemetry?: VehicleTwinTelemetry | null;
   showHud?: boolean;
+  /** Inline alert pills over the canvas (disable when parent shows its own badges). */
+  showAlerts?: boolean;
   /** Dev: list GLB node names for mapping. */
   debugNodes?: boolean;
 };
@@ -53,6 +55,7 @@ export function Vehicle3DViewer({
   showReset = true,
   telemetry = null,
   showHud = true,
+  showAlerts = true,
   debugNodes = false,
 }: Vehicle3DViewerProps) {
   const hostRef = useRef<HTMLDivElement>(null);
@@ -407,13 +410,24 @@ export function Vehicle3DViewer({
           Reset view
         </button>
       ) : null}
-      {status === 'ready' && alerts.length ? (
+      {status === 'ready' && showAlerts && alerts.length ? (
         <div className="vehicle-3d__alerts" role="status" aria-live="polite">
-          {alerts.map((a) => (
-            <span key={a} className={`vehicle-3d__alert ${a.includes('PANIC') ? 'is-panic' : 'is-open'}`}>
-              {a}
-            </span>
-          ))}
+          {alerts.map((a) => {
+            const tone = a.includes('PANIC')
+              ? 'is-panic'
+              : a.includes('STOLEN') || a.includes('RECOVERY') || a.includes('EMERGENCY')
+                ? 'is-recovery'
+                : a.includes('IGNITION')
+                  ? 'is-cut'
+                  : a.includes('OFFLINE')
+                    ? 'is-off'
+                    : 'is-open';
+            return (
+              <span key={a} className={`vehicle-3d__alert ${tone}`}>
+                {a}
+              </span>
+            );
+          })}
         </div>
       ) : null}
       {status === 'ready' && showHud ? (

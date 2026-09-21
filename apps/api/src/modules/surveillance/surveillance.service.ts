@@ -1,14 +1,23 @@
 import {
   AlarmEventStatus,
   AlarmEventType,
+  AlarmPanelConnectivity,
   AlarmStatus,
+  AlarmSystemStatus,
   CameraPlacement,
   CameraStatus,
+  CctvConnectivity,
+  CctvRecorderType,
+  CctvSystemStatus,
   IncidentPriority,
   IncidentStatus,
   IncidentType,
+  NotificationPriority,
+  NotificationType,
+  PropertyType,
   SensorStatus,
   SensorType,
+  UserRole,
 } from '@prisma/client';
 import {
   BadRequestException,
@@ -626,7 +635,183 @@ export class SurveillanceService {
       },
     });
 
+    await this.notifyZoneStakeholders({
+      tenantId,
+      ownerUserId: userId,
+      propertyId,
+      propertyName: (await this.prisma.property.findUnique({ where: { id: propertyId } }))?.name ?? 'Property',
+      zoneNumber: sensor.zoneNumber,
+      sensorName: sensor.name,
+      kind: bypassed ? 'disabled' : 'restored',
+      priority: NotificationPriority.P2,
+    });
+
     return { success: true, data: this.formatSensor(updated) };
+  }
+
+  /**
+   * Report FAULT / OFFLINE / TAMPER / NORMAL on a zone.
+   * Faults notify the property owner and control-room operators to inspect.
+   */
+  async setSensorHealth(
+    tenantId: string,
+    sensorId: string,
+    status: SensorStatus,
+    opts?: { actorUserId?: string; propertyOwnerOnly?: boolean },
+  ) {
+    const allowed = new Set<SensorStatus>([
+      SensorStatus.NORMAL,
+      SensorStatus.FAULT,
+      SensorStatus.OFFLINE,
+      SensorStatus.TAMPER,
+    ]);
+    if (!allowed.has(status)) {
+      throw new BadRequestException('Unsupported sensor health status');
+    }
+
+    const sensor = await this.prisma.sensor.findFirst({
+      where: { id: sensorId, tenantId },
+      include: { property: true },
+    });
+    if (!sensor) throw new NotFoundException('Sensor not found');
+    if (opts?.propertyOwnerOnly && opts.actorUserId && sensor.property.userId !== opts.actorUserId) {
+      throw new NotFoundException('Sensor not found');
+    }
+    if (sensor.bypassed && status !== SensorStatus.NORMAL) {
+      throw new BadRequestException('Enable the zone before reporting a fault');
+    }
+
+    const previous = sensor.status;
+    const updated = await this.prisma.sensor.update({
+      where: { id: sensor.id },
+      data: {
+        status,
+        bypassed: false,
+      },
+    });
+
+    const isProblem =
+      status === SensorStatus.FAULT ||
+      status === SensorStatus.OFFLINE ||
+      status === SensorStatus.TAMPER;
+
+    await this.prisma.alarmEvent.create({
+      data: {
+        tenantId,
+        propertyId: sensor.propertyId,
+        sensorId: sensor.id,
+        type: isProblem ? AlarmEventType.TROUBLE : AlarmEventType.ZONE_BYPASS,
+        severity: isProblem ? IncidentPriority.HIGH : IncidentPriority.LOW,
+        status: isProblem ? AlarmEventStatus.NEW : AlarmEventStatus.RESOLVED,
+        title: isProblem
+          ? `Zone ${sensor.zoneNumber} ${status.toLowerCase()} — ${sensor.name}`
+          : `Zone ${sensor.zoneNumber} restored — ${sensor.name}`,
+        description: `${sensor.locationLabel ?? ''} · was ${previous}`.trim(),
+        cidCode: isProblem ? '300' : '301',
+        resolvedAt: isProblem ? null : new Date(),
+      },
+    });
+
+    await this.notifyZoneStakeholders({
+      tenantId,
+      ownerUserId: sensor.property.userId,
+      propertyId: sensor.propertyId,
+      propertyName: sensor.property.name,
+      zoneNumber: sensor.zoneNumber,
+      sensorName: sensor.name,
+      kind:
+        status === SensorStatus.FAULT
+          ? 'fault'
+          : status === SensorStatus.OFFLINE
+            ? 'offline'
+            : status === SensorStatus.TAMPER
+              ? 'tamper'
+              : 'restored',
+      priority: isProblem ? NotificationPriority.P1 : NotificationPriority.P2,
+    });
+
+    return { success: true, data: this.formatSensor(updated) };
+  }
+
+  private async notifyZoneStakeholders(input: {
+    tenantId: string;
+    ownerUserId: string;
+    propertyId: string;
+    propertyName: string;
+    zoneNumber: number;
+    sensorName: string;
+    kind: 'fault' | 'offline' | 'tamper' | 'disabled' | 'restored';
+    priority: NotificationPriority;
+  }) {
+    const copy: Record<typeof input.kind, { title: string; body: string }> = {
+      fault: {
+        title: `Sensor fault · Z${input.zoneNumber}`,
+        body: `${input.sensorName} at ${input.propertyName} reported a fault. Please arrange inspection.`,
+      },
+      offline: {
+        title: `Sensor offline · Z${input.zoneNumber}`,
+        body: `${input.sensorName} at ${input.propertyName} is offline. Check power/comms.`,
+      },
+      tamper: {
+        title: `Sensor tamper · Z${input.zoneNumber}`,
+        body: `${input.sensorName} at ${input.propertyName} reported tamper. Verify the zone.`,
+      },
+      disabled: {
+        title: `Zone disabled · Z${input.zoneNumber}`,
+        body: `${input.sensorName} at ${input.propertyName} was disabled / bypassed and will not trip.`,
+      },
+      restored: {
+        title: `Zone restored · Z${input.zoneNumber}`,
+        body: `${input.sensorName} at ${input.propertyName} is active again.`,
+      },
+    };
+    const msg = copy[input.kind];
+    const deepOwner = `/portal/home/${input.propertyId}`;
+    const deepCr = `/control-room/surveillance/${input.propertyId}`;
+
+    await this.prisma.notification.create({
+      data: {
+        tenantId: input.tenantId,
+        userId: input.ownerUserId,
+        type: NotificationType.SYSTEM,
+        priority: input.priority,
+        title: msg.title,
+        body: msg.body,
+        deepLink: deepOwner,
+      },
+    });
+
+    const ops = await this.prisma.user.findMany({
+      where: {
+        tenantId: input.tenantId,
+        role: {
+          in: [
+            UserRole.DISPATCHER,
+            UserRole.SUPERVISOR,
+            UserRole.MANAGER,
+            UserRole.TENANT_ADMIN,
+            UserRole.OWNER,
+          ],
+        },
+        status: 'ACTIVE',
+      },
+      select: { id: true },
+      take: 40,
+    });
+
+    if (ops.length) {
+      await this.prisma.notification.createMany({
+        data: ops.map((u) => ({
+          tenantId: input.tenantId,
+          userId: u.id,
+          type: NotificationType.SYSTEM,
+          priority: input.priority,
+          title: msg.title,
+          body: msg.body,
+          deepLink: deepCr,
+        })),
+      });
+    }
   }
 
   async triggerSensorAlert(
@@ -1121,6 +1306,10 @@ export class SurveillanceService {
       channel?: number;
       vendor?: string;
       placement?: 'EXTERIOR' | 'INTERIOR';
+      serialNumber?: string;
+      model?: string;
+      resolution?: string;
+      systemId?: string;
     }[],
   ) {
     const property = await this.prisma.property.findFirst({
@@ -1138,6 +1327,7 @@ export class SurveillanceService {
             data: {
               tenantId,
               propertyId,
+              systemId: cam.systemId?.trim() || null,
               name: cam.name.trim(),
               locationLabel: cam.locationLabel.trim(),
               channel: cam.channel ?? i + 1,
@@ -1146,6 +1336,9 @@ export class SurveillanceService {
                   ? CameraPlacement.INTERIOR
                   : CameraPlacement.EXTERIOR,
               vendor: cam.vendor?.trim() || '4DS Nexus',
+              model: cam.model?.trim() || null,
+              serialNumber: cam.serialNumber?.trim() || null,
+              resolution: cam.resolution?.trim() || null,
               status: CameraStatus.ONLINE,
               lastSeenAt: new Date(),
               snapshotUrl: null,
@@ -1199,4 +1392,1045 @@ export class SurveillanceService {
       })),
     };
   }
+
+  private formatCctvSystem(
+    system: {
+      id: string;
+      propertyId: string;
+      name: string;
+      brand: string | null;
+      model: string | null;
+      kitSku: string | null;
+      supplier: string | null;
+      recorderType: CctvRecorderType;
+      channelCount: number;
+      connectivity: CctvConnectivity;
+      recorderSerial: string | null;
+      recorderIp: string | null;
+      cloudId: string | null;
+      hddInstalled: boolean;
+      hddSerial: string | null;
+      hddCapacityGb: number | null;
+      firmware: string | null;
+      mobileAppEnabled: boolean;
+      techNotes: string | null;
+      status: CctvSystemStatus;
+      installedAt: Date | null;
+      createdAt: Date;
+      updatedAt: Date;
+      property?: {
+        id: string;
+        name: string;
+        address: string;
+        propertyType: PropertyType;
+        user?: { id: string; firstName: string; lastName: string; email: string };
+      };
+      cameras?: Array<{
+        id: string;
+        name: string;
+        locationLabel: string;
+        channel: number;
+        placement: CameraPlacement;
+        status: CameraStatus;
+        vendor: string | null;
+        model: string | null;
+        serialNumber: string | null;
+        resolution: string | null;
+        propertyId: string;
+        snapshotUrl: string | null;
+        streamUrl: string | null;
+        lastSeenAt: Date | null;
+      }>;
+    },
+  ) {
+    return {
+      id: system.id,
+      propertyId: system.propertyId,
+      name: system.name,
+      brand: system.brand,
+      model: system.model,
+      kitSku: system.kitSku,
+      supplier: system.supplier,
+      recorderType: system.recorderType,
+      channelCount: system.channelCount,
+      connectivity: system.connectivity,
+      recorderSerial: system.recorderSerial,
+      recorderIp: system.recorderIp,
+      cloudId: system.cloudId,
+      hddInstalled: system.hddInstalled,
+      hddSerial: system.hddSerial,
+      hddCapacityGb: system.hddCapacityGb,
+      firmware: system.firmware,
+      mobileAppEnabled: system.mobileAppEnabled,
+      techNotes: system.techNotes,
+      status: system.status,
+      installedAt: system.installedAt,
+      createdAt: system.createdAt,
+      updatedAt: system.updatedAt,
+      property: system.property
+        ? {
+            id: system.property.id,
+            name: system.property.name,
+            address: system.property.address,
+            propertyType: system.property.propertyType,
+            client: system.property.user
+              ? {
+                  id: system.property.user.id,
+                  name: `${system.property.user.firstName} ${system.property.user.lastName}`.trim(),
+                  email: system.property.user.email,
+                }
+              : null,
+          }
+        : null,
+      cameras: (system.cameras ?? []).map((c) => ({
+        id: c.id,
+        name: c.name,
+        locationLabel: c.locationLabel,
+        channel: c.channel,
+        placement: c.placement,
+        status: c.status,
+        vendor: c.vendor,
+        model: c.model,
+        serialNumber: c.serialNumber,
+        resolution: c.resolution,
+      })),
+    };
+  }
+
+  async listCctvSystems(tenantId: string) {
+    const systems = await this.prisma.cctvSystem.findMany({
+      where: { tenantId },
+      include: {
+        property: {
+          select: {
+            id: true,
+            name: true,
+            address: true,
+            propertyType: true,
+            user: { select: { id: true, firstName: true, lastName: true, email: true } },
+          },
+        },
+        cameras: { orderBy: { channel: 'asc' } },
+      },
+      orderBy: { updatedAt: 'desc' },
+      take: 200,
+    });
+    return {
+      success: true,
+      data: {
+        presets: CCTV_KIT_PRESETS,
+        siteTypes: SITE_TYPE_OPTIONS,
+        systems: systems.map((s) => this.formatCctvSystem(s)),
+      },
+    };
+  }
+
+  async getCctvSystem(tenantId: string, id: string) {
+    const system = await this.prisma.cctvSystem.findFirst({
+      where: { id, tenantId },
+      include: {
+        property: {
+          select: {
+            id: true,
+            name: true,
+            address: true,
+            propertyType: true,
+            user: { select: { id: true, firstName: true, lastName: true, email: true } },
+          },
+        },
+        cameras: { orderBy: { channel: 'asc' } },
+      },
+    });
+    if (!system) throw new NotFoundException('CCTV system not found');
+    return { success: true, data: this.formatCctvSystem(system) };
+  }
+
+  async registerCctvSystem(
+    tenantId: string,
+    body: {
+      propertyId?: string;
+      clientUserId?: string;
+      site?: {
+        name: string;
+        address: string;
+        propertyType?: string;
+        accessNotes?: string;
+        gateCode?: string;
+      };
+      system: {
+        name: string;
+        brand?: string;
+        model?: string;
+        kitSku?: string;
+        supplier?: string;
+        recorderType?: string;
+        channelCount?: number;
+        connectivity?: string;
+        recorderSerial?: string;
+        recorderIp?: string;
+        cloudId?: string;
+        hddInstalled?: boolean;
+        hddSerial?: string;
+        hddCapacityGb?: number;
+        firmware?: string;
+        mobileAppEnabled?: boolean;
+        techNotes?: string;
+        status?: string;
+      };
+      cameras?: Array<{
+        name: string;
+        locationLabel: string;
+        channel?: number;
+        serialNumber?: string;
+        model?: string;
+        resolution?: string;
+        placement?: 'EXTERIOR' | 'INTERIOR';
+        vendor?: string;
+      }>;
+    },
+  ) {
+    if (!body?.system?.name?.trim()) {
+      throw new BadRequestException('System name is required');
+    }
+
+    const channelCount = Math.min(64, Math.max(1, body.system.channelCount ?? 4));
+    const cameras = (body.cameras ?? []).slice(0, channelCount);
+    if (!cameras.length) {
+      throw new BadRequestException('Add at least one camera channel with a label');
+    }
+
+    const propertyType = parsePropertyType(body.site?.propertyType);
+    const recorderType = parseRecorderType(body.system.recorderType);
+    const connectivity = parseConnectivity(body.system.connectivity);
+    const status = parseSystemStatus(body.system.status);
+
+    const created = await this.prisma.$transaction(async (tx) => {
+      let propertyId = body.propertyId?.trim() || '';
+
+      if (propertyId) {
+        const existing = await tx.property.findFirst({
+          where: { id: propertyId, tenantId },
+        });
+        if (!existing) throw new NotFoundException('Site / property not found');
+      } else {
+        const clientUserId = body.clientUserId?.trim();
+        if (!clientUserId) {
+          throw new BadRequestException('Select a customer or an existing site');
+        }
+        if (!body.site?.name?.trim() || !body.site?.address?.trim()) {
+          throw new BadRequestException('Site name and address are required');
+        }
+        const client = await tx.user.findFirst({
+          where: { id: clientUserId, tenantId },
+        });
+        if (!client) throw new NotFoundException('Customer not found');
+
+        const property = await tx.property.create({
+          data: {
+            tenantId,
+            userId: clientUserId,
+            name: body.site.name.trim(),
+            address: body.site.address.trim(),
+            propertyType,
+            accessNotes: body.site.accessNotes?.trim() || null,
+            gateCode: body.site.gateCode?.trim() || null,
+            camerasLinked: true,
+            monitoringEnabled: true,
+          },
+        });
+        propertyId = property.id;
+      }
+
+      const system = await tx.cctvSystem.create({
+        data: {
+          tenantId,
+          propertyId,
+          name: body.system.name.trim(),
+          brand: body.system.brand?.trim() || null,
+          model: body.system.model?.trim() || null,
+          kitSku: body.system.kitSku?.trim() || null,
+          supplier: body.system.supplier?.trim() || null,
+          recorderType,
+          channelCount,
+          connectivity,
+          recorderSerial: body.system.recorderSerial?.trim() || null,
+          recorderIp: body.system.recorderIp?.trim() || null,
+          cloudId: body.system.cloudId?.trim() || null,
+          hddInstalled: Boolean(body.system.hddInstalled),
+          hddSerial: body.system.hddSerial?.trim() || null,
+          hddCapacityGb: body.system.hddCapacityGb ?? null,
+          firmware: body.system.firmware?.trim() || null,
+          mobileAppEnabled: body.system.mobileAppEnabled !== false,
+          techNotes: body.system.techNotes?.trim() || null,
+          status,
+          installedAt: status === CctvSystemStatus.ONLINE ? new Date() : null,
+        },
+      });
+
+      for (let i = 0; i < cameras.length; i += 1) {
+        const cam = cameras[i];
+        await tx.camera.create({
+          data: {
+            tenantId,
+            propertyId,
+            systemId: system.id,
+            name: cam.name.trim() || `Camera ${i + 1}`,
+            locationLabel: cam.locationLabel.trim() || `Channel ${i + 1}`,
+            channel: cam.channel ?? i + 1,
+            placement:
+              cam.placement === 'INTERIOR'
+                ? CameraPlacement.INTERIOR
+                : CameraPlacement.EXTERIOR,
+            vendor: cam.vendor?.trim() || body.system.brand?.trim() || '4DS Nexus',
+            model: cam.model?.trim() || null,
+            serialNumber: cam.serialNumber?.trim() || null,
+            resolution: cam.resolution?.trim() || null,
+            status: CameraStatus.ONLINE,
+            lastSeenAt: new Date(),
+          },
+        });
+      }
+
+      await tx.property.update({
+        where: { id: propertyId },
+        data: { camerasLinked: true, monitoringEnabled: true },
+      });
+
+      return tx.cctvSystem.findFirstOrThrow({
+        where: { id: system.id },
+        include: {
+          property: {
+            select: {
+              id: true,
+              name: true,
+              address: true,
+              propertyType: true,
+              user: { select: { id: true, firstName: true, lastName: true, email: true } },
+            },
+          },
+          cameras: { orderBy: { channel: 'asc' } },
+        },
+      });
+    });
+
+    return { success: true, data: this.formatCctvSystem(created) };
+  }
+
+  async updateCctvSystem(
+    tenantId: string,
+    id: string,
+    body: {
+      name?: string;
+      brand?: string;
+      model?: string;
+      kitSku?: string;
+      supplier?: string;
+      recorderType?: string;
+      channelCount?: number;
+      connectivity?: string;
+      recorderSerial?: string;
+      recorderIp?: string;
+      cloudId?: string;
+      hddInstalled?: boolean;
+      hddSerial?: string;
+      hddCapacityGb?: number | null;
+      firmware?: string;
+      mobileAppEnabled?: boolean;
+      techNotes?: string;
+      status?: string;
+      cameras?: Array<{
+        id?: string;
+        name: string;
+        locationLabel: string;
+        channel?: number;
+        serialNumber?: string;
+        model?: string;
+        resolution?: string;
+        placement?: 'EXTERIOR' | 'INTERIOR';
+        vendor?: string;
+      }>;
+    },
+  ) {
+    const existing = await this.prisma.cctvSystem.findFirst({
+      where: { id, tenantId },
+    });
+    if (!existing) throw new NotFoundException('CCTV system not found');
+
+    const updated = await this.prisma.$transaction(async (tx) => {
+      await tx.cctvSystem.update({
+        where: { id },
+        data: {
+          name: body.name?.trim() || undefined,
+          brand: body.brand !== undefined ? body.brand.trim() || null : undefined,
+          model: body.model !== undefined ? body.model.trim() || null : undefined,
+          kitSku: body.kitSku !== undefined ? body.kitSku.trim() || null : undefined,
+          supplier: body.supplier !== undefined ? body.supplier.trim() || null : undefined,
+          recorderType: body.recorderType
+            ? parseRecorderType(body.recorderType)
+            : undefined,
+          channelCount:
+            body.channelCount !== undefined
+              ? Math.min(64, Math.max(1, body.channelCount))
+              : undefined,
+          connectivity: body.connectivity
+            ? parseConnectivity(body.connectivity)
+            : undefined,
+          recorderSerial:
+            body.recorderSerial !== undefined
+              ? body.recorderSerial.trim() || null
+              : undefined,
+          recorderIp:
+            body.recorderIp !== undefined ? body.recorderIp.trim() || null : undefined,
+          cloudId: body.cloudId !== undefined ? body.cloudId.trim() || null : undefined,
+          hddInstalled:
+            body.hddInstalled !== undefined ? Boolean(body.hddInstalled) : undefined,
+          hddSerial:
+            body.hddSerial !== undefined ? body.hddSerial.trim() || null : undefined,
+          hddCapacityGb:
+            body.hddCapacityGb !== undefined ? body.hddCapacityGb : undefined,
+          firmware:
+            body.firmware !== undefined ? body.firmware.trim() || null : undefined,
+          mobileAppEnabled:
+            body.mobileAppEnabled !== undefined
+              ? Boolean(body.mobileAppEnabled)
+              : undefined,
+          techNotes:
+            body.techNotes !== undefined ? body.techNotes.trim() || null : undefined,
+          status: body.status ? parseSystemStatus(body.status) : undefined,
+          installedAt:
+            body.status && parseSystemStatus(body.status) === CctvSystemStatus.ONLINE
+              ? existing.installedAt ?? new Date()
+              : undefined,
+        },
+      });
+
+      if (body.cameras?.length) {
+        for (let i = 0; i < body.cameras.length; i += 1) {
+          const cam = body.cameras[i];
+          const data = {
+            name: cam.name.trim() || `Camera ${i + 1}`,
+            locationLabel: cam.locationLabel.trim() || `Channel ${i + 1}`,
+            channel: cam.channel ?? i + 1,
+            placement:
+              cam.placement === 'INTERIOR'
+                ? CameraPlacement.INTERIOR
+                : CameraPlacement.EXTERIOR,
+            vendor: cam.vendor?.trim() || null,
+            model: cam.model?.trim() || null,
+            serialNumber: cam.serialNumber?.trim() || null,
+            resolution: cam.resolution?.trim() || null,
+          };
+          if (cam.id) {
+            await tx.camera.updateMany({
+              where: { id: cam.id, tenantId, systemId: id },
+              data,
+            });
+          } else {
+            await tx.camera.create({
+              data: {
+                tenantId,
+                propertyId: existing.propertyId,
+                systemId: id,
+                status: CameraStatus.ONLINE,
+                lastSeenAt: new Date(),
+                ...data,
+              },
+            });
+          }
+        }
+      }
+
+      return tx.cctvSystem.findFirstOrThrow({
+        where: { id },
+        include: {
+          property: {
+            select: {
+              id: true,
+              name: true,
+              address: true,
+              propertyType: true,
+              user: { select: { id: true, firstName: true, lastName: true, email: true } },
+            },
+          },
+          cameras: { orderBy: { channel: 'asc' } },
+        },
+      });
+    });
+
+    return { success: true, data: this.formatCctvSystem(updated) };
+  }
+
+  private formatAlarmSystem(
+    system: {
+      id: string;
+      propertyId: string;
+      name: string;
+      brand: string | null;
+      model: string | null;
+      kitSku: string | null;
+      supplier: string | null;
+      connectivity: AlarmPanelConnectivity;
+      panelSerial: string | null;
+      imei: string | null;
+      simIccid: string | null;
+      wifiMac: string | null;
+      wifiSsid: string | null;
+      cloudId: string | null;
+      appAccount: string | null;
+      wirelessFrequency: string | null;
+      wirelessCoding: string | null;
+      gsmBands: string | null;
+      wifiStandard: string | null;
+      inputVoltage: string | null;
+      backupBattery: string | null;
+      icasaCert: string | null;
+      rfidEnabled: boolean;
+      touchKeypad: boolean;
+      mobileAppEnabled: boolean;
+      zoneCount: number;
+      firmware: string | null;
+      techNotes: string | null;
+      status: AlarmSystemStatus;
+      installedAt: Date | null;
+      createdAt: Date;
+      updatedAt: Date;
+      property?: {
+        id: string;
+        name: string;
+        address: string;
+        propertyType: PropertyType;
+        user?: { id: string; firstName: string; lastName: string; email: string };
+      };
+    },
+  ) {
+    return {
+      id: system.id,
+      propertyId: system.propertyId,
+      name: system.name,
+      brand: system.brand,
+      model: system.model,
+      kitSku: system.kitSku,
+      supplier: system.supplier,
+      connectivity: system.connectivity,
+      panelSerial: system.panelSerial,
+      imei: system.imei,
+      simIccid: system.simIccid,
+      wifiMac: system.wifiMac,
+      wifiSsid: system.wifiSsid,
+      cloudId: system.cloudId,
+      appAccount: system.appAccount,
+      wirelessFrequency: system.wirelessFrequency,
+      wirelessCoding: system.wirelessCoding,
+      gsmBands: system.gsmBands,
+      wifiStandard: system.wifiStandard,
+      inputVoltage: system.inputVoltage,
+      backupBattery: system.backupBattery,
+      icasaCert: system.icasaCert,
+      rfidEnabled: system.rfidEnabled,
+      touchKeypad: system.touchKeypad,
+      mobileAppEnabled: system.mobileAppEnabled,
+      zoneCount: system.zoneCount,
+      firmware: system.firmware,
+      techNotes: system.techNotes,
+      status: system.status,
+      installedAt: system.installedAt,
+      createdAt: system.createdAt,
+      updatedAt: system.updatedAt,
+      property: system.property
+        ? {
+            id: system.property.id,
+            name: system.property.name,
+            address: system.property.address,
+            propertyType: system.property.propertyType,
+            client: system.property.user
+              ? {
+                  id: system.property.user.id,
+                  name: `${system.property.user.firstName} ${system.property.user.lastName}`.trim(),
+                  email: system.property.user.email,
+                }
+              : null,
+          }
+        : null,
+    };
+  }
+
+  async listAlarmSystems(tenantId: string) {
+    const systems = await this.prisma.alarmSystem.findMany({
+      where: { tenantId },
+      include: {
+        property: {
+          select: {
+            id: true,
+            name: true,
+            address: true,
+            propertyType: true,
+            user: { select: { id: true, firstName: true, lastName: true, email: true } },
+          },
+        },
+      },
+      orderBy: { updatedAt: 'desc' },
+      take: 200,
+    });
+    return {
+      success: true,
+      data: {
+        presets: ALARM_PANEL_PRESETS,
+        siteTypes: SITE_TYPE_OPTIONS,
+        systems: systems.map((s) => this.formatAlarmSystem(s)),
+      },
+    };
+  }
+
+  async getAlarmSystem(tenantId: string, id: string) {
+    const system = await this.prisma.alarmSystem.findFirst({
+      where: { id, tenantId },
+      include: {
+        property: {
+          select: {
+            id: true,
+            name: true,
+            address: true,
+            propertyType: true,
+            user: { select: { id: true, firstName: true, lastName: true, email: true } },
+          },
+        },
+      },
+    });
+    if (!system) throw new NotFoundException('Alarm system not found');
+    return { success: true, data: this.formatAlarmSystem(system) };
+  }
+
+  async registerAlarmSystem(
+    tenantId: string,
+    body: {
+      propertyId?: string;
+      clientUserId?: string;
+      site?: {
+        name: string;
+        address: string;
+        propertyType?: string;
+        accessNotes?: string;
+        gateCode?: string;
+      };
+      system: {
+        name: string;
+        brand?: string;
+        model?: string;
+        kitSku?: string;
+        supplier?: string;
+        connectivity?: string;
+        panelSerial?: string;
+        imei?: string;
+        simIccid?: string;
+        wifiMac?: string;
+        wifiSsid?: string;
+        cloudId?: string;
+        appAccount?: string;
+        wirelessFrequency?: string;
+        wirelessCoding?: string;
+        gsmBands?: string;
+        wifiStandard?: string;
+        inputVoltage?: string;
+        backupBattery?: string;
+        icasaCert?: string;
+        rfidEnabled?: boolean;
+        touchKeypad?: boolean;
+        mobileAppEnabled?: boolean;
+        zoneCount?: number;
+        firmware?: string;
+        techNotes?: string;
+        status?: string;
+      };
+    },
+  ) {
+    if (!body?.system?.name?.trim()) {
+      throw new BadRequestException('Panel name is required');
+    }
+
+    const propertyType = parsePropertyType(body.site?.propertyType);
+    const connectivity = parseAlarmConnectivity(body.system.connectivity);
+    const status = parseAlarmStatus(body.system.status);
+
+    const created = await this.prisma.$transaction(async (tx) => {
+      let propertyId = body.propertyId?.trim() || '';
+
+      if (propertyId) {
+        const existing = await tx.property.findFirst({
+          where: { id: propertyId, tenantId },
+        });
+        if (!existing) throw new NotFoundException('Site / property not found');
+      } else {
+        const clientUserId = body.clientUserId?.trim();
+        if (!clientUserId) {
+          throw new BadRequestException('Select a customer or an existing site');
+        }
+        if (!body.site?.name?.trim() || !body.site?.address?.trim()) {
+          throw new BadRequestException('Site name and address are required');
+        }
+        const client = await tx.user.findFirst({
+          where: { id: clientUserId, tenantId },
+        });
+        if (!client) throw new NotFoundException('Customer not found');
+
+        const property = await tx.property.create({
+          data: {
+            tenantId,
+            userId: clientUserId,
+            name: body.site.name.trim(),
+            address: body.site.address.trim(),
+            propertyType,
+            accessNotes: body.site.accessNotes?.trim() || null,
+            gateCode: body.site.gateCode?.trim() || null,
+            alarmLinked: true,
+            monitoringEnabled: true,
+            panelVendor: body.system.brand?.trim() || null,
+            panelModel: body.system.model?.trim() || null,
+            communicatorType: connectivity,
+          },
+        });
+        propertyId = property.id;
+      }
+
+      const system = await tx.alarmSystem.create({
+        data: {
+          tenantId,
+          propertyId,
+          name: body.system.name.trim(),
+          brand: body.system.brand?.trim() || null,
+          model: body.system.model?.trim() || null,
+          kitSku: body.system.kitSku?.trim() || null,
+          supplier: body.system.supplier?.trim() || null,
+          connectivity,
+          panelSerial: body.system.panelSerial?.trim() || null,
+          imei: body.system.imei?.trim() || null,
+          simIccid: body.system.simIccid?.trim() || null,
+          wifiMac: body.system.wifiMac?.trim() || null,
+          wifiSsid: body.system.wifiSsid?.trim() || null,
+          cloudId: body.system.cloudId?.trim() || null,
+          appAccount: body.system.appAccount?.trim() || null,
+          wirelessFrequency: body.system.wirelessFrequency?.trim() || null,
+          wirelessCoding: body.system.wirelessCoding?.trim() || null,
+          gsmBands: body.system.gsmBands?.trim() || null,
+          wifiStandard: body.system.wifiStandard?.trim() || null,
+          inputVoltage: body.system.inputVoltage?.trim() || null,
+          backupBattery: body.system.backupBattery?.trim() || null,
+          icasaCert: body.system.icasaCert?.trim() || null,
+          rfidEnabled: body.system.rfidEnabled !== false,
+          touchKeypad: body.system.touchKeypad !== false,
+          mobileAppEnabled: body.system.mobileAppEnabled !== false,
+          zoneCount: Math.max(0, body.system.zoneCount ?? 0),
+          firmware: body.system.firmware?.trim() || null,
+          techNotes: body.system.techNotes?.trim() || null,
+          status,
+          installedAt: status === AlarmSystemStatus.ONLINE ? new Date() : null,
+        },
+      });
+
+      await tx.property.update({
+        where: { id: propertyId },
+        data: {
+          alarmLinked: true,
+          monitoringEnabled: true,
+          panelVendor: body.system.brand?.trim() || undefined,
+          panelModel: body.system.model?.trim() || undefined,
+          communicatorType: connectivity,
+        },
+      });
+
+      return tx.alarmSystem.findFirstOrThrow({
+        where: { id: system.id },
+        include: {
+          property: {
+            select: {
+              id: true,
+              name: true,
+              address: true,
+              propertyType: true,
+              user: { select: { id: true, firstName: true, lastName: true, email: true } },
+            },
+          },
+        },
+      });
+    });
+
+    return { success: true, data: this.formatAlarmSystem(created) };
+  }
+
+  async updateAlarmSystem(
+    tenantId: string,
+    id: string,
+    body: {
+      name?: string;
+      brand?: string;
+      model?: string;
+      kitSku?: string;
+      supplier?: string;
+      connectivity?: string;
+      panelSerial?: string;
+      imei?: string;
+      simIccid?: string;
+      wifiMac?: string;
+      wifiSsid?: string;
+      cloudId?: string;
+      appAccount?: string;
+      wirelessFrequency?: string;
+      wirelessCoding?: string;
+      gsmBands?: string;
+      wifiStandard?: string;
+      inputVoltage?: string;
+      backupBattery?: string;
+      icasaCert?: string;
+      rfidEnabled?: boolean;
+      touchKeypad?: boolean;
+      mobileAppEnabled?: boolean;
+      zoneCount?: number;
+      firmware?: string;
+      techNotes?: string;
+      status?: string;
+    },
+  ) {
+    const existing = await this.prisma.alarmSystem.findFirst({
+      where: { id, tenantId },
+    });
+    if (!existing) throw new NotFoundException('Alarm system not found');
+
+    const updated = await this.prisma.$transaction(async (tx) => {
+      await tx.alarmSystem.update({
+        where: { id },
+        data: {
+          name: body.name?.trim() || undefined,
+          brand: body.brand !== undefined ? body.brand.trim() || null : undefined,
+          model: body.model !== undefined ? body.model.trim() || null : undefined,
+          kitSku: body.kitSku !== undefined ? body.kitSku.trim() || null : undefined,
+          supplier: body.supplier !== undefined ? body.supplier.trim() || null : undefined,
+          connectivity: body.connectivity
+            ? parseAlarmConnectivity(body.connectivity)
+            : undefined,
+          panelSerial:
+            body.panelSerial !== undefined ? body.panelSerial.trim() || null : undefined,
+          imei: body.imei !== undefined ? body.imei.trim() || null : undefined,
+          simIccid: body.simIccid !== undefined ? body.simIccid.trim() || null : undefined,
+          wifiMac: body.wifiMac !== undefined ? body.wifiMac.trim() || null : undefined,
+          wifiSsid: body.wifiSsid !== undefined ? body.wifiSsid.trim() || null : undefined,
+          cloudId: body.cloudId !== undefined ? body.cloudId.trim() || null : undefined,
+          appAccount:
+            body.appAccount !== undefined ? body.appAccount.trim() || null : undefined,
+          wirelessFrequency:
+            body.wirelessFrequency !== undefined
+              ? body.wirelessFrequency.trim() || null
+              : undefined,
+          wirelessCoding:
+            body.wirelessCoding !== undefined
+              ? body.wirelessCoding.trim() || null
+              : undefined,
+          gsmBands: body.gsmBands !== undefined ? body.gsmBands.trim() || null : undefined,
+          wifiStandard:
+            body.wifiStandard !== undefined ? body.wifiStandard.trim() || null : undefined,
+          inputVoltage:
+            body.inputVoltage !== undefined ? body.inputVoltage.trim() || null : undefined,
+          backupBattery:
+            body.backupBattery !== undefined ? body.backupBattery.trim() || null : undefined,
+          icasaCert:
+            body.icasaCert !== undefined ? body.icasaCert.trim() || null : undefined,
+          rfidEnabled:
+            body.rfidEnabled !== undefined ? Boolean(body.rfidEnabled) : undefined,
+          touchKeypad:
+            body.touchKeypad !== undefined ? Boolean(body.touchKeypad) : undefined,
+          mobileAppEnabled:
+            body.mobileAppEnabled !== undefined
+              ? Boolean(body.mobileAppEnabled)
+              : undefined,
+          zoneCount: body.zoneCount !== undefined ? Math.max(0, body.zoneCount) : undefined,
+          firmware: body.firmware !== undefined ? body.firmware.trim() || null : undefined,
+          techNotes:
+            body.techNotes !== undefined ? body.techNotes.trim() || null : undefined,
+          status: body.status ? parseAlarmStatus(body.status) : undefined,
+          installedAt:
+            body.status && parseAlarmStatus(body.status) === AlarmSystemStatus.ONLINE
+              ? existing.installedAt ?? new Date()
+              : undefined,
+        },
+      });
+
+      if (body.brand || body.model || body.connectivity) {
+        await tx.property.update({
+          where: { id: existing.propertyId },
+          data: {
+            alarmLinked: true,
+            panelVendor: body.brand?.trim() || undefined,
+            panelModel: body.model?.trim() || undefined,
+            communicatorType: body.connectivity
+              ? parseAlarmConnectivity(body.connectivity)
+              : undefined,
+          },
+        });
+      }
+
+      return tx.alarmSystem.findFirstOrThrow({
+        where: { id },
+        include: {
+          property: {
+            select: {
+              id: true,
+              name: true,
+              address: true,
+              propertyType: true,
+              user: { select: { id: true, firstName: true, lastName: true, email: true } },
+            },
+          },
+        },
+      });
+    });
+
+    return { success: true, data: this.formatAlarmSystem(updated) };
+  }
+}
+
+export const SITE_TYPE_OPTIONS = [
+  { value: 'HOUSE', label: 'House' },
+  { value: 'APARTMENT', label: 'Apartment' },
+  { value: 'TOWNHOUSE', label: 'Townhouse' },
+  { value: 'ESTATE', label: 'Estate' },
+  { value: 'BUSINESS', label: 'Business' },
+  { value: 'STORE', label: 'Store' },
+  { value: 'MALL', label: 'Mall' },
+  { value: 'OFFICE', label: 'Office' },
+  { value: 'BRANCH', label: 'Branch' },
+  { value: 'WAREHOUSE', label: 'Warehouse' },
+] as const;
+
+export const CCTV_KIT_PRESETS = [
+  {
+    id: 'hilook-4ch',
+    label: 'HiLook 4-Channel Analog Kit',
+    brand: 'HiLook',
+    model: '4 Channel CCTV Kit',
+    kitSku: 'HILOOK-4CH',
+    supplier: 'Makro / Hikvision channel',
+    recorderType: 'DVR',
+    channelCount: 4,
+    connectivity: 'ANALOG',
+    resolution: '2MP',
+    hddInstalled: false,
+    mobileAppEnabled: true,
+    cameraLabels: ['Front entrance', 'Side alley', 'Parking', 'Rear yard'],
+  },
+  {
+    id: 'dahua-8ch',
+    label: 'Dahua 2MP Bullet 8-Channel Kit',
+    brand: 'Dahua',
+    model: '2Mp Bullet 8Ch Full Kit',
+    kitSku: 'DAHUA-2MP-8CH',
+    supplier: 'Makro',
+    recorderType: 'NVR',
+    channelCount: 8,
+    connectivity: 'LAN',
+    resolution: '2MP',
+    hddInstalled: false,
+    mobileAppEnabled: true,
+    cameraLabels: [
+      'Entrance',
+      'Parking A',
+      'Parking B',
+      'Loading bay',
+      'Corridor',
+      'Till area',
+      'Stock room',
+      'Perimeter rear',
+    ],
+  },
+  {
+    id: 'proview-ahd-4ch',
+    label: 'Pro View 4-Channel AHD Kit',
+    brand: 'Pro View',
+    model: '4 CHANNEL AHD CCTV KIT',
+    kitSku: 'PROVIEW-AHD-4',
+    supplier: 'Big Brother Security Wholesalers',
+    recorderType: 'DVR',
+    channelCount: 4,
+    connectivity: 'AHD',
+    resolution: 'AHD',
+    hddInstalled: false,
+    mobileAppEnabled: true,
+    cameraLabels: ['Front gate', 'Driveway', 'Backyard', 'Garage'],
+  },
+] as const;
+
+export const ALARM_PANEL_PRESETS = [
+  {
+    id: 'mixbox-pg103',
+    label: 'mixbox PG-103 WiFi+4G Dual Network',
+    brand: 'mixbox',
+    model: 'PG-103',
+    kitSku: 'MIXBOX-PG103',
+    supplier: 'ICASA TA-2021/3152',
+    connectivity: 'WIFI_4G',
+    wirelessFrequency: '433.92MHz',
+    wirelessCoding: 'EV1527',
+    gsmBands: '2G/4G',
+    wifiStandard: 'IEEE802.11b/g/n',
+    inputVoltage: 'DC5V (TYPE-C)',
+    backupBattery: '3.7V/1000mAh lithium',
+    icasaCert: 'TA-2021/3152',
+    rfidEnabled: true,
+    touchKeypad: true,
+    mobileAppEnabled: true,
+    zoneCount: 0,
+  },
+  {
+    id: 'paradox-mg5050',
+    label: 'Paradox MG5050 Dual-Path',
+    brand: 'Paradox',
+    model: 'MG5050',
+    kitSku: 'PARADOX-MG5050',
+    supplier: 'Paradox Security',
+    connectivity: 'DUAL_PATH',
+    wirelessFrequency: null,
+    wirelessCoding: null,
+    gsmBands: null,
+    wifiStandard: null,
+    inputVoltage: null,
+    backupBattery: null,
+    icasaCert: null,
+    rfidEnabled: false,
+    touchKeypad: true,
+    mobileAppEnabled: true,
+    zoneCount: 8,
+  },
+] as const;
+
+function parsePropertyType(value?: string): PropertyType {
+  const allowed = Object.values(PropertyType) as string[];
+  if (value && allowed.includes(value)) return value as PropertyType;
+  return PropertyType.HOUSE;
+}
+
+function parseRecorderType(value?: string): CctvRecorderType {
+  const allowed = Object.values(CctvRecorderType) as string[];
+  if (value && allowed.includes(value)) return value as CctvRecorderType;
+  return CctvRecorderType.DVR;
+}
+
+function parseConnectivity(value?: string): CctvConnectivity {
+  const allowed = Object.values(CctvConnectivity) as string[];
+  if (value && allowed.includes(value)) return value as CctvConnectivity;
+  return CctvConnectivity.AHD;
+}
+
+function parseSystemStatus(value?: string): CctvSystemStatus {
+  const allowed = Object.values(CctvSystemStatus) as string[];
+  if (value && allowed.includes(value)) return value as CctvSystemStatus;
+  return CctvSystemStatus.COMMISSIONING;
+}
+
+function parseAlarmConnectivity(value?: string): AlarmPanelConnectivity {
+  const allowed = Object.values(AlarmPanelConnectivity) as string[];
+  if (value && allowed.includes(value)) return value as AlarmPanelConnectivity;
+  return AlarmPanelConnectivity.WIFI_4G;
+}
+
+function parseAlarmStatus(value?: string): AlarmSystemStatus {
+  const allowed = Object.values(AlarmSystemStatus) as string[];
+  if (value && allowed.includes(value)) return value as AlarmSystemStatus;
+  return AlarmSystemStatus.COMMISSIONING;
 }

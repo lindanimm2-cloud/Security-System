@@ -10,7 +10,7 @@ type HoldToActivateProps = {
   disabled?: boolean;
   loading?: boolean;
   className?: string;
-  tone?: 'danger' | 'warn' | 'medical';
+  tone?: 'danger' | 'warn' | 'medical' | 'neutral';
   hideHint?: boolean;
   keepLabel?: boolean;
   children?: ReactNode;
@@ -88,6 +88,7 @@ export function HoldToActivate({
       className={`hold-activate hold-activate--${tone} ${holding ? 'hold-activate--holding' : ''} ${className}`.trim()}
       disabled={disabled || loading}
       aria-label={`${label}. Hold for ${Math.round(holdMs / 1000)} seconds to activate.`}
+      style={{ ['--hold-progress' as string]: String(progress) }}
       onPointerDown={(e) => {
         e.preventDefault();
         (e.currentTarget as HTMLButtonElement).setPointerCapture(e.pointerId);
@@ -120,6 +121,65 @@ export function HoldToActivate({
         <span className="hold-activate__hint">{Math.round(holdMs / 1000)}s hold</span>
       )}
     </button>
+  );
+}
+
+export function OpsSirenIcon() {
+  return (
+    <svg className="hold-activate__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" aria-hidden>
+      <path d="M12 3v3" />
+      <path d="M5.6 7.6 7.7 9.7" />
+      <path d="M18.4 7.6 16.3 9.7" />
+      <path d="M8 14a4 4 0 0 1 8 0v2H8v-2Z" />
+      <path d="M6 16h12v2a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2v-2Z" />
+    </svg>
+  );
+}
+
+export function OpsDisarmIcon() {
+  return (
+    <svg className="hold-activate__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" aria-hidden>
+      <path d="M12 3 5 6v6c0 5 3.5 7.5 7 9 3.5-1.5 7-4 7-9V6l-7-3Z" />
+      <path d="m9.5 12 1.8 1.8 3.7-3.7" />
+    </svg>
+  );
+}
+
+export function OpsPanicIcon() {
+  return (
+    <svg className="hold-activate__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" aria-hidden>
+      <path d="M12 9v4" />
+      <path d="M12 17h.01" />
+      <path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z" />
+    </svg>
+  );
+}
+
+export function OpsMedicalIcon() {
+  return (
+    <svg className="hold-activate__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" aria-hidden>
+      <path d="M7 10V7a5 5 0 0 1 10 0v3" />
+      <rect x="4" y="10" width="16" height="11" rx="2" />
+      <path d="M12 13v5" />
+      <path d="M9.5 15.5h5" />
+    </svg>
+  );
+}
+
+export function OpsFireIcon() {
+  return (
+    <svg className="hold-activate__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" aria-hidden>
+      <path d="M12 3c2 3 1 5-1 7 3 0 6 2 6 6a5 5 0 0 1-10 0c0-3 2-5 3-7-2 1-3 3-3 5a7 7 0 0 0 14 0c0-5-4-8-9-11Z" />
+    </svg>
+  );
+}
+
+export function OpsDeviceIcon() {
+  return (
+    <svg className="hold-activate__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" aria-hidden>
+      <rect x="7" y="2" width="10" height="20" rx="2" />
+      <path d="M11 18h2" />
+    </svg>
   );
 }
 

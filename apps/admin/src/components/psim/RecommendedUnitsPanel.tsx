@@ -48,7 +48,7 @@ export function RecommendedUnitsPanel({
     <div className={`psim-units ${compact ? 'psim-units--compact' : ''}`}>
       <header className="psim-units__head">
         <strong>Recommended units</strong>
-        <span className="text-muted">Rules engine · zone + skills</span>
+        <span className="psim-units__engine">Rules engine · zone + skills</span>
       </header>
       <ul className="psim-units__list">
         {candidates.map((c, i) => (
@@ -58,6 +58,7 @@ export function RecommendedUnitsPanel({
             rank={i + 1}
             incidentId={incidentId}
             onAssigned={onAssigned}
+            topPick={i === 0}
           />
         ))}
       </ul>
@@ -70,29 +71,39 @@ function UnitRow({
   rank,
   incidentId,
   onAssigned,
+  topPick,
 }: {
   candidate: DispatchCandidate;
   rank: number;
   incidentId: string;
   onAssigned?: () => void;
+  topPick?: boolean;
 }) {
   return (
-    <li className="psim-units__row">
-      <span className="psim-units__rank">{rank}</span>
+    <li className={`psim-units__row ${topPick ? 'psim-units__row--top' : ''}`}>
+      <span className="psim-units__rank" aria-hidden>
+        {rank}
+      </span>
       <div className="psim-units__body">
-        <strong>
+        <strong className="psim-units__name">
           {candidate.callSign ? `${candidate.callSign} · ` : ''}
           {candidate.name}
         </strong>
-        <span className="text-muted">
+        <span className="psim-units__meta">
           {candidate.zone} · {(candidate.status ?? 'UNKNOWN').replace(/_/g, ' ')}
           {candidate.etaMin ? ` · ~${candidate.etaMin} min` : ''}
         </span>
-        <span className="psim-units__reasons">{candidate.reasons.join(' · ')}</span>
+        {candidate.reasons.length > 0 ? (
+          <ul className="psim-units__reasons">
+            {candidate.reasons.map((reason) => (
+              <li key={reason}>{reason}</li>
+            ))}
+          </ul>
+        ) : null}
       </div>
       <DispatchMenuButton
         incidentId={incidentId}
-        className="btn-sm psim-units__assign"
+        className={`ops-act psim-units__assign ${topPick ? 'ops-act--dispatch psim-units__assign--primary' : ''}`}
         label="Assign"
         onAssigned={onAssigned}
       />

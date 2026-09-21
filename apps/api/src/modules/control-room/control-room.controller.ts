@@ -12,6 +12,7 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
+import { TenantGuard } from '../../common/guards/tenant.guard';
 import { ADMIN_PORTAL_ROLES, OPS_ROLES } from '../../common/developer-access';
 import { SurveillanceService, type ArmMode } from '../surveillance/surveillance.service';
 import { ClientService } from '../client/client.service';
@@ -26,7 +27,7 @@ type AuthUser = {
 };
 
 @Controller('control-room')
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, RolesGuard, TenantGuard)
 @Roles(...ADMIN_PORTAL_ROLES)
 export class ControlRoomController {
   constructor(
@@ -106,6 +107,125 @@ export class ControlRoomController {
       actorUserId: user.id,
       force: body?.force ?? true,
     });
+  }
+
+  @Post('surveillance/sensors/:id/health')
+  @Roles(...OPS_ROLES)
+  sensorHealth(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Body() body: { status: 'FAULT' | 'OFFLINE' | 'TAMPER' | 'NORMAL' },
+  ) {
+    return this.surveillanceService.setSensorHealth(user.tenantId, id, body.status as never, {
+      actorUserId: user.id,
+    });
+  }
+
+  @Get('cctv-systems')
+  listCctvSystems(@CurrentUser() user: AuthUser) {
+    return this.surveillanceService.listCctvSystems(user.tenantId);
+  }
+
+  @Get('cctv-systems/:id')
+  getCctvSystem(@CurrentUser() user: AuthUser, @Param('id') id: string) {
+    return this.surveillanceService.getCctvSystem(user.tenantId, id);
+  }
+
+  @Post('cctv-systems')
+  registerCctvSystem(
+    @CurrentUser() user: AuthUser,
+    @Body()
+    body: {
+      propertyId?: string;
+      clientUserId?: string;
+      site?: {
+        name: string;
+        address: string;
+        propertyType?: string;
+        accessNotes?: string;
+        gateCode?: string;
+      };
+      system: {
+        name: string;
+        brand?: string;
+        model?: string;
+        kitSku?: string;
+        supplier?: string;
+        recorderType?: string;
+        channelCount?: number;
+        connectivity?: string;
+        recorderSerial?: string;
+        recorderIp?: string;
+        cloudId?: string;
+        hddInstalled?: boolean;
+        hddSerial?: string;
+        hddCapacityGb?: number;
+        firmware?: string;
+        mobileAppEnabled?: boolean;
+        techNotes?: string;
+        status?: string;
+      };
+      cameras?: Array<{
+        name: string;
+        locationLabel: string;
+        channel?: number;
+        serialNumber?: string;
+        model?: string;
+        resolution?: string;
+        placement?: 'EXTERIOR' | 'INTERIOR';
+        vendor?: string;
+      }>;
+    },
+  ) {
+    return this.surveillanceService.registerCctvSystem(user.tenantId, body);
+  }
+
+  @Patch('cctv-systems/:id')
+  updateCctvSystem(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Body() body: Record<string, unknown>,
+  ) {
+    return this.surveillanceService.updateCctvSystem(user.tenantId, id, body as never);
+  }
+
+  @Get('alarm-systems')
+  listAlarmSystems(@CurrentUser() user: AuthUser) {
+    return this.surveillanceService.listAlarmSystems(user.tenantId);
+  }
+
+  @Get('alarm-systems/:id')
+  getAlarmSystem(@CurrentUser() user: AuthUser, @Param('id') id: string) {
+    return this.surveillanceService.getAlarmSystem(user.tenantId, id);
+  }
+
+  @Post('alarm-systems')
+  registerAlarmSystem(
+    @CurrentUser() user: AuthUser,
+    @Body()
+    body: {
+      propertyId?: string;
+      clientUserId?: string;
+      site?: {
+        name: string;
+        address: string;
+        propertyType?: string;
+        accessNotes?: string;
+        gateCode?: string;
+      };
+      system: Record<string, unknown>;
+    },
+  ) {
+    return this.surveillanceService.registerAlarmSystem(user.tenantId, body as never);
+  }
+
+  @Patch('alarm-systems/:id')
+  updateAlarmSystem(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Body() body: Record<string, unknown>,
+  ) {
+    return this.surveillanceService.updateAlarmSystem(user.tenantId, id, body as never);
   }
 
   @Get('map')
@@ -351,6 +471,21 @@ export class ControlRoomController {
     });
   }
 
+  @Patch('client-vehicles/:id/emergency-status')
+  clientVehicleEmergencyStatus(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Body() body: { status?: string },
+  ) {
+    return this.clientService.setVehicleEmergencyStatus({
+      tenantId: user.tenantId,
+      vehicleId: id,
+      status: body?.status,
+      actorUserId: user.id,
+      source: 'control-room',
+    });
+  }
+
   @Post('fleet')
   createFleet(
     @CurrentUser() user: AuthUser,
@@ -449,14 +584,29 @@ export class ControlRoomController {
     return this.controlRoomService.markAllNotificationsRead(user.tenantId);
   }
 
+  @Patch('notifications/clear-all')
+  clearAllNotifications(@CurrentUser() user: AuthUser) {
+    return this.controlRoomService.clearAllNotifications(user.tenantId);
+  }
+
   @Patch('notifications/:id/read')
   markNotificationRead(@CurrentUser() user: AuthUser, @Param('id') id: string) {
     return this.controlRoomService.markNotificationRead(user.tenantId, id);
   }
 
+  @Patch('notifications/:id/clear')
+  clearNotification(@CurrentUser() user: AuthUser, @Param('id') id: string) {
+    return this.controlRoomService.clearNotification(user.tenantId, id);
+  }
+
   @Get('users')
   users(@CurrentUser() user: AuthUser) {
     return this.controlRoomService.listUsers(user.tenantId);
+  }
+
+  @Get('families')
+  families(@CurrentUser() user: AuthUser) {
+    return this.controlRoomService.listFamilies(user.tenantId);
   }
 
   @Post('users')
@@ -475,6 +625,15 @@ export class ControlRoomController {
       avatarUrl?: string;
       branchId?: string | null;
       teamIds?: string[];
+      /** Link into an existing family group */
+      familyId?: string | null;
+      /** Or link under this primary client's household */
+      linkToClientId?: string | null;
+      /** Spouse, Child, Parent, Account holder, etc. */
+      familyRelationship?: string | null;
+      /** When creating a primary client, also start a family group */
+      createFamily?: boolean;
+      familyName?: string | null;
     },
   ) {
     return this.controlRoomService.createUser(user.tenantId, body, {
@@ -579,5 +738,26 @@ export class ControlRoomController {
     @Param('userId') userId: string,
   ) {
     return this.controlRoomService.removeTeamMember(user.tenantId, id, userId);
+  }
+
+  @Get('security-settings')
+  getSecuritySettings(@CurrentUser() user: AuthUser) {
+    return this.controlRoomService.getSecuritySettings(user.tenantId);
+  }
+
+  @Patch('security-settings')
+  updateSecuritySettings(
+    @CurrentUser() user: AuthUser,
+    @Body()
+    body: {
+      mfaOwners?: boolean;
+      mfaDispatchers?: boolean;
+      sessionMinutes?: string;
+      lockoutAttempts?: string;
+      passwordDays?: string;
+      deviceHeartbeat?: boolean;
+    },
+  ) {
+    return this.controlRoomService.updateSecuritySettings(user.tenantId, body);
   }
 }

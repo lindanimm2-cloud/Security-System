@@ -12,6 +12,16 @@ export type ReadinessItem = {
   detail?: string;
 };
 
+/** Optional / OS-gated items — warn only; never hard-fail the readiness score. */
+const OPTIONAL_READINESS = new Set([
+  'native-sos',
+  'crash-detection',
+  'crash-entitlement',
+  'apple-watch',
+  'vehicle-connection',
+  'voice-sos',
+]);
+
 const READINESS_HREF: Record<string, (ok: boolean) => { href: string; action: string }> = {
   primary: (ok) =>
     ok
@@ -23,6 +33,11 @@ const READINESS_HREF: Record<string, (ok: boolean) => { href: string; action: st
   contacts: () => ({ href: '/portal/contacts', action: 'Contacts' }),
   'panic-test': () => ({ href: '/portal/security#drill', action: 'Run drill' }),
   consent: () => ({ href: '/portal/security/legal', action: 'Record consent' }),
+  'crash-detection': () => ({ href: '/portal/security/permissions#voice-crash', action: 'Crash readiness' }),
+  'crash-entitlement': () => ({ href: '/portal/security/permissions#voice-crash', action: 'Fallbacks' }),
+  'apple-watch': () => ({ href: '/portal/security/permissions#voice-crash', action: 'Watch status' }),
+  'vehicle-connection': () => ({ href: '/portal/vehicles', action: 'Vehicles' }),
+  'voice-sos': () => ({ href: '/portal/security/permissions#voice-crash', action: 'Voice SOS settings' }),
 };
 
 export function EmergencyReadinessCard({
@@ -34,7 +49,7 @@ export function EmergencyReadinessCard({
   items: ReadinessItem[];
   embedded?: boolean;
 }) {
-  const required = items.filter((item) => item.id !== 'native-sos');
+  const required = items.filter((item) => !OPTIONAL_READINESS.has(item.id));
   const readyCount = required.filter((item) => item.ok).length;
   const blocked = required.some((item) => !item.ok && !item.warn);
   const tone = blocked ? 'warning' : 'success';
@@ -52,7 +67,7 @@ export function EmergencyReadinessCard({
           <p className="sec-ready__lede">
             {blocked
               ? 'Finish required items so control room can verify a response.'
-              : 'App protection is ready. Native SOS is device-controlled and not required for in-app Panic.'}
+              : 'App protection is ready. Native SOS and Crash Detection are device-controlled and not required for in-app Panic.'}
           </p>
         </div>
         <div className="sec-ready__score">
@@ -65,7 +80,7 @@ export function EmergencyReadinessCard({
 
       <ul className="sec-ready__list">
         {items.map((item) => {
-          const info = item.id === 'native-sos' || (item.warn && !item.ok);
+          const info = OPTIONAL_READINESS.has(item.id) || (item.warn && !item.ok);
           const state = item.ok ? 'ok' : info ? 'info' : 'fail';
           const dest = READINESS_HREF[item.id]?.(item.ok);
           const inner = (

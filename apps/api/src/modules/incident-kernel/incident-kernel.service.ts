@@ -15,6 +15,7 @@ import {
   UserRole,
 } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
+import { AlertEscalationService } from '../alerts/alert-escalation.service';
 import { RealtimeGateway } from '../realtime/realtime.gateway';
 import {
   DISPATCH_EVENT_BY_STATUS,
@@ -34,7 +35,11 @@ export type EmergencyKind =
   | 'alarm'
   | 'manual'
   | 'service-request'
-  | 'vehicle-panic';
+  | 'vehicle-panic'
+  | 'voice-sos'
+  | 'voice-silent'
+  | 'voice-assistance'
+  | 'vehicle-crash';
 
 export type CreateEmergencyInput = {
   tenantId: string;
@@ -68,6 +73,7 @@ const CLASSIFICATION: Record<IncidentType, IncidentClassification> = {
   THEFT: IncidentClassification.THEFT,
   MEDICAL: IncidentClassification.MEDICAL,
   FIRE: IncidentClassification.FIRE,
+  CRASH: IncidentClassification.SECURITY,
   OTHER: IncidentClassification.OTHER,
 };
 
@@ -78,6 +84,7 @@ const AGENCY: Record<IncidentType, ResponseAgency> = {
   THEFT: ResponseAgency.SECURITY,
   MEDICAL: ResponseAgency.MEDICAL,
   FIRE: ResponseAgency.FIRE,
+  CRASH: ResponseAgency.SECURITY,
   OTHER: ResponseAgency.SECURITY,
 };
 
@@ -87,6 +94,7 @@ export class IncidentKernelService {
     private readonly prisma: PrismaService,
     private readonly realtime: RealtimeGateway,
     private readonly permissions: PermissionsService,
+    private readonly escalation: AlertEscalationService,
   ) {}
 
   async createFromEmergency(input: CreateEmergencyInput) {
@@ -148,7 +156,10 @@ export class IncidentKernelService {
       input.kind === 'panic' ||
       input.kind === 'silent' ||
       input.kind === 'home-panic' ||
-      input.kind === 'vehicle-panic'
+      input.kind === 'vehicle-panic' ||
+      input.kind === 'voice-sos' ||
+      input.kind === 'voice-silent' ||
+      input.kind === 'vehicle-crash'
     ) {
       await this.recordEvent({
         tenantId: input.tenantId,
@@ -301,6 +312,26 @@ export class IncidentKernelService {
       }
     }
 
+    const unitLabel =
+      dispatch.companyVehicle?.callSign ??
+      (dispatch.officer
+        ? `Officer ${dispatch.officer.firstName} ${dispatch.officer.lastName}`.trim()
+        : null);
+    await this.escalation.notifyClientResponseUpdate({
+      tenantId: opts.tenantId,
+      userId: incident.userId,
+      incidentId: opts.incidentId,
+      title: '4DS RESPONSE ACTIVE',
+      body: unitLabel
+        ? `${unitLabel} is responding · Dispatched · ${incident.publicRef}`
+        : `Response unit assigned · ${incident.publicRef}`,
+      status: IncidentStatus.DISPATCHED,
+      dispatchStatus: dispatch.status,
+      etaSeconds: dispatch.etaSeconds,
+      unitLabel,
+      publicRef: incident.publicRef,
+    });
+
     return dispatch;
   }
 
@@ -312,6 +343,7 @@ export class IncidentKernelService {
   }) {
     const dispatch = await this.prisma.dispatch.findFirst({
       where: { id: opts.dispatchId, tenantId: opts.tenantId },
+      include: { officer: true, companyVehicle: true, incident: true },
     });
     if (!dispatch) throw new NotFoundException('Dispatch not found');
     const eventType = DISPATCH_EVENT_BY_STATUS[dispatch.status] ?? PlatformEvent.INCIDENT_UPDATED;
@@ -327,6 +359,27 @@ export class IncidentKernelService {
       source: opts.source ?? 'officer',
       actorUserId: opts.actorUserId,
       payload: { dispatchId: dispatch.id, status: dispatch.status },
+    });
+
+    const unitLabel =
+      dispatch.companyVehicle?.callSign ??
+      (dispatch.officer
+        ? `Officer ${dispatch.officer.firstName} ${dispatch.officer.lastName}`.trim()
+        : null);
+    const stageLabel = String(dispatch.status).replace(/_/g, ' ');
+    await this.escalation.notifyClientResponseUpdate({
+      tenantId: opts.tenantId,
+      userId: dispatch.incident.userId,
+      incidentId: dispatch.incidentId,
+      title: 'OFFICER RESPONSE',
+      body: unitLabel
+        ? `${unitLabel} · ${stageLabel}${dispatch.etaSeconds != null ? ` · ETA ${Math.floor(dispatch.etaSeconds / 60)}:${String(dispatch.etaSeconds % 60).padStart(2, '0')}` : ''}`
+        : `Response update · ${stageLabel}`,
+      status: dispatch.incident.status,
+      dispatchStatus: dispatch.status,
+      etaSeconds: dispatch.etaSeconds,
+      unitLabel,
+      publicRef: dispatch.incident.publicRef,
     });
   }
 
@@ -707,12 +760,28 @@ export class IncidentKernelService {
     incident: { id: string; tenantId: string; userId: string; type: IncidentType; isSilent: boolean; publicRef: string; title: string | null },
     input: CreateEmergencyInput,
   ) {
-    const p0 = ['panic', 'silent', 'medical', 'fire', 'home-panic'].includes(input.kind);
+    const p0 = [
+      'panic',
+      'silent',
+      'medical',
+      'fire',
+      'home-panic',
+      'voice-sos',
+      'voice-silent',
+      'vehicle-crash',
+      'vehicle-panic',
+    ].includes(input.kind);
     const priority = p0 ? NotificationPriority.P0 : input.kind === 'theft' ? NotificationPriority.P1 : NotificationPriority.P1;
     const type =
       input.kind === 'theft'
         ? NotificationType.THEFT_ALERT
-        : input.kind === 'panic' || input.kind === 'silent' || input.kind === 'home-panic'
+        : input.kind === 'panic' ||
+            input.kind === 'silent' ||
+            input.kind === 'home-panic' ||
+            input.kind === 'voice-sos' ||
+            input.kind === 'voice-silent' ||
+            input.kind === 'vehicle-crash' ||
+            input.kind === 'vehicle-panic'
           ? NotificationType.PANIC_ALERT
           : NotificationType.INCIDENT_UPDATE;
     await this.createNotification({
@@ -723,7 +792,7 @@ export class IncidentKernelService {
       priority,
       title: this.clientConfirmTitle(input.kind, input.isSilent),
       body: this.clientConfirmBody(input.kind, incident.publicRef),
-      deepLink: '/portal',
+      deepLink: `/portal/response/${incident.id}`,
     });
 
     const ops = await this.prisma.user.findMany({
@@ -773,6 +842,10 @@ export class IncidentKernelService {
     deepLink?: string | null;
   }) {
     const row = await this.prisma.notification.create({ data });
+    const urgent =
+      data.priority === NotificationPriority.P0 ||
+      data.type === NotificationType.PANIC_ALERT ||
+      data.type === NotificationType.DISPATCH_ASSIGNED;
     this.realtime.emitNotification(data.tenantId, {
       id: row.id,
       userId: row.userId,
@@ -782,6 +855,13 @@ export class IncidentKernelService {
       body: row.body,
       incidentId: row.incidentId,
       deepLink: row.deepLink,
+      urgency: urgent ? 'critical' : 'normal',
+      template:
+        data.type === NotificationType.PANIC_ALERT
+          ? 'emergency_panic'
+          : data.type === NotificationType.DISPATCH_ASSIGNED
+            ? 'response_status'
+            : 'response_status',
     });
     return row;
   }
@@ -802,6 +882,7 @@ export class IncidentKernelService {
       this.prisma.familyMember.count({ where: { userId: input.userId } }),
     ]);
     return {
+      kind: input.kind,
       client: user ? { name: `${user.firstName} ${user.lastName}`, phone: user.phone } : null,
       medical: medical
         ? {
@@ -881,18 +962,34 @@ export class IncidentKernelService {
   }
 
   private clientConfirmTitle(kind: EmergencyKind, silent?: boolean) {
-    if (kind === 'silent' || silent) return 'Silent alert sent';
-    if (kind === 'medical') return 'Ambulance requested';
-    if (kind === 'fire') return 'Fire response requested';
-    if (kind === 'theft') return 'Theft reported';
-    if (kind === 'home-panic') return 'Home panic activated';
-    if (kind === 'alarm') return 'Alarm dispatched';
-    if (kind === 'service-request') return 'Request received';
-    return 'Panic alert sent';
+    if (kind === 'silent' || kind === 'voice-silent' || silent) return '4DS SILENT ALERT';
+    if (kind === 'medical') return 'MEDICAL RESPONSE';
+    if (kind === 'fire') return 'FIRE EMERGENCY';
+    if (kind === 'theft') return 'THEFT REPORT RECEIVED';
+    if (kind === 'vehicle-panic') return 'VEHICLE PANIC';
+    if (kind === 'vehicle-crash') return 'VEHICLE CRASH ALERT';
+    if (kind === 'voice-sos') return 'VOICE SOS ACTIVATED';
+    if (kind === 'voice-assistance') return 'ASSISTANCE REQUESTED';
+    if (kind === 'home-panic') return 'HOME PANIC ACTIVATED';
+    if (kind === 'alarm') return 'ALARM DISPATCHED';
+    if (kind === 'service-request') return 'REQUEST RECEIVED';
+    return '4DS SECURITY ALERT';
   }
 
   private clientConfirmBody(kind: EmergencyKind, publicRef: string) {
-    return `Incident ${publicRef} is open. Control room has been notified.`;
+    if (kind === 'silent' || kind === 'voice-silent') {
+      return 'Covert distress received. Response team notified discreetly.';
+    }
+    if (kind === 'medical') return 'Medical assistance has been requested. Open live response.';
+    if (kind === 'fire') return 'Fire response has been initiated. View incident.';
+    if (kind === 'vehicle-panic') return 'Your vehicle emergency alert was received. Track response.';
+    if (kind === 'vehicle-crash') return 'A vehicle crash signal was received. Track response.';
+    if (kind === 'voice-sos') return 'Voice emergency alert activated. Assistance has been notified.';
+    if (kind === 'voice-assistance') {
+      return 'Assistance has been requested. Your security provider has been notified.';
+    }
+    if (kind === 'theft') return `Theft report ${publicRef} is open. Control room notified.`;
+    return `Emergency response activated. ${publicRef} · Your security team has been notified.`;
   }
 
   private serializeIncident(incident: {

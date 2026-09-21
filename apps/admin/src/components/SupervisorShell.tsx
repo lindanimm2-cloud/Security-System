@@ -54,7 +54,7 @@ export function SupervisorShell({
   return (
     <>
       {handoff.overlay}
-    <div className="shell shell--supervisor shell--with-bottom-nav">
+    <div className="shell shell--supervisor shell--ops shell--with-bottom-nav">
       <header className="mobile-shell-header mobile-shell-header--officer">
         <button
           type="button"

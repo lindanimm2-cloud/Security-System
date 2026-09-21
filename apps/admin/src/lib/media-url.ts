@@ -6,7 +6,15 @@ function apiOrigin(): string {
 /** Resolve relative upload paths to the API public origin. */
 export function resolveMediaUrl(url: string | null | undefined): string | null | undefined {
   if (url == null || url === '') return url;
-  if (/^https?:\/\//i.test(url)) return url;
+  if (/^(https?:|data:|blob:)/i.test(url)) return url;
+  if (
+    url.startsWith('/brand/') ||
+    url.startsWith('/documents/') ||
+    url.startsWith('/manuals/')
+  ) {
+    if (typeof window !== 'undefined') return `${window.location.origin}${url}`;
+    return url;
+  }
   const origin = apiOrigin();
   const path = url.startsWith('/') ? url : `/${url}`;
   return `${origin}${path}`;

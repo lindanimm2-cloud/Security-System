@@ -205,7 +205,12 @@ export function RoleProfileDialog({
     }
   }
 
-  const tagChoices = Array.from(new Set([...TAG_OPTIONS, ...draft.tags]));
+  const tagChoices = Array.from(new Set([...TAG_OPTIONS, ...draft.tags])).filter(
+    (tag) => !(row.role === 'Officer' && tag === 'CCTV'),
+  );
+  const visibleModules = modules.filter(
+    (item) => item.access !== 'No' && !(row.role === 'Officer' && item.module === 'CCTV'),
+  );
 
   return (
     <OpsDialog
@@ -326,11 +331,11 @@ export function RoleProfileDialog({
             : null}
         </div>
 
-        {modules.length > 0 && !editingRole ? (
+        {visibleModules.length > 0 && !editingRole ? (
           <section>
             <h4 className="role-profile__section-title">Tool access</h4>
             <ul className="role-profile__modules">
-              {modules.map((item) => (
+              {visibleModules.map((item) => (
                 <li key={item.module}>
                   <span>{item.module}</span>
                   <strong>{item.access}</strong>

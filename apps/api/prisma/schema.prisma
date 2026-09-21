@@ -91,7 +91,12 @@ enum SalesLeadStatus {
 enum InstallJobStatus {
   SCHEDULED
   EN_ROUTE
+  ARRIVED
+  SITE_CHECK
+  INSTALL
   IN_PROGRESS
+  TESTING
+  CLIENT_APPROVAL
   COMPLETED
   CANCELLED
 }
@@ -118,6 +123,7 @@ enum IncidentType {
   FIRE
   ASSAULT
   ALARM
+  CRASH
   OTHER
 }
 
@@ -191,6 +197,15 @@ enum PanicSource {
   DURESS
   CONTROL_ROOM
   TEST
+  WATCH_SOS
+  WEAR_OS_SOS
+  BLE_PANIC
+  VOICE_SOS
+  VOICE_SILENT
+  APPLE_CRASH
+  ANDROID_CRASH
+  TELEMATICS_CRASH
+  SMART_HOME
 }
 
 enum DeviceLostReason {
@@ -309,6 +324,11 @@ enum PropertyType {
   TOWNHOUSE
   ESTATE
   BUSINESS
+  STORE
+  MALL
+  OFFICE
+  BRANCH
+  WAREHOUSE
 }
 
 enum AlarmStatus {
@@ -332,6 +352,45 @@ enum CameraStatus {
 enum CameraPlacement {
   EXTERIOR
   INTERIOR
+}
+
+enum CctvRecorderType {
+  DVR
+  NVR
+  HYBRID
+  IP_KIT
+}
+
+enum CctvConnectivity {
+  AHD
+  ANALOG
+  LAN
+  WIFI
+  HYBRID
+  CLOUD
+}
+
+enum CctvSystemStatus {
+  COMMISSIONING
+  ONLINE
+  OFFLINE
+  FAULT
+}
+
+enum AlarmPanelConnectivity {
+  WIFI
+  GSM_4G
+  WIFI_4G
+  ETHERNET
+  DUAL_PATH
+  RADIO
+}
+
+enum AlarmSystemStatus {
+  COMMISSIONING
+  ONLINE
+  OFFLINE
+  FAULT
 }
 
 enum SensorType {
@@ -471,6 +530,8 @@ model Tenant {
   vehicles           Vehicle[]
   properties         Property[]
   cameras            Camera[]
+  cctvSystems        CctvSystem[]
+  alarmSystems       AlarmSystem[]
   sensors            Sensor[]
   alarmEvents        AlarmEvent[]
   subscriptions      Subscription[]
@@ -494,6 +555,10 @@ model Tenant {
   securityLockdowns  SecurityLockdown[]
   securityConsents   SecurityConsent[]
   deviceSessions     DeviceSession[]
+  vulnerabilityFindings VulnerabilityFinding[]
+  offlineSyncCursors OfflineSyncCursor[]
+  accessPoints       AccessPoint[]
+  accessCommands     AccessCommand[]
 
   @@map("tenants")
 }
@@ -521,6 +586,10 @@ model User {
   inviteToken             String?    @unique @map("invite_token")
   inviteExpiresAt         DateTime?  @map("invite_expires_at")
   registrationCompletedAt DateTime?  @map("registration_completed_at")
+  mfaEnabled              Boolean    @default(false) @map("mfa_enabled")
+  mfaSecretEnc            String?    @map("mfa_secret_enc")
+  mfaEnrolledAt           DateTime?  @map("mfa_enrolled_at")
+  mfaBackupCodesHash      Json       @default("[]") @map("mfa_backup_codes_hash")
   createdAt               DateTime   @default(now()) @map("created_at")
   updatedAt       DateTime   @updatedAt @map("updated_at")
 
@@ -576,6 +645,16 @@ model Officer {
   branchId        String?       @map("branch_id") @db.Uuid
   avgResponseSec  Int           @default(300) @map("avg_response_sec")
   isActive        Boolean       @default(true) @map("is_active")
+  /** Persistent Operational Mode — cloud source of truth (not OS kill-proofing). */
+  dutyModeActive  Boolean       @default(false) @map("duty_mode_active")
+  dutyStartedAt   DateTime?     @map("duty_started_at")
+  lastHeartbeatAt DateTime?     @map("last_heartbeat_at")
+  deviceLabel     String?       @map("device_label")
+  batteryPct      Int?          @map("battery_pct")
+  networkType     String?       @map("network_type")
+  pushToken       String?       @map("push_token")
+  appVersion      String?       @map("app_version")
+  operationalChecks Json?       @map("operational_checks")
   createdAt       DateTime      @default(now()) @map("created_at")
   updatedAt       DateTime      @updatedAt @map("updated_at")
 
@@ -586,6 +665,7 @@ model Officer {
 
   @@unique([tenantId, email])
   @@index([tenantId, status])
+  @@index([tenantId, dutyModeActive, lastHeartbeatAt])
   @@map("officers")
 }
 
@@ -672,6 +752,8 @@ model FamilyMember {
   familyId        String   @map("family_id") @db.Uuid
   userId          String   @map("user_id") @db.Uuid
   nickname        String?
+  /** Kinship / household type: Spouse, Child, Parent, etc. */
+  relationship    String?
   canViewLocation Boolean  @default(true) @map("can_view_location")
   joinedAt        DateTime @default(now()) @map("joined_at")
 
@@ -836,6 +918,8 @@ model Vehicle {
   trackerLinked         Boolean   @default(false) @map("tracker_linked")
   phoneTrackingEnabled  Boolean   @default(false) @map("phone_tracking_enabled")
   theftRecovery         Boolean   @default(false) @map("theft_recovery")
+  /** Active situation label while recovery is on: STOLEN, HIJACKING, ACCIDENT, etc. */
+  emergencyStatus       String?   @map("emergency_status")
   lastKnownLat    Decimal?  @map("last_known_lat") @db.Decimal(10, 8)
   lastKnownLng    Decimal?  @map("last_known_lng") @db.Decimal(11, 8)
   immobiliserOn   Boolean   @default(false) @map("immobiliser_on")
@@ -881,19 +965,106 @@ model Property {
   tenant      Tenant       @relation(fields: [tenantId], references: [id])
   user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
   cameras     Camera[]
+  cctvSystems CctvSystem[]
+  alarmSystems AlarmSystem[]
   sensors     Sensor[]
   alarmEvents AlarmEvent[]
   incidents   Incident[]
+  accessPoints AccessPoint[]
 
   @@index([userId])
   @@index([tenantId])
   @@map("properties")
 }
 
+/** Installed CCTV kit / DVR-NVR registry at a site (HiLook, Dahua, AHD kits, etc.). */
+model CctvSystem {
+  id                 String            @id @default(uuid()) @db.Uuid
+  tenantId           String            @map("tenant_id") @db.Uuid
+  propertyId         String            @map("property_id") @db.Uuid
+  name               String
+  brand              String?
+  model              String?
+  kitSku             String?           @map("kit_sku")
+  supplier           String?
+  recorderType       CctvRecorderType  @default(DVR) @map("recorder_type")
+  channelCount       Int               @default(4) @map("channel_count")
+  connectivity       CctvConnectivity  @default(AHD)
+  recorderSerial     String?           @map("recorder_serial")
+  recorderIp         String?           @map("recorder_ip")
+  cloudId            String?           @map("cloud_id")
+  hddInstalled       Boolean           @default(false) @map("hdd_installed")
+  hddSerial          String?           @map("hdd_serial")
+  hddCapacityGb      Int?              @map("hdd_capacity_gb")
+  firmware           String?
+  mobileAppEnabled   Boolean           @default(true) @map("mobile_app_enabled")
+  techNotes          String?           @map("tech_notes")
+  status             CctvSystemStatus  @default(COMMISSIONING)
+  installedAt        DateTime?         @map("installed_at")
+  createdAt          DateTime          @default(now()) @map("created_at")
+  updatedAt          DateTime          @updatedAt @map("updated_at")
+
+  tenant   Tenant   @relation(fields: [tenantId], references: [id])
+  property Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  cameras  Camera[]
+
+  @@index([propertyId])
+  @@index([tenantId])
+  @@index([recorderSerial])
+  @@map("cctv_systems")
+}
+
+/** Installed alarm panel / controller (Mixbox PG-103, Paradox, etc.). */
+model AlarmSystem {
+  id                 String                  @id @default(uuid()) @db.Uuid
+  tenantId           String                  @map("tenant_id") @db.Uuid
+  propertyId         String                  @map("property_id") @db.Uuid
+  name               String
+  brand              String?
+  model              String?
+  kitSku             String?                 @map("kit_sku")
+  supplier           String?
+  connectivity       AlarmPanelConnectivity  @default(WIFI_4G)
+  panelSerial        String?                 @map("panel_serial")
+  imei               String?
+  simIccid           String?                 @map("sim_iccid")
+  wifiMac            String?                 @map("wifi_mac")
+  wifiSsid           String?                 @map("wifi_ssid")
+  cloudId            String?                 @map("cloud_id")
+  appAccount         String?                 @map("app_account")
+  wirelessFrequency  String?                 @map("wireless_frequency")
+  wirelessCoding     String?                 @map("wireless_coding")
+  gsmBands           String?                 @map("gsm_bands")
+  wifiStandard       String?                 @map("wifi_standard")
+  inputVoltage       String?                 @map("input_voltage")
+  backupBattery      String?                 @map("backup_battery")
+  icasaCert          String?                 @map("icasa_cert")
+  rfidEnabled        Boolean                 @default(true) @map("rfid_enabled")
+  touchKeypad        Boolean                 @default(true) @map("touch_keypad")
+  mobileAppEnabled   Boolean                 @default(true) @map("mobile_app_enabled")
+  zoneCount          Int                     @default(0) @map("zone_count")
+  firmware           String?
+  techNotes          String?                 @map("tech_notes")
+  status             AlarmSystemStatus       @default(COMMISSIONING)
+  installedAt        DateTime?               @map("installed_at")
+  createdAt          DateTime                @default(now()) @map("created_at")
+  updatedAt          DateTime                @updatedAt @map("updated_at")
+
+  tenant   Tenant   @relation(fields: [tenantId], references: [id])
+  property Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+
+  @@index([propertyId])
+  @@index([tenantId])
+  @@index([panelSerial])
+  @@index([imei])
+  @@map("alarm_systems")
+}
+
 model Camera {
   id            String          @id @default(uuid()) @db.Uuid
   tenantId      String          @map("tenant_id") @db.Uuid
   propertyId    String          @map("property_id") @db.Uuid
+  systemId      String?         @map("system_id") @db.Uuid
   name          String
   locationLabel String          @map("location_label")
   channel       Int             @default(1)
@@ -902,16 +1073,23 @@ model Camera {
   snapshotUrl   String?         @map("snapshot_url")
   streamUrl     String?         @map("stream_url")
   vendor        String?
+  model         String?
+  serialNumber  String?         @map("serial_number")
+  resolution    String?
   lastSeenAt    DateTime?       @map("last_seen_at")
   createdAt     DateTime        @default(now()) @map("created_at")
   updatedAt     DateTime        @updatedAt @map("updated_at")
 
   tenant      Tenant       @relation(fields: [tenantId], references: [id])
   property    Property     @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  system      CctvSystem?  @relation(fields: [systemId], references: [id], onDelete: SetNull)
   alarmEvents AlarmEvent[]
+  accessPoints AccessPoint[]
 
   @@index([propertyId])
   @@index([tenantId])
+  @@index([systemId])
+  @@index([serialNumber])
   @@map("cameras")
 }
 
@@ -1042,16 +1220,20 @@ model SafeZone {
 }
 
 model IncidentMedia {
-  id         String   @id @default(uuid()) @db.Uuid
-  incidentId String   @map("incident_id") @db.Uuid
-  fileName   String   @map("file_name")
-  fileType   String   @map("file_type")
-  fileUrl    String   @map("file_url")
-  createdAt  DateTime @default(now()) @map("created_at")
+  id             String   @id @default(uuid()) @db.Uuid
+  incidentId     String   @map("incident_id") @db.Uuid
+  fileName       String   @map("file_name")
+  fileType       String   @map("file_type")
+  fileUrl        String   @map("file_url")
+  sha256Hash     String?  @map("sha256_hash")
+  fileSizeBytes  Int?     @map("file_size_bytes")
+  custodyHash    String?  @map("custody_hash")
+  createdAt      DateTime @default(now()) @map("created_at")
 
   incident Incident @relation(fields: [incidentId], references: [id], onDelete: Cascade)
 
   @@index([incidentId])
+  @@index([sha256Hash])
   @@map("incident_media")
 }
 
@@ -1485,6 +1667,9 @@ model InstallJob {
   scheduledAt     DateTime         @map("scheduled_at")
   completedAt     DateTime?        @map("completed_at")
   equipmentNotes  String?          @map("equipment_notes")
+  serial          String?
+  checklist       Json?
+  overrideReason  String?          @map("override_reason")
   lat             Decimal?         @db.Decimal(10, 8)
   lng             Decimal?         @db.Decimal(11, 8)
   createdAt       DateTime         @default(now()) @map("created_at")
@@ -1699,6 +1884,8 @@ model SecurityAuditEvent {
   previousState Json?    @map("previous_state")
   newState      Json?    @map("new_state")
   ipAddress     String?  @map("ip_address")
+  eventHash     String?  @map("event_hash")
+  prevEventHash String?  @map("prev_event_hash")
   createdAt     DateTime @default(now()) @map("created_at")
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
@@ -1707,6 +1894,7 @@ model SecurityAuditEvent {
   @@index([tenantId, createdAt])
   @@index([accountUserId, createdAt])
   @@index([action])
+  @@index([tenantId, eventHash])
   @@map("security_audit_events")
 }
 
@@ -1744,5 +1932,147 @@ model ClientSecuritySettings {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("client_security_settings")
+}
+
+model VulnerabilityFinding {
+  id          String   @id @default(uuid()) @db.Uuid
+  tenantId    String   @map("tenant_id") @db.Uuid
+  title       String
+  severity    String   @default("MEDIUM")
+  status      String   @default("OPEN")
+  source      String   @default("internal")
+  description String?
+  remediation String?
+  cveId       String?  @map("cve_id")
+  discoveredAt DateTime @default(now()) @map("discovered_at")
+  closedAt    DateTime? @map("closed_at")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, status])
+  @@index([tenantId, severity])
+  @@map("vulnerability_findings")
+}
+
+/** Field offline sync watermark per device/user (Phase 2 stub → Phase 3 enterprise). */
+model OfflineSyncCursor {
+  id           String   @id @default(uuid()) @db.Uuid
+  tenantId     String   @map("tenant_id") @db.Uuid
+  userId       String   @map("user_id") @db.Uuid
+  deviceKey    String   @map("device_key")
+  lastSyncAt   DateTime @default(now()) @map("last_sync_at")
+  cursorJson   Json     @default("{}") @map("cursor_json")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, userId, deviceKey])
+  @@index([tenantId, userId])
+  @@map("offline_sync_cursors")
+}
+
+/** Physical Control Engine — gates, doors, barriers (ONVIF Profile C–oriented). */
+enum AccessPointKind {
+  VEHICLE_GATE
+  PEDESTRIAN_GATE
+  DOOR
+  BARRIER
+  PARKING_GATE
+}
+
+enum AccessPointState {
+  CLOSED
+  OPEN
+  LOCKED
+  UNLOCKED
+  MOVING
+  FORCED
+  HELD_OPEN
+  OFFLINE
+  UNKNOWN
+}
+
+enum AccessPointHealth {
+  HEALTHY
+  DEGRADED
+  OFFLINE
+}
+
+enum AccessCommandType {
+  OPEN
+  CLOSE
+  HOLD_OPEN
+  UNLOCK
+  LOCK
+  EMERGENCY_RELEASE
+}
+
+enum AccessCommandPhase {
+  SENT
+  ACKNOWLEDGED
+  MOVING
+  SUCCEEDED
+  FAILED
+  TIMEOUT
+}
+
+model AccessPoint {
+  id               String            @id @default(uuid()) @db.Uuid
+  tenantId         String            @map("tenant_id") @db.Uuid
+  propertyId       String            @map("property_id") @db.Uuid
+  name             String
+  kind             AccessPointKind   @default(VEHICLE_GATE)
+  state            AccessPointState  @default(CLOSED)
+  health           AccessPointHealth @default(HEALTHY)
+  controllerOnline Boolean           @default(true) @map("controller_online")
+  networkOnline    Boolean           @default(true) @map("network_online")
+  powerOnline      Boolean           @default(true) @map("power_online")
+  sensorNormal     Boolean           @default(true) @map("sensor_normal")
+  motorNormal      Boolean           @default(true) @map("motor_normal")
+  cameraId         String?           @map("camera_id") @db.Uuid
+  externalRef      String?           @map("external_ref")
+  adapter          String            @default("generic")
+  lastEvent        String?           @map("last_event")
+  lastEventAt      DateTime?         @map("last_event_at")
+  lastCommandAt    DateTime?         @map("last_command_at")
+  openSince        DateTime?         @map("open_since")
+  createdAt        DateTime          @default(now()) @map("created_at")
+  updatedAt        DateTime          @updatedAt @map("updated_at")
+
+  tenant   Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  property Property       @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  camera   Camera?        @relation(fields: [cameraId], references: [id], onDelete: SetNull)
+  commands AccessCommand[]
+
+  @@index([tenantId, propertyId])
+  @@index([propertyId])
+  @@index([tenantId, state])
+  @@map("access_points")
+}
+
+model AccessCommand {
+  id              String             @id @default(uuid()) @db.Uuid
+  tenantId        String             @map("tenant_id") @db.Uuid
+  accessPointId   String             @map("access_point_id") @db.Uuid
+  command         AccessCommandType
+  phase           AccessCommandPhase @default(SENT)
+  actorUserId     String?            @map("actor_user_id") @db.Uuid
+  actorName       String?            @map("actor_name")
+  source          String             @default("control-room")
+  confirmedClear  Boolean            @default(false) @map("confirmed_clear")
+  resultMessage   String?            @map("result_message")
+  createdAt       DateTime           @default(now()) @map("created_at")
+  acknowledgedAt  DateTime?          @map("acknowledged_at")
+  completedAt     DateTime?          @map("completed_at")
+
+  tenant      Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  accessPoint AccessPoint @relation(fields: [accessPointId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, createdAt])
+  @@index([accessPointId, createdAt])
+  @@map("access_commands")
 }
 

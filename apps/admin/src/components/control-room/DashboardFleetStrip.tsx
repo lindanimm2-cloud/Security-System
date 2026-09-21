@@ -20,7 +20,7 @@ type FleetVehicle = {
   cameras?: CctvCamera[];
 };
 
-export function DashboardFleetStrip() {
+export function DashboardFleetStrip({ compact = false }: { compact?: boolean }) {
   const { data, loading, reload } = useApi(
     () => adminApi.get<ApiResponse<FleetVehicle[]>>('/control-room/fleet'),
     [],
@@ -32,14 +32,17 @@ export function DashboardFleetStrip() {
     return () => window.clearInterval(id);
   }, [reload]);
 
-  const list = (Array.isArray(data?.data) ? data.data : []).slice(0, 8);
+  const list = (Array.isArray(data?.data) ? data.data : []).slice(0, compact ? 6 : 8);
 
   return (
-    <section className="ops-board__vehicles" aria-label="Vehicles">
+    <section
+      className={`ops-board__vehicles ${compact ? 'ops-board__vehicles--compact' : ''}`}
+      aria-label="Vehicles"
+    >
       <div className="panel-header ops-board__pane-head">
         <div>
-          <h2>Vehicles</h2>
-          <p className="text-muted">Fleet units · status strip</p>
+          <h2>{compact ? 'Vehicle status' : 'Vehicles'}</h2>
+          <p className="text-muted">{compact ? 'Fleet telemetry strip' : 'Fleet units · status strip'}</p>
         </div>
         <Link href={CONTROL_ROOM_ROUTES.fleet} className="link-sm">
           Fleet
@@ -53,15 +56,16 @@ export function DashboardFleetStrip() {
           </p>
         </div>
       ) : (
-        <ul className="ops-fleet">
+        <ul className={`ops-fleet ${compact ? 'ops-fleet--compact' : ''}`}>
           {list.map((v) => {
-            const cam = v.cameras?.[0];
+            const cam = compact ? null : v.cameras?.[0];
             return (
               <li key={v.id} className={`ops-fleet__item ops-fleet__item--${(v.status ?? 'unknown').toLowerCase()}`}>
                 {cam ? (
                   <CctvLiveFeed camera={cam} href={CONTROL_ROOM_ROUTES.fleet} compact />
                 ) : null}
                 <strong className="ops-fleet__callsign">{v.callSign}</strong>
+                <span className="ops-fleet__reg">{v.registration}</span>
                 <span className="ops-fleet__type">{fleetTeamLabel(v.vehicleType, v.teamName)}</span>
                 <em className="ops-fleet__status">{(v.status ?? 'UNKNOWN').replace(/_/g, ' ')}</em>
               </li>

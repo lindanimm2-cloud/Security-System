@@ -6,6 +6,7 @@ import { DashboardLiveCctv } from '@/components/portal/DashboardLiveCctv';
 import { VehicleRemotePad } from '@/components/vehicle/VehicleRemotePad';
 import { VehicleRemoteVisual } from '@/components/vehicle/VehicleRemoteVisual';
 import { clientApi, type ApiResponse } from '@/lib/api-client';
+import type { VehicleEmergencyStatus } from '@/lib/vehicle-emergency-status';
 import type { VehicleRemoteAction, VehicleRemoteState } from '@/lib/vehicle-remote';
 
 export type ClientVehicleRemoteVehicle = {
@@ -20,6 +21,7 @@ export type ClientVehicleRemoteVehicle = {
   doorsLocked?: boolean;
   immobiliserOn?: boolean;
   theftRecovery?: boolean;
+  emergencyStatus?: string | null;
   hornActive?: boolean;
 };
 
@@ -37,10 +39,12 @@ export function ClientVehicleRemote({
   onUpdated,
 }: Props) {
   const [busy, setBusy] = useState<VehicleRemoteAction | null>(null);
+  const [statusBusy, setStatusBusy] = useState(false);
   const [local, setLocal] = useState<VehicleRemoteState>(() => ({
     doorsLocked: vehicle.doorsLocked ?? true,
     immobiliserOn: vehicle.immobiliserOn ?? false,
     theftRecovery: vehicle.theftRecovery ?? false,
+    emergencyStatus: vehicle.emergencyStatus ?? (vehicle.theftRecovery ? 'STOLEN' : null),
     hornActive: vehicle.hornActive ?? false,
   }));
 
@@ -49,14 +53,21 @@ export function ClientVehicleRemote({
       doorsLocked: vehicle.doorsLocked ?? true,
       immobiliserOn: vehicle.immobiliserOn ?? false,
       theftRecovery: vehicle.theftRecovery ?? false,
+      emergencyStatus: vehicle.emergencyStatus ?? (vehicle.theftRecovery ? 'STOLEN' : null),
       hornActive: vehicle.hornActive ?? false,
     });
-  }, [vehicle.doorsLocked, vehicle.hornActive, vehicle.immobiliserOn, vehicle.theftRecovery]);
+  }, [
+    vehicle.doorsLocked,
+    vehicle.emergencyStatus,
+    vehicle.hornActive,
+    vehicle.immobiliserOn,
+    vehicle.theftRecovery,
+  ]);
 
   async function send(action: VehicleRemoteAction): Promise<boolean> {
     setBusy(action);
     try {
-      const res = await clientApi.post<ApiResponse<{ message?: string }>>(
+      await clientApi.post<ApiResponse<{ message?: string }>>(
         `/client/vehicles/${vehicle.id}/remote`,
         { action },
       );
@@ -65,6 +76,12 @@ export function ClientVehicleRemote({
         immobiliserOn: action === 'immobilise' ? true : action === 'release' ? false : prev.immobiliserOn,
         theftRecovery:
           action === 'panic' ? true : action === 'clearRecovery' ? false : prev.theftRecovery,
+        emergencyStatus:
+          action === 'panic'
+            ? prev.emergencyStatus ?? 'STOLEN'
+            : action === 'clearRecovery'
+              ? null
+              : prev.emergencyStatus,
         hornActive: action === 'horn' ? !prev.hornActive : prev.hornActive,
       }));
       onUpdated?.();
@@ -75,6 +92,26 @@ export function ClientVehicleRemote({
       setBusy(null);
     }
   }
+
+  async function setEmergencyStatus(status: VehicleEmergencyStatus) {
+    setStatusBusy(true);
+    try {
+      await clientApi.patch<ApiResponse<{ emergencyStatus?: string }>>(
+        `/client/vehicles/${vehicle.id}/emergency-status`,
+        { status },
+      );
+      setLocal((prev) => ({
+        ...prev,
+        theftRecovery: true,
+        emergencyStatus: status,
+      }));
+      onUpdated?.();
+    } finally {
+      setStatusBusy(false);
+    }
+  }
+
+  const emergency = local.emergencyStatus ?? (local.theftRecovery ? 'STOLEN' : null);
 
   return (
     <section className="vehicle-remote--dash" aria-label="Remote vehicle">
@@ -88,9 +125,16 @@ export function ClientVehicleRemote({
           colour: vehicle.colour ?? vehicle.color,
           assetUrl: vehicle.modelAsset,
         }}
-        busyAction={busy}
+        meta={{
+          registration: vehicle.registration,
+          emergencyStatus: emergency,
+          stolen: Boolean(local.theftRecovery),
+          vehicleType: local.theftRecovery ? 'STOLEN' : 'CLIENT',
+        }}
+        busyAction={busy ?? (statusBusy ? 'panic' : null)}
         hidePanic={hidePanic}
         onCommand={(action) => send(action)}
+        onEmergencyStatusChange={setEmergencyStatus}
       />
       <VehicleRemotePad
         state={local}
@@ -100,7 +144,9 @@ export function ClientVehicleRemote({
         hidePanic={hidePanic}
         vehicleLabel={[vehicle.make, vehicle.model].filter(Boolean).join(' ') || null}
         registration={vehicle.registration ?? null}
+        emergencyStatus={emergency}
         onCommand={(action) => send(action)}
+        onEmergencyStatusChange={setEmergencyStatus}
       >
         <DashboardLiveCctv embedded kind="vehicle" vehicleId={vehicle.id} />
       </VehicleRemotePad>

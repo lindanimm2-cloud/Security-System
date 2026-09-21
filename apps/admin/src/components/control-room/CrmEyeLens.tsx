@@ -208,6 +208,20 @@ export function CrmEyeLens() {
     setReady(true);
   }, []);
 
+  /* Ops board: keep dock compact bottom-right so it never covers the 3-column console. */
+  useEffect(() => {
+    const onOpsBoard = pathname === '/control-room' || pathname === '/control-room/';
+    if (!onOpsBoard) return;
+    setMini(true);
+    setPos(null);
+    try {
+      localStorage.removeItem(POS_KEY);
+      localStorage.setItem(MODE_KEY, 'mini');
+    } catch {
+      /* ignore */
+    }
+  }, [pathname]);
+
   useEffect(() => {
     function sync() {
       setLensSettings(loadLensSettings());

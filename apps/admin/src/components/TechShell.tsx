@@ -99,7 +99,7 @@ export function TechShell({
   return (
     <>
       {handoff.overlay}
-    <div className="shell shell--officer shell--with-bottom-nav">
+    <div className="shell shell--officer shell--ops shell--with-bottom-nav">
       <header className="mobile-shell-header mobile-shell-header--officer">
         <button
           type="button"
@@ -111,7 +111,10 @@ export function TechShell({
           <span className={`menu-toggle-icon ${menuOpen ? 'menu-toggle-icon--open' : ''}`} />
         </button>
         <BrandMark variant="officer" compact />
-        <h1 className="mobile-shell-header__title">{title ?? 'Install Tech'}</h1>
+        <h1 className="mobile-shell-header__title">
+          Security Operations
+          <span className="mobile-shell-header__live">Live</span>
+        </h1>
         <div className="mobile-topbar-actions">
           <ShellRouteActions homeHref="/tech" compact />
           <NavClock compact />
@@ -177,8 +180,8 @@ export function TechShell({
           <div className="topbar-brand">
             <BrandMark variant="officer" compact showProduct={false} href={false} />
             <div>
-              <h1>{title ?? 'Install Tech'}</h1>
-              <p>4DS Solutions · Technician Team</p>
+              <h1>{title ?? 'Security Operations'}</h1>
+              <p>4DS Solutions · Field installation & CCTV</p>
             </div>
           </div>
           <div className="topbar-actions">
@@ -195,7 +198,7 @@ export function TechShell({
           label: item.mobileLabel,
           icon: item.icon,
           exact: item.exact,
-          badge: item.href === '/tech/jobs' && activeJobs > 0 ? activeJobs : undefined,
+          badge: (item.href === '/tech' || item.href === '/tech/jobs') && activeJobs > 0 ? activeJobs : undefined,
         }))}
         ariaLabel="Technician"
       />

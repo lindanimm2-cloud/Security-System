@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { ALERT_KIND_LABELS, type PriorityAlertKind } from '@/lib/alert-priority';
 import { DispatchMenuButton } from '@/components/control-room/DispatchMenuButton';
+import { muteAlert, snoozeAlert } from '@/lib/alert-engine';
 import { usePriorityAlerts } from './PriorityAlertProvider';
 
 function AlertIcon({ kind }: { kind: PriorityAlertKind }) {
@@ -36,7 +37,14 @@ export function PriorityAlertUI() {
 
   if (!ctx) return null;
 
-  const { criticalAlert, criticalQueue, highToasts, dismissCritical, dismissToast } = ctx;
+  const {
+    criticalAlert,
+    criticalQueue,
+    highToasts,
+    dismissCritical,
+    acknowledgeCritical,
+    dismissToast,
+  } = ctx;
 
   return (
     <>
@@ -49,7 +57,10 @@ export function PriorityAlertUI() {
           <div className="alert-lens__info">
             <AlertIcon kind={criticalAlert.kind} />
             <div className="alert-lens__meta">
-              <span className="alert-lens__tag">{ALERT_KIND_LABELS[criticalAlert.kind]}</span>
+              <span className="alert-lens__tag">
+                {criticalAlert.force ? 'TEST · ' : ''}
+                {ALERT_KIND_LABELS[criticalAlert.kind]}
+              </span>
               <span className="alert-lens__title">{criticalAlert.title}</span>
               <span className="alert-lens__subtitle">{criticalAlert.subtitle}</span>
             </div>
@@ -63,11 +74,18 @@ export function PriorityAlertUI() {
                 +{criticalQueue - 1}
               </span>
             )}
+            <button
+              type="button"
+              className="alert-lens__btn alert-lens__btn--ack"
+              onClick={acknowledgeCritical}
+            >
+              Acknowledge
+            </button>
             {criticalAlert.link && (
               <Link
                 href={criticalAlert.link}
                 className="alert-lens__btn alert-lens__btn--open"
-                onClick={dismissCritical}
+                onClick={acknowledgeCritical}
               >
                 Open
               </Link>
@@ -76,9 +94,20 @@ export function PriorityAlertUI() {
               <DispatchMenuButton
                 incidentId={criticalAlert.incidentId}
                 className="alert-lens__btn alert-lens__btn--dispatch"
-                onAssigned={dismissCritical}
+                onAssigned={acknowledgeCritical}
               />
             )}
+            <button
+              type="button"
+              className="alert-lens__btn alert-lens__btn--ghost"
+              title="Snooze sound 5 minutes (critical still visible)"
+              onClick={() => {
+                snoozeAlert(criticalAlert.id, 5);
+                acknowledgeCritical();
+              }}
+            >
+              Snooze 5m
+            </button>
             <button
               type="button"
               className="alert-lens__dismiss"
@@ -106,6 +135,16 @@ export function PriorityAlertUI() {
                     View
                   </Link>
                 )}
+                <button
+                  type="button"
+                  className="alert-toast__link"
+                  onClick={() => {
+                    muteAlert(toast.id, 15);
+                    dismissToast(toast.id);
+                  }}
+                >
+                  Mute 15m
+                </button>
                 <button
                   type="button"
                   className="alert-toast__dismiss"

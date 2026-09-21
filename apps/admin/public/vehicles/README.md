@@ -2,30 +2,40 @@
 
 Only drop **real** licensed vehicle models here. The app never invents cars from boxes/CSS.
 
-## Vivekkk-1 / 3D-Models (`Cars/*.glb`, BSL-1.0)
+## FormDrive ([nesdesignco/FormDrive](https://github.com/nesdesignco/FormDrive))
 
-Source: [Vivekkk-1/3D-Models](https://github.com/Vivekkk-1/3D-Models)
+| Slug                 | Model              | Notes                          |
+| -------------------- | ------------------ | ------------------------------ |
+| `ford-mustang-2005`  | Mustang 2005       | See MUSTANG license in upstream |
+| `tesla-model-3`      | Tesla Model 3 2018 | **Default sedan** · TESLA license |
 
-| Slug                 | Model                    | Size   | Twin notes                                      |
-| -------------------- | ------------------------ | ------ | ----------------------------------------------- |
-| `bmw-2018`           | BMW 2018 (default)       | ~5 MB  | **Best** — DoorL/R, Hood, Boot                  |
-| `ferrari-599`        | Ferrari 599              | ~44 MB | DoorL/R, hood, trunk                            |
-| `toyota-supra-mk4`   | Toyota Supra MK4 A80     | ~13 MB | DoorL* / DoorR* named meshes + Paint            |
-| `bmw-m8`             | BMW M8 2020              | ~15 MB | Paint / Coloured body (no door split)           |
-| `bmw-x6m`            | BMW X6 M                 | ~28 MB | SUV body paint                                  |
-| `dodge-challenger-rt`| Dodge Challenger RT      | ~17 MB | Paint body                                      |
-| `tesla-roadster`     | Tesla Roadster 2020      | ~25 MB | `car_main_paint`                                |
-| `bugatti-bolide`     | Bugatti Bolide 2024      | ~15 MB | Paint + animated door rocker mesh               |
-| `ford-gt40`          | Ford GT40                | ~11 MB | Display                                         |
-| `lancia-037`         | Lancia 037 Stradale      | ~9 MB  | Display                                         |
-| `concept-car-037`    | Concept 037 (CC0)        | ~7 MB  | Public domain                                   |
+## 3d-car-viewing ([jiaxiantao/3d-car-viewing](https://github.com/jiaxiantao/3d-car-viewing))
+
+Quaternius / Poly Pizza CC0 mainstream set:
+
+| Slug                  | Category |
+| --------------------- | -------- |
+| `suv-mainstream`      | SUV      |
+| `offroad-mainstream`  | Off-road |
+
+(`sedan-mainstream` was a BMW M2 demo mesh — **not** included.)
 
 ## Other fleet assets
 
-| Slug              | Path                                  | Notes                    |
-| ----------------- | ------------------------------------- | ------------------------ |
-| `honda-cr-v`      | `/vehicles/honda-cr-v/model.glb`      | Compact SUV fallback     |
-| `jac-1045-truck`  | `/vehicles/jac-1045-truck/model.glb`  | Trucks / bakkies / vans  |
+| Slug                  | Notes                                      |
+| --------------------- | ------------------------------------------ |
+| `ferrari-599`         | DoorL/R, hood, trunk                       |
+| `toyota-supra-mk4`    | Named door meshes + paint                  |
+| `dodge-challenger-rt` | Paint body                                 |
+| `tesla-roadster`      | Paint body                                 |
+| `bugatti-bolide`      | Paint + rocker                             |
+| `ford-gt40`           | Display                                    |
+| `lancia-037`          | Display                                    |
+| `concept-car-037`     | CC0                                        |
+| `honda-cr-v`          | Compact SUV                                |
+| `jac-1045-truck`      | **Only truck** — bakkies / vans / sprinter |
+
+BMW GLBs (`bmw-2018`, `bmw-m8`, `bmw-x6m`) have been removed from the catalog.
 
 Register files in `AVAILABLE_VEHICLE_ASSETS` (`src/lib/vehicle-model-assets.ts`).
 

@@ -334,7 +334,34 @@ DRAFT → ACTIVE → DISPATCHED → EN_ROUTE → ON_SCENE → RESOLVED → CLOSE
 
 Each transition appends to `incident_timeline` (immutable). SLA timers via BullMQ delayed jobs.
 
-**Incident types:** `PANIC`, `THEFT`, `MEDICAL`, `FIRE`, `ASSAULT`, `OTHER`
+**Incident types:** `PANIC`, `THEFT`, `MEDICAL`, `FIRE`, `ASSAULT`, `ALARM`, `CRASH`, `OTHER`
+
+### 5.2.1 Voice SOS + Crash Detection (IntegrationsModule)
+
+All voice assistants (Alexa, Google, Siri, SmartThings, Home Assistant, Matter) and crash sources
+(Apple SafetyKit, Android vehicle safety, telematics, OEM, dashcam, manual vehicle panic) normalize
+to one internal event, then route only through `IncidentKernelService.createFromEmergency`.
+
+- `VoiceIntegrationManager` → `VOICE_COMMAND` levels (`INFO` | `ASSISTANCE` | `EMERGENCY` | `SILENT_SOS`)
+- `CrashDetectionManager` → `VEHICLE_CRASH_DETECTED` with confidence (`OS_CONFIRMED` | `SENSOR_SUSPECTED` | `MANUAL`)
+- `IncidentCorrelationService` merges same user/vehicle signals within ~120s and ~500 m into **one** incident
+- Control Room Alert Engine remains UX-only (sound/flash); it must not create incidents
+- Native SafetyKit / Alexa Skills stay as contracts + stubs until OS entitlement / skill approval — never claim Crash Detection active without authorization
+- 4DS does **not** auto-dial South African (or any public) emergency services via Apple; Apple Emergency SOS remains independent
+
+HTTP ingest: `POST /integrations/voice/:provider/webhook`, `POST /integrations/voice/command`,
+`POST /integrations/crash/event`, plus `GET /integrations/voice/config` and `GET /integrations/crash/readiness`.
+
+### 5.2.2 Physical Control Engine
+
+Gates, doors, and barriers are commanded through `PhysicalControlService` — never fire-and-forget.
+
+Lifecycle: **COMMAND SENT → ACKNOWLEDGED → MOVING → OPEN|CLOSED**, with `SecurityAuditEvent` on every action.
+Forced / state mismatch (`commanded CLOSED`, sensor `OPEN`) sets `AccessPointState.FORCED` and can create an
+ALARM incident via `createFromEmergency`. Adapters: `generic`, `onvif-profile-c`, `hid`, `gallagher`, `demo`.
+
+Control Room: Command Hub → Access tab (`PropertyCommandPanel`). Portal: property detail → Property Command.
+CCTV-linked gates require visual clear confirmation before OPEN.
 
 ### 5.3 Notification Engine
 
@@ -443,6 +470,9 @@ Redis Adapter (`@socket.io/redis-adapter`) + sticky sessions on load balancer.
 | Twilio | SMS fallback for critical alerts |
 | SendGrid | Transactional email |
 | S3 + CloudFront | Media storage (theft photos, avatars) |
+| Alexa / Google / Siri (planned) | Voice SOS webhooks → VoiceIntegrationManager |
+| Apple SafetyKit (planned) | Crash Detection entitlement → CrashDetectionManager |
+| Vehicle telematics / OEM | Impact / panic webhooks → CrashDetectionManager |
 
 ---
 

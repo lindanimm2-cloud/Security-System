@@ -7,24 +7,58 @@ export type OfficerNavItem = {
   exact?: boolean;
 };
 
-export const OFFICER_NAV: OfficerNavItem[] = [
-  { href: '/officer/queue', label: 'Your Jobs', icon: 'queue' },
-  { href: '/officer', label: 'Home', icon: 'home', exact: true },
-  { href: '/officer/map', label: 'Map', icon: 'navigation' },
-  { href: '/officer/record', label: 'Evidence', icon: 'evidence' },
-  { href: '/officer/report', label: 'Incident Report', icon: 'report' },
-  { href: '/officer/internal-chat', label: 'Crew Chat', icon: 'team-chat' },
-  { href: '/officer/messages', label: 'Dispatch Chat', icon: 'dispatch-chat' },
-  { href: '/officer/calls', label: 'Calls', icon: 'calls' },
-  { href: '/officer/profile', label: 'Profile', icon: 'profile' },
-  { href: '/officer/settings', label: 'Settings', icon: 'account' },
+export type OfficerNavGroup = {
+  id: string;
+  label: string;
+  items: OfficerNavItem[];
+};
+
+export const OFFICER_NAV_GROUPS: OfficerNavGroup[] = [
+  {
+    id: 'operations',
+    label: 'Operations',
+    items: [
+      { href: '/officer', label: 'Command Home', icon: 'home', exact: true },
+      { href: '/officer/duty', label: 'Duty Mode', icon: 'emergency' },
+      { href: '/officer/queue', label: 'Assignment Queue', icon: 'queue' },
+      { href: '/officer/map', label: 'Live Map', icon: 'navigation' },
+      { href: '/officer/patrol', label: 'Patrol', icon: 'location' },
+    ],
+  },
+  {
+    id: 'records',
+    label: 'Field records',
+    items: [
+      { href: '/officer/record', label: 'Evidence', icon: 'evidence' },
+      { href: '/officer/report', label: 'Incident Report', icon: 'report' },
+    ],
+  },
+  {
+    id: 'comms',
+    label: 'Communications',
+    items: [
+      { href: '/officer/internal-chat', label: 'Crew Chat', icon: 'team-chat' },
+      { href: '/officer/messages', label: 'Dispatch', icon: 'dispatch-chat' },
+      { href: '/officer/calls', label: 'Calls', icon: 'calls' },
+    ],
+  },
+  {
+    id: 'account',
+    label: 'Account',
+    items: [
+      { href: '/officer/profile', label: 'Profile', icon: 'profile' },
+      { href: '/officer/settings', label: 'Settings', icon: 'account' },
+    ],
+  },
 ];
 
-/** Floating mobile bottom bar — Your Jobs · Home · Map · Evidence · Settings */
+export const OFFICER_NAV: OfficerNavItem[] = OFFICER_NAV_GROUPS.flatMap((g) => g.items);
+
+/** Floating mobile bottom bar — Home · Tasks · Map · Patrol · More */
 export const OFFICER_MOBILE_NAV: Array<OfficerNavItem & { mobileLabel: string }> = [
-  { href: '/officer/queue', label: 'Your Jobs', mobileLabel: 'Jobs', icon: 'queue' },
-  { href: '/officer', label: 'Home', mobileLabel: 'Home', icon: 'home', exact: true },
-  { href: '/officer/map', label: 'Map', mobileLabel: 'Map', icon: 'navigation' },
-  { href: '/officer/record', label: 'Evidence', mobileLabel: 'Evidence', icon: 'evidence' },
-  { href: '/officer/settings', label: 'Settings', mobileLabel: 'Settings', icon: 'account' },
+  { href: '/officer', label: 'Command Home', mobileLabel: 'Home', icon: 'home', exact: true },
+  { href: '/officer/queue', label: 'Assignment Queue', mobileLabel: 'Tasks', icon: 'queue' },
+  { href: '/officer/map', label: 'Live Map', mobileLabel: 'Map', icon: 'navigation' },
+  { href: '/officer/patrol', label: 'Patrol', mobileLabel: 'Patrol', icon: 'location' },
+  { href: '/officer/settings', label: 'Settings', mobileLabel: 'More', icon: 'account' },
 ];

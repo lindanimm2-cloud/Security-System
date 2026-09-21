@@ -508,6 +508,23 @@ export class ControlRoomService {
     return { success: true, data: { marked: true } };
   }
 
+  async clearNotification(tenantId: string, id: string) {
+    if (id.startsWith('incident-') || id.startsWith('ticket-')) {
+      return { success: true, data: { id, cleared: true } };
+    }
+    const notification = await this.prisma.notification.findFirst({
+      where: { id, tenantId },
+    });
+    if (!notification) throw new NotFoundException('Notification not found');
+    await this.prisma.notification.delete({ where: { id } });
+    return { success: true, data: { id, cleared: true } };
+  }
+
+  async clearAllNotifications(tenantId: string) {
+    await this.prisma.notification.deleteMany({ where: { tenantId } });
+    return { success: true, data: { cleared: true } };
+  }
+
   async listIncidents(tenantId: string) {
     const incidents = await this.prisma.incident.findMany({
       where: { tenantId },
@@ -739,6 +756,7 @@ export class ControlRoomService {
         id: c.id,
         firstName: c.firstName,
         lastName: c.lastName,
+        email: c.email,
         phone: c.phone,
         role: c.role,
         subscription: c.subscription
@@ -869,8 +887,38 @@ export class ControlRoomService {
       success: true,
       data: officers.map((o) => {
         const vehicle = crewIndex.get(o.id);
+        const lastHeartbeatAt = o.lastHeartbeatAt?.toISOString() ?? null;
+        const heartbeatAgeMs = o.lastHeartbeatAt
+          ? Date.now() - o.lastHeartbeatAt.getTime()
+          : null;
+        const staleMs = 3 * 60 * 1000;
+        const deviceOnline =
+          o.dutyModeActive && heartbeatAgeMs != null && heartbeatAgeMs <= staleMs;
+        const deviceLink = !o.dutyModeActive
+          ? 'STANDBY'
+          : !o.lastHeartbeatAt
+            ? 'NO_SIGNAL'
+            : deviceOnline
+              ? 'ONLINE'
+              : 'OFFLINE';
         return {
-          ...o,
+          id: o.id,
+          firstName: o.firstName,
+          lastName: o.lastName,
+          email: o.email,
+          status: o.status,
+          zone: o.zone,
+          avgResponseSec: o.avgResponseSec,
+          currentLat: o.currentLat ? Number(o.currentLat) : null,
+          currentLng: o.currentLng ? Number(o.currentLng) : null,
+          dutyModeActive: o.dutyModeActive,
+          dutyStartedAt: o.dutyStartedAt?.toISOString() ?? null,
+          lastHeartbeatAt,
+          deviceLabel: o.deviceLabel,
+          batteryPct: o.batteryPct,
+          networkType: o.networkType,
+          appVersion: o.appVersion,
+          deviceLink,
           avatarUrl: avatarByEmail.get(o.email) ?? null,
           vehicle: vehicle
             ? {
@@ -997,6 +1045,7 @@ export class ControlRoomService {
         ownerId: v.user.id,
         trackerLinked: v.trackerLinked,
         theftRecovery: v.theftRecovery,
+        emergencyStatus: v.emergencyStatus ?? (v.theftRecovery ? 'STOLEN' : null),
         immobiliserOn: v.immobiliserOn,
         doorsLocked: v.doorsLocked,
         lat: v.lastKnownLat != null ? Number(v.lastKnownLat) : null,
@@ -1088,6 +1137,11 @@ export class ControlRoomService {
       avatarUrl?: string;
       branchId?: string | null;
       teamIds?: string[];
+      familyId?: string | null;
+      linkToClientId?: string | null;
+      familyRelationship?: string | null;
+      createFamily?: boolean;
+      familyName?: string | null;
     },
     actor: { role: UserRole },
   ) {
@@ -1108,6 +1162,18 @@ export class ControlRoomService {
     await this.validateBranchAndTeams(tenantId, body.branchId, body.teamIds);
 
     const isClientRole = body.role === 'USER' || body.role === 'FAMILY_MEMBER';
+    const relationship = body.familyRelationship?.trim() || null;
+    const wantsFamilyLink = Boolean(
+      body.familyId || body.linkToClientId || body.createFamily || body.role === 'FAMILY_MEMBER',
+    );
+
+    if (wantsFamilyLink && !isClientRole) {
+      throw new BadRequestException('Family linking is only available for client accounts');
+    }
+    if ((body.familyId || body.linkToClientId || body.role === 'FAMILY_MEMBER') && !relationship) {
+      throw new BadRequestException('Select a family relationship type (Spouse, Child, Parent, …)');
+    }
+
     if (
       body.password?.trim() &&
       !isClientRole &&
@@ -1188,6 +1254,20 @@ export class ControlRoomService {
         });
       }
 
+      if (isClientRole && wantsFamilyLink) {
+        await this.linkUserToFamily(tx, tenantId, created, {
+          familyId: body.familyId,
+          linkToClientId: body.linkToClientId,
+          relationship:
+            relationship ||
+            (body.createFamily && !body.familyId && !body.linkToClientId
+              ? 'Account holder'
+              : null),
+          createFamily: Boolean(body.createFamily),
+          familyName: body.familyName,
+        });
+      }
+
       return tx.user.findUniqueOrThrow({
         where: { id: created.id },
         include: this.managedUserInclude(),
@@ -1195,6 +1275,139 @@ export class ControlRoomService {
     });
 
     return { success: true, data: this.formatManagedUser(user) };
+  }
+
+  async listFamilies(tenantId: string) {
+    const families = await this.prisma.family.findMany({
+      where: { tenantId },
+      orderBy: { createdAt: 'desc' },
+      include: {
+        owner: { select: { id: true, firstName: true, lastName: true, email: true } },
+        members: {
+          include: {
+            user: { select: { id: true, firstName: true, lastName: true, email: true, role: true } },
+          },
+        },
+      },
+    });
+
+    return {
+      success: true,
+      data: families.map((f) => ({
+        id: f.id,
+        name: f.name,
+        ownerUserId: f.ownerUserId,
+        ownerName: `${f.owner.firstName} ${f.owner.lastName}`.trim(),
+        ownerEmail: f.owner.email,
+        memberCount: f.members.length,
+        members: f.members.map((m) => ({
+          userId: m.userId,
+          name: `${m.user.firstName} ${m.user.lastName}`.trim(),
+          email: m.user.email,
+          role: m.user.role,
+          relationship: m.relationship,
+          nickname: m.nickname,
+        })),
+      })),
+    };
+  }
+
+  private async linkUserToFamily(
+    tx: Prisma.TransactionClient,
+    tenantId: string,
+    user: { id: string; firstName: string; lastName: string; role: UserRole },
+    opts: {
+      familyId?: string | null;
+      linkToClientId?: string | null;
+      relationship: string | null;
+      createFamily: boolean;
+      familyName?: string | null;
+    },
+  ) {
+    let familyId = opts.familyId?.trim() || null;
+
+    if (!familyId && opts.linkToClientId) {
+      const primary = await tx.user.findFirst({
+        where: {
+          id: opts.linkToClientId,
+          tenantId,
+          role: { in: [UserRole.USER, UserRole.FAMILY_MEMBER] },
+        },
+        select: { id: true, firstName: true, lastName: true },
+      });
+      if (!primary) throw new BadRequestException('Primary client not found for family link');
+
+      const owned = await tx.family.findFirst({
+        where: { tenantId, ownerUserId: primary.id },
+        select: { id: true },
+      });
+      if (owned) {
+        familyId = owned.id;
+      } else {
+        const membership = await tx.familyMember.findFirst({
+          where: { userId: primary.id, family: { tenantId } },
+          select: { familyId: true },
+        });
+        if (membership) {
+          familyId = membership.familyId;
+        } else {
+          const createdFamily = await tx.family.create({
+            data: {
+              tenantId,
+              name: `${primary.firstName} ${primary.lastName}`.trim() + ' Family',
+              ownerUserId: primary.id,
+            },
+          });
+          familyId = createdFamily.id;
+          await tx.familyMember.create({
+            data: {
+              familyId,
+              userId: primary.id,
+              relationship: 'Account holder',
+              nickname: primary.firstName,
+            },
+          });
+        }
+      }
+    }
+
+    if (!familyId && opts.createFamily) {
+      const name =
+        opts.familyName?.trim() ||
+        `${user.firstName} ${user.lastName}`.trim() + ' Family';
+      const createdFamily = await tx.family.create({
+        data: {
+          tenantId,
+          name,
+          ownerUserId: user.id,
+        },
+      });
+      familyId = createdFamily.id;
+    }
+
+    if (!familyId) {
+      throw new BadRequestException('Choose a family group or primary client to link');
+    }
+
+    const family = await tx.family.findFirst({
+      where: { id: familyId, tenantId },
+      select: { id: true },
+    });
+    if (!family) throw new BadRequestException('Family group not found');
+
+    await tx.familyMember.upsert({
+      where: { familyId_userId: { familyId, userId: user.id } },
+      update: {
+        relationship: opts.relationship,
+        nickname: user.firstName,
+      },
+      create: {
+        familyId,
+        userId: user.id,
+        relationship: opts.relationship,
+        nickname: user.firstName,
+      },
+    });
   }
 
   async updateUser(
@@ -2243,6 +2456,91 @@ export class ControlRoomService {
     }
     if (text.includes('alarm') || text.includes('property')) return '/control-room/map?focus=properties';
     return '/control-room';
+  }
+
+  async getSecuritySettings(tenantId: string) {
+    const tenant = await this.prisma.tenant.findUnique({
+      where: { id: tenantId },
+      select: { settings: true },
+    });
+    if (!tenant) throw new NotFoundException('Tenant not found');
+    const security = this.readSecuritySettings(tenant.settings);
+    return { success: true, data: security };
+  }
+
+  async updateSecuritySettings(
+    tenantId: string,
+    patch: {
+      mfaOwners?: boolean;
+      mfaDispatchers?: boolean;
+      sessionMinutes?: string;
+      lockoutAttempts?: string;
+      passwordDays?: string;
+      deviceHeartbeat?: boolean;
+    },
+  ) {
+    const tenant = await this.prisma.tenant.findUnique({
+      where: { id: tenantId },
+      select: { settings: true },
+    });
+    if (!tenant) throw new NotFoundException('Tenant not found');
+
+    const root =
+      tenant.settings && typeof tenant.settings === 'object' && !Array.isArray(tenant.settings)
+        ? { ...(tenant.settings as Record<string, unknown>) }
+        : {};
+    const prev = this.readSecuritySettings(tenant.settings);
+    const next = {
+      ...prev,
+      ...(typeof patch.mfaOwners === 'boolean' ? { mfaOwners: patch.mfaOwners } : {}),
+      ...(typeof patch.mfaDispatchers === 'boolean' ? { mfaDispatchers: patch.mfaDispatchers } : {}),
+      ...(patch.sessionMinutes !== undefined ? { sessionMinutes: patch.sessionMinutes } : {}),
+      ...(patch.lockoutAttempts !== undefined ? { lockoutAttempts: patch.lockoutAttempts } : {}),
+      ...(patch.passwordDays !== undefined ? { passwordDays: patch.passwordDays } : {}),
+      ...(typeof patch.deviceHeartbeat === 'boolean'
+        ? { deviceHeartbeat: patch.deviceHeartbeat }
+        : {}),
+    };
+
+    root.security = next;
+    await this.prisma.tenant.update({
+      where: { id: tenantId },
+      data: { settings: root as Prisma.InputJsonValue },
+    });
+
+    return { success: true, data: next };
+  }
+
+  private readSecuritySettings(settingsJson: Prisma.JsonValue | null) {
+    const defaults = {
+      mfaOwners: true,
+      mfaDispatchers: false,
+      sessionMinutes: '30',
+      lockoutAttempts: '5',
+      passwordDays: '90',
+      deviceHeartbeat: true,
+    };
+    if (!settingsJson || typeof settingsJson !== 'object' || Array.isArray(settingsJson)) {
+      return defaults;
+    }
+    const root = settingsJson as Record<string, unknown>;
+    const security = root.security;
+    if (!security || typeof security !== 'object' || Array.isArray(security)) {
+      return defaults;
+    }
+    const s = security as Record<string, unknown>;
+    return {
+      mfaOwners: typeof s.mfaOwners === 'boolean' ? s.mfaOwners : defaults.mfaOwners,
+      mfaDispatchers:
+        typeof s.mfaDispatchers === 'boolean' ? s.mfaDispatchers : defaults.mfaDispatchers,
+      sessionMinutes:
+        typeof s.sessionMinutes === 'string' ? s.sessionMinutes : defaults.sessionMinutes,
+      lockoutAttempts:
+        typeof s.lockoutAttempts === 'string' ? s.lockoutAttempts : defaults.lockoutAttempts,
+      passwordDays: typeof s.passwordDays === 'string' ? s.passwordDays : defaults.passwordDays,
+      deviceHeartbeat:
+        typeof s.deviceHeartbeat === 'boolean' ? s.deviceHeartbeat : defaults.deviceHeartbeat,
+    };
   }
 
   private canManageUserPasswords(role: UserRole): boolean {

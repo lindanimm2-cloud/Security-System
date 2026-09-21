@@ -38,6 +38,12 @@ test('parses common user agents', () => {
   );
   assert.equal(desktop.deviceType, 'desktop');
   assert.match(desktop.name, /Chrome \/ Windows/);
+
+  const wear = parseUserAgent(
+    'Mozilla/5.0 (Linux; Android 13; Wear OS Pixel Watch) AppleWebKit/537.36 Chrome/120.0.0.0 Mobile Safari/537.36',
+  );
+  assert.equal(wear.deviceType, 'watch');
+  assert.equal(wear.platformFamily, 'wearos');
 });
 
 test('does not claim native SOS on web user agents', () => {

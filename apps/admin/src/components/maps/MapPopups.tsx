@@ -234,6 +234,9 @@ export function VehiclePopup({
               doorsLocked: vehicle.doorsLocked ?? true,
               immobiliserOn: Boolean(vehicle.immobiliserOn),
               theftRecovery: Boolean(vehicle.theftRecovery || vehicle.vehicleType === 'STOLEN'),
+              emergencyStatus:
+                vehicle.emergencyStatus ??
+                (vehicle.theftRecovery || vehicle.vehicleType === 'STOLEN' ? 'STOLEN' : null),
             }}
             model={{
               make: vehicle.make,
@@ -245,6 +248,11 @@ export function VehiclePopup({
               online: true,
               gpsLive: vehicle.lat != null && vehicle.lng != null,
               speedKph: typeof vehicle.speed === 'number' ? vehicle.speed : null,
+              vehicleType: vehicle.vehicleType ?? null,
+              stolen: vehicle.vehicleType === 'STOLEN' || Boolean(vehicle.theftRecovery),
+              emergencyStatus:
+                vehicle.emergencyStatus ??
+                (vehicle.theftRecovery || vehicle.vehicleType === 'STOLEN' ? 'STOLEN' : null),
             }}
             onCommand={onRemote}
           />
@@ -256,9 +264,16 @@ export function VehiclePopup({
               doorsLocked: vehicle.doorsLocked ?? true,
               immobiliserOn: Boolean(vehicle.immobiliserOn),
               theftRecovery: Boolean(vehicle.theftRecovery || vehicle.vehicleType === 'STOLEN'),
+              emergencyStatus:
+                vehicle.emergencyStatus ??
+                (vehicle.theftRecovery || vehicle.vehicleType === 'STOLEN' ? 'STOLEN' : null),
             }}
             vehicleLabel={[vehicle.make, vehicle.model].filter(Boolean).join(' ') || null}
             registration={vehicle.registration ?? null}
+            emergencyStatus={
+              vehicle.emergencyStatus ??
+              (vehicle.theftRecovery || vehicle.vehicleType === 'STOLEN' ? 'STOLEN' : null)
+            }
             onCommand={onRemote}
           />
         </>

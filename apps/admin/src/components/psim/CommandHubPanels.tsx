@@ -18,9 +18,12 @@ import type {
   PatrolRouteRow,
   WatchlistRow,
 } from '@/lib/demo/demo-psim';
+import type { OfficerPatrolShift } from '@/lib/demo/demo-patrol-shift';
 import type { IntegrationEntry } from '@/lib/psim/integration-catalog';
 import type { DispatchRule } from '@/lib/psim/integration-catalog';
 import type { NormalizedSecurityEvent } from '@/lib/psim/security-events';
+import { PropertyCommandPanel } from '@/components/access/PropertyCommandPanel';
+import { ProgressBar } from '@/components/ui/ProgressBar';
 
 export type PsimTab =
   | 'overview'
@@ -65,6 +68,16 @@ type PsimBundle = {
   alarms: AlarmFeedRow[];
   access: AccessDoorRow[];
   patrols: PatrolRouteRow[];
+  patrolPhotos?: {
+    shift: OfficerPatrolShift;
+    summary: {
+      requiredTotal: number;
+      requiredDone: number;
+      requiredRemaining: number;
+      photosTaken: number;
+      progressPct: number;
+    };
+  };
   compliance: ComplianceRow[];
   watchlists: WatchlistRow[];
   rules: DispatchRule[];
@@ -102,8 +115,12 @@ export function CommandHubPanels({ initialTab = 'overview' }: { initialTab?: Psi
         {tab === 'overview' && <OverviewPanel data={bundle.overview} onNav={setTab} />}
         {tab === 'alarms' && <AlarmsPanel rows={bundle.alarms} onAck={reload} />}
         {tab === 'events' && <EventsPanel events={bundle.events} onAck={reload} />}
-        {tab === 'access' && <AccessPanel rows={bundle.access} />}
-        {tab === 'patrols' && <PatrolsPanel rows={bundle.patrols} />}
+        {tab === 'access' && (
+          <AccessPanel rows={bundle.access} onReload={reload} />
+        )}
+        {tab === 'patrols' && (
+          <PatrolsPanel rows={bundle.patrols} photoShift={bundle.patrolPhotos} />
+        )}
         {tab === 'compliance' && <CompliancePanel rows={bundle.compliance} />}
         {tab === 'intelligence' && <WatchlistPanel rows={bundle.watchlists} />}
         {tab === 'rules' && <RulesPanel rules={bundle.rules} />}
@@ -271,39 +288,68 @@ function EventsPanel({
   );
 }
 
-function AccessPanel({ rows }: { rows: AccessDoorRow[] }) {
+function AccessPanel({ rows, onReload }: { rows: AccessDoorRow[]; onReload: () => void }) {
   return (
-    <section className="psim-table-section">
-      <header className="card-header-row card-header-row--panel">
-        <div>
-          <h2>Access control</h2>
-          <p className="text-muted">Doors · readers · forced entry</p>
-        </div>
-      </header>
-      <div className="psim-cards">
-        {rows.map((d) => (
-          <article key={d.id} className={`psim-card psim-card--${d.status.toLowerCase()}`}>
-            <StatusBadge tone={doorTone(d.status)} label={d.status.replace(/_/g, ' ')} />
-            <strong>{d.name}</strong>
-            <span className="text-muted">{d.site}</span>
-            <p>{d.lastEvent}</p>
-            <time className="text-muted">{formatWhen(d.lastEventAt)}</time>
-          </article>
-        ))}
-      </div>
-    </section>
+    <PropertyCommandPanel
+      mode="control-room"
+      initialRows={rows}
+      allowEmergency
+      onChanged={onReload}
+    />
   );
 }
 
-function PatrolsPanel({ rows }: { rows: PatrolRouteRow[] }) {
+function PatrolsPanel({
+  rows,
+  photoShift,
+}: {
+  rows: PatrolRouteRow[];
+  photoShift?: PsimBundle['patrolPhotos'];
+}) {
   return (
     <section className="psim-table-section">
       <header className="card-header-row card-header-row--panel">
         <div>
-          <h2>Guard patrols & e-OB</h2>
-          <p className="text-muted">NFC checkpoints · daily activity reports</p>
+          <h2>Guard patrols & site photos</h2>
+          <p className="text-muted">NFC checkpoints · required site photos · e-OB / DAR</p>
         </div>
       </header>
+
+      {photoShift ? (
+        <article className="psim-card psim-card--photos">
+          <div className="psim-card__head">
+            <StatusBadge
+              tone={photoShift.summary.requiredRemaining === 0 ? 'success' : 'warning'}
+              label={
+                photoShift.summary.requiredRemaining === 0
+                  ? 'Photos complete'
+                  : `${photoShift.summary.requiredRemaining} sites pending`
+              }
+            />
+            <strong>{photoShift.shift.officerName} · shift photos</strong>
+          </div>
+          <span className="text-muted">{photoShift.shift.shiftLabel}</span>
+          <ProgressBar
+            value={photoShift.summary.requiredDone}
+            max={Math.max(1, photoShift.summary.requiredTotal)}
+            label={`${photoShift.summary.requiredDone}/${photoShift.summary.requiredTotal} required · ${photoShift.summary.photosTaken} photos`}
+            tone={photoShift.summary.requiredRemaining === 0 ? 'success' : 'warning'}
+          />
+          <ul className="psim-checkpoints">
+            {photoShift.shift.stops
+              .filter((s) => s.required)
+              .map((s) => (
+                <li key={s.id} className={s.status === 'DONE' ? 'done' : 'miss'}>
+                  {s.siteName}
+                  {s.status === 'DONE'
+                    ? ` · ${s.photos.length} photo${s.photos.length === 1 ? '' : 's'}`
+                    : ' · photo required'}
+                </li>
+              ))}
+          </ul>
+        </article>
+      ) : null}
+
       <div className="psim-cards psim-cards--wide">
         {rows.map((p) => (
           <article key={p.id} className="psim-card">
@@ -314,7 +360,10 @@ function PatrolsPanel({ rows }: { rows: PatrolRouteRow[] }) {
             <span className="text-muted">{p.site} · {p.officer}</span>
             <div className="psim-progress">
               <div className="psim-progress__bar" style={{ width: `${p.progress}%` }} />
-              <span>{p.progress}% · {p.checkpoints.filter((c) => c.scannedAt).length}/{p.checkpoints.length} scans</span>
+              <span>
+                {p.progress}% · {p.checkpoints.filter((c) => c.scannedAt).length}/
+                {p.checkpoints.length} scans
+              </span>
             </div>
             <ul className="psim-checkpoints">
               {p.checkpoints.map((cp) => (
@@ -486,13 +535,6 @@ function alarmStatusTone(status: string): StatusTone {
   if (status === 'NEW') return 'danger';
   if (status === 'ACK') return 'warning';
   if (status === 'DISPATCHED') return 'active';
-  return 'neutral';
-}
-
-function doorTone(status: string): StatusTone {
-  if (status === 'SECURE') return 'success';
-  if (status === 'OPEN') return 'warning';
-  if (status === 'FORCED') return 'danger';
   return 'neutral';
 }
 

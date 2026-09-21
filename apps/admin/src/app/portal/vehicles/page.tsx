@@ -10,6 +10,7 @@ import { UpgradeBanner } from '@/components/portal/UpgradeBanner';
 import { useSubscriptionAccess } from '@/hooks/useSubscriptionAccess';
 import { useApi } from '@/hooks/useApi';
 import { clientApi, type ApiResponse } from '@/lib/api-client';
+import { vehicleEmergencyMeta } from '@/lib/vehicle-emergency-status';
 
 type Vehicle = {
   id: string;
@@ -22,6 +23,7 @@ type Vehicle = {
   vin: string | null;
   trackerLinked: boolean;
   theftRecovery: boolean;
+  emergencyStatus?: string | null;
   immobiliserOn: boolean;
   insuranceInfo: string | null;
 };
@@ -71,12 +73,16 @@ function VehiclesContent() {
               <div className="entity-card-header">
                 <span className="entity-card-title">{v.registration}</span>
                 <span className={`status-pill ${v.theftRecovery ? 'status-pill--alert' : 'status-pill--ok'}`}>
-                  {v.theftRecovery ? 'Recovery active' : 'Secure'}
+                  {v.theftRecovery ? vehicleEmergencyMeta(v.emergencyStatus).label : 'Secure'}
                 </span>
               </div>
               <p>{v.year} {v.make} {v.model}</p>
               <p className="text-muted">
-                {v.immobiliserOn ? 'Immobiliser on' : v.theftRecovery ? 'Recovery active' : 'Remote lock ready'}
+                {v.immobiliserOn
+                  ? 'Immobiliser on'
+                  : v.theftRecovery
+                    ? `${vehicleEmergencyMeta(v.emergencyStatus).badge} · recovery active`
+                    : 'Remote lock ready'}
                 {v.insuranceInfo ? ` · ${v.insuranceInfo}` : ''}
               </p>
               <span className="feature-action">Open vehicle profile</span>

@@ -4,6 +4,9 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { HoldToActivate } from '@/components/ops/EmergencyMode';
 import { OpsCommandTile } from '@/components/ops/OpsUi';
 import type { VehicleRemoteAction, VehicleRemoteState } from '@/lib/vehicle-remote';
+import { vehicleEmergencyMeta } from '@/lib/vehicle-emergency-status';
+import { VehicleEmergencyStatusPicker } from '@/components/vehicle/VehicleEmergencyStatusPicker';
+import type { VehicleEmergencyStatus } from '@/lib/vehicle-emergency-status';
 
 type FeedbackPhase = 'loading' | 'success' | 'error';
 
@@ -20,8 +23,11 @@ type VehicleRemotePadProps = {
   /** Optional labels for confirmation dialogs. */
   vehicleLabel?: string | null;
   registration?: string | null;
+  /** Active emergency situation while recovery is on */
+  emergencyStatus?: string | null;
   /** Return false on failure; thrown errors count as failure. */
   onCommand: (action: VehicleRemoteAction) => void | boolean | Promise<void | boolean>;
+  onEmergencyStatusChange?: (status: VehicleEmergencyStatus) => void | Promise<void>;
 };
 
 const FEEDBACK_MS = 2200;
@@ -37,13 +43,17 @@ export function VehicleRemotePad({
   children,
   vehicleLabel = null,
   registration = null,
+  emergencyStatus = null,
   onCommand,
+  onEmergencyStatusChange,
 }: VehicleRemotePadProps) {
   const ops = variant === 'ops';
   const locked = state.doorsLocked;
   const cut = state.immobiliserOn;
   const panic = Boolean(state.panicActive) || Boolean(state.theftRecovery);
+  const emergency = vehicleEmergencyMeta(emergencyStatus ?? (state.theftRecovery ? 'STOLEN' : null));
   const [feedback, setFeedback] = useState<Partial<Record<VehicleRemoteAction, FeedbackPhase>>>({});
+  const [statusBusy, setStatusBusy] = useState(false);
   const [killOpen, setKillOpen] = useState(false);
   const [killAck, setKillAck] = useState(false);
   const timersRef = useRef<Partial<Record<VehicleRemoteAction, number>>>({});
@@ -118,7 +128,7 @@ export function VehicleRemotePad({
     (action: VehicleRemoteAction, idle: string, loading: string) => {
       const phase = feedback[action] ?? (busyAction === action ? 'loading' : null);
       if (phase === 'loading') return loading;
-      if (phase === 'success') return 'Successful';
+      if (phase === 'success') return 'Done';
       if (phase === 'error') return 'Failed';
       return idle;
     },
@@ -178,7 +188,7 @@ export function VehicleRemotePad({
               title="Unlock all doors"
               description="Grant access"
               stateLabel={stateLabel('unlock', !locked ? 'Unlocked' : 'Ready')}
-              tone="info"
+              tone="warn"
               active={!locked}
               icon={<UnlockIcon />}
               disabled={disabled || anyBusy || !locked || isBusy('unlock')}
@@ -193,9 +203,10 @@ export function VehicleRemotePad({
             <OpsCommandTile
               title="Disable ignition"
               description="Prevent vehicle from starting"
-              stateLabel={stateLabel('immobilise', cut ? 'Disabled' : 'Enabled')}
-              tone="warn"
+              stateLabel={stateLabel('immobilise', cut ? 'Disabled' : 'Armed')}
+              tone={cut ? 'danger' : 'muted'}
               active={cut}
+              holdMs={1600}
               icon={<CutIcon />}
               disabled={disabled || anyBusy || cut || isBusy('immobilise')}
               onClick={() => {
@@ -204,11 +215,12 @@ export function VehicleRemotePad({
               }}
             />
             <OpsCommandTile
-              title="Authorize start"
+              title="Authorise start"
               description="Release immobiliser"
               stateLabel={stateLabel('release', cut ? 'Ready' : 'Live')}
               tone="info"
               active={!cut}
+              holdMs={1400}
               icon={<KeyIcon />}
               disabled={disabled || anyBusy || !cut || isBusy('release')}
               onClick={() => void runCommand('release')}
@@ -219,6 +231,7 @@ export function VehicleRemotePad({
               stateLabel={stateLabel('horn', state.hornActive ? 'Active' : 'Ready')}
               tone="purple"
               active={Boolean(state.hornActive)}
+              holdMs={1200}
               icon={<HornIcon />}
               disabled={disabled || anyBusy || isBusy('horn')}
               onClick={() => void runCommand('horn')}
@@ -232,9 +245,28 @@ export function VehicleRemotePad({
             {state.theftRecovery ? (
               <div className="ops-cmd-panic">
                 <div className="ops-cmd-panic__copy">
-                  <strong>Theft recovery</strong>
-                  <span>Clear recovery mode when the vehicle is secured.</span>
+                  <strong>{emergency.label}</strong>
+                  <span>
+                    Update the situation so responders and notifications stay accurate, then clear when
+                    secured.
+                  </span>
                 </div>
+                {onEmergencyStatusChange ? (
+                  <VehicleEmergencyStatusPicker
+                    status={emergency.value}
+                    disabled={disabled}
+                    busy={statusBusy || anyBusy}
+                    compact
+                    onChange={async (next) => {
+                      setStatusBusy(true);
+                      try {
+                        await onEmergencyStatusChange(next);
+                      } finally {
+                        setStatusBusy(false);
+                      }
+                    }}
+                  />
+                ) : null}
                 <button
                   type="button"
                   className="ops-cmd-panic__btn ops-cmd-panic__btn--clear"
@@ -299,14 +331,16 @@ export function VehicleRemotePad({
               >
                 Cancel
               </button>
-              <button
-                type="button"
-                className="btn-danger"
+              <HoldToActivate
+                label={label('immobilise', 'Confirm disable', 'Disabling…')}
+                holdMs={1400}
+                tone="danger"
+                keepLabel
                 disabled={!killAck || disabled || anyBusy || isBusy('immobilise')}
-                onClick={() => void runCommand('immobilise')}
-              >
-                {label('immobilise', 'Confirm disable', 'Disabling…')}
-              </button>
+                loading={feedback.immobilise === 'loading' || busyAction === 'immobilise'}
+                className="hold-activate--console btn-danger"
+                onActivate={() => void runCommand('immobilise')}
+              />
             </div>
           </div>
         ) : null}
@@ -328,7 +362,7 @@ export function VehicleRemotePad({
             {cut ? 'Immobiliser on' : 'Starter live'}
           </span>
           {state.theftRecovery ? (
-            <span className="status-pill status-pill--alert">Recovery</span>
+            <span className="status-pill status-pill--alert">Stolen · Recovery</span>
           ) : null}
           {state.hornActive ? <span className="status-pill status-pill--sync">Horn</span> : null}
         </div>
@@ -369,31 +403,43 @@ export function VehicleRemotePad({
           className={`${btnClass('immobilise', `vehicle-remote__hold vehicle-remote__btn--cut ${cut ? 'vehicle-remote__btn--on' : ''}`)}`}
           onActivate={() => void runCommand('immobilise')}
         />
-        <button
-          type="button"
-          className={btnClass('release')}
+        <HoldToActivate
+          label={label('release', 'Authorise start', 'Authorising…')}
+          holdLabel="Hold to authorise"
+          holdMs={1400}
+          tone="warn"
+          keepLabel
+          hideHint={compact}
+          loading={feedback.release === 'loading' || busyAction === 'release'}
           disabled={disabled || anyBusy || !cut || isBusy('release')}
-          onClick={tap('release')}
+          className={`${btnClass('release', 'vehicle-remote__hold')}`}
+          onActivate={() => void runCommand('release')}
         >
           <span className="vehicle-remote__icon" aria-hidden>
             <KeyIcon />
           </span>
-          <strong>{label('release', 'Authorize start', 'Authorizing…')}</strong>
-        </button>
-        <button
-          type="button"
-          className={btnClass(
-            'horn',
-            `${state.hornActive ? 'vehicle-remote__btn--on' : ''} ${hidePanic ? 'vehicle-remote__btn--span' : ''}`,
-          )}
+          <strong>{label('release', 'Authorise start', 'Authorising…')}</strong>
+        </HoldToActivate>
+        <HoldToActivate
+          label={label('horn', 'Horn / lights', 'Pulsing…')}
+          holdLabel="Hold to pulse"
+          holdMs={1200}
+          tone="warn"
+          keepLabel
+          hideHint={compact}
+          loading={feedback.horn === 'loading' || busyAction === 'horn'}
           disabled={disabled || anyBusy || isBusy('horn')}
-          onClick={tap('horn')}
+          className={`${btnClass(
+            'horn',
+            `vehicle-remote__hold ${state.hornActive ? 'vehicle-remote__btn--on' : ''} ${hidePanic ? 'vehicle-remote__btn--span' : ''}`,
+          )}`}
+          onActivate={() => void runCommand('horn')}
         >
           <span className="vehicle-remote__icon" aria-hidden>
             <HornIcon />
           </span>
           <strong>{label('horn', 'Horn / lights', 'Pulsing…')}</strong>
-        </button>
+        </HoldToActivate>
         {hidePanic ? null : (
           <HoldToActivate
             label={label('panic', 'Vehicle panic', 'Sending…')}
@@ -439,13 +485,14 @@ function UnlockIcon() {
   );
 }
 
-/** Authorize start / immobiliser release */
+/** Authorise start / immobiliser release */
 function KeyIcon() {
   return (
     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="10" cy="14" r="5.25" />
-      <path d="M13.75 10.25L20 4" />
-      <path d="M15.5 4H20v4.5" />
+      <circle cx="8" cy="15" r="4.25" />
+      <path d="M11.5 12.5L20 4.5" />
+      <path d="M16.5 4.5h3.5V8" />
+      <path d="M15 8.5l2.2 2.2" />
     </svg>
   );
 }

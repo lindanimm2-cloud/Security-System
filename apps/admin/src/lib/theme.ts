@@ -19,7 +19,7 @@ export const THEME_PREFERENCE_LABELS: Record<ThemePreference, string> = {
 
 export const THEME_PREFERENCE_HINTS: Record<ThemePreference, string> = {
   light: 'Always use light mode.',
-  dark: 'Default for ops — always use dark mode.',
+  dark: 'Always use dark mode across all portals.',
   system: 'Match your device appearance setting.',
   schedule: 'Dark from 6:00 PM to 6:00 AM, light during the day.',
 };

@@ -255,13 +255,46 @@ export class StoreController {
   techJobStatus(
     @CurrentUser() user: AuthUser,
     @Param('id') id: string,
-    @Body() body: { status: InstallJobStatus },
+    @Body() body: { status: InstallJobStatus | string; overrideReason?: string },
   ) {
     return this.store.updateInstallJobStatus(
       user.tenantId,
       id,
       body.status,
       user.id,
+      body.overrideReason,
+    );
+  }
+
+  @Patch('tech/jobs/:id/tests')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.TECHNICIAN)
+  techJobTests(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Body() body: { tests: Array<{ id: string; label: string; done: boolean }> },
+  ) {
+    return this.store.updateInstallJobChecklist(
+      user.tenantId,
+      id,
+      user.id,
+      body?.tests ?? [],
+    );
+  }
+
+  @Patch('tech/jobs/:id/serial')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.TECHNICIAN)
+  techJobSerial(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Body() body: { serial: string },
+  ) {
+    return this.store.updateInstallJobSerial(
+      user.tenantId,
+      id,
+      user.id,
+      body?.serial ?? '',
     );
   }
 
@@ -270,6 +303,64 @@ export class StoreController {
   @Roles(UserRole.TECHNICIAN)
   techProperties(@CurrentUser() user: AuthUser) {
     return this.surveillance.listTenantPropertiesForTech(user.tenantId);
+  }
+
+  @Get('tech/cctv-systems')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.TECHNICIAN)
+  techCctvSystems(@CurrentUser() user: AuthUser) {
+    return this.surveillance.listCctvSystems(user.tenantId);
+  }
+
+  @Post('tech/cctv-systems')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.TECHNICIAN)
+  techRegisterCctvSystem(
+    @CurrentUser() user: AuthUser,
+    @Body()
+    body: {
+      propertyId?: string;
+      clientUserId?: string;
+      site?: {
+        name: string;
+        address: string;
+        propertyType?: string;
+        accessNotes?: string;
+        gateCode?: string;
+      };
+      system: {
+        name: string;
+        brand?: string;
+        model?: string;
+        kitSku?: string;
+        supplier?: string;
+        recorderType?: string;
+        channelCount?: number;
+        connectivity?: string;
+        recorderSerial?: string;
+        recorderIp?: string;
+        cloudId?: string;
+        hddInstalled?: boolean;
+        hddSerial?: string;
+        hddCapacityGb?: number;
+        firmware?: string;
+        mobileAppEnabled?: boolean;
+        techNotes?: string;
+        status?: string;
+      };
+      cameras?: Array<{
+        name: string;
+        locationLabel: string;
+        channel?: number;
+        serialNumber?: string;
+        model?: string;
+        resolution?: string;
+        placement?: 'EXTERIOR' | 'INTERIOR';
+        vendor?: string;
+      }>;
+    },
+  ) {
+    return this.surveillance.registerCctvSystem(user.tenantId, body);
   }
 
   @Post('tech/properties/:id/cameras')
@@ -285,6 +376,11 @@ export class StoreController {
         locationLabel: string;
         channel?: number;
         vendor?: string;
+        placement?: 'EXTERIOR' | 'INTERIOR';
+        serialNumber?: string;
+        model?: string;
+        resolution?: string;
+        systemId?: string;
       }[];
     },
   ) {

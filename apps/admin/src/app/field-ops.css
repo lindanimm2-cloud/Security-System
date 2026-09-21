@@ -1,0 +1,2496 @@
+/**
+ * 4DS Field Operations ? shared ops visual system.
+ * DJI-style charcoal console for all portals via .shell--ops (officer alias kept).
+ */
+
+:is(.shell--ops, .shell--officer) {
+  --field-bg: #050505;
+  --field-bg-2: #121212;
+  --field-surface: #1c1c1e;
+  --field-elevated: #2a2a2c;
+  --field-border: transparent;
+  --field-text: #ffffff;
+  --field-muted: #8e8e93;
+  --field-green: #34d399;
+  --field-amber: #fdd835;
+  --field-red: #ef4444;
+  --field-olive: #8a8a8a;
+  --field-steel: #6b6b6b;
+  --field-radius: 26px;
+  --field-radius-sm: 14px;
+  --field-radius-xs: 10px;
+
+  --bg: var(--field-bg);
+  --surface: var(--field-surface);
+  --surface-2: var(--field-elevated);
+  --border: var(--field-border);
+  --text: var(--field-text);
+  --muted: var(--field-muted);
+  --success: var(--field-green);
+  --warning: var(--field-amber);
+  --danger: var(--field-red);
+  --accent: #ef4444;
+  --accent-soft: rgba(239, 68, 68, 0.14);
+  --accent-text: #fb7185;
+  --data-accent: #fdd835;
+  --radius-sm: var(--field-radius-sm);
+  --radius-md: var(--field-radius);
+  --radius-lg: 28px;
+  --panel-radius: 26px;
+  --module-gap: 0.85rem;
+  --cr-panel: var(--field-surface);
+  --cr-surface: #2a2a2c;
+  --cr-surface-hover: #323234;
+  --cr-surface-active: #3a3a3c;
+  --cr-edge: transparent;
+  --cr-edge-strong: rgba(255, 255, 255, 0.1);
+  --btn-metal: linear-gradient(180deg, #3a3a3c 0%, #2c2c2e 48%, #1f1f21 100%);
+  --btn-metal-hover: linear-gradient(180deg, #48484a 0%, #363638 48%, #2a2a2c 100%);
+  --btn-metal-active: linear-gradient(180deg, #242426 0%, #1a1a1c 100%);
+  --btn-metal-border: rgba(255, 255, 255, 0.1);
+  --btn-metal-inset: inset 0 1px 0 rgba(255, 255, 255, 0.14), inset 0 -1px 0 rgba(0, 0, 0, 0.45);
+  --btn-metal-text: #f5f5f7;
+
+  color: var(--field-text);
+  background-color: var(--field-bg);
+  background-image: none;
+}
+
+:is(.shell--ops, .shell--officer) .officer-main,
+:is(.shell--ops, .shell--officer) .officer-content {
+  background: transparent;
+}
+
+:is(.shell--ops, .shell--officer) .officer-content {
+  padding-bottom: 1.25rem;
+}
+
+:is(.shell--ops, .shell--officer) .portal-card,
+:is(.shell--ops, .shell--officer) .ops-section,
+:is(.shell--ops, .shell--officer) .ops-queue-card,
+:is(.shell--ops, .shell--officer) .officer-standby {
+  background: #1c1c1e;
+  border: 0;
+  border-radius: var(--field-radius);
+  box-shadow: none;
+}
+
+:is(.shell--ops, .shell--officer) .btn-primary,
+:is(.shell--ops, .shell--officer) .btn-secondary,
+:is(.shell--ops, .shell--officer) .btn-ghost,
+:is(.shell--ops, .shell--officer) .btn-sm {
+  border-radius: var(--field-radius-sm);
+  background: transparent;
+  color: #d4d4d8;
+  border: 1px solid color-mix(in srgb, #d4d4d8 50%, transparent);
+  box-shadow: none;
+}
+
+:is(.shell--ops, .shell--officer) .btn-primary:hover:not(:disabled),
+:is(.shell--ops, .shell--officer) .btn-secondary:hover:not(:disabled),
+:is(.shell--ops, .shell--officer) .btn-ghost:hover:not(:disabled),
+:is(.shell--ops, .shell--officer) .btn-sm:hover:not(:disabled) {
+  background: color-mix(in srgb, currentColor 10%, transparent);
+  border-color: currentColor;
+  color: inherit;
+  filter: brightness(1.1);
+  box-shadow: 0 0 12px color-mix(in srgb, currentColor 20%, transparent);
+}
+
+:is(.shell--ops, .shell--officer) .btn-ok {
+  background: transparent;
+  color: #86efac;
+  border: 1px solid color-mix(in srgb, #86efac 55%, transparent);
+  box-shadow: none;
+}
+
+:is(.shell--ops, .shell--officer) .btn-danger {
+  background: transparent;
+  color: #f87171;
+  border: 1px solid color-mix(in srgb, #f87171 55%, transparent);
+  box-shadow: none;
+}
+
+:is(.shell--ops, .shell--officer) .btn-primary--accent,
+:is(.shell--ops, .shell--officer) .btn-primary--filled {
+  background: var(--btn-charcoal, #141414);
+  color: var(--btn-amber, #d49b5a);
+  border: 1.5px solid var(--btn-amber-border, rgba(212, 155, 90, 0.72));
+  box-shadow: none;
+}
+
+:is(.shell--ops, .shell--officer) .btn-primary--danger {
+  background: transparent;
+  color: #f87171;
+  border: 1px solid color-mix(in srgb, #f87171 55%, transparent);
+  box-shadow: none;
+}
+
+:is(.shell--ops, .shell--officer) .btn-primary--calm {
+  background: transparent;
+  color: #60a5fa;
+  border: 1px solid color-mix(in srgb, #60a5fa 55%, transparent);
+  box-shadow: none;
+}
+
+:is(.shell--ops, .shell--officer) .status-pill,
+:is(.shell--ops, .shell--officer) .badge {
+  border-radius: var(--field-radius-xs);
+}
+
+/* ??? Mobile top bar ??? */
+:is(.shell--ops, .shell--officer) .mobile-shell-header--officer {
+  background: color-mix(in srgb, var(--field-bg-2) 92%, transparent);
+  border-bottom: 1px solid var(--field-border);
+  backdrop-filter: blur(10px);
+}
+
+:is(.shell--ops, .shell--officer) .mobile-shell-header__title {
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--field-muted);
+}
+
+:is(.shell--ops, .shell--officer) .officer-topbar h1 {
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--field-muted);
+}
+
+/* ??? Sidebar ??? */
+:is(.shell--ops, .shell--officer) .officer-sidebar {
+  background: var(--field-bg-2);
+  border-right: 1px solid var(--field-border);
+}
+
+:is(.shell--ops, .shell--officer) .officer-sidebar-brand {
+  border-bottom: 1px solid var(--field-border);
+  padding: 0.85rem 0.9rem;
+  gap: 0.55rem;
+}
+
+.field-sidebar-head {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  min-width: 0;
+  flex: 1;
+}
+
+.field-sidebar-head__brand {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-width: 0;
+}
+
+.field-sidebar-head__kicker {
+  margin: 0;
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--field-olive);
+}
+
+.field-sidebar-head__title {
+  margin: 0;
+  font-size: 0.82rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  color: var(--field-text);
+}
+
+.field-sidebar-officer {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.45rem 0.55rem;
+  border-radius: var(--field-radius-sm);
+  border: 1px solid var(--field-border);
+  background: var(--field-surface);
+}
+
+.field-sidebar-officer__dot {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  background: var(--field-green);
+  box-shadow: 0 0 0 3px rgba(114, 199, 122, 0.18);
+  flex-shrink: 0;
+}
+
+.field-sidebar-officer__meta {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.25;
+}
+
+.field-sidebar-officer__name {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--field-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.field-sidebar-officer__role {
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--field-muted);
+}
+
+:is(.shell--ops, .shell--officer) .officer-sidebar-nav {
+  gap: 0.85rem;
+  padding: 0.75rem 0.55rem;
+}
+
+.field-nav-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.field-nav-group__label {
+  margin: 0 0 0.25rem 0.45rem;
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--field-steel);
+}
+
+:is(.shell--ops, .shell--officer) .officer-sidebar-link {
+  border: 0;
+  border-radius: var(--field-radius-sm);
+  padding: 0.55rem 0.7rem 0.55rem 0.85rem;
+  color: var(--field-muted);
+  background: transparent;
+}
+
+:is(.shell--ops, .shell--officer) .officer-sidebar-link:hover {
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--field-text);
+}
+
+:is(.shell--ops, .shell--officer) .officer-sidebar-link--active {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--field-text);
+  font-weight: 650;
+  border: 0;
+  box-shadow: inset 3px 0 0 rgba(255, 255, 255, 0.35);
+}
+
+:is(.shell--ops, .shell--officer) .officer-sidebar-footer {
+  border-top-color: var(--field-border);
+  padding: 0.85rem;
+}
+
+:is(.shell--ops, .shell--officer).sidebar--collapsed .field-sidebar-head__title,
+:is(.shell--ops, .shell--officer).sidebar--collapsed .field-sidebar-officer,
+:is(.shell--ops, .shell--officer) .sidebar--collapsed .field-sidebar-head__title,
+:is(.shell--ops, .shell--officer) .sidebar--collapsed .field-sidebar-officer,
+:is(.shell--ops, .shell--officer) .sidebar--collapsed .field-nav-group__label {
+  display: none;
+}
+
+:is(.shell--ops, .shell--officer) .sidebar--collapsed .officer-sidebar-link--active {
+  box-shadow: inset 3px 0 0 rgba(255, 255, 255, 0.35);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+/* ??? Field Home command ??? */
+.field-cmd {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.field-cmd-header {
+  padding: 0.95rem 1rem;
+  border-radius: var(--field-radius);
+  border: 1px solid var(--field-border);
+  background:
+    linear-gradient(180deg, rgba(102, 113, 91, 0.08), transparent 55%),
+    var(--field-surface);
+}
+
+.field-cmd-header__top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.55rem 1rem;
+}
+
+.field-cmd-header__kicker {
+  margin: 0;
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--field-olive);
+}
+
+.field-cmd-header__title {
+  margin: 0.15rem 0 0;
+  font-size: 1.15rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  color: var(--field-text);
+}
+
+.field-cmd-header__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem 0.75rem;
+  margin-top: 0.45rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--field-muted);
+}
+
+.field-status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.3rem 0.55rem;
+  border-radius: var(--field-radius-xs);
+  border: 1px solid color-mix(in srgb, var(--field-green) 35%, var(--field-border));
+  background: rgba(114, 199, 122, 0.1);
+  color: var(--field-green);
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.field-status-pill__dot {
+  width: 0.4rem;
+  height: 0.4rem;
+  border-radius: 50%;
+  background: currentColor;
+  box-shadow: 0 0 0 3px rgba(114, 199, 122, 0.15);
+}
+
+.field-metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.45rem;
+  margin-top: 0.85rem;
+}
+
+.field-metric {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding: 0.55rem 0.6rem 0.55rem 0.7rem;
+  border-radius: var(--field-radius-sm);
+  border: 1px solid var(--field-border);
+  background: var(--field-elevated);
+  text-align: left;
+  color: inherit;
+  cursor: pointer;
+  overflow: hidden;
+  font: inherit;
+}
+
+.field-metric::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: var(--field-steel);
+}
+
+.field-metric--warn::before { background: var(--field-amber); }
+.field-metric--urgent::before { background: var(--field-red); }
+.field-metric--ok::before { background: var(--field-green); }
+.field-metric.is-active {
+  border-color: color-mix(in srgb, var(--field-olive) 50%, var(--field-border));
+  background: rgba(102, 113, 91, 0.14);
+}
+
+.field-metric__label {
+  font-size: 0.58rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--field-muted);
+}
+
+.field-metric strong {
+  font-size: 1.15rem;
+  font-weight: 800;
+  line-height: 1;
+  color: var(--field-text);
+}
+
+.field-metric__hint {
+  font-size: 0.62rem;
+  color: var(--field-steel);
+  letter-spacing: 0.02em;
+}
+
+.field-ops-panel {
+  padding: 0.95rem 1rem;
+  border-radius: var(--field-radius);
+  border: 1px solid var(--field-border);
+  background: var(--field-surface);
+}
+
+.field-ops-panel__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.45rem;
+  margin-bottom: 0.75rem;
+  padding-bottom: 0.65rem;
+  border-bottom: 1px solid var(--field-border);
+}
+
+.field-ops-panel__kicker {
+  margin: 0;
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--field-olive);
+}
+
+.field-ops-panel__status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--field-green);
+}
+
+.field-ops-panel__label {
+  margin: 0 0 0.35rem;
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--field-muted);
+}
+
+.field-ops-panel h2 {
+  margin: 0 0 0.35rem;
+  font-size: 1.2rem;
+  font-weight: 800;
+  color: var(--field-text);
+}
+
+.field-ops-panel__detail {
+  margin: 0 0 0.85rem;
+  font-size: 0.84rem;
+  color: var(--field-muted);
+  line-height: 1.45;
+}
+
+.field-ops-panel__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.field-ops-panel__actions .btn-primary {
+  background: color-mix(in srgb, var(--field-olive) 75%, #1b201e);
+  border-color: color-mix(in srgb, var(--field-olive) 55%, var(--field-border));
+  color: var(--field-text);
+}
+
+.field-sys-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.45rem;
+  margin-top: 0.95rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--field-border);
+}
+
+.field-sys-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+}
+
+.field-sys-item__label {
+  font-size: 0.58rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--field-steel);
+}
+
+.field-sys-item__value {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--field-text);
+}
+
+.field-sys-item__dot {
+  width: 0.35rem;
+  height: 0.35rem;
+  border-radius: 50%;
+  background: var(--field-green);
+  flex-shrink: 0;
+}
+
+.field-section-label {
+  margin: 0.35rem 0 0;
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--field-steel);
+}
+
+.field-section-sub {
+  margin: 0.15rem 0 0.55rem;
+  font-size: 0.72rem;
+  color: var(--field-muted);
+}
+
+:is(.shell--ops, .shell--officer) .ops-section > .card-header-row h2,
+:is(.shell--ops, .shell--officer) .ops-section h2 {
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--field-muted);
+}
+
+.field-empty {
+  padding: 0.85rem 0.1rem;
+  color: var(--field-muted);
+  font-size: 0.84rem;
+  line-height: 1.45;
+}
+
+.field-system-strip {
+  margin-top: 0.25rem;
+  padding: 0.75rem 0.9rem;
+  border-radius: var(--field-radius);
+  border: 1px solid var(--field-border);
+  background: var(--field-bg-2);
+}
+
+.field-system-strip__title {
+  margin: 0 0 0.55rem;
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--field-steel);
+}
+
+.field-system-strip__grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.55rem;
+}
+
+.field-system-strip__sync {
+  margin: 0.55rem 0 0;
+  font-size: 0.72rem;
+  color: var(--field-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ??? Bottom nav ??? */
+:is(.shell--ops, .shell--officer) .mobile-bottom-nav__pill {
+  background: color-mix(in srgb, var(--field-bg-2) 94%, transparent);
+  border: 1px solid var(--field-border);
+  border-radius: 16px;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(12px);
+}
+
+:is(.shell--ops, .shell--officer) .mobile-bottom-nav__item {
+  border-radius: var(--field-radius-sm);
+  color: var(--field-muted);
+}
+
+:is(.shell--ops, .shell--officer) .mobile-bottom-nav__item--active {
+  background: transparent !important;
+  color: var(--field-text) !important;
+  box-shadow: none !important;
+}
+
+:is(.shell--ops, .shell--officer) .mobile-bottom-nav__item--active .mobile-bottom-nav__icon-wrap::before {
+  content: '';
+  position: absolute;
+  top: -0.2rem;
+  left: 50%;
+  width: 0.35rem;
+  height: 0.35rem;
+  border-radius: 50%;
+  background: var(--field-green);
+  transform: translateX(-50%);
+  box-shadow: 0 0 0 3px rgba(114, 199, 122, 0.18);
+}
+
+:is(.shell--ops, .shell--officer) .mobile-bottom-nav__icon-wrap {
+  position: relative;
+}
+
+:is(.shell--ops, .shell--officer) .mobile-bottom-nav__label {
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+/* ??? REC ? compact field control ??? */
+:is(.shell--ops, .shell--officer) .officer-record-fab {
+  width: 3.35rem;
+  height: 3.35rem;
+  border-radius: 999px;
+  background: var(--field-elevated);
+  border: 1.5px solid color-mix(in srgb, var(--field-red) 55%, var(--field-border));
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+  gap: 0.05rem;
+  right: 1rem;
+  bottom: calc(5.25rem + env(safe-area-inset-bottom, 0px));
+}
+
+:is(.shell--ops, .shell--officer) .officer-record-fab:hover {
+  transform: scale(1.04);
+  border-color: var(--field-red);
+}
+
+:is(.shell--ops, .shell--officer) .officer-record-fab__ring {
+  position: absolute;
+  inset: 0.28rem;
+  border-radius: 999px;
+  border: 1.5px solid color-mix(in srgb, var(--field-red) 65%, transparent);
+  pointer-events: none;
+}
+
+:is(.shell--ops, .shell--officer) .officer-record-fab__icon {
+  color: var(--field-red);
+  width: 1.15rem;
+  height: 1.15rem;
+}
+
+:is(.shell--ops, .shell--officer) .officer-record-fab__icon svg {
+  width: 100%;
+  height: 100%;
+}
+
+:is(.shell--ops, .shell--officer) .officer-record-fab__label {
+  font-size: 0.52rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  color: var(--field-muted);
+}
+
+/* ??? Ops chips on officer (if still used) ??? */
+:is(.shell--ops, .shell--officer) .ops-shift {
+  background: var(--field-surface);
+  border: 1px solid var(--field-border);
+  border-radius: var(--field-radius);
+  padding: 0.85rem 1rem;
+}
+
+:is(.shell--ops, .shell--officer) .ops-shift__title {
+  font-size: 1.05rem;
+}
+
+:is(.shell--ops, .shell--officer) .ops-shift__chip {
+  border-radius: var(--field-radius-sm);
+  border-color: var(--field-border);
+  background: var(--field-elevated);
+}
+
+:is(.shell--ops, .shell--officer) .ops-shift__chip.is-active {
+  border-color: color-mix(in srgb, var(--field-olive) 50%, var(--field-border));
+  background: rgba(102, 113, 91, 0.16);
+}
+
+@media (max-width: 640px) {
+  .field-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .field-sys-row,
+  .field-system-strip__grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ==========================================================================
+   LIGHT MODE ? field command tablet / aviation ops terminal
+   Off-white page ? cooler grey nav ? white cards. Not inverted dark.
+   ========================================================================== */
+/* Security Light ? daytime ops centre (not consumer white cards) */
+[data-theme='light'] :is(.shell--ops, .shell--officer) {
+  --field-bg: #f3f6f8;
+  --field-bg-2: #eef2f5;
+  --field-surface: #ffffff;
+  --field-elevated: #eef2f5;
+  --field-border: #cbd4dc;
+  --field-text: #17212b;
+  --field-muted: #66727d;
+  --field-muted-2: #7a8793;
+  --field-navy: #172b3a;
+  --field-navy-2: #405466;
+  --field-green: #2e8b57;
+  --field-amber: #c58a20;
+  --field-red: #c63d3d;
+  --field-info: #2878b5;
+  --field-olive: #405466;
+  --field-steel: #405466;
+  --field-accent-soft: rgba(23, 43, 58, 0.08);
+  --field-radius: 12px;
+  --field-radius-sm: 8px;
+  --field-radius-xs: 6px;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 14px;
+
+  --bg: var(--field-bg);
+  --surface: var(--field-surface);
+  --surface-2: var(--field-elevated);
+  --border: var(--field-border);
+  --text: var(--field-text);
+  --muted: var(--field-muted);
+  --success: var(--field-green);
+  --warning: var(--field-amber);
+  --danger: var(--field-red);
+  --accent: var(--field-navy);
+  --accent-soft: var(--field-accent-soft);
+  --accent-text: var(--field-navy);
+  --accent-hover: #1f3749;
+  --on-accent: #ffffff;
+
+  color: var(--field-text);
+  background-color: var(--field-bg);
+  background-image:
+    linear-gradient(rgba(60, 80, 95, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(60, 80, 95, 0.05) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+[data-theme='light'] :is(.shell--ops, .shell--officer) .portal-card,
+[data-theme='light'] :is(.shell--ops, .shell--officer) .ops-section,
+[data-theme='light'] :is(.shell--ops, .shell--officer) .ops-queue-card,
+[data-theme='light'] :is(.shell--ops, .shell--officer) .officer-standby,
+[data-theme='light'] :is(.shell--ops, .shell--officer) .field-ops-panel,
+[data-theme='light'] :is(.shell--ops, .shell--officer) .field-cmd-header,
+[data-theme='light'] :is(.shell--ops, .shell--officer) .field-system-strip {
+  background: var(--field-surface);
+  border-color: var(--field-border);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.85) inset,
+    0 1px 2px rgba(24, 32, 29, 0.04);
+}
+
+[data-theme='light'] :is(.shell--ops, .shell--officer) .field-system-strip {
+  background: var(--field-elevated);
+}
+
+[data-theme='light'] :is(.shell--ops, .shell--officer) .mobile-shell-header--officer {
+  background: var(--field-navy);
+  border-bottom-color: color-mix(in srgb, var(--field-navy) 88%, #000);
+  color: #e8eef3;
+}
+
+[data-theme='light'] :is(.shell--ops, .shell--officer) .mobile-shell-header--officer .menu-toggle,
+[data-theme='light'] :is(.shell--ops, .shell--officer) .mobile-shell-header--officer .theme-toggle,
+[data-theme='light'] :is(.shell--ops, .shell--officer) .mobile-shell-header--officer .nav-clock {
+  color: #e8eef3;
+}
+
+[data-theme='light'] :is(.shell--ops, .shell--officer) .mobile-shell-header__title,
+[data-theme='light'] :is(.shell--ops, .shell--officer) .officer-topbar h1 {
+  color: #d7e0e8;
+  letter-spacing: 0.14em;
+}
+
+[data-theme='light'] :is(.shell--ops, .shell--officer) .mobile-shell-header__live {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-left: 0.55rem;
+  padding: 0.15rem 0.45rem;
+  border-radius: 999px;
+  border: 1px solid rgba(46, 139, 87, 0.45);
+  background: rgba(46, 139, 87, 0.16);
+  color: #9fd7b4;
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  vertical-align: middle;
+}
+
+[data-theme='light'] :is(.shell--ops, .shell--officer) .mobile-shell-header__live::before {
+  content: '';
+  width: 0.42rem;
+  height: 0.42rem;
+  border-radius: 50%;
+  background: #2e8b57;
+  box-shadow: 0 0 0 3px rgba(46, 139, 87, 0.22);
+}
+
+/* Sidebar ? slightly darker than page */
+[data-theme='light'] :is(.shell--ops, .shell--officer) .officer-sidebar {
+  background: var(--field-bg-2);
+  border-right-color: var(--field-border);
+}
+
+[data-theme='light'] :is(.shell--ops, .shell--officer) .officer-sidebar-brand {
+  border-bottom-color: var(--field-border);
+}
+
+[data-theme='light'] :is(.shell--ops, .shell--officer) .field-sidebar-head__kicker {
+  color: var(--field-navy);
+}
+
+[data-theme='light'] :is(.shell--ops, .shell--officer) .field-sidebar-head__title {
+  color: var(--field-text);
+}
+
+[data-theme='light'] :is(.shell--ops, .shell--officer) .field-sidebar-officer {
+  background: var(--field-surface);
+  border-color: var(--field-border);
+}
+
+[data-theme='light'] :is(.shell--ops, .shell--officer) .field-sidebar-officer__dot {
+  background: var(--field-green);
+  box-shadow: 0 0 0 3px rgba(63, 125, 72, 0.16);
+}
+
+[data-theme='light'] :is(.shell--ops, .shell--officer) .field-sidebar-officer__name {
+  color: var(--field-text);
+}
+
+[data-theme='light'] :is(.shell--ops, .shell--officer) .field-sidebar-officer__role,
+[data-theme='light'] :is(.shell--ops, .shell--officer) .field-nav-group__label {
+  color: var(--field-steel);
+}
+
+[data-theme='light'] :is(.shell--ops, .shell--officer) .officer-sidebar-link {
+  color: var(--field-muted);
+}
+
+[data-theme='light'] :is(.shell--ops, .shell--officer) .officer-sidebar-link:hover {
+  background: rgba(24, 32, 29, 0.035);
+  color: var(--field-text);
+}
+
+[data-theme='light'] :is(.shell--ops, .shell--officer) .officer-sidebar-link--active {
+  background: rgba(23, 43, 58, 0.08);
+  color: var(--field-text);
+  box-shadow: inset 3px 0 0 var(--field-navy);
+}
+
+[data-theme='light'] :is(.shell--ops, .shell--officer) .sidebar--collapsed .officer-sidebar-link--active {
+  background: rgba(23, 43, 58, 0.12);
+  box-shadow: inset 3px 0 0 var(--field-navy);
+}
+
+[data-theme='light'] :is(.shell--ops, .shell--officer) .officer-sidebar-footer {
+  border-top-color: var(--field-border);
+}
+
+[data-theme='light'] :is(.shell--ops, .shell--officer) .officer-sidebar-user {
+  color: var(--field-text);
+}
+
+[data-theme='light'] :is(.shell--ops, .shell--officer) .officer-sidebar-role {
+  color: var(--field-muted-2);
+}
+
+/* Command header */
+[data-theme='light'] :is(.shell--ops, .shell--officer) .field-cmd-header {
+  background:
+    linear-gradient(180deg, rgba(101, 114, 88, 0.06), transparent 55%),
+    var(--field-surface);
+}
+
+[data-theme='light'] :is(.shell--ops, .shell--officer) .field-cmd-header__kicker,
+[data-theme='light'] :is(.shell--ops, .shell--officer) .field-ops-panel__kicker {
+  color: var(--field-olive);
+}
+
+[data-theme='light'] :is(.shell--ops, .shell--officer) .field-cmd-header__title,
+[data-theme='light'] :is(.shell--ops, .shell--officer) .field-ops-panel h2 {
+  color: var(--field-text);
+}
+
+[data-theme='light'] :is(.shell--ops, .shell--officer) .field-cmd-header__meta,
+[data-theme='light'] :is(.shell--ops, .shell--officer) .field-ops-panel__detail,
+[data-theme='light'] :is(.shell--ops, .shell--officer) .field-section-sub,
+[data-theme='light'] :is(.shell--ops, .shell--officer) .field-empty {
+  color: var(--field-muted);
+}
+
+[data-theme='light'] :is(.shell--ops, .shell--officer) .field-status-pill {
+  border-color: color-mix(in srgb, var(--field-green) 32%, var(--field-border));
+  background: rgba(63, 125, 72, 0.1);
+  color: var(--field-green);
+}
+
+[data-theme='light'] :is(.shell--ops, .shell--officer) .field-status-pill__dot,
+[data-theme='light'] :is(.shell--ops, .shell--officer) .field-sys-item__dot {
+  background: var(--field-green);
+  box-shadow: 0 0 0 3px rgba(63, 125, 72, 0.14);
+}
+
+[data-theme='light'] :is(.shell--ops, .shell--officer) .field-ops-panel__status {
+  color: var(--field-green);
+}
+
+/* Metrics ? white cards on grey page */
+[data-theme='light'] :is(.shell--ops, .shell--officer) .field-metric {
+  background: var(--field-surface);
+  border-color: var(--field-border);
+  box-shadow: 0 1px 2px rgba(24, 32, 29, 0.03);
+}
+
+[data-theme='light'] :is(.shell--ops, .shell--officer) .field-metric__label,
+[data-theme='light'] :is(.shell--ops, .shell--officer) .field-ops-panel__label,
+[data-theme='light'] :is(.shell--ops, .shell--officer) .field-sys-item__label,
+[data-theme='light'] :is(.shell--ops, .shell--officer) .field-section-label,
+[data-theme='light'] :is(.shell--ops, .shell--officer) .field-system-strip__title {
+  color: var(--field-steel);
+}
+
+[data-theme='light'] :is(.shell--ops, .shell--officer) .field-metric strong,
+[data-theme='light'] :is(.shell--ops, .shell--officer) .field-sys-item__value {
+  color: var(--field-text);
+}
+
+[data-theme='light'] :is(.shell--ops, .shell--officer) .field-metric__hint {
+  color: var(--field-muted-2);
+}
+
+[data-theme='light'] :is(.shell--ops, .shell--officer) .field-metric::before {
+  background: var(--field-steel);
+}
+
+[data-theme='light'] :is(.shell--ops, .shell--officer) .field-metric--warn::before {
+  background: var(--field-amber);
+}
+
+[data-theme='light'] :is(.shell--ops, .shell--officer) .field-metric--urgent::before {
+  background: var(--field-red);
+}
+
+[data-theme='light'] :is(.shell--ops, .shell--officer) .field-metric--ok::before {
+  background: var(--field-green);
+}
+
+[data-theme='light'] :is(.shell--ops, .shell--officer) .field-metric.is-active {
+  border-color: color-mix(in srgb, var(--field-navy) 35%, var(--field-border));
+  background: rgba(23, 43, 58, 0.06);
+}
+
+[data-theme='light'] :is(.shell--ops, .shell--officer) .field-ops-panel__head,
+[data-theme='light'] :is(.shell--ops, .shell--officer) .field-sys-row,
+[data-theme='light'] :is(.shell--ops, .shell--officer) .field-system-strip {
+  border-color: var(--field-border);
+}
+
+[data-theme='light'] :is(.shell--ops, .shell--officer) .btn-primary,
+[data-theme='light'] :is(.shell--ops, .shell--officer) .btn-primary.tech-stage,
+[data-theme='light'] :is(.shell--ops, .shell--officer) .field-ops-panel__actions .btn-primary {
+  background: var(--field-navy) !important;
+  border-color: var(--field-navy) !important;
+  color: #ffffff !important;
+  border-radius: var(--field-radius-sm);
+  box-shadow: none;
+}
+
+[data-theme='light'] :is(.shell--ops, .shell--officer) .btn-primary:hover:not(:disabled),
+[data-theme='light'] :is(.shell--ops, .shell--officer) .btn-primary.tech-stage:hover:not(:disabled),
+[data-theme='light'] :is(.shell--ops, .shell--officer) .field-ops-panel__actions .btn-primary:hover {
+  background: var(--accent-hover) !important;
+  border-color: var(--accent-hover) !important;
+  filter: none;
+}
+
+[data-theme='light'] :is(.shell--ops, .shell--officer) .btn-secondary {
+  border-radius: var(--field-radius-sm);
+  background: var(--field-surface);
+  border-color: var(--field-border);
+  color: var(--field-text);
+}
+
+[data-theme='light'] :is(.shell--ops, .shell--officer) .field-ops-panel__actions .btn-secondary {
+  background: var(--field-elevated);
+  border-color: var(--field-border);
+  color: var(--field-text);
+}
+
+[data-theme='light'] :is(.shell--ops, .shell--officer) .field-system-strip__sync {
+  color: var(--field-muted-2);
+}
+
+[data-theme='light'] :is(.shell--ops, .shell--officer) .ops-section > .card-header-row h2,
+[data-theme='light'] :is(.shell--ops, .shell--officer) .ops-section h2 {
+  color: var(--field-steel);
+}
+
+/* Bottom nav */
+[data-theme='light'] :is(.shell--ops, .shell--officer) .mobile-bottom-nav__pill {
+  background: color-mix(in srgb, #ffffff 92%, var(--field-bg-2));
+  border-color: var(--field-border);
+  border-radius: 14px;
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.95) inset,
+    0 8px 22px rgba(23, 33, 43, 0.1);
+}
+
+[data-theme='light'] :is(.shell--ops, .shell--officer) .mobile-bottom-nav__item {
+  color: var(--field-muted);
+}
+
+[data-theme='light'] :is(.shell--ops, .shell--officer) .mobile-bottom-nav__item--active {
+  color: var(--field-navy) !important;
+  font-weight: 800;
+}
+
+[data-theme='light'] :is(.shell--ops, .shell--officer) .mobile-bottom-nav__item--active .mobile-bottom-nav__icon-wrap::before {
+  background: var(--field-info);
+  box-shadow: 0 0 0 3px rgba(40, 120, 181, 0.18);
+}
+
+[data-theme='light'] :is(.shell--ops, .shell--officer) .mobile-bottom-nav__item--active .mobile-bottom-nav__label::before {
+  content: '?';
+  margin-right: 0.28rem;
+  color: var(--field-green);
+  font-size: 0.55rem;
+  vertical-align: middle;
+}
+
+/* REC ? compact, operational red on light surfaces */
+[data-theme='light'] :is(.shell--ops, .shell--officer) .officer-record-fab {
+  background: var(--field-surface);
+  border-color: color-mix(in srgb, var(--field-red) 45%, var(--field-border));
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.9) inset,
+    0 6px 16px rgba(24, 32, 29, 0.12);
+}
+
+[data-theme='light'] :is(.shell--ops, .shell--officer) .officer-record-fab__ring {
+  border-color: color-mix(in srgb, var(--field-red) 55%, transparent);
+}
+
+[data-theme='light'] :is(.shell--ops, .shell--officer) .officer-record-fab__icon {
+  color: var(--field-red);
+}
+
+[data-theme='light'] :is(.shell--ops, .shell--officer) .officer-record-fab__label {
+  color: var(--field-muted);
+}
+
+[data-theme='light'] :is(.shell--ops, .shell--officer) .officer-record-fab:hover {
+  border-color: var(--field-red);
+  background: #fff8f7;
+}
+
+/* Shared ops surfaces on officer light */
+[data-theme='light'] :is(.shell--ops, .shell--officer) .ops-shift {
+  background: transparent;
+  border: 0;
+  padding: 0;
+}
+
+[data-theme='light'] :is(.shell--ops, .shell--officer) .ops-shift__date {
+  background: var(--field-elevated);
+  border: 1px solid var(--field-border);
+  color: var(--field-steel);
+  border-radius: 6px;
+}
+
+[data-theme='light'] :is(.shell--ops, .shell--officer) .ops-shift__kicker {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin: 0 0 0.55rem;
+  padding: 0.55rem 0.7rem;
+  border: 1px solid var(--field-border);
+  border-radius: 10px;
+  background: var(--field-navy);
+  color: #e8eef3;
+}
+
+[data-theme='light'] :is(.shell--ops, .shell--officer) .ops-shift__kicker-label {
+  margin: 0;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+[data-theme='light'] :is(.shell--ops, .shell--officer) .ops-shift__kicker-live {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #9fd7b4;
+}
+
+[data-theme='light'] :is(.shell--ops, .shell--officer) .ops-shift__kicker-live::before {
+  content: '';
+  width: 0.42rem;
+  height: 0.42rem;
+  border-radius: 50%;
+  background: #2e8b57;
+  box-shadow: 0 0 0 3px rgba(46, 139, 87, 0.25);
+}
+
+[data-theme='light'] :is(.shell--ops, .shell--officer) .ops-shift__title {
+  color: var(--field-navy);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  font-size: clamp(1.15rem, 3.6vw, 1.45rem);
+  font-weight: 800;
+}
+
+[data-theme='light'] :is(.shell--ops, .shell--officer) .ops-shift__chip {
+  background: var(--field-surface);
+  border-color: var(--field-border);
+  color: var(--field-text);
+  border-radius: 8px;
+}
+
+[data-theme='light'] :is(.shell--ops, .shell--officer) .ops-shift__chip.is-active {
+  background: rgba(23, 43, 58, 0.08);
+  border-color: color-mix(in srgb, var(--field-navy) 35%, var(--field-border));
+  box-shadow: inset 0 -2px 0 var(--field-navy);
+}
+
+[data-theme='light'] :is(.shell--ops, .shell--officer) .check-row,
+[data-theme='light'] :is(.shell--ops, .shell--officer) .protect-tile {
+  background: var(--field-surface);
+  border-color: var(--field-border);
+}
+
+[data-theme='light'] :is(.shell--ops, .shell--officer) .text-muted {
+  color: var(--field-muted);
+}
+
+[data-theme='light'] :is(.shell--ops, .shell--officer) .btn-ghost {
+  color: var(--field-muted);
+}
+
+[data-theme='light'] :is(.shell--ops, .shell--officer) .btn-ghost:hover {
+  color: var(--field-text);
+  background: rgba(24, 32, 29, 0.04);
+}
+
+[data-theme='light'] :is(.shell--ops, .shell--officer) .link-sm {
+  color: var(--field-info);
+}
+
+[data-theme='light'] :is(.shell--ops, .shell--officer) input,
+[data-theme='light'] :is(.shell--ops, .shell--officer) textarea,
+[data-theme='light'] :is(.shell--ops, .shell--officer) select,
+[data-theme='light'] :is(.shell--ops, .shell--officer) .ops-menu__trigger {
+  background: var(--field-surface);
+  border-color: var(--field-border);
+  color: var(--field-text);
+}
+
+[data-theme='light'] :is(.shell--ops, .shell--officer) .empty-state,
+[data-theme='light'] :is(.shell--ops, .shell--officer) .portal-card .text-muted {
+  color: var(--field-muted);
+}
+
+/* ??? Ops sections: denser, less consumer ??? */
+:is(.shell--ops, .shell--officer) .ops-section {
+  margin: 0;
+  padding: 0.75rem 0.85rem 0.85rem;
+  border-radius: var(--field-radius-sm);
+  border: 1px solid var(--field-border);
+  background: var(--field-surface);
+  box-shadow: none;
+}
+
+:is(.shell--ops, .shell--officer) .ops-section__head {
+  margin: 0 0 0.65rem;
+  padding-bottom: 0.55rem;
+  border-bottom: 1px solid var(--field-border);
+  align-items: flex-start;
+}
+
+:is(.shell--ops, .shell--officer) .ops-section__titles {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+}
+
+:is(.shell--ops, .shell--officer) .ops-section__head h2 {
+  margin: 0;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--field-steel);
+}
+
+:is(.shell--ops, .shell--officer) .ops-section__subtitle {
+  margin: 0;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--field-muted);
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+:is(.shell--ops, .shell--officer) .ops-section .link-sm {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  text-decoration: none;
+  color: var(--field-olive);
+}
+
+:is(.shell--ops, .shell--officer) .field-empty {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  padding: 0.55rem 0 0.15rem;
+}
+
+:is(.shell--ops, .shell--officer) .field-empty p {
+  margin: 0;
+  font-size: 0.84rem;
+  line-height: 1.45;
+  color: var(--field-muted);
+}
+
+:is(.shell--ops, .shell--officer) .field-empty__status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  width: fit-content;
+  padding: 0.22rem 0.5rem;
+  border-radius: var(--field-radius-xs);
+  border: 1px solid color-mix(in srgb, var(--field-green) 30%, var(--field-border));
+  background: color-mix(in srgb, var(--field-green) 10%, transparent);
+  color: var(--field-green);
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+:is(.shell--ops, .shell--officer) .field-empty__dot {
+  width: 0.35rem;
+  height: 0.35rem;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+/* ??? Settings hub: open lists, not nested boxes ??? */
+:is(.shell--ops, .shell--officer) .settings-hub {
+  max-width: 28rem;
+  padding-bottom: 1.5rem;
+}
+
+:is(.shell--ops, .shell--officer) .settings-hub__top {
+  margin: 0 0 0.85rem;
+}
+
+:is(.shell--ops, .shell--officer) .settings-hub__top h1 {
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--field-steel);
+}
+
+:is(.shell--ops, .shell--officer) .settings-hub__lede {
+  display: none;
+}
+
+:is(.shell--ops, .shell--officer) .settings-hub__back {
+  width: 2.1rem;
+  height: 2.1rem;
+  border-radius: 999px;
+  background: transparent;
+  border: 0;
+  color: var(--field-muted);
+}
+
+:is(.shell--ops, .shell--officer) .settings-hub__layout {
+  gap: 1.15rem;
+}
+
+:is(.shell--ops, .shell--officer) .settings-hub__profile {
+  border-radius: 16px;
+  padding: 0.85rem 0.15rem 0.95rem;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--field-border) 70%, transparent);
+  box-shadow: none;
+  transform: none;
+}
+
+:is(.shell--ops, .shell--officer) .settings-hub__profile:hover {
+  transform: none;
+  box-shadow: none;
+  border-color: color-mix(in srgb, var(--field-olive) 35%, var(--field-border));
+  background: transparent;
+}
+
+:is(.shell--ops, .shell--officer) .settings-hub__profile-text strong {
+  font-size: 0.98rem;
+  font-weight: 750;
+  letter-spacing: -0.01em;
+  color: var(--field-text);
+}
+
+:is(.shell--ops, .shell--officer) .settings-hub__profile-text > span {
+  font-size: 0.68rem;
+  font-weight: 650;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--field-steel);
+}
+
+:is(.shell--ops, .shell--officer) .settings-hub__profile-go {
+  display: none;
+}
+
+:is(.shell--ops, .shell--officer) .settings-hub__sections {
+  gap: 1.35rem;
+}
+
+:is(.shell--ops, .shell--officer) .settings-hub__section {
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  padding: 0;
+}
+
+:is(.shell--ops, .shell--officer) .settings-hub__section h2 {
+  margin: 0 0 0.15rem 0.15rem;
+  font-size: 0.62rem;
+  color: var(--field-steel);
+  letter-spacing: 0.12em;
+}
+
+:is(.shell--ops, .shell--officer) .settings-hub__list {
+  gap: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  overflow: visible;
+  box-shadow: none;
+}
+
+:is(.shell--ops, .shell--officer) .settings-hub__list > li + li {
+  border-top: 1px solid color-mix(in srgb, var(--field-border) 55%, transparent);
+}
+
+:is(.shell--ops, .shell--officer) .settings-hub__row {
+  border: 0;
+  border-radius: 0;
+  padding: 0.78rem 0.15rem;
+  background: transparent;
+  box-shadow: none;
+  transform: none;
+}
+
+:is(.shell--ops, .shell--officer) .settings-hub__row:hover {
+  background: transparent;
+  border-color: transparent;
+  transform: none;
+  box-shadow: none;
+}
+
+:is(.shell--ops, .shell--officer) .settings-hub__row:hover .settings-hub__label strong {
+  color: var(--field-text);
+}
+
+:is(.shell--ops, .shell--officer) .settings-hub__icon {
+  width: auto;
+  height: auto;
+  min-width: 1.35rem;
+  padding: 0;
+  border-radius: 0;
+  background: transparent;
+  border: 0;
+  color: var(--field-olive);
+  box-shadow: none;
+}
+
+:is(.shell--ops, .shell--officer) .settings-hub__icon svg {
+  width: 1.15rem;
+  height: 1.15rem;
+}
+
+:is(.shell--ops, .shell--officer) .settings-hub__label strong {
+  font-size: 0.9rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--field-text);
+}
+
+:is(.shell--ops, .shell--officer) .settings-hub__label em {
+  font-size: 0.72rem;
+  font-style: normal;
+  color: var(--field-muted);
+}
+
+:is(.shell--ops, .shell--officer) .settings-hub__chevron {
+  color: var(--field-steel);
+  opacity: 0.45;
+  font-size: 1.05rem;
+}
+
+:is(.shell--ops, .shell--officer) .settings-hub__signout {
+  width: 100%;
+  min-height: 2.35rem;
+  margin-top: 0.35rem;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--field-border) 80%, transparent);
+  background: transparent;
+  color: var(--field-muted);
+  font-size: 0.8rem;
+  font-weight: 650;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  box-shadow: none;
+}
+
+:is(.shell--ops, .shell--officer) .settings-hub__signout:hover {
+  border-color: color-mix(in srgb, var(--field-red) 35%, var(--field-border));
+  color: var(--field-red);
+  background: color-mix(in srgb, var(--field-red) 6%, transparent);
+}
+
+/* Soften floating support dock on field */
+:is(.shell--ops, .shell--officer) .support-fab-dock:not(.support-fab-dock--inline) {
+  gap: 0.4rem;
+}
+
+:is(.shell--ops, .shell--officer) .support-fab {
+  width: 2.65rem;
+  height: 2.65rem;
+  border-radius: var(--field-radius-sm);
+  border: 1px solid var(--field-border);
+  background: var(--field-elevated);
+  box-shadow: none;
+  color: var(--field-olive);
+}
+
+:is(.shell--ops, .shell--officer) .support-fab:hover {
+  background: var(--field-surface);
+  border-color: color-mix(in srgb, var(--field-olive) 40%, var(--field-border));
+}
+
+[data-theme='light'] :is(.shell--ops, .shell--officer) .support-fab {
+  background: var(--field-surface);
+  color: var(--field-olive);
+  box-shadow: none;
+}
+
+[data-theme='light'] :is(.shell--ops, .shell--officer) .ops-section {
+  background: var(--field-surface);
+  border-color: var(--field-border);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.8) inset;
+}
+
+[data-theme='light'] :is(.shell--ops, .shell--officer) .ops-section__head {
+  border-bottom-color: var(--field-border);
+}
+
+[data-theme='light'] :is(.shell--ops, .shell--officer) .ops-section__head h2 {
+  color: var(--field-steel);
+}
+
+[data-theme='light'] :is(.shell--ops, .shell--officer) .ops-section__subtitle {
+  color: var(--field-muted);
+}
+
+[data-theme='light'] :is(.shell--ops, .shell--officer) .field-empty__status {
+  border-color: color-mix(in srgb, var(--field-green) 28%, var(--field-border));
+  background: rgba(63, 125, 72, 0.08);
+  color: var(--field-green);
+}
+
+[data-theme='light'] :is(.shell--ops, .shell--officer) .settings-hub__profile,
+[data-theme='light'] :is(.shell--ops, .shell--officer) .settings-hub__list,
+[data-theme='light'] :is(.shell--ops, .shell--officer) .settings-hub__section,
+[data-theme='light'] :is(.shell--ops, .shell--officer) .settings-hub__signout {
+  background: transparent !important;
+  border-color: transparent;
+  box-shadow: none !important;
+}
+
+[data-theme='light'] :is(.shell--ops, .shell--officer) .settings-hub__profile {
+  border-bottom: 1px solid #dde2e7;
+}
+
+[data-theme='light'] :is(.shell--ops, .shell--officer) .settings-hub__list > li + li {
+  border-top-color: #e8ecf0;
+}
+
+[data-theme='light'] :is(.shell--ops, .shell--officer) .settings-hub__icon {
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  color: #5b6b58;
+}
+
+[data-theme='light'] :is(.shell--ops, .shell--officer) .settings-hub__row:hover {
+  background: transparent;
+}
+
+[data-theme='light'] :is(.shell--ops, .shell--officer) .settings-hub__signout {
+  background: transparent !important;
+  border: 1px solid #dde2e7 !important;
+  color: #667085;
+}
+
+/* Kill leftover soft consumer elevation on officer cards */
+:is(.shell--ops, .shell--officer) .portal-card,
+:is(.shell--ops, .shell--officer) .ops-queue-card,
+:is(.shell--ops, .shell--officer) .officer-standby {
+  border-radius: var(--field-radius-sm);
+  box-shadow: none;
+}
+
+/* ==========================================================================
+   Cross-portal chrome bridge ? admin / portal / medical / supervisor
+   Match officer sidebar, header, and card chrome without changing layouts.
+   ========================================================================== */
+.shell--ops .sidebar,
+.shell--ops .portal-sidebar,
+.shell--ops .officer-sidebar {
+  background: var(--field-bg-2);
+  border-right: 1px solid var(--field-border);
+}
+
+.shell--ops .sidebar-brand,
+.shell--ops .portal-sidebar-brand,
+.shell--ops .officer-sidebar-brand {
+  border-bottom: 1px solid var(--field-border);
+}
+
+.shell--ops .sidebar-link,
+.shell--ops .portal-sidebar-link {
+  border: 0;
+  border-radius: var(--field-radius-sm);
+  color: var(--field-muted);
+  background: transparent;
+}
+
+.shell--ops .sidebar-link:hover,
+.shell--ops .portal-sidebar-link:hover {
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--field-text);
+}
+
+.shell--ops .sidebar-link--active,
+.shell--ops .portal-sidebar-link--active {
+  background: rgba(102, 113, 91, 0.16) !important;
+  color: var(--field-text) !important;
+  font-weight: 650;
+  border: 0 !important;
+  box-shadow: inset 3px 0 0 var(--field-green) !important;
+}
+
+.shell--ops .mobile-shell-header,
+.shell--ops .mobile-shell-header--admin,
+.shell--ops .mobile-shell-header--portal,
+.shell--ops .mobile-shell-header--officer,
+.shell--ops .topbar {
+  background: color-mix(in srgb, var(--field-bg-2) 92%, transparent);
+  border-bottom: 1px solid var(--field-border);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  box-shadow: none;
+}
+
+.shell--ops .mobile-shell-header__title,
+.shell--ops .topbar h1 {
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--field-muted);
+}
+
+.shell--ops .panel,
+.shell--ops .card,
+.shell--ops .card-panel,
+.shell--ops .stat-card,
+.shell--ops .entity-card,
+.shell--ops .ops-mini__card,
+.shell--ops .ops-panel,
+.shell--ops .portal-card {
+  background: var(--field-surface);
+  border: 1px solid var(--field-border);
+  border-radius: var(--field-radius);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.03) inset;
+}
+
+.shell--ops .ops-kpi {
+  background: transparent;
+  border: 0;
+  border-radius: 10px;
+  box-shadow: none;
+}
+
+.shell--ops .btn-primary,
+.shell--ops .btn-secondary,
+.shell--ops .btn-ghost,
+.shell--ops .btn-sm {
+  border-radius: var(--field-radius-sm);
+}
+
+.shell--ops .shell-main,
+.shell--ops .shell-content,
+.shell--ops .portal-main,
+.shell--ops .portal-shell-main,
+.shell--ops .officer-main,
+.shell--ops .officer-content {
+  background: transparent;
+  color: var(--field-text);
+}
+
+/* Align control-room polish tokens with ops palette */
+.shell--ops {
+  --cr-panel: var(--field-surface);
+  --cr-surface: color-mix(in srgb, var(--field-elevated) 55%, transparent);
+  --cr-surface-hover: color-mix(in srgb, var(--field-olive) 12%, transparent);
+  --cr-surface-active: color-mix(in srgb, var(--field-olive) 18%, transparent);
+  --cr-edge: color-mix(in srgb, var(--field-border) 90%, transparent);
+  --cr-edge-strong: var(--field-border);
+  --cr-shadow: 0 8px 28px rgba(0, 0, 0, 0.28);
+  --cr-shadow-soft: 0 4px 16px rgba(0, 0, 0, 0.18);
+}
+
+/* Security ops strip / event feed ? shared structure */
+.sec-ops-strip {
+  display: grid;
+  gap: 0.55rem;
+  margin: 0 0 0.9rem;
+  padding: 0.7rem 0.8rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+}
+
+.sec-ops-strip__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text);
+}
+
+.sec-ops-strip__state {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  color: var(--success);
+}
+
+.sec-ops-strip__state::before {
+  content: '';
+  width: 0.42rem;
+  height: 0.42rem;
+  border-radius: 50%;
+  background: currentColor;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--success) 22%, transparent);
+}
+
+.sec-ops-strip__meta {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.sec-ops-strip__stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.45rem;
+}
+
+.sec-ops-strip__stat {
+  padding: 0.55rem 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-2);
+  text-align: center;
+}
+
+.sec-ops-strip__stat strong {
+  display: block;
+  font-size: 1.15rem;
+  line-height: 1;
+  color: var(--text);
+}
+
+.sec-ops-strip__stat span {
+  display: block;
+  margin-top: 0.28rem;
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.sec-ops-strip__stat--warn strong {
+  color: var(--warning);
+}
+
+.sec-ops-strip__stat--critical strong {
+  color: var(--danger);
+}
+
+.sec-status-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin: 0.65rem 0 0.15rem;
+}
+
+.sec-status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.28rem 0.55rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface-2);
+  font-size: 0.68rem;
+  font-weight: 750;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text);
+}
+
+.sec-status-pill::before {
+  content: '';
+  width: 0.4rem;
+  height: 0.4rem;
+  border-radius: 50%;
+  background: var(--muted);
+}
+
+.sec-status-pill--ok::before {
+  background: var(--success);
+}
+
+.sec-status-pill--info::before {
+  background: var(--accent);
+}
+
+.sec-status-pill--warn::before {
+  background: var(--warning);
+}
+
+.sec-status-pill--danger::before {
+  background: var(--danger);
+}
+
+.sec-event-feed {
+  margin: 0.9rem 0 0;
+  padding: 0.75rem 0.8rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+}
+
+.sec-event-feed__title {
+  margin: 0 0 0.55rem;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.sec-event-feed__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.45rem;
+}
+
+.sec-event-feed__item {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 0.45rem;
+  align-items: start;
+  font-size: 0.82rem;
+  color: var(--text);
+}
+
+.sec-event-feed__dot {
+  width: 0.45rem;
+  height: 0.45rem;
+  margin-top: 0.35rem;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+.sec-event-feed__dot--ok {
+  background: var(--success);
+}
+
+.sec-event-feed__dot--warn {
+  background: var(--warning);
+}
+
+.sec-event-feed__dot--danger {
+  background: var(--danger);
+}
+
+.sec-event-feed__time {
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.ops-shift__kicker {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin: 0 0 0.55rem;
+  padding: 0.55rem 0.7rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--surface-2) 80%, transparent);
+  color: var(--text);
+}
+
+.ops-shift__kicker-label {
+  margin: 0;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.ops-shift__kicker-live {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--success);
+}
+
+.ops-shift__kicker-live::before {
+  content: '';
+  width: 0.42rem;
+  height: 0.42rem;
+  border-radius: 50%;
+  background: var(--success);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--success) 22%, transparent);
+}
+
+.mobile-shell-header__live {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-left: 0.45rem;
+  padding: 0.12rem 0.4rem;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--success) 45%, transparent);
+  background: color-mix(in srgb, var(--success) 16%, transparent);
+  color: var(--success);
+  font-size: 0.58rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  vertical-align: middle;
+}
+
+.mobile-shell-header__live::before {
+  content: '';
+  width: 0.38rem;
+  height: 0.38rem;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+/* Soften portal mood washes so ops palette wins */
+.shell--portal.shell--ops {
+  --portal-ambient-strength: 0 !important;
+  --portal-ambient-card: 0 !important;
+}
+
+.shell--portal.shell--ops::before {
+  opacity: 0 !important;
+}
+
+[data-theme='light'] .shell--ops .sidebar,
+[data-theme='light'] .shell--ops .portal-sidebar,
+[data-theme='light'] .shell--ops .officer-sidebar {
+  background: var(--field-bg-2);
+  border-right-color: var(--field-border);
+}
+
+[data-theme='light'] .shell--ops .sidebar-link:hover,
+[data-theme='light'] .shell--ops .portal-sidebar-link:hover {
+  background: rgba(24, 32, 29, 0.04);
+  color: var(--field-text);
+}
+
+[data-theme='light'] .shell--ops .sidebar-link--active,
+[data-theme='light'] .shell--ops .portal-sidebar-link--active {
+  background: rgba(23, 43, 58, 0.08) !important;
+  color: var(--field-text) !important;
+  box-shadow: inset 3px 0 0 var(--field-navy, #172b3a) !important;
+}
+
+[data-theme='light'] .shell--ops .mobile-shell-header,
+[data-theme='light'] .shell--ops .mobile-shell-header--admin,
+[data-theme='light'] .shell--ops .mobile-shell-header--portal,
+[data-theme='light'] .shell--ops .topbar {
+  background: color-mix(in srgb, var(--field-surface) 88%, var(--field-bg-2));
+  border-bottom-color: var(--field-border);
+  box-shadow: none;
+}
+
+[data-theme='light'] .shell--ops .mobile-shell-header--officer {
+  background: var(--field-navy, #172b3a);
+  border-bottom-color: color-mix(in srgb, var(--field-navy, #172b3a) 88%, #000);
+}
+
+[data-theme='light'] .shell--ops .panel,
+[data-theme='light'] .shell--ops .card,
+[data-theme='light'] .shell--ops .card-panel,
+[data-theme='light'] .shell--ops .stat-card,
+[data-theme='light'] .shell--ops .entity-card,
+[data-theme='light'] .shell--ops .ops-mini__card,
+[data-theme='light'] .shell--ops .ops-panel,
+[data-theme='light'] .shell--ops .portal-card {
+  background: var(--field-surface);
+  border-color: var(--field-border);
+  box-shadow: none;
+  border-radius: var(--field-radius, 12px);
+}
+
+[data-theme='light'] .shell--ops .ops-kpi {
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  border-radius: 16px;
+}
+
+/* ?? Security Light: tech ops board ?? */
+[data-theme='light'] :is(.shell--ops, .shell--officer) .sec-ops-strip {
+  display: grid;
+  gap: 0.55rem;
+  margin: 0 0 0.9rem;
+  padding: 0.7rem 0.8rem;
+  border: 1px solid var(--field-border);
+  border-radius: 10px;
+  background: var(--field-surface);
+}
+
+[data-theme='light'] :is(.shell--ops, .shell--officer) .sec-ops-strip__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--field-navy);
+}
+
+[data-theme='light'] :is(.shell--ops, .shell--officer) .sec-ops-strip__state {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  color: var(--field-green);
+}
+
+[data-theme='light'] :is(.shell--ops, .shell--officer) .sec-ops-strip__state::before {
+  content: '';
+  width: 0.42rem;
+  height: 0.42rem;
+  border-radius: 50%;
+  background: currentColor;
+  box-shadow: 0 0 0 3px rgba(46, 139, 87, 0.18);
+}
+
+[data-theme='light'] :is(.shell--ops, .shell--officer) .sec-ops-strip__meta {
+  margin: 0;
+  color: var(--field-muted);
+  font-size: 0.78rem;
+}
+
+[data-theme='light'] :is(.shell--ops, .shell--officer) .sec-ops-strip__stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.45rem;
+}
+
+[data-theme='light'] :is(.shell--ops, .shell--officer) .sec-ops-strip__stat {
+  padding: 0.55rem 0.5rem;
+  border: 1px solid var(--field-border);
+  border-radius: 8px;
+  background: var(--field-elevated);
+  text-align: center;
+}
+
+[data-theme='light'] :is(.shell--ops, .shell--officer) .sec-ops-strip__stat strong {
+  display: block;
+  font-size: 1.15rem;
+  line-height: 1;
+  color: var(--field-navy);
+}
+
+[data-theme='light'] :is(.shell--ops, .shell--officer) .sec-ops-strip__stat span {
+  display: block;
+  margin-top: 0.28rem;
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--field-muted);
+}
+
+[data-theme='light'] :is(.shell--ops, .shell--officer) .sec-ops-strip__stat--warn strong {
+  color: var(--field-amber);
+}
+
+[data-theme='light'] :is(.shell--ops, .shell--officer) .sec-ops-strip__stat--critical strong {
+  color: var(--field-red);
+}
+
+[data-theme='light'] :is(.shell--ops, .shell--officer) .sec-status-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin: 0.65rem 0 0.15rem;
+}
+
+[data-theme='light'] :is(.shell--ops, .shell--officer) .sec-status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.28rem 0.55rem;
+  border: 1px solid var(--field-border);
+  border-radius: 999px;
+  background: var(--field-elevated);
+  font-size: 0.68rem;
+  font-weight: 750;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--field-text);
+}
+
+[data-theme='light'] :is(.shell--ops, .shell--officer) .sec-status-pill::before {
+  content: '';
+  width: 0.4rem;
+  height: 0.4rem;
+  border-radius: 50%;
+  background: var(--field-muted);
+}
+
+[data-theme='light'] :is(.shell--ops, .shell--officer) .sec-status-pill--ok::before {
+  background: var(--field-green);
+}
+
+[data-theme='light'] :is(.shell--ops, .shell--officer) .sec-status-pill--info::before {
+  background: var(--field-info);
+}
+
+[data-theme='light'] :is(.shell--ops, .shell--officer) .sec-status-pill--warn::before {
+  background: var(--field-amber);
+}
+
+[data-theme='light'] :is(.shell--ops, .shell--officer) .sec-status-pill--danger::before {
+  background: var(--field-red);
+}
+
+[data-theme='light'] :is(.shell--ops, .shell--officer) .tech-focus-job {
+  border-radius: 12px;
+  border-color: var(--field-border);
+  box-shadow: none;
+  background: var(--field-surface);
+}
+
+[data-theme='light'] :is(.shell--ops, .shell--officer) .tech-focus-job__head .dash-ops__eyebrow {
+  color: var(--field-navy);
+  font-weight: 800;
+  letter-spacing: 0.12em;
+}
+
+[data-theme='light'] :is(.shell--ops, .shell--officer) .tech-focus-job__head h2 {
+  margin: 0.2rem 0 0;
+  color: var(--field-navy);
+  font-size: 1.05rem;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+[data-theme='light'] :is(.shell--ops, .shell--officer) .tech-note--ok {
+  color: var(--field-green);
+}
+
+[data-theme='light'] :is(.shell--ops, .shell--officer) .tech-note--warn {
+  color: var(--field-amber);
+}
+
+[data-theme='light'] :is(.shell--ops, .shell--officer) .tech-opt--ok {
+  border-color: color-mix(in srgb, var(--field-green) 45%, var(--field-border));
+  background: rgba(46, 139, 87, 0.08);
+  color: var(--field-green);
+}
+
+[data-theme='light'] :is(.shell--ops, .shell--officer) .tech-opt--hot {
+  border-color: color-mix(in srgb, var(--field-amber) 45%, var(--field-border));
+  background: rgba(197, 138, 32, 0.1);
+  color: var(--field-amber);
+}
+
+[data-theme='light'] :is(.shell--ops, .shell--officer) .sec-event-feed {
+  margin: 0.9rem 0 0;
+  padding: 0.75rem 0.8rem;
+  border: 1px solid var(--field-border);
+  border-radius: 10px;
+  background: var(--field-surface);
+}
+
+[data-theme='light'] :is(.shell--ops, .shell--officer) .sec-event-feed__title {
+  margin: 0 0 0.55rem;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--field-navy);
+}
+
+[data-theme='light'] :is(.shell--ops, .shell--officer) .sec-event-feed__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.45rem;
+}
+
+[data-theme='light'] :is(.shell--ops, .shell--officer) .sec-event-feed__item {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 0.45rem;
+  align-items: start;
+  font-size: 0.82rem;
+  color: var(--field-text);
+}
+
+[data-theme='light'] :is(.shell--ops, .shell--officer) .sec-event-feed__dot {
+  width: 0.45rem;
+  height: 0.45rem;
+  margin-top: 0.35rem;
+  border-radius: 50%;
+  background: var(--field-info);
+}
+
+[data-theme='light'] :is(.shell--ops, .shell--officer) .sec-event-feed__dot--ok {
+  background: var(--field-green);
+}
+
+[data-theme='light'] :is(.shell--ops, .shell--officer) .sec-event-feed__dot--warn {
+  background: var(--field-amber);
+}
+
+[data-theme='light'] :is(.shell--ops, .shell--officer) .sec-event-feed__dot--danger {
+  background: var(--field-red);
+}
+
+[data-theme='light'] :is(.shell--ops, .shell--officer) .sec-event-feed__time {
+  color: var(--field-muted);
+  font-size: 0.72rem;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ?? Persistent Operational Mode / Duty Mode ?? */
+.ops-ready-gate {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: grid;
+  place-items: center;
+  padding: 1.25rem;
+  background:
+    radial-gradient(120% 80% at 50% -10%, rgba(46, 139, 87, 0.18), transparent 55%),
+    linear-gradient(165deg, #0c1418 0%, #152028 48%, #0e161c 100%);
+  color: #e8eef3;
+}
+
+.ops-ready-gate__panel {
+  width: min(26rem, 100%);
+  display: grid;
+  gap: 0.85rem;
+}
+
+.ops-ready-gate__brand {
+  margin: 0;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: #9fd7b4;
+}
+
+.ops-ready-gate h1 {
+  margin: 0;
+  font-size: 1.45rem;
+  font-weight: 750;
+  letter-spacing: 0.02em;
+}
+
+.ops-ready-gate__list {
+  list-style: none;
+  margin: 0.25rem 0 0;
+  padding: 0;
+  display: grid;
+  gap: 0.45rem;
+}
+
+.ops-ready-gate__list li {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.ops-ready-gate__ready {
+  margin: 0.35rem 0 0;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: #9fd7b4;
+}
+
+.ops-ready-gate__copy,
+.ops-ready-gate__hint {
+  margin: 0;
+  color: rgba(232, 238, 243, 0.72);
+  font-size: 0.88rem;
+  line-height: 1.45;
+}
+
+.ops-ready-gate__cta {
+  margin-top: 0.35rem;
+  min-height: 2.75rem;
+  width: 100%;
+}
+
+.duty-mode {
+  display: grid;
+  gap: 1rem;
+}
+
+.duty-mode__hero {
+  padding: 1.1rem 1.15rem;
+  border-radius: 14px;
+  border: 1px solid var(--field-border, var(--border));
+  background: var(--field-surface, var(--surface));
+}
+
+.duty-mode__hero.is-active {
+  border-color: color-mix(in srgb, #2e8b57 45%, var(--field-border, var(--border)));
+  background:
+    linear-gradient(135deg, color-mix(in srgb, #2e8b57 12%, transparent), transparent 60%),
+    var(--field-surface, var(--surface));
+}
+
+.duty-mode__kicker {
+  margin: 0 0 0.35rem;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--field-muted, var(--muted));
+}
+
+.duty-mode__hero h2 {
+  margin: 0 0 0.45rem;
+  font-size: 1.25rem;
+}
+
+.duty-mode__lede {
+  margin: 0 0 0.85rem;
+  color: var(--field-muted, var(--muted));
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
+.duty-mode__status-row,
+.duty-mode__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 0.65rem;
+}
+
+.duty-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  border: 1px solid var(--field-border, var(--border));
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.duty-chip--online {
+  color: #1f7a4d;
+  border-color: color-mix(in srgb, #2e8b57 40%, transparent);
+  background: color-mix(in srgb, #2e8b57 12%, transparent);
+}
+
+.duty-chip--offline,
+.duty-chip--no_signal {
+  color: #a33b3b;
+  border-color: color-mix(in srgb, #c45c5c 40%, transparent);
+  background: color-mix(in srgb, #c45c5c 12%, transparent);
+}
+
+.duty-chip--standby {
+  color: var(--field-muted, var(--muted));
+}
+
+.duty-mode__msg {
+  margin: 0.35rem 0 0;
+  font-size: 0.88rem;
+  color: #1f7a4d;
+}
+
+.duty-check-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.4rem;
+}
+
+.duty-check-list li {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.duty-check-list li.is-ok span:first-child {
+  color: #2e8b57;
+}
+
+.duty-check-list li.is-warn span:first-child {
+  color: #c48a2a;
+}
+
+.duty-device-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem 1rem;
+  margin: 0;
+}
+
+.duty-device-grid dt {
+  margin: 0;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--field-muted, var(--muted));
+}
+
+.duty-device-grid dd {
+  margin: 0.15rem 0 0;
+  font-size: 0.92rem;
+  font-weight: 650;
+}
+
+.duty-mode__footnote {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--field-muted, var(--muted));
+  line-height: 1.4;
+}
+
+.duty-home-strip {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  margin: 0.85rem 0 0;
+  padding: 0.75rem 0.9rem;
+  border-radius: 12px;
+  border: 1px solid var(--field-border, var(--border));
+  background: var(--field-elevated, var(--surface-2, var(--surface)));
+  text-decoration: none;
+  color: inherit;
+}
+
+.duty-home-strip.is-active {
+  border-color: color-mix(in srgb, #2e8b57 45%, var(--field-border, var(--border)));
+}
+
+.duty-home-strip > span:first-child {
+  font-weight: 750;
+  font-size: 0.92rem;
+}
+
+.duty-home-strip__meta {
+  font-size: 0.75rem;
+  color: var(--field-muted, var(--muted));
+}
+
+@media (max-width: 520px) {
+  .duty-device-grid {
+    grid-template-columns: 1fr;
+  }
+}

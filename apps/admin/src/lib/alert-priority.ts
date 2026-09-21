@@ -90,6 +90,7 @@ type IncidentSocketPayload = {
 
 function incidentCategoryFromType(type: string, isSilent: boolean): NotificationCategory {
   if (type === 'PANIC') return isSilent ? 'SILENT_PANIC' : 'PANIC';
+  if (type === 'CRASH') return 'PANIC';
   if (type === 'MEDICAL') return 'MEDICAL';
   if (type === 'THEFT') return 'THEFT_RECOVERY';
   if (type === 'FIRE') return 'ALARM';
@@ -117,7 +118,9 @@ export function incidentSocketToAlert(raw: IncidentSocketPayload): PriorityAlert
     category === 'SILENT_PANIC'
       ? 'Silent panic'
       : category === 'PANIC'
-        ? 'Panic alert'
+        ? raw.type === 'CRASH'
+          ? 'Vehicle crash'
+          : 'Panic alert'
         : raw.type === 'FIRE'
           ? 'Fire emergency'
           : raw.type.replace(/_/g, ' ');
@@ -125,7 +128,7 @@ export function incidentSocketToAlert(raw: IncidentSocketPayload): PriorityAlert
   return {
     id: `incident-${raw.id}-${Date.now()}`,
     tier,
-    kind: raw.type === 'FIRE' ? 'fire' : kindFromCategory(category),
+    kind: raw.type === 'FIRE' ? 'fire' : raw.type === 'CRASH' ? 'panic' : kindFromCategory(category),
     category: 'INCIDENT',
     title: raw.name,
     subtitle: `${label} · ${raw.address ?? 'Location updating'} · ${raw.status.replace(/_/g, ' ')}`,
@@ -168,10 +171,17 @@ export function looseNotificationToAlert(raw: Record<string, unknown>): Priority
     priority === 'P0' ||
     type.includes('emergency') ||
     type.includes('panic') ||
+    type.includes('crash') ||
     type.includes('critical')
   ) {
     tier = 'critical';
-    kind = type.includes('silent') ? 'silent' : type.includes('medical') ? 'medical' : type.includes('fire') ? 'fire' : 'critical';
+    kind = type.includes('silent')
+      ? 'silent'
+      : type.includes('medical')
+        ? 'medical'
+        : type.includes('fire')
+          ? 'fire'
+          : 'critical';
   } else if (priority === 'P1') {
     tier = 'high';
   } else if (priority === 'P2' || priority === 'P3') {

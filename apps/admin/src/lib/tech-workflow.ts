@@ -71,6 +71,28 @@ export function workflowStageKey(status: string) {
   return id.toLowerCase().replace(/_/g, '-');
 }
 
+export function stageActionLabel(status: string) {
+  if (status === 'EN_ROUTE') return 'Confirm arrival';
+  if (status === 'CLIENT_APPROVAL') return 'Complete with signature';
+  const action = primaryActionFor(status);
+  if (action.kind === 'done' || action.kind === 'checklist') {
+    const next = nextWorkflowStatus(status);
+    return next ? `Mark ${workflowLabel(next)}` : null;
+  }
+  return action.label;
+}
+
+export function advanceActionLabel(status: string) {
+  return stageActionLabel(status);
+}
+
+/** Completing from client approval should not be blocked by earlier checklist items. */
+export function requiresChecklistToComplete(currentStatus: string) {
+  return currentStatus !== 'CLIENT_APPROVAL';
+}
+
+export const SKIP_SIGNATURE_REASON = 'Client signature skipped by technician';
+
 export function primaryActionFor(status: string): JobPrimaryAction {
   switch (status) {
     case 'SCHEDULED':
@@ -87,27 +109,12 @@ export function primaryActionFor(status: string): JobPrimaryAction {
     case 'TESTING':
       return { label: 'Start testing', kind: 'advance' };
     case 'CLIENT_APPROVAL':
-      return { label: 'Request signature', kind: 'advance' };
+      return { label: 'Complete with signature', kind: 'advance' };
     case 'COMPLETED':
       return { label: 'Job complete', kind: 'done' };
     default:
       return { label: `Mark ${workflowLabel(nextWorkflowStatus(status) ?? status)}`, kind: 'advance' };
   }
-}
-
-export function stageActionLabel(status: string) {
-  if (status === 'EN_ROUTE') return 'Confirm arrival';
-  if (status === 'CLIENT_APPROVAL') return 'Request signature';
-  const action = primaryActionFor(status);
-  if (action.kind === 'done' || action.kind === 'checklist') {
-    const next = nextWorkflowStatus(status);
-    return next ? `Mark ${workflowLabel(next)}` : null;
-  }
-  return action.label;
-}
-
-export function advanceActionLabel(status: string) {
-  return stageActionLabel(status);
 }
 
 export function mapsUrl(address: string) {

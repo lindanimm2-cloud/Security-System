@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useMemo, useRef, useState } from 'react';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ProgressBar } from '@/components/ui/ProgressBar';
@@ -14,6 +15,8 @@ import {
   nextWorkflowStatus,
   optionTone,
   primaryActionFor,
+  requiresChecklistToComplete,
+  SKIP_SIGNATURE_REASON,
   TECH_WORKFLOW,
   whatsappUrl,
   workflowIndex,
@@ -119,6 +122,7 @@ export function InstallJobCard({
   overrideReason,
   onOverrideReason,
   onAdvance,
+  onSkipSignature,
   onToggleCheck,
   onSaveSerial,
 }: {
@@ -127,6 +131,7 @@ export function InstallJobCard({
   overrideReason: string;
   onOverrideReason: (value: string) => void;
   onAdvance: () => void;
+  onSkipSignature?: () => void;
   onToggleCheck: (item: ChecklistItem) => void;
   onSaveSerial: (serial: string) => void;
 }) {
@@ -275,7 +280,12 @@ export function InstallJobCard({
             className={`btn-primary ds-btn-block ${stageBtn}`}
             disabled={busy}
             onClick={() => {
-              if (next === 'COMPLETED' && doneCount < checks.length && !overrideReason.trim()) {
+              if (
+                next === 'COMPLETED' &&
+                requiresChecklistToComplete(job.status) &&
+                doneCount < checks.length &&
+                !overrideReason.trim()
+              ) {
                 setOpenPanel('checklist');
                 return;
               }
@@ -285,10 +295,28 @@ export function InstallJobCard({
             {busy ? 'Updating…' : advanceLabel}
           </button>
         ) : null}
+        {job.status === 'CLIENT_APPROVAL' && onSkipSignature ? (
+          <button
+            type="button"
+            className="btn-secondary ds-btn-block"
+            disabled={busy}
+            onClick={() => {
+              onOverrideReason(SKIP_SIGNATURE_REASON);
+              onSkipSignature();
+            }}
+          >
+            Skip signature · complete job
+          </button>
+        ) : null}
         <div className="tech-job-tools">
           <a className="btn-secondary" href={mapsUrl(job.address)} target="_blank" rel="noreferrer">
             Navigate
           </a>
+          {/cctv|camera|nvr|dvr/i.test(`${job.jobType} ${job.title} ${job.equipmentNotes ?? ''}`) ? (
+            <Link className="btn-secondary" href="/tech/cameras">
+              Commission CCTV kit
+            </Link>
+          ) : null}
           {phone ? (
             <>
               <a className="btn-secondary" href={`tel:${phone}`}>
@@ -303,14 +331,14 @@ export function InstallJobCard({
         {primary.kind === 'done' && <p className="ds-job__done">This job is complete.</p>}
       </div>
 
-      {next === 'COMPLETED' && (
+      {(job.status === 'CLIENT_APPROVAL' || next === 'COMPLETED') && (
         <label className="ds-field">
-          <span>Override reason if tests are incomplete</span>
+          <span>Override / skip reason</span>
           <input
             className="input"
             value={overrideReason}
             onChange={(e) => onOverrideReason(e.target.value)}
-            placeholder="Required only if the checklist is not finished"
+            placeholder="Optional · used when completing without full checklist"
           />
         </label>
       )}

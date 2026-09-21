@@ -1,0 +1,32 @@
+{
+  "name": "4DS Nexus",
+  "short_name": "4DS",
+  "description": "4DS security protection, live response, and control room — compatible devices and platforms.",
+  "start_url": "/portal",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#0a0a0a",
+  "theme_color": "#7f1d1d",
+  "orientation": "any",
+  "categories": ["security", "productivity"],
+  "icons": [
+    {
+      "src": "/brand/4ds-logo.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Protect",
+      "url": "/portal/protect",
+      "description": "Open emergency protect"
+    },
+    {
+      "name": "Live response",
+      "url": "/portal/incidents",
+      "description": "Incident response history"
+    }
+  ]
+}

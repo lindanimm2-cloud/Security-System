@@ -16,6 +16,7 @@ import {
 import { clientApi, type ApiResponse } from '@/lib/api-client';
 import { getSession } from '@/lib/auth';
 import { getSocketUrl } from '@/lib/socket';
+import { showClientEmergencyNotification } from '@/lib/client-push';
 
 type NotificationData = {
   notifications: ClientNotificationRecord[];
@@ -96,7 +97,32 @@ export function PortalNotificationCenter() {
       transports: ['websocket', 'polling'],
     });
 
-    const refresh = () => void reload({ silent: true });
+    const refresh = (payload?: Record<string, unknown>) => {
+      void reload({ silent: true });
+      if (!payload || typeof payload !== 'object') return;
+      const type = String(payload.type ?? '');
+      const priority = String(payload.priority ?? '');
+      const urgent =
+        payload.urgency === 'critical' ||
+        priority === 'P0' ||
+        type === 'PANIC_ALERT' ||
+        type === 'DISPATCH_ASSIGNED';
+      if (!urgent) return;
+      const title = String(payload.title ?? '4DS SECURITY ALERT');
+      const body = String(payload.body ?? 'Emergency update');
+      const deepLink = String(
+        payload.deepLink ??
+          (payload.incidentId ? `/portal/response/${payload.incidentId}` : '/portal'),
+      );
+      void showClientEmergencyNotification({
+        title,
+        body,
+        tag: String(payload.id ?? payload.incidentId ?? '4ds-emergency'),
+        deepLink,
+        urgency: 'critical',
+        kind: type === 'PANIC_ALERT' ? 'panic' : 'critical',
+      });
+    };
     socket.on('notification:new', refresh);
 
     return () => {

@@ -1,0 +1,5 @@
+-- AlterTable
+ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "mfa_enabled" BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "mfa_secret_enc" TEXT;
+ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "mfa_enrolled_at" TIMESTAMP(3);
+ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "mfa_backup_codes_hash" JSONB NOT NULL DEFAULT '[]';

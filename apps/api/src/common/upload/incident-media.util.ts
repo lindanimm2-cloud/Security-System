@@ -1,7 +1,7 @@
 import { BadRequestException } from '@nestjs/common';
+import { createHash, randomUUID } from 'crypto';
 import { mkdir, writeFile } from 'fs/promises';
 import { extname, join } from 'path';
-import { randomUUID } from 'crypto';
 import { PrismaService } from '../../database/prisma.service';
 
 export type UploadedFile = {
@@ -52,6 +52,28 @@ export function resolveMediaKind(mime: string): 'IMAGE' | 'VIDEO' | 'AUDIO' | 'D
   return 'DOCUMENT';
 }
 
+export function sha256Buffer(buf: Buffer): string {
+  return createHash('sha256').update(buf).digest('hex');
+}
+
+function custodyHash(opts: {
+  incidentId: string;
+  sha256Hash: string;
+  prevCustodyHash: string | null;
+  fileName: string;
+}): string {
+  return createHash('sha256')
+    .update(
+      JSON.stringify({
+        incidentId: opts.incidentId,
+        sha256Hash: opts.sha256Hash,
+        prevCustodyHash: opts.prevCustodyHash,
+        fileName: opts.fileName,
+      }),
+    )
+    .digest('hex');
+}
+
 export async function saveIncidentMedia(
   prisma: PrismaService,
   tenantId: string,
@@ -66,28 +88,49 @@ export async function saveIncidentMedia(
   await mkdir(tenantDir, { recursive: true });
   const apiBase = process.env.API_PUBLIC_URL ?? 'http://localhost:4010';
 
-  const records = await Promise.all(
-    files.map(async (file) => {
-      const safeName = file.originalname.replace(/[^\w.\-()+ ]/g, '_');
-      const storedName = `${incidentId.slice(0, 8)}-${randomUUID()}${extname(safeName)}`;
-      await writeFile(join(tenantDir, storedName), file.buffer);
+  const last = await prisma.incidentMedia.findFirst({
+    where: { incidentId, custodyHash: { not: null } },
+    orderBy: { createdAt: 'desc' },
+    select: { custodyHash: true },
+  });
+  let prevCustody = last?.custodyHash ?? null;
 
-      return prisma.incidentMedia.create({
-        data: {
-          incidentId,
-          fileName: safeName,
-          fileType: file.mimetype,
-          fileUrl: `${apiBase}/uploads/incidents/${tenantId}/${storedName}`,
-        },
-      });
-    }),
-  );
+  const records = [];
+  for (const file of files) {
+    const safeName = file.originalname.replace(/[^\w.\-()+ ]/g, '_');
+    const storedName = `${incidentId.slice(0, 8)}-${randomUUID()}${extname(safeName)}`;
+    await writeFile(join(tenantDir, storedName), file.buffer);
+    const sha256Hash = sha256Buffer(file.buffer);
+    const chain = custodyHash({
+      incidentId,
+      sha256Hash,
+      prevCustodyHash: prevCustody,
+      fileName: safeName,
+    });
+
+    const row = await prisma.incidentMedia.create({
+      data: {
+        incidentId,
+        fileName: safeName,
+        fileType: file.mimetype,
+        fileUrl: `${apiBase}/uploads/incidents/${tenantId}/${storedName}`,
+        sha256Hash,
+        fileSizeBytes: file.size,
+        custodyHash: chain,
+      },
+    });
+    prevCustody = chain;
+    records.push(row);
+  }
 
   return records.map((m) => ({
     id: m.id,
     fileName: m.fileName,
     fileType: m.fileType,
     fileUrl: m.fileUrl,
+    sha256Hash: m.sha256Hash,
+    fileSizeBytes: m.fileSizeBytes,
+    custodyHash: m.custodyHash,
     kind: resolveMediaKind(m.fileType),
     createdAt: m.createdAt.toISOString(),
   }));

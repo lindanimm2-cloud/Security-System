@@ -54,7 +54,7 @@ export function MedicalShell({
   return (
     <>
       {handoff.overlay}
-    <div className="shell shell--medical shell--with-bottom-nav">
+    <div className="shell shell--medical shell--ops shell--with-bottom-nav">
       <header className="mobile-shell-header mobile-shell-header--admin">
         <button
           type="button"

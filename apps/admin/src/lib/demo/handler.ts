@@ -8,8 +8,9 @@ import { dispatchVehicleFocus, type VehicleRemoteAction } from '../vehicle-remot
 import { FLEET_TEAMS, fleetTeamLabel } from '../fleet-teams';
 import { getDemoCategories, getDemoProducts } from './catalog';
 import { handleDeviceSecurityDemo } from './device-security';
+import { handleIntegrationsDemo } from './demo-integrations';
+import { demoAccessDoorsForPsim, handlePhysicalControlDemo } from './demo-physical-control';
 import {
-  demoAccessDoors,
   demoAlarmFeed,
   demoCompliance,
   demoPatrolRoutes,
@@ -545,6 +546,96 @@ const demoOfficerRoster = [
   },
 ];
 
+type DemoOfficerDuty = {
+  dutyModeActive: boolean;
+  dutyStartedAt: string | null;
+  lastHeartbeatAt: string | null;
+  deviceLabel: string | null;
+  batteryPct: number | null;
+  networkType: string | null;
+  appVersion: string | null;
+  operationalChecks: Record<string, boolean | string> | null;
+  lat: number | null;
+  lng: number | null;
+};
+
+const demoOfficerDuty = new Map<string, DemoOfficerDuty>();
+
+function ensureDemoDuty(officerId: string): DemoOfficerDuty {
+  let row = demoOfficerDuty.get(officerId);
+  if (!row) {
+    const seeded = officerId === 'demo-off-1';
+    row = {
+      dutyModeActive: seeded,
+      dutyStartedAt: seeded ? new Date(Date.now() - 45 * 60_000).toISOString() : null,
+      lastHeartbeatAt: seeded ? new Date().toISOString() : null,
+      deviceLabel: seeded ? 'Samsung Galaxy · Web' : null,
+      batteryPct: seeded ? 87 : null,
+      networkType: seeded ? '4g' : null,
+      appVersion: '1.4.0',
+      operationalChecks: seeded
+        ? {
+            notifications: true,
+            sound: true,
+            vibration: true,
+            location: true,
+            background: true,
+            network: true,
+            deviceRegistered: true,
+            pushToken: true,
+            controlRoom: true,
+            emergencyContact: true,
+            battery: true,
+            checkedAt: new Date().toISOString(),
+          }
+        : null,
+      lat: seeded ? -29.835 : null,
+      lng: seeded ? 31.002 : null,
+    };
+    demoOfficerDuty.set(officerId, row);
+  }
+  return row;
+}
+
+function demoDeviceLink(duty: DemoOfficerDuty): string {
+  if (!duty.dutyModeActive) return 'STANDBY';
+  if (!duty.lastHeartbeatAt) return 'NO_SIGNAL';
+  const age = Date.now() - new Date(duty.lastHeartbeatAt).getTime();
+  return age <= 3 * 60_000 ? 'ONLINE' : 'OFFLINE';
+}
+
+function formatDemoDuty(officer: (typeof demoOfficerRoster)[number], duty: DemoOfficerDuty) {
+  return {
+    id: officer.id,
+    firstName: officer.firstName,
+    lastName: officer.lastName,
+    email: `${officer.firstName.toLowerCase()}@4ds.local`,
+    status: officer.status,
+    zone: officer.zone,
+    dutyModeActive: duty.dutyModeActive,
+    dutyStartedAt: duty.dutyStartedAt,
+    lastHeartbeatAt: duty.lastHeartbeatAt,
+    deviceLabel: duty.deviceLabel,
+    batteryPct: duty.batteryPct,
+    networkType: duty.networkType,
+    hasPushToken: true,
+    appVersion: duty.appVersion,
+    operationalChecks: duty.operationalChecks,
+    deviceLink: demoDeviceLink(duty),
+    deviceTrusted: demoDeviceLink(duty) === 'ONLINE' || demoDeviceLink(duty) === 'STANDBY',
+    lat: duty.lat,
+    lng: duty.lng,
+  };
+}
+
+function resolveDemoOfficerForUser(user: { firstName?: string; lastName?: string } | null | undefined) {
+  return (
+    demoOfficerRoster.find(
+      (o) => o.firstName === user?.firstName && o.lastName === user?.lastName,
+    ) ?? demoOfficerRoster[0]
+  );
+}
+
 const OFFICER_PROFILE_KEY = '4ds-demo-officer-profiles';
 let officerProfilesHydrated = false;
 
@@ -828,6 +919,7 @@ const demoFamilyMessages: {
 let demoVehicleState = {
   phoneTrackingEnabled: false,
   theftRecovery: true,
+  emergencyStatus: 'STOLEN' as string | null,
   immobiliserOn: false,
   doorsLocked: true,
   trackingMode: 'THEFT_RECOVERY' as 'OFF' | 'TRACKER' | 'PHONE' | 'THEFT_RECOVERY',
@@ -845,6 +937,7 @@ function liveDemoClientVehicle(id: string) {
     return {
       ...base,
       theftRecovery: demoVehicleState.theftRecovery,
+      emergencyStatus: demoVehicleState.emergencyStatus ?? (demoVehicleState.theftRecovery ? 'STOLEN' : null),
       immobiliserOn: demoVehicleState.immobiliserOn,
       doorsLocked: demoVehicleState.doorsLocked,
       lat: demoVehicleState.lat,
@@ -884,6 +977,7 @@ function formatCrClientVehicle(id: string) {
     ownerId: live.ownerId,
     trackerLinked: live.trackerLinked,
     theftRecovery: live.theftRecovery,
+    emergencyStatus: live.emergencyStatus ?? (live.theftRecovery ? 'STOLEN' : null),
     immobiliserOn: live.immobiliserOn,
     doorsLocked: live.doorsLocked ?? true,
     lat: live.lat,
@@ -947,8 +1041,8 @@ function applyDemoVehicleRemote(
   if (typed === 'release') immobiliserOn = false;
   if (typed === 'panic') {
     doorsLocked = true;
-    immobiliserOn = true;
     theftRecovery = true;
+    // Do not auto-cut ignition — require explicit immobilise hold
   }
   if (typed === 'clearRecovery') {
     theftRecovery = false;
@@ -957,13 +1051,25 @@ function applyDemoVehicleRemote(
   target.doorsLocked = doorsLocked;
   target.immobiliserOn = immobiliserOn;
   target.theftRecovery = theftRecovery;
+  if (typed === 'panic') {
+    target.emergencyStatus = target.emergencyStatus ?? 'STOLEN';
+  }
+  if (typed === 'clearRecovery') {
+    target.emergencyStatus = null;
+  }
   if (isPrimary) {
     demoVehicleState.doorsLocked = doorsLocked;
     demoVehicleState.immobiliserOn = immobiliserOn;
     demoVehicleState.theftRecovery = theftRecovery;
-    if (typed === 'panic') demoVehicleState.trackingMode = 'THEFT_RECOVERY';
-    if (typed === 'clearRecovery' && demoVehicleState.trackingMode === 'THEFT_RECOVERY') {
-      demoVehicleState.trackingMode = 'TRACKER';
+    if (typed === 'panic') {
+      demoVehicleState.trackingMode = 'THEFT_RECOVERY';
+      demoVehicleState.emergencyStatus = demoVehicleState.emergencyStatus ?? 'STOLEN';
+    }
+    if (typed === 'clearRecovery') {
+      demoVehicleState.emergencyStatus = null;
+      if (demoVehicleState.trackingMode === 'THEFT_RECOVERY') {
+        demoVehicleState.trackingMode = 'TRACKER';
+      }
     }
   }
 
@@ -1052,6 +1158,9 @@ function applyDemoVehicleRemote(
     doorsLocked,
     immobiliserOn,
     theftRecovery,
+    emergencyStatus:
+      (isPrimary ? demoVehicleState.emergencyStatus : target.emergencyStatus) ??
+      (theftRecovery ? 'STOLEN' : null),
     trackerLinked: target.trackerLinked,
     cameras: demoClientDashCams(target.id, target.registration),
   };
@@ -1676,8 +1785,16 @@ const demoControlRoomNotifications: DemoCrNotification[] = [
 ];
 
 const demoCrReadIds = new Set<string>();
+const demoCrClearedIds = new Set<string>();
 
 function markDemoCrRead(id: string) {
+  demoCrReadIds.add(id);
+  const n = demoControlRoomNotifications.find((item) => item.id === id);
+  if (n) n.isRead = true;
+}
+
+function clearDemoCrNotification(id: string) {
+  demoCrClearedIds.add(id);
   demoCrReadIds.add(id);
   const n = demoControlRoomNotifications.find((item) => item.id === id);
   if (n) n.isRead = true;
@@ -2905,6 +3022,35 @@ export async function handleDemoRequest<T>({
     return security.response as T;
   }
 
+  const integrations = handleIntegrationsDemo({
+    clean,
+    method: m,
+    payload: (payload ?? {}) as Record<string, unknown>,
+    userId: user?.id,
+    tenantId: session?.user?.tenantId,
+  });
+  if (integrations.handled) {
+    if (integrations.incident) demoIncidents.unshift(integrations.incident as (typeof demoIncidents)[number]);
+    if (integrations.crNotification) demoControlRoomNotifications.unshift(integrations.crNotification);
+    return integrations.response as T;
+  }
+
+  const physical = handlePhysicalControlDemo({
+    clean,
+    method: m,
+    payload: {
+      ...(payload ?? {}),
+      propertyId: params.get('propertyId') ?? (payload as { propertyId?: string } | null)?.propertyId,
+    },
+    actorName:
+      session?.user
+        ? `${session.user.firstName ?? ''} ${session.user.lastName ?? ''}`.trim() || session.user.email
+        : 'Operator',
+  });
+  if (physical.handled) {
+    return physical.response as T;
+  }
+
   // ——— Store (public) ———
   if (clean === '/store/catalog' && m === 'GET') {
     const category = params.get('category') ?? undefined;
@@ -3274,6 +3420,16 @@ export async function handleDemoRequest<T>({
     if (open) open.status = 'CANCELLED';
     return ok({ cancelled: Boolean(open) }) as T;
   }
+  if (clean === '/alerts/escalate' && m === 'POST') {
+    return {
+      success: true,
+      recipients: 3,
+      queued: 1,
+    } as T;
+  }
+  if (clean === '/alerts/escalation-queue' && m === 'GET') {
+    return { success: true, data: [] } as T;
+  }
   if (clean === '/client/overview' && m === 'GET') {
     return ok({
       user: {
@@ -3311,16 +3467,48 @@ export async function handleDemoRequest<T>({
           year: 2024,
           color: 'White',
           theftRecovery: demoVehicleState.theftRecovery,
+          emergencyStatus: demoVehicleState.emergencyStatus ?? (demoVehicleState.theftRecovery ? 'STOLEN' : null),
           immobiliserOn: demoVehicleState.immobiliserOn,
           doorsLocked: demoVehicleState.doorsLocked,
         },
       ],
-      properties: demoProperties.filter((p) => {
-        const site = demoSurveillanceSites.find((s) => s.id === p.id);
-        if (!site) return p.id === 'demo-prop-1';
-        const ownerId = user?.id ?? 'demo-user-client-demo-local';
-        return site.owner.id === ownerId || site.owner.email === user?.email || p.id === 'demo-prop-1';
-      }),
+      properties: demoProperties
+        .filter((p) => {
+          const site = demoSurveillanceSites.find((s) => s.id === p.id);
+          if (!site) return p.id === 'demo-prop-1';
+          const ownerId = user?.id ?? 'demo-user-client-demo-local';
+          return site.owner.id === ownerId || site.owner.email === user?.email || p.id === 'demo-prop-1';
+        })
+        .map((p) => {
+          const site = demoSurveillanceSites.find((s) => s.id === p.id);
+          const sensors = site?.sensors ?? [];
+          const active = sensors.filter(
+            (s) =>
+              !s.bypassed &&
+              !['FAULT', 'OFFLINE', 'TAMPER', 'BYPASSED', 'DISABLED'].includes(s.status.toUpperCase()) &&
+              !['ALARM', 'ALERT', 'OPEN'].includes(s.status.toUpperCase()),
+          ).length;
+          const fault = sensors.filter((s) =>
+            ['FAULT', 'TAMPER', 'OFFLINE'].includes(s.status.toUpperCase()),
+          ).length;
+          const alert = sensors.filter((s) =>
+            ['ALARM', 'ALERT', 'OPEN'].includes(s.status.toUpperCase()),
+          ).length;
+          const disabled = sensors.filter(
+            (s) => s.bypassed || ['BYPASSED', 'DISABLED'].includes(s.status.toUpperCase()),
+          ).length;
+          return {
+            ...p,
+            alarmStatus: site?.alarmStatus ?? p.alarmStatus,
+            zoneHealth: {
+              total: sensors.length || site?.sensorCount || 0,
+              active: sensors.length ? active : site?.sensorCount ?? 0,
+              fault,
+              alert,
+              disabled,
+            },
+          };
+        }),
       family: [
         { id: 'demo-fam-1', name: 'Thandi Client', trackingEnabled: true, phone: '+27821234568' },
         { id: 'demo-fam-2', name: 'Lerato Client', trackingEnabled: false, phone: '+27821234569' },
@@ -3345,6 +3533,11 @@ export async function handleDemoRequest<T>({
         publicRef: 'NX-0001',
         type: 'PANIC',
         status: 'DISPATCHED',
+        stage: 'EN_ROUTE',
+        headline: 'Security response active',
+        detail: 'Unit 14 is responding · En route · ETA 04:32',
+        unitLabel: 'Unit 14',
+        etaSeconds: 272,
         events: [
           {
             id: 'demo-ev-1',
@@ -3732,7 +3925,7 @@ export async function handleDemoRequest<T>({
   ) {
     const type =
       clean.includes('medical') ? 'MEDICAL' : clean.includes('fire') ? 'FIRE' : 'PANIC';
-    demoIncidents.unshift({
+    const created = {
       id: `demo-inc-${Date.now()}`,
       type,
       status: 'OPEN',
@@ -3742,11 +3935,12 @@ export async function handleDemoRequest<T>({
       priority: 'CRITICAL',
       user: 'Nomsa Client',
       location: 'Umhlanga Rocks Dr',
-    });
+    };
+    demoIncidents.unshift(created);
     if (type === 'MEDICAL') {
       medicalTickets.unshift({
         id: `demo-med-${Date.now()}`,
-        incidentId: demoIncidents[0].id,
+        incidentId: created.id,
         client: 'Nomsa Client',
         location: 'Umhlanga Rocks Dr',
         priority: 'CRITICAL',
@@ -3754,10 +3948,104 @@ export async function handleDemoRequest<T>({
         level: 'ALS',
         distanceKm: 2.4,
         patientSummary: 'Known medical profile on file · PHI withheld from officers',
-        securityTicketId: demoIncidents[0].id,
+        securityTicketId: created.id,
       });
     }
-    return ok({ created: true, dualDispatch: type === 'MEDICAL' }) as T;
+    return ok({
+      ...created,
+      created: true,
+      dualDispatch: type === 'MEDICAL',
+      incidentId: created.id,
+    }) as T;
+  }
+  {
+    const bypassMatch = clean.match(/^\/client\/properties\/([^/]+)\/sensors\/([^/]+)\/bypass$/);
+    if (bypassMatch && m === 'PATCH') {
+      const site = demoSurveillanceSites.find((s) => s.id === bypassMatch[1]);
+      const sensor = site?.sensors.find((s) => s.id === bypassMatch[2]);
+      if (!site || !sensor) throw new Error('Sensor not found');
+      const bypassed = payload.bypassed !== false;
+      sensor.bypassed = bypassed;
+      sensor.status = bypassed ? 'BYPASSED' : 'SECURE';
+      const ts = new Date().toISOString();
+      demoControlRoomNotifications.unshift({
+        id: `demo-n-zone-${Date.now()}`,
+        category: 'ALARM',
+        title: bypassed
+          ? `Zone disabled · Z${sensor.zoneNumber}`
+          : `Zone restored · Z${sensor.zoneNumber}`,
+        body: `${sensor.name} at ${site.name} ${bypassed ? 'disabled / will not trip' : 'active again'}`,
+        priority: 'medium',
+        isRead: false,
+        createdAt: ts,
+        link: `/control-room/surveillance/${site.id}`,
+      });
+      demoClientNotifications.unshift({
+        id: `demo-cn-zone-${Date.now()}`,
+        type: 'SYSTEM',
+        title: bypassed
+          ? `Zone disabled · Z${sensor.zoneNumber}`
+          : `Zone restored · Z${sensor.zoneNumber}`,
+        body: `${sensor.name} ${bypassed ? 'will not trip while disabled' : 'is active again'}`,
+        createdAt: ts,
+        isRead: false,
+        href: `/portal/home/${site.id}`,
+      });
+      return ok(sensor) as T;
+    }
+  }
+  {
+    const healthMatch = clean.match(/^\/client\/properties\/([^/]+)\/sensors\/([^/]+)\/health$/);
+    const crHealthMatch = clean.match(/^\/control-room\/surveillance\/sensors\/([^/]+)\/health$/);
+    if ((healthMatch || crHealthMatch) && m === 'POST') {
+      const sensorId = healthMatch?.[2] ?? crHealthMatch?.[1] ?? '';
+      const site =
+        (healthMatch && demoSurveillanceSites.find((s) => s.id === healthMatch[1])) ||
+        demoSurveillanceSites.find((s) => s.sensors.some((x) => x.id === sensorId));
+      const sensor = site?.sensors.find((s) => s.id === sensorId);
+      if (!site || !sensor) throw new Error('Sensor not found');
+      const status = String(payload.status ?? 'FAULT').toUpperCase();
+      if (sensor.bypassed && status !== 'NORMAL' && status !== 'SECURE') {
+        throw new Error('Enable the zone before reporting a fault');
+      }
+      if (status === 'NORMAL' || status === 'SECURE') {
+        sensor.status = 'SECURE';
+        sensor.bypassed = false;
+      } else if (status === 'FAULT' || status === 'OFFLINE' || status === 'TAMPER') {
+        sensor.status = status;
+        sensor.bypassed = false;
+      } else {
+        throw new Error('Unsupported sensor health status');
+      }
+      const problem = ['FAULT', 'OFFLINE', 'TAMPER'].includes(sensor.status);
+      const ts = new Date().toISOString();
+      const title = problem
+        ? `Sensor ${sensor.status.toLowerCase()} · Z${sensor.zoneNumber}`
+        : `Zone restored · Z${sensor.zoneNumber}`;
+      const body = problem
+        ? `${sensor.name} at ${site.name} needs inspection. Owner and control room notified.`
+        : `${sensor.name} at ${site.name} is active again.`;
+      demoControlRoomNotifications.unshift({
+        id: `demo-n-health-${Date.now()}`,
+        category: 'ALARM',
+        title,
+        body,
+        priority: problem ? 'high' : 'medium',
+        isRead: false,
+        createdAt: ts,
+        link: `/control-room/surveillance/${site.id}`,
+      });
+      demoClientNotifications.unshift({
+        id: `demo-cn-health-${Date.now()}`,
+        type: 'SYSTEM',
+        title,
+        body,
+        createdAt: ts,
+        isRead: false,
+        href: `/portal/home/${site.id}`,
+      });
+      return ok(sensor) as T;
+    }
   }
   {
     const alarmMatch = clean.match(/^\/client\/properties\/([^/]+)\/alarm$/);
@@ -3992,6 +4280,9 @@ export async function handleDemoRequest<T>({
           trackerLinked: v.trackerLinked,
           phoneTrackingEnabled: demoVehicleState.phoneTrackingEnabled,
           theftRecovery: v.theftRecovery,
+          emergencyStatus:
+            ('emergencyStatus' in v ? v.emergencyStatus : null) ??
+            (v.theftRecovery ? demoVehicleState.emergencyStatus ?? 'STOLEN' : null),
           immobiliserOn: v.immobiliserOn,
           doorsLocked: v.doorsLocked ?? true,
           insuranceInfo: 'insuranceInfo' in v ? v.insuranceInfo : 'Santam comprehensive',
@@ -4242,6 +4533,10 @@ export async function handleDemoRequest<T>({
         vin: v.vin,
         trackerLinked: v.trackerLinked,
         theftRecovery: v.id === 'demo-veh-1' ? demoVehicleState.theftRecovery : v.theftRecovery,
+        emergencyStatus:
+          v.id === 'demo-veh-1'
+            ? demoVehicleState.emergencyStatus ?? (demoVehicleState.theftRecovery ? 'STOLEN' : null)
+            : v.emergencyStatus ?? (v.theftRecovery ? 'STOLEN' : null),
         immobiliserOn: v.id === 'demo-veh-1' ? demoVehicleState.immobiliserOn : v.immobiliserOn,
         doorsLocked: v.id === 'demo-veh-1' ? demoVehicleState.doorsLocked : (v.doorsLocked ?? true),
         insuranceInfo: v.insuranceInfo,
@@ -4348,10 +4643,70 @@ export async function handleDemoRequest<T>({
     ) as T;
   }
   {
+    const liveMatch = clean.match(/^\/client\/incidents\/([^/]+)\/live$/);
+    if (liveMatch && m === 'GET') {
+      const id = liveMatch[1];
+      const row = demoIncidents.find((i) => i.id === id) ?? demoIncidents[0];
+      return ok({
+        id: row?.id ?? id,
+        publicRef: row?.publicRef ?? 'NX-0001',
+        type: row?.type ?? 'PANIC',
+        status: row?.status ?? 'DISPATCHED',
+        title: row?.title ?? 'Panic Alert',
+        address: row?.location ?? 'Umhlanga Ridge',
+        isSilent: row?.isSilent ?? false,
+        priority: row?.priority ?? 'CRITICAL',
+        ackedAt: new Date(Date.now() - 120_000).toISOString(),
+        dispatchedAt: new Date(Date.now() - 90_000).toISOString(),
+        onSceneAt: null,
+        resolvedAt: null,
+        createdAt: new Date(Date.now() - 180_000).toISOString(),
+        lat: -29.725,
+        lng: 31.085,
+        unit: {
+          callSign: 'Unit 14',
+          kind: 'SECURITY',
+          status: 'EN_ROUTE',
+          etaSeconds: 272,
+          officerName: 'Sipho Dlamini',
+        },
+        stage: 'EN_ROUTE',
+        headline: 'Security response active',
+        detail: 'Unit 14 is responding · En route · ETA 04:32',
+        timeline: [
+          {
+            id: 'tl-1',
+            type: 'incident.created',
+            createdAt: new Date(Date.now() - 180_000).toISOString(),
+            source: 'portal',
+          },
+          {
+            id: 'tl-2',
+            type: 'incident.acknowledged',
+            createdAt: new Date(Date.now() - 120_000).toISOString(),
+            source: 'control-room',
+          },
+          {
+            id: 'tl-3',
+            type: 'dispatch.created',
+            createdAt: new Date(Date.now() - 90_000).toISOString(),
+            source: 'control-room',
+          },
+          {
+            id: 'tl-4',
+            type: 'dispatch.en_route',
+            createdAt: new Date(Date.now() - 60_000).toISOString(),
+            source: 'officer',
+          },
+        ],
+      }) as T;
+    }
+  }
+  {
     const vehicleIdMatch = clean.match(
-      /^\/client\/vehicles\/([^/]+)\/(tracking\/phone|location|theft-recovery|remote)$/,
+      /^\/client\/vehicles\/([^/]+)\/(tracking\/phone|location|theft-recovery|remote|emergency-status)$/,
     );
-    if (vehicleIdMatch && (m === 'POST' || m === 'DELETE')) {
+    if (vehicleIdMatch && (m === 'POST' || m === 'DELETE' || m === 'PATCH')) {
       const action = vehicleIdMatch[2];
       const lat = Number(payload.lat);
       const lng = Number(payload.lng);
@@ -4369,7 +4724,9 @@ export async function handleDemoRequest<T>({
         }
       }
       if (action === 'theft-recovery' && m === 'POST') {
+        const status = String(payload.status ?? 'STOLEN').toUpperCase();
         demoVehicleState.theftRecovery = true;
+        demoVehicleState.emergencyStatus = status;
         demoVehicleState.trackingMode = 'THEFT_RECOVERY';
         const existing = demoIncidents.find((i) => i.type === 'THEFT' && isActiveDemoIncident(i.status));
         if (!existing) {
@@ -4377,14 +4734,55 @@ export async function handleDemoRequest<T>({
             id: `demo-inc-${Date.now()}`,
             type: 'THEFT',
             status: 'OPEN',
-            title: 'Vehicle recovery track',
+            title: `${status.replace(/_/g, ' ')} — vehicle recovery`,
             isSilent: false,
             time: 'Just now',
-            priority: 'HIGH',
+            priority: status === 'HIJACKING' || status === 'MEDICAL' ? 'CRITICAL' : 'HIGH',
             user: user ? `${user.firstName ?? ''} ${user.lastName ?? ''}`.trim() || user.email : 'Nomsa Client',
             location: 'Live phone relay',
           });
         }
+        demoControlRoomNotifications.unshift({
+          id: `demo-n-status-${Date.now()}`,
+          category: 'THEFT',
+          title: `${status.replace(/_/g, ' ')} — ND 123-456`,
+          body: 'Client activated recovery — keep notifications updated as the situation changes.',
+          priority: status === 'HIJACKING' || status === 'MEDICAL' ? 'critical' : 'high',
+          isRead: false,
+          createdAt: new Date().toISOString(),
+          link: '/control-room/fleet',
+        });
+      }
+      if (action === 'emergency-status' && m === 'PATCH') {
+        const status = String(payload.status ?? 'STOLEN').toUpperCase();
+        const vehicleId = vehicleIdMatch[1];
+        const target =
+          demoClientVehicles.find((v) => v.id === vehicleId) ??
+          demoClientVehicles.find((v) => v.id === 'demo-veh-1');
+        demoVehicleState.theftRecovery = true;
+        demoVehicleState.emergencyStatus = status;
+        demoVehicleState.trackingMode = 'THEFT_RECOVERY';
+        if (target) {
+          target.theftRecovery = true;
+          target.emergencyStatus = status;
+        }
+        demoControlRoomNotifications.unshift({
+          id: `demo-n-status-${Date.now()}`,
+          category: 'THEFT',
+          title: `${status.replace(/_/g, ' ')} — ${target?.registration ?? 'vehicle'}`,
+          body: 'Situation updated — responders and family stay informed.',
+          priority: status === 'HIJACKING' || status === 'MEDICAL' ? 'critical' : 'high',
+          isRead: false,
+          createdAt: new Date().toISOString(),
+          link: '/control-room/fleet',
+        });
+        return ok({
+          id: target?.id ?? vehicleId,
+          registration: target?.registration ?? 'ND 123-456',
+          theftRecovery: true,
+          emergencyStatus: status,
+          message: `${target?.registration ?? 'Vehicle'} status → ${status.replace(/_/g, ' ')}.`,
+        }) as T;
       }
       if (action === 'remote' && m === 'POST') {
         const actor = user ? `${user.firstName ?? ''} ${user.lastName ?? ''}`.trim() || user.email : 'Nomsa Client';
@@ -4396,6 +4794,7 @@ export async function handleDemoRequest<T>({
         ok: true,
         phoneTrackingEnabled: demoVehicleState.phoneTrackingEnabled,
         theftRecovery: demoVehicleState.theftRecovery,
+        emergencyStatus: demoVehicleState.emergencyStatus,
         trackingMode: demoVehicleState.trackingMode,
         lat: demoVehicleState.lat,
         lng: demoVehicleState.lng,
@@ -4674,6 +5073,88 @@ export async function handleDemoRequest<T>({
   }
 
   // ——— Control room ———
+  if (clean === '/control-room/assurance' && m === 'GET') {
+    return ok({
+      profile: {
+        id: 'STANDARD',
+        label: 'Standard',
+        description: 'Private security company baseline.',
+        retentionDaysMin: 90,
+        siemExportRequired: false,
+        supplierPackRequired: false,
+      },
+      profiles: [
+        {
+          id: 'STANDARD',
+          label: 'Standard',
+          description: 'Private security company baseline.',
+          retentionDaysMin: 90,
+          siemExportRequired: false,
+          supplierPackRequired: false,
+        },
+        {
+          id: 'ENTERPRISE',
+          label: 'Enterprise',
+          description: 'Multi-branch ops.',
+          retentionDaysMin: 365,
+          siemExportRequired: true,
+          supplierPackRequired: false,
+        },
+        {
+          id: 'HIGH_ASSURANCE',
+          label: 'High assurance',
+          description: 'Government / critical-ops target posture.',
+          retentionDaysMin: 2555,
+          siemExportRequired: true,
+          supplierPackRequired: true,
+        },
+      ],
+      metrics: { openVulns: 0, auditCount: 12, evidenceHashed: 3, mfaUsers: 1 },
+      checklist: [
+        { id: 'mfa', label: 'Privileged MFA enrolled', done: true, required: true },
+        { id: 'audit', label: 'Security audit events flowing', done: true, required: true },
+        { id: 'evidence', label: 'Evidence SHA-256 in use', done: true, required: true },
+        { id: 'vuln', label: 'Vulnerability register reviewed', done: true, required: false },
+        { id: 'siem', label: 'SIEM export available', done: true, required: false },
+        { id: 'backup', label: 'Backup runbook documented', done: true, required: true },
+      ],
+      passkeys: {
+        status: 'planned',
+        message: 'WebAuthn/passkeys are on the Phase 3 roadmap; TOTP MFA is the current control.',
+      },
+    }) as T;
+  }
+  if (clean === '/control-room/assurance/profile' && m === 'PATCH') {
+    return ok({ success: true }) as T;
+  }
+  if (clean === '/control-room/assurance/vulnerabilities' && m === 'GET') {
+    return ok([]) as T;
+  }
+  if (clean === '/control-room/assurance/vulnerabilities' && m === 'POST') {
+    return ok({
+      id: `vuln-${Date.now()}`,
+      title: String((payload as { title?: string })?.title ?? 'Finding'),
+      severity: String((payload as { severity?: string })?.severity ?? 'MEDIUM'),
+      status: 'OPEN',
+      cveId: null,
+      discoveredAt: new Date().toISOString(),
+    }) as T;
+  }
+  if (clean.startsWith('/control-room/assurance/vulnerabilities/') && m === 'PATCH') {
+    return ok({ id: clean.split('/').pop(), status: 'CLOSED' }) as T;
+  }
+  if (clean === '/control-room/assurance/siem-export' && m === 'GET') {
+    return ok({
+      format: '4ds-siem-json-v1',
+      exportedAt: new Date().toISOString(),
+      since: new Date(Date.now() - 86400000).toISOString(),
+      count: 2,
+      events: [
+        { id: '1', action: 'AUTH_LOGIN_SUCCESS', result: 'SUCCESS', createdAt: new Date().toISOString() },
+        { id: '2', action: 'AUTH_MFA_ENROLLED', result: 'SUCCESS', createdAt: new Date().toISOString() },
+      ],
+    }) as T;
+  }
   if (clean === '/control-room/security-settings' && m === 'GET') {
     return ok({
       mfaOwners: true,
@@ -4838,7 +5319,7 @@ export async function handleDemoRequest<T>({
         ],
       },
       alarms: demoAlarmFeed,
-      access: demoAccessDoors,
+      access: demoAccessDoorsForPsim(),
       patrols: demoPatrolRoutes,
       patrolPhotos: {
         shift: demoOfficerPatrolShift,
@@ -5275,6 +5756,7 @@ export async function handleDemoRequest<T>({
           doorsLocked: live.doorsLocked ?? true,
           immobiliserOn: live.immobiliserOn,
           theftRecovery: live.theftRecovery,
+          emergencyStatus: live.emergencyStatus ?? (live.theftRecovery ? 'STOLEN' : null),
           speed: live.theftRecovery ? live.speed : v.speed,
         };
       }),
@@ -5337,7 +5819,7 @@ export async function handleDemoRequest<T>({
         ...n,
         isRead: n.isRead || demoCrReadIds.has(n.id),
       })),
-    ];
+    ].filter((n) => !demoCrClearedIds.has(n.id));
     return ok({
       notifications,
       unreadCount: notifications.filter((n) => !n.isRead).length,
@@ -5347,6 +5829,24 @@ export async function handleDemoRequest<T>({
     for (const n of demoControlRoomNotifications) n.isRead = true;
     for (const n of demoTicketNotifications(user?.role)) demoCrReadIds.add(n.id);
     return ok({ ok: true, unreadCount: 0 }) as T;
+  }
+  if (clean === '/control-room/notifications/clear-all' && m === 'PATCH') {
+    for (const n of demoControlRoomNotifications) {
+      demoCrClearedIds.add(n.id);
+      n.isRead = true;
+    }
+    for (const n of demoTicketNotifications(user?.role)) {
+      demoCrClearedIds.add(n.id);
+      demoCrReadIds.add(n.id);
+    }
+    return ok({ ok: true, cleared: true }) as T;
+  }
+  {
+    const clearMatch = clean.match(/^\/control-room\/notifications\/([^/]+)\/clear$/);
+    if (clearMatch && m === 'PATCH') {
+      clearDemoCrNotification(clearMatch[1]);
+      return ok({ ok: true, cleared: true }) as T;
+    }
   }
   {
     const readMatch = clean.match(/^\/control-room\/notifications\/([^/]+)\/read$/);
@@ -5794,6 +6294,38 @@ export async function handleDemoRequest<T>({
       if (!result) return { success: false as const, message: 'Unknown vehicle remote action' } as T;
       return ok(result) as T;
     }
+    const statusMatch = clean.match(/^\/control-room\/client-vehicles\/([^/]+)\/emergency-status$/);
+    if (statusMatch && m === 'PATCH') {
+      const status = String(payload.status ?? 'STOLEN').toUpperCase();
+      const vehicleId = statusMatch[1];
+      const target =
+        demoClientVehicles.find((v) => v.id === vehicleId) ??
+        demoClientVehicles.find((v) => v.id === 'demo-veh-1');
+      demoVehicleState.theftRecovery = true;
+      demoVehicleState.emergencyStatus = status;
+      demoVehicleState.trackingMode = 'THEFT_RECOVERY';
+      if (target) {
+        target.theftRecovery = true;
+        target.emergencyStatus = status;
+      }
+      demoControlRoomNotifications.unshift({
+        id: `demo-n-status-${Date.now()}`,
+        category: 'THEFT',
+        title: `${status.replace(/_/g, ' ')} — ${target?.registration ?? 'vehicle'}`,
+        body: 'Control room updated the situation — notifications refreshed.',
+        priority: status === 'HIJACKING' || status === 'MEDICAL' ? 'critical' : 'high',
+        isRead: false,
+        createdAt: new Date().toISOString(),
+        link: '/control-room/fleet',
+      });
+      return ok({
+        id: target?.id ?? vehicleId,
+        registration: target?.registration ?? 'ND 123-456',
+        theftRecovery: true,
+        emergencyStatus: status,
+        message: `${target?.registration ?? 'Vehicle'} status → ${status.replace(/_/g, ' ')}.`,
+      }) as T;
+    }
   }
   if (clean === '/control-room/fleet' && m === 'GET') {
     const seen = new Set<string>();
@@ -6072,6 +6604,21 @@ export async function handleDemoRequest<T>({
           email: emailMap[o.id] ?? null,
           rank: rankMap[o.id] ?? 'Officer',
           vehicle: o.vehicle,
+          ...(() => {
+            const duty = ensureDemoDuty(o.id);
+            return {
+              dutyModeActive: duty.dutyModeActive,
+              dutyStartedAt: duty.dutyStartedAt,
+              lastHeartbeatAt: duty.lastHeartbeatAt,
+              deviceLabel: duty.deviceLabel,
+              batteryPct: duty.batteryPct,
+              networkType: duty.networkType,
+              appVersion: duty.appVersion,
+              deviceLink: demoDeviceLink(duty),
+              currentLat: duty.lat,
+              currentLng: duty.lng,
+            };
+          })(),
           assignedFleet: fleetV
             ? {
                 id: fleetV.id,
@@ -6864,13 +7411,14 @@ export async function handleDemoRequest<T>({
         ['ACCEPTED', 'EN_ROUTE', 'ON_SCENE'].includes(d.status),
       ) ?? open[0] ?? null;
     const completedToday = officerDispatches.filter((d) => d.status === 'COMPLETED').length;
+    const roster = resolveDemoOfficerForUser(user);
+    const duty = ensureDemoDuty(roster.id);
     return ok({
       officer: {
-        firstName: user?.firstName ?? 'Sipho',
-        lastName: user?.lastName ?? 'Ndlovu',
-        status: active?.status ?? 'AVAILABLE',
-        zone: 'Zone A',
-        avgResponseSec: 280,
+        ...formatDemoDuty(roster, duty),
+        firstName: user?.firstName ?? roster.firstName,
+        lastName: user?.lastName ?? roster.lastName,
+        avgResponseSec: roster.avgResponseSec,
       },
       stats: {
         activeAssignments: open.filter((d) =>
@@ -6883,6 +7431,53 @@ export async function handleDemoRequest<T>({
       queue: open,
     }) as T;
   }
+  if (clean === '/officer/duty' && m === 'GET') {
+    const roster = resolveDemoOfficerForUser(user);
+    return ok(formatDemoDuty(roster, ensureDemoDuty(roster.id))) as T;
+  }
+  if (clean === '/officer/duty/start' && m === 'POST') {
+    const roster = resolveDemoOfficerForUser(user);
+    const duty = ensureDemoDuty(roster.id);
+    const now = new Date().toISOString();
+    duty.dutyModeActive = true;
+    duty.dutyStartedAt = now;
+    duty.lastHeartbeatAt = now;
+    duty.deviceLabel = typeof payload.deviceLabel === 'string' ? payload.deviceLabel : duty.deviceLabel ?? '4DS Web Officer';
+    duty.batteryPct = typeof payload.batteryPct === 'number' ? payload.batteryPct : duty.batteryPct ?? 87;
+    duty.networkType = typeof payload.networkType === 'string' ? payload.networkType : duty.networkType ?? 'online';
+    duty.appVersion = typeof payload.appVersion === 'string' ? payload.appVersion : '1.4.0';
+    duty.operationalChecks =
+      payload.checks && typeof payload.checks === 'object'
+        ? { ...(payload.checks as Record<string, boolean>), checkedAt: now }
+        : duty.operationalChecks;
+    if (typeof payload.lat === 'number') duty.lat = payload.lat;
+    if (typeof payload.lng === 'number') duty.lng = payload.lng;
+    if (roster.status === 'OFF_DUTY') roster.status = 'AVAILABLE';
+    return ok(formatDemoDuty(roster, duty)) as T;
+  }
+  if (clean === '/officer/duty/end' && m === 'POST') {
+    const roster = resolveDemoOfficerForUser(user);
+    const duty = ensureDemoDuty(roster.id);
+    duty.dutyModeActive = false;
+    duty.lastHeartbeatAt = new Date().toISOString();
+    roster.status = 'OFF_DUTY';
+    return ok(formatDemoDuty(roster, duty)) as T;
+  }
+  if (clean === '/officer/duty/heartbeat' && m === 'POST') {
+    const roster = resolveDemoOfficerForUser(user);
+    const duty = ensureDemoDuty(roster.id);
+    if (!duty.dutyModeActive) {
+      return { success: false as const, message: 'Duty Mode is not active' } as T;
+    }
+    duty.lastHeartbeatAt = new Date().toISOString();
+    if (typeof payload.batteryPct === 'number') duty.batteryPct = payload.batteryPct;
+    if (typeof payload.networkType === 'string') duty.networkType = payload.networkType;
+    if (typeof payload.deviceLabel === 'string') duty.deviceLabel = payload.deviceLabel;
+    if (typeof payload.appVersion === 'string') duty.appVersion = payload.appVersion;
+    if (typeof payload.lat === 'number') duty.lat = payload.lat;
+    if (typeof payload.lng === 'number') duty.lng = payload.lng;
+    return ok(formatDemoDuty(roster, duty)) as T;
+  }
   if (clean === '/officer/status' && m === 'PATCH') {
     const next = payload.status as string | undefined;
     const roster = (
@@ -6890,7 +7485,14 @@ export async function handleDemoRequest<T>({
         (o) => o.firstName === user?.firstName && o.lastName === user?.lastName,
       ) ?? demoOfficerRoster[0]
     ) as (typeof demoOfficerRoster)[number] & { phone?: string | null };
-    if (roster && next) roster.status = next;
+    if (roster && next) {
+      roster.status = next;
+      if (next === 'OFF_DUTY') {
+        const duty = ensureDemoDuty(roster.id);
+        duty.dutyModeActive = false;
+        duty.lastHeartbeatAt = new Date().toISOString();
+      }
+    }
     return ok({ ok: true, status: next ?? roster?.status ?? 'AVAILABLE' }) as T;
   }
   if (clean === '/officer/profile' && m === 'GET') {

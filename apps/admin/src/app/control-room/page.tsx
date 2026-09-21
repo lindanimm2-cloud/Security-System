@@ -33,7 +33,6 @@ import {
   opsIsDispatched,
   opsPriorityLabel,
   opsResponseStatus,
-  slaSnapshot,
   type OpsIncident,
 } from '@/lib/ops-incident';
 import { useNow } from '@/hooks/useNow';
@@ -74,7 +73,7 @@ export default function ControlRoomPage() {
   );
 }
 
-type MobileOpsPane = 'queue' | 'map' | 'detail' | 'more';
+type MobileOpsPane = 'queue' | 'cctv' | 'map' | 'more' | 'detail';
 
 function OverviewContent() {
   const { data, loading, error, reload } = useApi(
@@ -86,6 +85,9 @@ function OverviewContent() {
   const [timelineNote, setTimelineNote] = useState('');
   const [resolveBusyId, setResolveBusyId] = useState<string | null>(null);
   const [queueFilter, setQueueFilter] = useState<OpsQueueFilter>('all');
+  const [queueOpen, setQueueOpen] = useState(false);
+  const [detailOpen, setDetailOpen] = useState(false);
+  const [isNarrow, setIsNarrow] = useState(false);
   const now = useNow(1000);
 
   useEffect(() => {
@@ -93,6 +95,18 @@ function OverviewContent() {
     const id = window.setInterval(() => void reload({ silent: true }), 15000);
     return () => window.clearInterval(id);
   }, [reload]);
+
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 900px)');
+    const sync = () => setIsNarrow(mq.matches);
+    sync();
+    mq.addEventListener('change', sync);
+    return () => mq.removeEventListener('change', sync);
+  }, []);
+
+  // Desktop side-rails are unused on mobile — always render real panes.
+  const showQueuePane = queueOpen || isNarrow;
+  const showDetailPane = detailOpen || isNarrow;
 
   const role = getSession('admin')?.user.role ?? '';
   const allowedNav = new Set(navForRole(role).map((item) => item.href));
@@ -119,8 +133,18 @@ function OverviewContent() {
     });
   }, [prioritizedIncidents, queueFilter]);
 
-  const p1Count = prioritizedIncidents.filter((i) => opsPriorityLabel(i.priority, i.type) === 'P1').length;
-  const slaCount = prioritizedIncidents.filter((i) => slaSnapshot(i, now).overdue).length;
+  const hasActiveIncidents = prioritizedIncidents.length > 0;
+
+  useEffect(() => {
+    if (hasActiveIncidents) {
+      setQueueOpen(true);
+      setDetailOpen(true);
+    } else {
+      setQueueOpen(false);
+      setDetailOpen(false);
+      setFocusIncidentId(null);
+    }
+  }, [hasActiveIncidents]);
 
   useEffect(() => {
     if (focusIncidentId && !prioritizedIncidents.some((i) => i.id === focusIncidentId)) {
@@ -136,6 +160,8 @@ function OverviewContent() {
 
   function selectIncident(id: string) {
     setFocusIncidentId(id);
+    setDetailOpen(true);
+    setQueueOpen(true);
     if (typeof window !== 'undefined' && window.matchMedia('(max-width: 900px)').matches) {
       setMobilePane('detail');
     }
@@ -184,11 +210,24 @@ function OverviewContent() {
   if (!d || !stats) return null;
 
   return (
-    <div className="dash-ops dash-ops--ops-board">
+    <div className="dash-ops dash-ops--ops-board dash-ops--command">
+      <header className="ops-board-hero">
+        <div>
+          <h1 className="ops-board-hero__title">Live Ops Board</h1>
+          <p className="ops-board-hero__sub">Real-time incidents, units &amp; field activity</p>
+        </div>
+        <div className="ops-board-hero__meta">
+          <span className="ops-board-hero__live">
+            <span className="ops-board-hero__pulse" aria-hidden />
+            Live
+          </span>
+          <time dateTime={new Date(now).toISOString()} className="ops-board-hero__clock">
+            {new Date(now).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+          </time>
+        </div>
+      </header>
+
       <OpsCommandStrip
-        active={prioritizedIncidents.length}
-        p1={p1Count}
-        slaBreaches={slaCount}
         filter={queueFilter}
         onFilter={setQueueFilter}
       />
@@ -226,17 +265,17 @@ function OverviewContent() {
         </button>
         <button
           type="button"
+          className={`ops-mobile-tabs__btn ${mobilePane === 'cctv' ? 'ops-mobile-tabs__btn--on' : ''}`}
+          onClick={() => setMobilePane('cctv')}
+        >
+          CCTV
+        </button>
+        <button
+          type="button"
           className={`ops-mobile-tabs__btn ${mobilePane === 'map' ? 'ops-mobile-tabs__btn--on' : ''}`}
           onClick={() => setMobilePane('map')}
         >
           Map
-        </button>
-        <button
-          type="button"
-          className={`ops-mobile-tabs__btn ${mobilePane === 'detail' ? 'ops-mobile-tabs__btn--on' : ''}`}
-          onClick={() => setMobilePane('detail')}
-        >
-          Detail
         </button>
         <button
           type="button"
@@ -247,39 +286,100 @@ function OverviewContent() {
         </button>
       </nav>
 
-      <div className="ops-board ops-board--console" data-mobile-pane={mobilePane}>
-        <aside className="ops-board__queue" aria-label="Incident queue">
-          <div className="ops-board__pane-head">
-            <h2>Incidents</h2>
-            <p className="text-muted">
-              {filteredIncidents.length} in view · {stats.availableOfficers} units available
-            </p>
-          </div>
-          <div className="ops-board__queue-list">
-            {filteredIncidents.length === 0 ? (
-              <div className="dash-clear" style={{ padding: '1rem' }}>
-                <strong>Board clear</strong>
-                <p className="text-muted">No incidents match this filter.</p>
+      <div
+        className={[
+          'ops-board ops-board--console ops-board--v2',
+          !hasActiveIncidents ? 'ops-board--dash-main' : '',
+          showQueuePane ? 'ops-board--queue-open' : 'ops-board--queue-collapsed',
+          showDetailPane ? 'ops-board--detail-open' : 'ops-board--detail-collapsed',
+        ]
+          .filter(Boolean)
+          .join(' ')}
+        data-mobile-pane={mobilePane}
+      >
+        {showQueuePane ? (
+          <aside className="ops-board__queue" aria-label="Incident queue">
+            <div className="ops-board__pane-head">
+              <div>
+                <h2>Incidents</h2>
+                <p className="text-muted">
+                  {filteredIncidents.length} in view · {stats.availableOfficers} units available
+                </p>
               </div>
-            ) : (
-              filteredIncidents.map((i) => (
-                <OpsIncidentCard
-                  key={i.id}
-                  incident={{ ...i, userPhone: i.userPhone ?? CLIENT_PHONES[i.user] ?? '+27820000000' }}
-                  focused={focusIncidentId === i.id}
-                  canCctv={canAccess(CONTROL_ROOM_ROUTES.surveillance)}
-                  canMap={canAccess(CONTROL_ROOM_ROUTES.map)}
-                  resolveBusy={resolveBusyId === i.id}
-                  onSelect={() => selectIncident(i.id)}
-                  onResolve={() => void resolveIncident(false, i.id)}
-                  onAssigned={() => void reload({ silent: true })}
-                />
-              ))
-            )}
-          </div>
-        </aside>
+              {!isNarrow ? (
+                <button
+                  type="button"
+                  className="ops-board__pane-collapse"
+                  onClick={() => setQueueOpen(false)}
+                  title="Collapse incidents"
+                >
+                  Collapse
+                </button>
+              ) : null}
+            </div>
+            <div className="ops-board__queue-list">
+              {filteredIncidents.length === 0 ? (
+                <div className="dash-clear" style={{ padding: '1rem' }}>
+                  <strong>Board clear</strong>
+                  <p className="text-muted">
+                    {hasActiveIncidents
+                      ? 'No incidents match this filter.'
+                      : 'No active incidents — map & cameras are the main dash.'}
+                  </p>
+                </div>
+              ) : (
+                filteredIncidents.map((i) => (
+                  <OpsIncidentCard
+                    key={i.id}
+                    incident={{ ...i, userPhone: i.userPhone ?? CLIENT_PHONES[i.user] ?? '+27820000000' }}
+                    focused={focusIncidentId === i.id}
+                    canCctv={canAccess(CONTROL_ROOM_ROUTES.surveillance)}
+                    canMap={canAccess(CONTROL_ROOM_ROUTES.map)}
+                    canChat={canAccess(CONTROL_ROOM_ROUTES.incidents)}
+                    resolveBusy={resolveBusyId === i.id}
+                    onSelect={() => selectIncident(i.id)}
+                    onResolve={() => void resolveIncident(false, i.id)}
+                    onAssigned={() => void reload({ silent: true })}
+                  />
+                ))
+              )}
+            </div>
+          </aside>
+        ) : (
+          <button
+            type="button"
+            className="ops-board__rail ops-board__rail--queue"
+            onClick={() => {
+              setQueueOpen(true);
+              setMobilePane('queue');
+            }}
+            aria-label="Open incidents queue"
+            title="Incidents"
+          >
+            <span className="ops-board__rail-label">Incidents</span>
+            <span className={`ops-board__rail-count ${hasActiveIncidents ? 'is-hot' : ''}`}>
+              {prioritizedIncidents.length}
+            </span>
+          </button>
+        )}
 
         <div className="ops-board__center">
+          <div className="ops-live-head">
+            <span className="ops-live-head__live">
+              <span className="ops-board-hero__pulse" aria-hidden />
+              Live
+            </span>
+            <span className="ops-live-head__counts">
+              {prioritizedIncidents.length} incidents · {stats.availableOfficers} officers · {stats.activeUsers}{' '}
+              users
+            </span>
+            {canAccess(CONTROL_ROOM_ROUTES.map) ? (
+              <Link href={CONTROL_ROOM_ROUTES.map} className="ops-live-head__map">
+                Full map
+              </Link>
+            ) : null}
+          </div>
+
           <section className="ops-board__map" aria-label="Live map">
             {canAccess(CONTROL_ROOM_ROUTES.map) ? (
               <SectionErrorBoundary label="Live map">
@@ -303,158 +403,225 @@ function OverviewContent() {
           </SectionErrorBoundary>
         ) : null}
 
-        <aside className="ops-board__detail ops-board__detail--command" aria-label="Incident detail">
-          <div className="ops-board__pane-head">
-            {focus ? (
-              <div className="ops-board__detail-title">
-                <div className="cmd-drawer__badges">
-                  <span className={`cmd-drawer__pri cmd-drawer__pri--${opsPriorityLabel(focus.priority, focus.type)}`}>
-                    {opsPriorityLabel(focus.priority, focus.type)}
-                  </span>
-                  <span className="cmd-drawer__type">{focus.type}</span>
-                </div>
-                <p className="cmd-drawer__client">{focus.user}</p>
-                <span className="cmd-drawer__status">{opsResponseStatus(focus.status, focus.officer)}</span>
+        {showDetailPane ? (
+          <aside className="ops-board__detail ops-board__detail--command" aria-label="Incident detail">
+            <div className="ops-board__pane-head">
+              <h2 className="ops-board__pane-title">Incident details</h2>
+              <div className="ops-board__pane-head-actions">
+                {focus ? (
+                  <Link href={incidentHref(focus.id)} className="link-sm">
+                    Full file
+                  </Link>
+                ) : null}
+                {!isNarrow ? (
+                  <button
+                    type="button"
+                    className="ops-board__pane-collapse"
+                    onClick={() => setDetailOpen(false)}
+                    title="Collapse details"
+                  >
+                    Collapse
+                  </button>
+                ) : null}
               </div>
-            ) : (
-              <h2>Incident details</h2>
-            )}
-            {focus ? (
-              <Link href={incidentHref(focus.id)} className="link-sm">
-                Full file
-              </Link>
-            ) : null}
-          </div>
-          <div className="ops-board__detail-body">
-            {focus ? (
-              <>
-                <p className="ops-board__detail-meta">
-                  {focus.location}
-                  {focus.unit ? ` · ${focus.unit}` : ''}
-                  {focus.officer ? ` · ${focus.officer}` : ''}
-                </p>
-
-                {canAccess(CONTROL_ROOM_ROUTES.dispatch) && !opsIsDispatched(focus.status, focus.officer) && (
-                  <OpsQuickWork
-                    hint="Dispatch & response"
-                    lead={
-                      <DispatchMenuButton
-                        incidentId={focus.id}
-                        className="ops-act ops-act--dispatch"
-                        onAssigned={() => void reload({ silent: true })}
-                      />
-                    }
-                    actions={[
-                      {
-                        id: 'ack',
-                        label: 'ACK',
-                        onClick: () => void softTimeline('ACK'),
-                      },
-                      {
-                        id: 'verify',
-                        label: 'VERIFY',
-                        onClick: () => void softTimeline('VERIFY'),
-                      },
-                      {
-                        id: 'open',
-                        label: 'Open',
-                        href: dispatchHref(focus.id),
-                      },
-                    ]}
-                  />
-                )}
-
-                <div className="workflow-steps workflow-steps--ops" aria-hidden>
-                  {OPS_TIMELINE_STEPS.map((step, idx) => (
-                    <span
-                      key={step}
-                      className={`workflow-step ${
-                        idx < focusIdx
-                          ? 'workflow-step--done'
-                          : idx === focusIdx
-                            ? 'workflow-step--current'
-                            : ''
-                      }`}
-                    >
-                      {step.replace(/_/g, ' ')}
+            </div>
+            <div className="ops-board__detail-body">
+              {focus ? (
+                <>
+                  <div className="ops-detail-hero">
+                    <div className="cmd-drawer__badges">
+                      <span
+                        className={`cmd-drawer__pri cmd-drawer__pri--${opsPriorityLabel(focus.priority, focus.type)}`}
+                      >
+                        {opsPriorityLabel(focus.priority, focus.type)}
+                      </span>
+                      <span className="cmd-drawer__type">{focus.type}</span>
+                    </div>
+                    <p className="cmd-drawer__client">{focus.user}</p>
+                    <span className="cmd-drawer__status">
+                      {opsResponseStatus(focus.status, focus.officer)}
                     </span>
-                  ))}
-                </div>
+                  </div>
 
-                <CadLifecycleStepper status={focus.status} priority={focus.priority} />
+                  <dl className="ops-detail-facts">
+                    <div>
+                      <dt>Location</dt>
+                      <dd>{focus.location || '—'}</dd>
+                    </div>
+                    <div>
+                      <dt>Unit</dt>
+                      <dd>{focus.unit || '—'}</dd>
+                    </div>
+                    <div>
+                      <dt>Responder</dt>
+                      <dd>{focus.officer || 'Unassigned'}</dd>
+                    </div>
+                  </dl>
 
-                {!opsIsDispatched(focus.status, focus.officer) && canAccess(CONTROL_ROOM_ROUTES.command) ? (
-                  <RecommendedUnitsPanel
-                    incidentId={focus.id}
-                    incidentType={focus.type}
-                    priority={focus.priority}
-                    location={focus.location}
-                    officers={officers.map((o) => ({
-                      id: o.id,
-                      name: o.name,
-                      status: o.status,
-                      zone: o.zone,
-                      skills: ['armed'],
-                    }))}
-                    assignedOfficer={focus.officer}
-                    onAssigned={() => void reload({ silent: true })}
-                    compact
-                  />
-                ) : null}
+                  {canAccess(CONTROL_ROOM_ROUTES.dispatch) && !opsIsDispatched(focus.status, focus.officer) && (
+                    <OpsQuickWork
+                      hint="Dispatch & response"
+                      lead={
+                        <DispatchMenuButton
+                          incidentId={focus.id}
+                          className="ops-act ops-act--dispatch"
+                          onAssigned={() => void reload({ silent: true })}
+                        />
+                      }
+                      actions={[
+                        {
+                          id: 'ack',
+                          label: 'ACK',
+                          onClick: () => void softTimeline('ACK'),
+                        },
+                        {
+                          id: 'verify',
+                          label: 'VERIFY',
+                          onClick: () => void softTimeline('VERIFY'),
+                        },
+                        {
+                          id: 'open',
+                          label: 'Open',
+                          href: dispatchHref(focus.id),
+                        },
+                      ]}
+                    />
+                  )}
 
-                {timelineNote ? (
-                  <p className="alert alert--success" role="status" style={{ fontSize: '0.82rem' }}>
-                    {timelineNote}
+                  <section className="ops-response" aria-label="Response timeline">
+                    <h3 className="ops-response__title">Response timeline</h3>
+                    <div className="workflow-steps workflow-steps--ops" aria-hidden>
+                      {OPS_TIMELINE_STEPS.map((step, idx) => (
+                        <span
+                          key={step}
+                          className={`workflow-step ${
+                            idx < focusIdx
+                              ? 'workflow-step--done'
+                              : idx === focusIdx
+                                ? 'workflow-step--current'
+                                : ''
+                          }`}
+                        >
+                          {step.replace(/_/g, ' ')}
+                        </span>
+                      ))}
+                    </div>
+                    <CadLifecycleStepper status={focus.status} priority={focus.priority} />
+                  </section>
+
+                  {focus.unit || focus.officer ? (
+                    <section className="ops-responder" aria-label="Responding unit">
+                      <h3 className="ops-response__title">Responding unit</h3>
+                      <strong className="ops-responder__unit">{focus.unit ?? 'Unit'}</strong>
+                      <p className="ops-responder__driver">
+                        Driver: {focus.officer ?? '—'}
+                        <span className="ops-responder__status">
+                          {opsResponseStatus(focus.status, focus.officer)}
+                        </span>
+                      </p>
+                      {canAccess(CONTROL_ROOM_ROUTES.map) ? (
+                        <Link
+                          href={`${CONTROL_ROOM_ROUTES.map}?incident=${focus.id}`}
+                          className="btn-sm btn-secondary"
+                        >
+                          View on map
+                        </Link>
+                      ) : null}
+                    </section>
+                  ) : null}
+
+                  {!opsIsDispatched(focus.status, focus.officer) && canAccess(CONTROL_ROOM_ROUTES.command) ? (
+                    <RecommendedUnitsPanel
+                      incidentId={focus.id}
+                      incidentType={focus.type}
+                      priority={focus.priority}
+                      location={focus.location}
+                      officers={officers.map((o) => ({
+                        id: o.id,
+                        name: o.name,
+                        status: o.status,
+                        zone: o.zone,
+                        skills: ['armed'],
+                      }))}
+                      assignedOfficer={focus.officer}
+                      onAssigned={() => void reload({ silent: true })}
+                      compact
+                    />
+                  ) : null}
+
+                  {timelineNote ? (
+                    <p className="alert alert--success" role="status" style={{ fontSize: '0.82rem' }}>
+                      {timelineNote}
+                    </p>
+                  ) : null}
+
+                  <IncidentKernelPanels incidentId={focus.id} portal="admin" compact showChat={false} />
+
+                  <p className="ops-safety-note ops-safety-note--board">
+                    <strong>Keep everyone safe</strong>
+                    Always follow security protocols and confirm the scene is safe before arrival.
                   </p>
-                ) : null}
-
-                <IncidentKernelPanels incidentId={focus.id} portal="admin" compact showChat={false} />
-              </>
-            ) : (
-              <div className="dash-clear">
-                <strong>Select an incident</strong>
-                <p className="text-muted">Queue cards drive the map and dispatch pane.</p>
-              </div>
-            )}
-          </div>
-          {focus ? (
-            <div className="ops-board__detail-foot">
-              <button
-                type="button"
-                className="ops-act ops-act--resolve"
-                disabled={resolveBusyId === focus.id}
-                onClick={() => void resolveIncident(false, focus.id)}
-              >
-                {resolveBusyId === focus.id ? '…' : 'Resolve'}
-              </button>
-              <button
-                type="button"
-                className="ops-act ops-act--danger"
-                disabled={resolveBusyId === focus.id}
-                onClick={() => void resolveIncident(true, focus.id)}
-              >
-                False alarm
-              </button>
-              <button
-                type="button"
-                className="ops-act"
-                disabled={resolveBusyId === focus.id}
-                onClick={async () => {
-                  if (!focus) return;
-                  await adminApi.post(`/control-room/incidents/${focus.id}/request-medical`);
-                  setTimelineNote('Medical requested · dual ticket opened');
-                }}
-              >
-                Medical
-              </button>
-              {canAccess(CONTROL_ROOM_ROUTES.map) && (
-                <Link href={`${CONTROL_ROOM_ROUTES.map}?incident=${focus.id}`} className="ops-act">
-                  Map
-                </Link>
+                </>
+              ) : (
+                <div className="dash-clear">
+                  <strong>Board clear</strong>
+                  <p className="text-muted">No active incident selected. Map &amp; cameras fill the dash.</p>
+                </div>
               )}
             </div>
-          ) : null}
-        </aside>
+            {focus ? (
+              <div className="ops-board__detail-foot">
+                <button
+                  type="button"
+                  className="ops-act ops-act--resolve"
+                  disabled={resolveBusyId === focus.id}
+                  onClick={() => void resolveIncident(false, focus.id)}
+                >
+                  {resolveBusyId === focus.id ? '…' : 'Resolve'}
+                </button>
+                <button
+                  type="button"
+                  className="ops-act ops-act--danger"
+                  disabled={resolveBusyId === focus.id}
+                  onClick={() => void resolveIncident(true, focus.id)}
+                >
+                  False alarm
+                </button>
+                <button
+                  type="button"
+                  className="ops-act"
+                  disabled={resolveBusyId === focus.id}
+                  onClick={async () => {
+                    if (!focus) return;
+                    await adminApi.post(`/control-room/incidents/${focus.id}/request-medical`);
+                    setTimelineNote('Medical requested · dual ticket opened');
+                  }}
+                >
+                  Medical
+                </button>
+                {canAccess(CONTROL_ROOM_ROUTES.map) && (
+                  <Link href={`${CONTROL_ROOM_ROUTES.map}?incident=${focus.id}`} className="ops-act">
+                    Map
+                  </Link>
+                )}
+              </div>
+            ) : null}
+          </aside>
+        ) : (
+          <button
+            type="button"
+            className="ops-board__rail ops-board__rail--detail"
+            onClick={() => {
+              setDetailOpen(true);
+              setMobilePane('detail');
+            }}
+            aria-label="Open incident details"
+            title="Incident details"
+          >
+            <span className="ops-board__rail-label">Details</span>
+            {focus ? <span className="ops-board__rail-count is-hot">1</span> : null}
+          </button>
+        )}
 
         <section className="ops-board__avail" aria-label="Officer availability">
           <div className="ops-board__pane-head">

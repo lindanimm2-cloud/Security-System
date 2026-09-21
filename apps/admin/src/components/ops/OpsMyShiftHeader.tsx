@@ -15,6 +15,8 @@ export function OpsMyShiftHeader({
   subtitleHref,
   subtitleAction,
   sectionLabel,
+  kicker = 'Security Operations',
+  liveLabel = 'System online',
   chips,
   activeChip,
   onChip,
@@ -25,6 +27,8 @@ export function OpsMyShiftHeader({
   subtitleHref?: string;
   subtitleAction?: string;
   sectionLabel?: string;
+  kicker?: string | null;
+  liveLabel?: string;
   chips: Chip[];
   activeChip: string;
   onChip: (id: string) => void;
@@ -39,6 +43,12 @@ export function OpsMyShiftHeader({
 
   return (
     <header className={`ops-shift ${urgent ? 'ops-shift--urgent' : ''}`}>
+      {kicker ? (
+        <div className="ops-shift__kicker">
+          <p className="ops-shift__kicker-label">{kicker}</p>
+          <span className="ops-shift__kicker-live">{liveLabel}</span>
+        </div>
+      ) : null}
       <p className="ops-shift__date">{today}</p>
       <div className="ops-shift__intro">
         <h1 className="ops-shift__title">{title}</h1>

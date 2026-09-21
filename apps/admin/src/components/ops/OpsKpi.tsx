@@ -19,7 +19,8 @@ type OpsKpiIconName =
   | 'sites'
   | 'cameras'
   | 'events'
-  | 'offline';
+  | 'offline'
+  | 'sla';
 
 type OpsKpiProps = {
   label: string;
@@ -135,6 +136,12 @@ const ICONS: Record<OpsKpiIconName, ReactNode> = {
       <path d="m15 10 6-3v9l-6-3M4 4l16 16" />
     </>
   ),
+  sla: (
+    <>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 7v5l3 2" />
+    </>
+  ),
 };
 
 function iconForLabel(label: string, override?: OpsKpiIconName): OpsKpiIconName {
@@ -154,6 +161,8 @@ function iconForLabel(label: string, override?: OpsKpiIconName): OpsKpiIconName 
   if (key.includes('camera') || key.includes('cctv')) return 'cameras';
   if (key.includes('event')) return 'events';
   if (key.includes('offline')) return 'offline';
+  if (key.includes('sla') || key.includes('breach')) return 'sla';
+  if (key === 'p1' || key.includes('priority')) return 'critical';
   return 'active';
 }
 

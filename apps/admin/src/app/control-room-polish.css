@@ -1003,35 +1003,200 @@
 
 .cctv-feed__controls {
   position: absolute;
-  right: 0.5rem;
-  bottom: 0.5rem;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 4;
   display: flex;
-  gap: 0.3rem;
+  justify-content: flex-end;
+  align-items: flex-end;
+  padding: 1.35rem 0.45rem 0.4rem;
+  max-width: 100%;
+  box-sizing: border-box;
   pointer-events: none;
   opacity: 0;
-  transition: opacity var(--cr-transition);
+  transform: translateY(6px);
+  transition:
+    opacity 200ms ease,
+    transform 200ms ease;
 }
 
-.cctv-feed:hover .cctv-feed__controls,
-.cctv-feed-link:hover .cctv-feed__controls {
+.cctv-feed__controls.is-peek {
+  opacity: 0.88;
+  transform: translateY(0);
+  pointer-events: none;
+}
+
+.cctv-feed__controls.is-peek:not(.is-visible) {
+  padding-top: 0.35rem;
+}
+
+.cctv-feed__controls.is-peek:not(.is-visible) .cctv-feed__controls-scrim {
+  opacity: 0;
+}
+
+.cctv-feed__controls.is-peek .cctv-feed__controls-row {
+  pointer-events: auto;
+}
+
+.cctv-feed__controls.is-visible {
   opacity: 1;
+  transform: translateY(0);
+  pointer-events: none;
+}
+
+.cctv-feed__controls.is-visible .cctv-feed__controls-row {
+  pointer-events: auto;
+}
+
+.cctv-feed__controls.is-hidden {
+  opacity: 0;
+  transform: translateY(6px);
+  pointer-events: none;
+}
+
+.cctv-feed__controls-scrim {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    180deg,
+    transparent 0%,
+    rgba(0, 0, 0, 0.18) 45%,
+    rgba(0, 0, 0, 0.55) 100%
+  );
+  pointer-events: none;
+}
+
+.cctv-feed__controls-row {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 0.3rem;
+  max-width: 100%;
+  overflow: hidden;
+}
+
+.cctv-feed:focus-within .cctv-feed__controls,
+.cctv-feed-link:focus-within .cctv-feed__controls {
+  opacity: 1;
+  transform: translateY(0);
 }
 
 .cctv-feed__ctrl {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  flex: 0 0 auto;
   width: 1.65rem;
   height: 1.65rem;
+  padding: 0;
   border-radius: 8px;
   background: rgba(0, 0, 0, 0.55);
   border: 1px solid rgba(255, 255, 255, 0.12);
   color: rgba(255, 255, 255, 0.9);
+  cursor: pointer;
+  appearance: none;
+}
+
+.cctv-feed__ctrl:hover,
+.cctv-feed__ctrl:focus-visible {
+  background: rgba(0, 0, 0, 0.72);
+  border-color: rgba(255, 255, 255, 0.22);
+  outline: none;
+}
+
+.cctv-feed__ctrl:focus-visible {
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.35);
+}
+
+.cctv-feed__ctrl--active {
+  border-color: rgba(255, 255, 255, 0.35);
+  background: rgba(40, 40, 40, 0.85);
+}
+
+.cctv-feed__ctrl--rec,
+.cctv-feed__ctrl--rec.cctv-feed__ctrl--active {
+  color: #f87171;
+  border-color: color-mix(in srgb, #dc2626 55%, rgba(255, 255, 255, 0.2));
+  box-shadow: 0 0 0 1px color-mix(in srgb, #dc2626 35%, transparent);
 }
 
 .cctv-feed__ctrl svg {
   width: 0.85rem;
   height: 0.85rem;
+  pointer-events: none;
+}
+
+.cctv-feed__rec--user {
+  color: #f87171;
+}
+
+.cctv-feed--compact .cctv-feed__controls {
+  padding: 1rem 0.3rem 0.3rem;
+}
+
+.cctv-feed--compact .cctv-feed__ctrl {
+  width: 1.45rem;
+  height: 1.45rem;
+  border-radius: 7px;
+}
+
+.cctv-feed--compact .cctv-feed__ctrl svg {
+  width: 0.75rem;
+  height: 0.75rem;
+}
+
+.cctv-feed--paused .cctv-feed__scan {
+  animation-play-state: paused;
+}
+
+.cctv-feed__stage:fullscreen,
+.cctv-feed__stage:-webkit-full-screen {
+  background: #050505;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.cctv-feed__stage:fullscreen .cctv-feed__img,
+.cctv-feed__stage:fullscreen .cctv-feed__sim,
+.cctv-feed__stage:-webkit-full-screen .cctv-feed__img,
+.cctv-feed__stage:-webkit-full-screen .cctv-feed__sim {
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.cctv-feed__stage:fullscreen .cctv-feed__controls,
+.cctv-feed__stage:-webkit-full-screen .cctv-feed__controls {
+  padding: 2.5rem 1rem 1rem;
+}
+
+.cctv-feed__stage:fullscreen .cctv-feed__ctrl,
+.cctv-feed__stage:-webkit-full-screen .cctv-feed__ctrl {
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 10px;
+}
+
+.cctv-feed__stage:fullscreen .cctv-feed__ctrl svg,
+.cctv-feed__stage:-webkit-full-screen .cctv-feed__ctrl svg {
+  width: 1.05rem;
+  height: 1.05rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cctv-feed__controls {
+    transition: none;
+    transform: none;
+  }
+}
+
+@media (hover: none) {
+  .cctv-feed__controls.is-peek {
+    opacity: 0.9;
+  }
 }
 
 .cctv-feed__footer {
@@ -2865,13 +3030,121 @@ html[data-theme='light'] .shell--admin:not(.shell--ops) .ops-page .ops-cmd-tile_
 }
 
 html[data-theme='light'] .shell--admin:not(.shell--ops) .ops-page .ops-kill-confirm {
-  background: rgba(217, 45, 32, 0.04) !important;
-  border: 1px solid rgba(217, 45, 32, 0.28) !important;
-  color: #172033;
+  background: #fff7f6 !important;
+  border: 1px solid #f0c2bc !important;
+  color: #172033 !important;
+  box-shadow: none !important;
 }
 
 html[data-theme='light'] .shell--admin:not(.shell--ops) .ops-page .ops-kill-confirm__head strong {
-  color: #d92d20 !important;
+  color: #b42318 !important;
+}
+
+html[data-theme='light'] .shell--admin:not(.shell--ops) .ops-page .ops-kill-confirm__unit {
+  color: #4b5565 !important;
+}
+
+html[data-theme='light'] .shell--admin:not(.shell--ops) .ops-page .ops-kill-confirm .text-muted {
+  color: #4b5565 !important;
+}
+
+html[data-theme='light'] .shell--admin:not(.shell--ops) .ops-page .ops-kill-confirm label {
+  color: #172033 !important;
+}
+
+html[data-theme='light'] .shell--admin:not(.shell--ops) .ops-page .ops-kill-confirm__actions .btn-ghost {
+  color: #344054 !important;
+}
+
+html[data-theme='light'] .shell--admin:not(.shell--ops) .ops-page .ops-kill-confirm__actions .hold-activate,
+html[data-theme='light'] .shell--admin:not(.shell--ops) .ops-page .ops-kill-confirm__actions .hold-activate.btn-danger,
+html[data-theme='light'] .shell--admin:not(.shell--ops) .ops-page .ops-kill-confirm__actions .hold-activate--danger,
+html[data-theme='light'] .shell--admin:not(.shell--ops) .ops-page .ops-kill-confirm__actions .hold-activate--console {
+  background: linear-gradient(180deg, #dc2626 0%, #b91c1c 100%) !important;
+  border: 1px solid #991b1b !important;
+  color: #ffffff !important;
+  box-shadow: 0 6px 16px rgba(185, 28, 28, 0.28) !important;
+}
+
+html[data-theme='light'] .shell--admin:not(.shell--ops) .ops-page .ops-kill-confirm__actions .hold-activate__label,
+html[data-theme='light'] .shell--admin:not(.shell--ops) .ops-page .ops-kill-confirm__actions .hold-activate__hint,
+html[data-theme='light'] .shell--admin:not(.shell--ops) .ops-page .ops-kill-confirm__actions .hold-activate__pct {
+  color: #ffffff !important;
+  opacity: 1 !important;
+  border-color: rgba(255, 255, 255, 0.35) !important;
+}
+
+html[data-theme='light'] .shell--admin:not(.shell--ops) .ops-page .ops-cmd-tile {
+  border-radius: 12px !important;
+}
+
+html[data-theme='light'] .shell--admin:not(.shell--ops) .ops-page .ops-cmd-tile__desc {
+  color: #5b6575 !important;
+}
+
+html[data-theme='light'] .shell--admin:not(.shell--ops) .ops-page .ops-cmd-tile.ops-status--ok .ops-cmd-tile__icon,
+html[data-theme='light'] .shell--admin:not(.shell--ops) .ops-page .ops-cmd-tile.ops-status--ok .ops-cmd-tile__state {
+  color: #067647 !important;
+}
+
+html[data-theme='light'] .shell--admin:not(.shell--ops) .ops-page .ops-cmd-tile.ops-status--warn .ops-cmd-tile__icon,
+html[data-theme='light'] .shell--admin:not(.shell--ops) .ops-page .ops-cmd-tile.ops-status--warn .ops-cmd-tile__state {
+  color: #b54708 !important;
+}
+
+html[data-theme='light'] .shell--admin:not(.shell--ops) .ops-page .ops-cmd-tile.ops-status--info .ops-cmd-tile__icon,
+html[data-theme='light'] .shell--admin:not(.shell--ops) .ops-page .ops-cmd-tile.ops-status--info .ops-cmd-tile__state {
+  color: #026aa2 !important;
+}
+
+html[data-theme='light'] .shell--admin:not(.shell--ops) .ops-page .ops-cmd-tile.ops-status--purple .ops-cmd-tile__icon,
+html[data-theme='light'] .shell--admin:not(.shell--ops) .ops-page .ops-cmd-tile.ops-status--purple .ops-cmd-tile__state {
+  color: #6941c6 !important;
+}
+
+html[data-theme='light'] .shell--admin:not(.shell--ops) .ops-page .ops-cmd-tile.ops-status--danger .ops-cmd-tile__icon,
+html[data-theme='light'] .shell--admin:not(.shell--ops) .ops-page .ops-cmd-tile.ops-status--danger .ops-cmd-tile__state {
+  color: #b42318 !important;
+}
+
+html[data-theme='light'] .shell--admin:not(.shell--ops) .ops-page .ops-cmd-tile.ops-status--muted .ops-cmd-tile__icon,
+html[data-theme='light'] .shell--admin:not(.shell--ops) .ops-page .ops-cmd-tile.ops-status--muted .ops-cmd-tile__state {
+  color: #667085 !important;
+}
+
+html[data-theme='light'] .shell--admin:not(.shell--ops) .ops-page .ops-cmd-tile--active.ops-status--ok {
+  background: #ecfdf3 !important;
+  border-color: #abefc6 !important;
+  color: #067647 !important;
+}
+
+html[data-theme='light'] .shell--admin:not(.shell--ops) .ops-page .ops-cmd-tile--active.ops-status--warn {
+  background: #fffaeb !important;
+  border-color: #fedf89 !important;
+  color: #b54708 !important;
+}
+
+html[data-theme='light'] .shell--admin:not(.shell--ops) .vehicle-car__state-bar {
+  color: #344054;
+}
+
+html[data-theme='light'] .shell--admin:not(.shell--ops) .vehicle-car__state-bar span.is-ok {
+  color: #067647;
+}
+
+html[data-theme='light'] .shell--admin:not(.shell--ops) .vehicle-car__state-bar span.is-live {
+  color: #026aa2;
+}
+
+html[data-theme='light'] .shell--admin:not(.shell--ops) .vehicle-car__state-bar span.is-stolen,
+html[data-theme='light'] .shell--admin:not(.shell--ops) .vehicle-car__state-bar span.is-recovery {
+  color: #b54708;
+  font-weight: 700;
+}
+
+html[data-theme='light'] .shell--admin:not(.shell--ops) .vehicle-car__caption-title,
+html[data-theme='light'] .shell--admin:not(.shell--ops) .vehicle-car__caption-title em {
+  color: #172033;
 }
 
 html[data-theme='light'] .shell--admin:not(.shell--ops) .topbar,

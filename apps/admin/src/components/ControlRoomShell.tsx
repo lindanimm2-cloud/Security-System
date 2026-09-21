@@ -2,9 +2,15 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { AuthSession, clearSession } from '@/lib/auth';
-import { mobileNavForRole, navForRole, canAccessControlRoomRoute } from '@/lib/control-room-nav';
+import {
+  mobileNavForRole,
+  navForRole,
+  navSectionsForRole,
+  pinnedNavForRole,
+  canAccessControlRoomRoute,
+} from '@/lib/control-room-nav';
 import { roleDisplayLabel } from '@/lib/role-labels';
 import { adminHomeForRole } from '@/lib/admin-home';
 import { NotificationCenter } from './control-room/NotificationCenter';
@@ -38,6 +44,7 @@ export function ControlRoomShell({
   const { collapsed, toggle } = useSidebarCollapsed();
   const handoff = useActionHandoff();
   const crSettings = useCrSettings();
+  const sidebarNavRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
     document.documentElement.classList.toggle('cr-compact-tables', Boolean(crSettings.general?.compactTables));
@@ -88,6 +95,23 @@ export function ControlRoomShell({
     document.documentElement.style.overflow = '';
   }, []);
 
+  useEffect(() => {
+    const nav = sidebarNavRef.current;
+    if (!nav) return;
+
+    function onWheel(e: WheelEvent) {
+      if (!nav || nav.scrollHeight <= nav.clientHeight + 1) return;
+      const atTop = nav.scrollTop <= 0;
+      const atBottom = nav.scrollTop + nav.clientHeight >= nav.scrollHeight - 1;
+      if ((e.deltaY < 0 && atTop) || (e.deltaY > 0 && atBottom)) return;
+      nav.scrollTop += e.deltaY;
+      e.preventDefault();
+    }
+
+    nav.addEventListener('wheel', onWheel, { passive: false });
+    return () => nav.removeEventListener('wheel', onWheel);
+  }, []);
+
   function logout() {
     handoff.begin('sign-out', () => {
       clearSession('admin');
@@ -96,10 +120,10 @@ export function ControlRoomShell({
   }
 
   const navItems = navForRole(session.user.role);
+  const navSections = navSectionsForRole(session.user.role);
+  const pinnedItems = pinnedNavForRole(session.user.role);
   const navHrefs = navItems.map((item) => item.href);
   const homeHref = adminHomeForRole(session.user.role);
-  const brandProduct =
-    session.user.role === 'DEVELOPER' ? 'Developer' : undefined;
 
   useEffect(() => {
     if (!pathname?.startsWith('/control-room')) return;
@@ -116,7 +140,9 @@ export function ControlRoomShell({
     pathname.includes('/documents') ||
     pathname.includes('/chat') ||
     pathname.includes('/incidents') ||
-    pathname.includes('/map');
+    pathname.includes('/map') ||
+    pathname.includes('/officers') ||
+    pathname.includes('/fleet');
 
   const mobileNavItems = mobileNavForRole(session.user.role).map((item) => ({
     href: item.href,
@@ -132,7 +158,7 @@ export function ControlRoomShell({
   return (
     <>
       {handoff.overlay}
-    <div className="shell shell--admin shell--with-bottom-nav">
+    <div className="shell shell--admin shell--ops shell--with-bottom-nav">
       <header className="mobile-shell-header mobile-shell-header--admin">
         <button
           type="button"
@@ -147,7 +173,7 @@ export function ControlRoomShell({
           variant="control"
           compact
           href={homeHref}
-          productLabel={brandProduct}
+          showProduct={false}
         />
         <h1 className="mobile-shell-header__title">{title}</h1>
         <div className="mobile-topbar-actions">
@@ -176,28 +202,56 @@ export function ControlRoomShell({
           <BrandMark
             variant="control"
             compact={collapsed}
-            showProduct={!collapsed}
+            showProduct={false}
             href={homeHref}
-            productLabel={brandProduct}
           />
           <SidebarCollapseButton collapsed={collapsed} onClick={toggle} />
         </div>
-        <nav className="sidebar-nav">
-          {navItems.map((item) => (
-            <Link
-              key={item.href}
-              href={item.href}
-              data-tip={item.label}
-              aria-label={item.label}
-              className={`sidebar-link ${isActive(item.href, item.exact) ? 'sidebar-link--active' : ''}`}
+        <nav ref={sidebarNavRef} className="sidebar-nav" aria-label="Control panel">
+          {navSections.map((section) => (
+            <div
+              key={section.id}
+              className={`sidebar-nav-section${section.id === 'development' ? ' sidebar-nav-section--dev' : ''}`}
             >
-              <span className="sidebar-link__icon">
-                <NavIcon name={item.icon} size={collapsed ? 20 : 18} />
+              <span className="sidebar-nav-section-title">
+                <NavIcon name={section.icon} size={14} className="nav-icon--section" />
+                {section.title}
               </span>
-              <span className="sidebar-link__label">{item.label}</span>
-            </Link>
+              {section.items.map((item) => (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  data-tip={item.label}
+                  aria-label={item.label}
+                  className={`sidebar-link ${isActive(item.href, item.exact) ? 'sidebar-link--active' : ''}`}
+                >
+                  <span className="sidebar-link__icon">
+                    <NavIcon name={item.icon} size={collapsed ? 20 : 18} />
+                  </span>
+                  <span className="sidebar-link__label">{item.label}</span>
+                </Link>
+              ))}
+            </div>
           ))}
         </nav>
+        {pinnedItems.length > 0 && (
+          <div className="sidebar-nav-pin">
+            {pinnedItems.map((item) => (
+              <Link
+                key={item.href}
+                href={item.href}
+                data-tip={item.label}
+                aria-label={item.label}
+                className={`sidebar-link ${isActive(item.href, item.exact) ? 'sidebar-link--active' : ''}`}
+              >
+                <span className="sidebar-link__icon">
+                  <NavIcon name={item.icon} size={collapsed ? 20 : 18} />
+                </span>
+                <span className="sidebar-link__label">{item.label}</span>
+              </Link>
+            ))}
+          </div>
+        )}
         <div className="sidebar-footer">
           <Link
             href="/control-room/profile"

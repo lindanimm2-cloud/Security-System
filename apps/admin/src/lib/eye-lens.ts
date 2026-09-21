@@ -250,24 +250,10 @@ export function lensRouteContext(pathname: string): LensRouteContext {
 export function playLensAlertTone() {
   if (typeof window === 'undefined') return;
   if (!shouldPlayPanicSound()) return;
-  try {
-    const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-    if (!AudioCtx) return;
-    const ctx = new AudioCtx();
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.type = 'sine';
-    osc.frequency.value = 880;
-    gain.gain.value = 0.04;
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-    osc.start();
-    gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.22);
-    osc.stop(ctx.currentTime + 0.24);
-    window.setTimeout(() => void ctx.close(), 400);
-  } catch {
-    /* browsers may block audio until a gesture */
-  }
+  // Delegate to AlertEngine sound library (panic siren one-shot for lens peek)
+  void import('@/lib/alert-engine').then(({ previewAlertSound }) => {
+    previewAlertSound('panic');
+  });
 }
 
 /** Keep CrSettings.lens optional-safe for older localStorage payloads. */

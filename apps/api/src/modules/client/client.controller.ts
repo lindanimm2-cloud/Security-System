@@ -118,9 +118,29 @@ export class ClientController {
     return this.clientService.getIncidentEvidence(user.id);
   }
 
+  @Get('incidents/:id/live')
+  liveResponse(@CurrentUser() user: AuthUser, @Param('id') id: string) {
+    return this.clientService.getLiveResponse(user.id, user.tenantId, id);
+  }
+
   @Get('family')
   family(@CurrentUser() user: AuthUser) {
     return this.clientService.getFamily(user.id);
+  }
+
+  @Post('family/members')
+  inviteFamilyMember(
+    @CurrentUser() user: AuthUser,
+    @Body()
+    body: {
+      firstName: string;
+      lastName: string;
+      email: string;
+      phone?: string | null;
+      relationship: string;
+    },
+  ) {
+    return this.clientService.inviteFamilyMember(user.id, user.tenantId, body);
   }
 
   @Get('communication-settings')
@@ -247,8 +267,28 @@ export class ClientController {
   }
 
   @Post('vehicles/:id/theft-recovery')
-  theftRecovery(@CurrentUser() user: AuthUser, @Param('id') id: string) {
-    return this.clientService.activateTheftRecovery(user.id, user.tenantId, id);
+  theftRecovery(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Body() body?: { status?: string },
+  ) {
+    return this.clientService.activateTheftRecovery(user.id, user.tenantId, id, body?.status);
+  }
+
+  @Patch('vehicles/:id/emergency-status')
+  setVehicleEmergencyStatus(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Body() body: { status?: string },
+  ) {
+    return this.clientService.setVehicleEmergencyStatus({
+      tenantId: user.tenantId,
+      vehicleId: id,
+      status: body?.status,
+      actorUserId: user.id,
+      source: 'portal',
+      ownerUserId: user.id,
+    });
   }
 
   @Post('vehicles/:id/remote')
@@ -332,6 +372,18 @@ export class ClientController {
     @Param('sensorId') sensorId: string,
   ) {
     return this.surveillanceService.triggerSensorAlert(user.tenantId, sensorId);
+  }
+
+  @Post('properties/:id/sensors/:sensorId/health')
+  sensorHealth(
+    @CurrentUser() user: AuthUser,
+    @Param('sensorId') sensorId: string,
+    @Body() body: { status: 'FAULT' | 'OFFLINE' | 'TAMPER' | 'NORMAL' },
+  ) {
+    return this.surveillanceService.setSensorHealth(user.tenantId, sensorId, body.status as never, {
+      actorUserId: user.id,
+      propertyOwnerOnly: true,
+    });
   }
 
   @Post('properties/:id/panic')

@@ -4,10 +4,17 @@ import { NestFactory } from '@nestjs/core';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { join } from 'path';
 import { AppModule } from './app.module';
+import { assertProductionSecrets } from './modules/auth/mfa-crypto';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
   const config = app.get(ConfigService);
+
+  assertProductionSecrets({
+    nodeEnv: config.get<string>('NODE_ENV'),
+    jwtSecret: config.get<string>('JWT_SECRET'),
+    mfaKey: config.get<string>('MFA_ENCRYPTION_KEY'),
+  });
 
   app.useStaticAssets(join(process.cwd(), 'uploads'), { prefix: '/uploads' });
 

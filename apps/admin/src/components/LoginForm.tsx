@@ -5,8 +5,14 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { FormEvent, Suspense, useEffect, useState } from 'react';
 import {
   AuthPortal,
+  confirmMfaSetup,
+  isMfaChallenge,
   login,
   oauthClientSignIn,
+  startMfaSetup,
+  verifyMfaLogin,
+  type AuthSession,
+  type MfaChallenge,
 } from '@/lib/auth';
 import { applyTabTitle, bootTabSession } from '@/lib/tab-session';
 import { clearActionKind, getActionKind, setActionKind } from '@/lib/action-status';
@@ -103,6 +109,13 @@ function LoginFormInner({
     null,
   );
   const [oauthAccept, setOauthAccept] = useState(false);
+  const [mfaChallenge, setMfaChallenge] = useState<MfaChallenge | null>(null);
+  const [mfaCode, setMfaCode] = useState('');
+  const [setupSecret, setSetupSecret] = useState<string | null>(null);
+  const [setupUri, setSetupUri] = useState<string | null>(null);
+  const [setupToken, setSetupToken] = useState<string | null>(null);
+  const [backupCodes, setBackupCodes] = useState<string[] | null>(null);
+  const [pendingSessionRole, setPendingSessionRole] = useState<string | null>(null);
 
   useEffect(() => {
     const pending = getActionKind();
@@ -125,23 +138,85 @@ function LoginFormInner({
     }
   }, [portal]);
 
+  function finishSignIn(session: AuthSession) {
+    applyTabTitle(session, portal);
+    if (remember) {
+      localStorage.setItem(REMEMBER_KEY, JSON.stringify({ email, tenantSlug, portal }));
+    } else {
+      localStorage.removeItem(REMEMBER_KEY);
+    }
+    setActionKind('sign-in');
+    setRedirecting(true);
+    router.push(portal === 'admin' ? adminHomeForRole(session.user.role) : redirectTo);
+  }
+
+  async function beginMfaSetup(challenge: MfaChallenge) {
+    const started = await startMfaSetup(challenge.mfaToken);
+    setSetupSecret(started.secret);
+    setSetupUri(started.otpauthUrl);
+    setSetupToken(started.mfaToken);
+    setMfaChallenge(challenge);
+    setMfaCode('');
+  }
+
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setError('');
     setLoading(true);
     try {
-      const session = await login(portal, email, password, tenantSlug, {
+      const result = await login(portal, email, password, tenantSlug, {
         authSource: portal === 'client' ? 'portal' : undefined,
       });
-      applyTabTitle(session, portal);
-      if (remember) {
-        localStorage.setItem(REMEMBER_KEY, JSON.stringify({ email, tenantSlug, portal }));
-      } else {
-        localStorage.removeItem(REMEMBER_KEY);
+      if (isMfaChallenge(result)) {
+        if (result.kind === 'setup') {
+          await beginMfaSetup(result);
+        } else {
+          setMfaChallenge(result);
+          setMfaCode('');
+        }
+        setLoading(false);
+        return;
       }
-      setActionKind('sign-in');
-      setRedirecting(true);
-      router.push(portal === 'admin' ? adminHomeForRole(session.user.role) : redirectTo);
+      finishSignIn(result);
+    } catch (err) {
+      setError(friendlyErrorMessage(err, 'login'));
+      setLoading(false);
+    }
+  }
+
+  async function handleMfaVerify(e: FormEvent) {
+    e.preventDefault();
+    if (!mfaChallenge) return;
+    setError('');
+    setLoading(true);
+    try {
+      if (mfaChallenge.kind === 'setup') {
+        const token = setupToken ?? mfaChallenge.mfaToken;
+        const { session, backupCodes: codes } = await confirmMfaSetup(
+          portal,
+          token,
+          mfaCode,
+          { authSource: portal === 'client' ? 'portal' : undefined },
+        );
+        setPendingSessionRole(session.user.role);
+        applyTabTitle(session, portal);
+        if (remember) {
+          localStorage.setItem(REMEMBER_KEY, JSON.stringify({ email, tenantSlug, portal }));
+        } else {
+          localStorage.removeItem(REMEMBER_KEY);
+        }
+        if (codes.length) {
+          setBackupCodes(codes);
+          setLoading(false);
+          return;
+        }
+        finishSignIn(session);
+        return;
+      }
+      const session = await verifyMfaLogin(portal, mfaChallenge.mfaToken, mfaCode, {
+        authSource: portal === 'client' ? 'portal' : undefined,
+      });
+      finishSignIn(session);
     } catch (err) {
       setError(friendlyErrorMessage(err, 'login'));
       setLoading(false);
@@ -182,6 +257,129 @@ function LoginFormInner({
 
   if (redirecting) {
     return <LoadingSpinner brand fullScreen action="sign-in" />;
+  }
+
+  if (backupCodes) {
+    return (
+      <div className="login-page login-page--v2">
+        <LoginPageChrome />
+        <div className="login-page__inner">
+          <div className="login-card login-card--v2">
+            <div className="login-brand login-brand--v2">
+              <h1>Save your backup codes</h1>
+              <p>
+                Store these codes offline. Each works once if you lose your authenticator.
+              </p>
+            </div>
+            <ul className="login-mfa-backup-list">
+              {backupCodes.map((code) => (
+                <li key={code}>
+                  <code>{code}</code>
+                </li>
+              ))}
+            </ul>
+            <button
+              type="button"
+              className="login-submit"
+              onClick={() => {
+                setActionKind('sign-in');
+                setBackupCodes(null);
+                setRedirecting(true);
+                router.push(
+                  portal === 'admin'
+                    ? adminHomeForRole(pendingSessionRole ?? mfaChallenge?.user.role ?? 'OWNER')
+                    : redirectTo,
+                );
+              }}
+            >
+              Continue to portal
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (mfaChallenge) {
+    const isSetup = mfaChallenge.kind === 'setup';
+    return (
+      <div className="login-page login-page--v2">
+        <LoginPageChrome />
+        <div className="login-page__inner">
+          <div className="login-page__logo">
+            <BrandMark
+              variant={portal === 'admin' ? 'control' : portal === 'officer' ? 'officer' : 'portal'}
+              href={false}
+              showProduct={false}
+            />
+          </div>
+          <div className="login-card login-card--v2">
+            <div className="login-brand login-brand--v2">
+              <h1>{isSetup ? 'Set up authenticator' : 'Two-step verification'}</h1>
+              <p>
+                {isSetup
+                  ? 'Add this account in Google Authenticator, Authy, or a compatible app, then enter the 6-digit code.'
+                  : 'Enter the 6-digit code from your authenticator app (or a backup code).'}
+              </p>
+            </div>
+            {isSetup && setupSecret && (
+              <div className="login-mfa-setup">
+                <p className="text-muted">
+                  Secret key (manual entry): <code>{setupSecret}</code>
+                </p>
+                {setupUri && (
+                  <p className="text-muted login-mfa-uri">
+                    <a href={setupUri}>Open in authenticator</a>
+                  </p>
+                )}
+              </div>
+            )}
+            <form onSubmit={handleMfaVerify} className="login-form login-form--v2">
+              <label className="login-field">
+                <span>Authenticator code</span>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  value={mfaCode}
+                  onChange={(e) => setMfaCode(e.target.value.replace(/\s/g, ''))}
+                  placeholder="123456"
+                  required
+                  autoFocus
+                />
+              </label>
+              {error && <div className="login-error">{error}</div>}
+              <button type="submit" className="login-submit" disabled={loading || mfaCode.length < 6}>
+                {loading ? (
+                  <span className="btn-loading">
+                    <ButtonSpinner />
+                    Verifying…
+                  </span>
+                ) : isSetup ? (
+                  'Confirm and continue'
+                ) : (
+                  'Verify and sign in'
+                )}
+              </button>
+              <button
+                type="button"
+                className="login-forgot"
+                onClick={() => {
+                  setMfaChallenge(null);
+                  setSetupSecret(null);
+                  setSetupUri(null);
+                  setSetupToken(null);
+                  setMfaCode('');
+                  setError('');
+                }}
+              >
+                Back to sign-in
+              </button>
+            </form>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return (

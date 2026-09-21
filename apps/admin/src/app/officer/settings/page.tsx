@@ -29,8 +29,9 @@ function OfficerSettingsContent() {
         title: 'Account',
         items: [
           { id: 'profile', label: 'Profile & shift', icon: 'profile', href: '/officer/profile' },
+          { id: 'duty', label: 'Duty Mode', icon: 'emergency', href: '/officer/duty', hint: 'Operational readiness & device security' },
           { id: 'password', label: 'Password', icon: 'key', onClick: () => setPasswordOpen(true) },
-          { id: 'appearance', label: 'Appearance', icon: 'personal', hint: 'Light, dark, or system', onClick: () => setAppearanceOpen(true) },
+          { id: 'appearance', label: 'Appearance', icon: 'personal', hint: 'Dark (default), light, or system', onClick: () => setAppearanceOpen(true) },
           { id: 'calls', label: 'Call settings', icon: 'calls', href: '/officer/calls' },
           { id: 'dispatch', label: 'Dispatch chat', icon: 'dispatch-chat', href: '/officer/messages' },
         ],
@@ -38,9 +39,9 @@ function OfficerSettingsContent() {
       {
         title: 'Field',
         items: [
-          { id: 'jobs', label: 'Your Jobs', icon: 'queue', href: '/officer/queue' },
-          { id: 'map', label: 'Navigation map', icon: 'navigation', href: '/officer/map' },
-          { id: 'evidence', label: 'Evidence capture', icon: 'evidence', href: '/officer/record' },
+          { id: 'jobs', label: 'Assignment queue', icon: 'queue', href: '/officer/queue' },
+          { id: 'map', label: 'Location / Live map', icon: 'navigation', href: '/officer/map' },
+          { id: 'evidence', label: 'Field records / Evidence', icon: 'evidence', href: '/officer/record' },
           { id: 'report', label: 'Incident report', icon: 'report', href: '/officer/report' },
         ],
       },
@@ -55,12 +56,14 @@ function OfficerSettingsContent() {
   return (
     <>
       <SettingsHub
+        title="Account"
+        lede={null}
         backHref="/officer"
         profile={{
           firstName: user.firstName,
           lastName: user.lastName,
           roleLabel: roleDisplayLabel(user.role) || 'Officer',
-          orgLabel: user.tenant?.name ?? '4DS Response',
+          orgLabel: user.tenant?.name ?? '4DS Solutions',
           profileHref: '/officer/profile',
         }}
         sections={sections}

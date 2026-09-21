@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<title>Monthly Revenue Share Invoice Template | 4DS Solutions</title>
+<style>
+:root {
+  --ink: #141414;
+  --muted: #666;
+  --line: #d6d6d6;
+  --soft: #f4f4f5;
+  --red: #c9302c;
+  --dark: #111;
+}
+* { box-sizing: border-box; }
+html, body {
+  margin: 0; padding: 0;
+  font-family: "Segoe UI", Calibri, Arial, Helvetica, sans-serif;
+  color: var(--ink); background: #fff;
+  -webkit-print-color-adjust: exact; print-color-adjust: exact;
+}
+@page { size: A4 portrait; margin: 0; }
+.page {
+  width: 210mm;
+  min-height: 297mm;
+  height: 297mm;
+  padding: 12mm 14mm 11mm 16mm;
+  position: relative;
+  overflow: hidden;
+  background: #fff;
+  display: flex;
+  flex-direction: column;
+}
+.accent {
+  position: absolute; left: 0; top: 0; bottom: 0; width: 3.5mm;
+  background: linear-gradient(180deg, var(--red), #7a1512);
+}
+.topbar {
+  display: flex; justify-content: space-between; align-items: flex-start; gap: 8mm;
+  padding-bottom: 5px; border-bottom: 2.5px solid var(--dark); margin-bottom: 5mm;
+  flex: 0 0 auto;
+}
+.brand .logo {
+  height: 30px; width: auto; display: block; background: transparent; object-fit: contain;
+  margin-bottom: 2.5mm;
+}
+.brand strong { display: block; font-size: 11.5pt; font-weight: 800; }
+.brand .sub {
+  margin-top: 1.5mm; font-size: 8pt; color: var(--muted); line-height: 1.4;
+}
+.doc-title { text-align: right; flex: 0 0 auto; }
+.doc-title h1 {
+  margin: 0 0 2mm; font-size: 18pt; font-weight: 800;
+  letter-spacing: 0.08em; text-transform: uppercase;
+}
+.doc-title .meta { font-size: 8.5pt; color: var(--muted); line-height: 1.5; }
+.doc-title .meta b { color: var(--ink); }
+
+.parties {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 4mm;
+  margin-bottom: 4mm; flex: 0 0 auto;
+}
+.party {
+  background: var(--soft); border-top: 2.5px solid var(--dark);
+  padding: 2.8mm 3.5mm;
+}
+.party.bill { border-top-color: var(--red); }
+.party .label {
+  font-size: 7pt; letter-spacing: 0.12em; text-transform: uppercase;
+  font-weight: 750; color: var(--muted); margin-bottom: 1.8mm;
+}
+.party strong { display: block; font-size: 10.5pt; margin-bottom: 1mm; }
+.party p { margin: 0 0 0.6mm; font-size: 8.3pt; line-height: 1.35; color: #333; }
+.party .blank-line {
+  display: block; border-bottom: 1px solid #bbb; height: 11px; margin: 1.5mm 0 2mm;
+}
+
+.banner {
+  display: grid; grid-template-columns: 1.25fr 1fr 1fr; gap: 2.5mm;
+  margin-bottom: 4mm; flex: 0 0 auto;
+}
+.banner .cell { border: 1px solid var(--line); padding: 2.4mm 3mm; }
+.banner .k {
+  font-size: 6.5pt; letter-spacing: 0.1em; text-transform: uppercase;
+  color: var(--muted); font-weight: 750;
+}
+.banner strong { display: block; margin-top: 1mm; font-size: 9.5pt; }
+
+.body { flex: 1 1 auto; min-height: 0; }
+
+table {
+  width: 100%; border-collapse: collapse; margin-bottom: 3.5mm;
+  font-size: 8.2pt; line-height: 1.3;
+}
+th {
+  background: var(--dark); color: #fff; text-align: left;
+  padding: 6px 8px; font-size: 7pt; letter-spacing: 0.06em; text-transform: uppercase;
+}
+td { border-bottom: 1px solid var(--line); padding: 6px 8px; vertical-align: top; }
+td.num, th.num { text-align: right; white-space: nowrap; }
+td.desc strong { display: block; font-size: 8.8pt; margin-bottom: 1mm; }
+td.desc span { color: #444; font-size: 7.8pt; }
+tr.discount td { background: #f8e8e7; }
+tr.discount td.num { color: var(--red); font-weight: 700; }
+tr.blank td { height: 9mm; color: #aaa; }
+
+.grid2 {
+  display: grid; grid-template-columns: 1.2fr 0.8fr; gap: 4mm;
+  align-items: start; margin-bottom: 3mm;
+}
+.notes h3, .bank h3, .pay-note h3 {
+  margin: 0 0 1.5mm; font-size: 7.5pt; letter-spacing: 0.08em;
+  text-transform: uppercase; font-weight: 750; color: var(--muted);
+}
+.notes ul { margin: 0 0 2.5mm; padding-left: 4mm; font-size: 8pt; line-height: 1.4; }
+.notes li { margin-bottom: 1mm; }
+.box {
+  border: 1px solid var(--line); padding: 2.8mm 3.2mm; background: #fff;
+  margin-bottom: 2.5mm;
+}
+.box.soft { background: var(--soft); border-color: var(--dark); }
+.box strong { display: block; font-size: 8.8pt; margin-bottom: 1mm; color: var(--ink); }
+.box p { margin: 0; font-size: 7.8pt; line-height: 1.4; color: #333; }
+
+.bank-table { width: 100%; border-collapse: collapse; font-size: 8pt; }
+.bank-table td { border: 0; border-bottom: 1px solid #e5e5e5; padding: 2.2mm 0; }
+.bank-table td:first-child { color: var(--muted); width: 38%; }
+.bank-table tr:last-child td { border-bottom: 0; }
+
+.totals { border: 1px solid var(--line); }
+.totals .row {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 2.2mm 3.2mm; border-bottom: 1px solid var(--line); font-size: 8.5pt;
+}
+.totals .row:last-child { border-bottom: 0; }
+.totals .row.due {
+  background: var(--dark); color: #fff; font-size: 11pt; font-weight: 800;
+}
+.totals .muted { color: var(--muted); }
+.totals .due .muted { color: rgba(255,255,255,0.72); }
+
+.foot {
+  flex: 0 0 auto;
+  margin-top: auto;
+  display: flex; justify-content: space-between; align-items: center; gap: 8mm;
+  font-size: 7pt; color: #888; border-top: 1px solid #ddd; padding-top: 3.5px;
+}
+.foot span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.foot .left { flex: 1 1 auto; min-width: 0; }
+.foot .right { flex: 0 0 auto; }
+</style>
+</head>
+<body>
+<section class="page">
+  <div class="accent" aria-hidden="true"></div>
+  
+  <div class="topbar">
+  <div class="brand">
+    <img class="logo" src="4ds-logo-header.png" alt="4DS" />
+    <strong>4DS Solutions (Pty) Ltd</strong>
+    <div class="sub">Trading as 4 Dimensional Software<br/>
+    Reg K2025567725 · South Africa<br/>
+    www.4dsnexus.co.za · Lindani Maphumulo</div>
+  </div>
+  <div class="doc-title">
+    <h1>Tax Invoice</h1>
+    <div class="meta">Invoice no. <b>INV-4DS-RS-20__-___</b><br/>
+        Period <b>________________</b><br/>
+        Issue date <b>________________</b><br/>
+        Payment due <b>________________</b></div>
+  </div>
+</div>
+
+  <div class="parties">
+    <div class="party">
+      <div class="label">From</div>
+      <strong>4DS Solutions (Pty) Ltd</strong>
+      <p>4 Dimensional Software · 4DS Nexus</p>
+      <p>Reg K2025567725</p>
+      <p>www.4dsnexus.co.za</p>
+    </div>
+    <div class="party bill">
+      <div class="label">Bill to</div>
+      <strong>Client / company name</strong>
+      <span class="blank-line"></span>
+      <p>Revenue-share % agreed</p>
+      <span class="blank-line"></span>
+      <p>System / product</p>
+      <span class="blank-line"></span>
+    </div>
+  </div>
+
+  <div class="banner">
+    <div class="cell"><div class="k">Share rate</div><strong>____ % of monthly client payments</strong></div>
+    <div class="cell"><div class="k">Gross client payments</div><strong>R ____________</strong></div>
+    <div class="cell"><div class="k">Share due</div><strong>R ____________</strong></div>
+  </div>
+
+  <div class="body">
+  <table>
+    <thead>
+      <tr>
+        <th style="width:12mm">#</th>
+        <th>Description</th>
+        <th class="num" style="width:34mm">Base (ZAR)</th>
+        <th class="num" style="width:22mm">Rate</th>
+        <th class="num" style="width:32mm">Amount (ZAR)</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>01</td>
+        <td class="desc">
+          <strong>Monthly revenue share</strong>
+          <span>Share of client payments processed through / attributable to the System for the period stated above.</span>
+        </td>
+        <td class="num">____________</td>
+        <td class="num">____%</td>
+        <td class="num">____________</td>
+      </tr>
+      <tr class="blank"><td>02</td><td class="desc"><span>Adjustments / notes</span></td><td class="num"></td><td class="num"></td><td class="num"></td></tr>
+    </tbody>
+  </table>
+
+  <div class="grid2">
+    <div>
+      <div class="box soft">
+        <strong>Worked example (30%)</strong>
+        <p>If clients pay R50,000 in the month, share due = R15,000. Replace with the agreed % and verified period total.</p>
+      </div>
+      <div class="box bank">
+  <h3>Banking details — Absa</h3>
+  <table class="bank-table">
+    <tr><td>Account name</td><td><strong>4DS SOLUTIONS (PTY)LTD</strong></td></tr>
+    <tr><td>Bank</td><td>Absa</td></tr>
+    <tr><td>Account number</td><td><strong>9400334355</strong></td></tr>
+    <tr><td>Account type</td><td>Savings</td></tr>
+    <tr><td>Branch code</td><td><strong>632005</strong></td></tr>
+    <tr><td>Payment reference</td><td><strong>INV-4DS-RS-…</strong></td></tr>
+  </table>
+</div>
+    </div>
+    <div class="totals">
+      <div class="row"><span class="muted">Gross client payments</span><strong>R ____________</strong></div>
+      <div class="row"><span class="muted">Share rate</span><strong>____ %</strong></div>
+      <div class="row"><span class="muted">VAT</span><strong>As applicable</strong></div>
+      <div class="row due"><span class="muted">Amount due</span><span>R ____________</span></div>
+    </div>
+  </div>
+  </div>
+
+  <div class="foot">
+    <span class="left">4DS Solutions · Monthly revenue-share invoice template · Confidential</span>
+    <span class="right">Page 01 · A4</span>
+  </div>
+</section>
+</body>
+</html>

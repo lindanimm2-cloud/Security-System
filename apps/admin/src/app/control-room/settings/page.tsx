@@ -4,6 +4,8 @@ import { useMemo, useState, useEffect } from 'react';
 import { ControlRoomLayout } from '@/components/control-room/ControlRoomLayout';
 import { RoleProfileDialog, type RoleGuideRow } from '@/components/control-room/RoleProfileDialog';
 import { SettingsCategoryPanels } from '@/components/control-room/SettingsCategoryPanels';
+import { AlertEngineTestPanel } from '@/components/control-room/AlertEngineTestPanel';
+import { SoundHapticsTestPanel } from '@/components/control-room/SoundHapticsTestPanel';
 import { pushPriorityAlert } from '@/components/control-room/PriorityAlertProvider';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import type { PriorityAlert } from '@/lib/alert-priority';
@@ -62,6 +64,44 @@ const PREVIEW_ALERTS: {
       category: 'SILENT_PANIC',
       title: '4DS-2050-JJ-00088',
       subtitle: 'Silent panic · Berea, Durban · Discreet activation',
+      link: '/control-room/map',
+      createdAt: new Date().toISOString(),
+    },
+  },
+  {
+    label: 'Voice SOS',
+    priority: 'Critical',
+    recipients: 'Control room, supervisor, nearest officers',
+    channel: 'Panic siren · floating alert',
+    escalation: '30s / 60s / 120s',
+    fallback: 'Correlate with crash · backup desk',
+    ack: 'Required',
+    alert: {
+      id: 'preview-voice-sos',
+      tier: 'critical',
+      kind: 'panic',
+      category: 'PANIC',
+      title: 'VOICE SOS · ALEXA',
+      subtitle: 'Voice emergency · Morningside · correlated to Incident Kernel',
+      link: '/control-room/map',
+      createdAt: new Date().toISOString(),
+    },
+  },
+  {
+    label: 'Vehicle crash',
+    priority: 'Critical',
+    recipients: 'Control room, supervisor, nearest officers',
+    channel: 'Panic siren · map focus',
+    escalation: 'Immediate',
+    fallback: 'Telematics + phone GPS',
+    ack: 'Required',
+    alert: {
+      id: 'preview-crash',
+      tier: 'critical',
+      kind: 'panic',
+      category: 'PANIC',
+      title: 'SEVERE VEHICULAR CRASH DETECTED',
+      subtitle: 'Apple SafetyKit · OS_CONFIRMED · N2 Durban',
       link: '/control-room/map',
       createdAt: new Date().toISOString(),
     },
@@ -196,7 +236,7 @@ const PERMISSION_MATRIX = [
   { module: 'Dashboard', owner: 'Yes', manager: 'Yes', supervisor: 'Yes', officer: 'Yes', technician: 'Yes' },
   { module: 'Customers', owner: 'Yes', manager: 'Yes', supervisor: 'View', officer: 'No', technician: 'No' },
   { module: 'Fleet', owner: 'Yes', manager: 'Yes', supervisor: 'Yes', officer: 'View', technician: 'View' },
-  { module: 'CCTV', owner: 'Yes', manager: 'Yes', supervisor: 'Yes', officer: 'Scoped', technician: 'Yes' },
+  { module: 'CCTV', owner: 'Yes', manager: 'Yes', supervisor: 'Yes', officer: 'No', technician: 'Yes' },
   { module: 'Panic', owner: 'Yes', manager: 'Yes', supervisor: 'Yes', officer: 'Yes', technician: 'No' },
   { module: 'Dispatch', owner: 'Yes', manager: 'Yes', supervisor: 'Yes', officer: 'Yes', technician: 'No' },
   { module: 'Installations', owner: 'Yes', manager: 'Yes', supervisor: 'View', officer: 'No', technician: 'Yes' },
@@ -512,6 +552,8 @@ export default function ControlRoomSettingsPage() {
 
             {activeSection === 'alerts' && (
               <>
+                <SoundHapticsTestPanel />
+                <AlertEngineTestPanel />
                 <section className="portal-card settings-panel">
                   <div className="settings-panel__head">
                     <div>
@@ -519,6 +561,7 @@ export default function ControlRoomSettingsPage() {
                       <h2>Critical event routing</h2>
                       <p className="text-muted">
                         Configure how incidents surface to control room staff, field supervisors and backup channels.
+                        Critical P1 panic sounds repeat until Acknowledge. Escalation: 15s visual → 30s supervisor → 60s manager.
                       </p>
                     </div>
                   </div>

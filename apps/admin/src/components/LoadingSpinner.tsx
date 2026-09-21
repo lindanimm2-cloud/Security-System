@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { ButtonSpinner } from './ButtonSpinner';
+import { ActivitySpinner } from './ActivitySpinner';
 import {
   type ActionKind,
   actionCopy,
@@ -15,7 +15,7 @@ type LoadingSpinnerProps = {
   action?: ActionKind;
   size?: 'sm' | 'md' | 'lg';
   fullScreen?: boolean;
-  /** Stronger branded boot screen (login redirect, auth guard). */
+  /** Stronger branded boot screen. Defaults on for fullScreen (login/boot parity). */
   brand?: boolean;
 };
 
@@ -47,9 +47,10 @@ export function LoadingSpinner({
   action,
   size = 'md',
   fullScreen = false,
-  brand = false,
+  brand,
 }: LoadingSpinnerProps) {
-  const resolvedAction = action ?? (fullScreen || brand ? getActionKind() : null);
+  const branded = brand ?? fullScreen;
+  const resolvedAction = action ?? (fullScreen || branded ? getActionKind() : null);
   const copy = actionCopy(resolvedAction);
   const displayLabel = label === undefined ? copy.label : label;
   const hintLines =
@@ -59,52 +60,30 @@ export function LoadingSpinner({
         ? [hint, ...copy.hints.filter((line) => line !== hint)]
         : copy.hints;
 
-  if (fullScreen || brand) {
+  if (fullScreen || branded) {
     return (
       <div
-        className={`loading-screen loading-screen--v2 ${brand ? 'loading-screen--brand' : ''}`}
+        className="loading-screen loading-screen--v2 loading-screen--brand loading-screen--ios"
         role="status"
         aria-live="polite"
         aria-busy="true"
       >
-        <div className="loading-screen__glow" aria-hidden />
-        <div className="loading-screen__scan" aria-hidden />
-        <div className="loading-screen__content">
-          <div className="loader-orbit" aria-label={displayLabel}>
-            <span className="loader-orbit__track" aria-hidden />
-            <span className="loader-orbit__ring loader-orbit__ring--a" aria-hidden />
-            <span className="loader-orbit__ring loader-orbit__ring--b" aria-hidden />
-            <span className="loader-orbit__ring loader-orbit__ring--c" aria-hidden />
-            <span className="loader-orbit__core" aria-hidden />
+        <div className="loading-screen__card">
+          <div className="loading-screen__row">
+            <ActivitySpinner size="md" label={displayLabel || 'Loading'} />
+            <p className="loading-screen__label">{displayLabel || 'Loading...'}</p>
           </div>
-          <p className="loading-screen__label">{displayLabel}</p>
-          <RotatingHint lines={hintLines} />
-          <div className="loading-screen__bar" aria-hidden>
-            <span />
-          </div>
+          {hintLines.length > 0 ? <RotatingHint lines={hintLines} /> : null}
         </div>
       </div>
     );
   }
 
   return (
-    <div className={`loader-wrap loader-wrap--${size}`}>
-      {size === 'sm' ? (
-        <ButtonSpinner />
-      ) : (
-        <div className="loader-spinner" role="status" aria-label={displayLabel}>
-          {Array.from({ length: 8 }).map((_, i) => (
-            <span
-              key={i}
-              className="loader-bar"
-              style={{
-                transform: `rotate(${i * 45}deg)`,
-                animationDelay: `${i * 0.125}s`,
-              }}
-            />
-          ))}
-        </div>
-      )}
+    <div
+      className={`loader-wrap loader-wrap--${size}${size === 'sm' ? '' : ' loader-wrap--ios'}`}
+    >
+      <ActivitySpinner size={size} label={displayLabel || 'Loading'} />
       {displayLabel ? <p className="loader-label">{displayLabel}</p> : null}
     </div>
   );

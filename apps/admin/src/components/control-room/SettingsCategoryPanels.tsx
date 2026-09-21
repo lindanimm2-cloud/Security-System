@@ -107,12 +107,64 @@ export function SettingsCategoryPanels({
     return () => window.removeEventListener(CR_SETTINGS_CHANGED_EVENT, sync);
   }, []);
 
+  useEffect(() => {
+    if (section !== 'security') return;
+    let cancelled = false;
+    adminApi
+      .get<ApiResponse<{
+        mfaOwners: boolean;
+        mfaDispatchers: boolean;
+        sessionMinutes: string;
+        lockoutAttempts: string;
+        passwordDays: string;
+        deviceHeartbeat: boolean;
+      }>>('/control-room/security-settings')
+      .then((res) => {
+        if (cancelled || !res?.data) return;
+        const current = loadCrSettings();
+        const next = {
+          ...current,
+          security: { ...current.security, ...res.data },
+        };
+        setSettings(next);
+        saveCrSettings(next);
+      })
+      .catch(() => {
+        /* keep local defaults when API unavailable */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [section]);
+
   function commit(next: CrSettings, module: string, title: string, detail: string) {
     const withLog = withAudit(next, module, title, detail, actor);
     setSettings(withLog);
     saveCrSettings(withLog);
     setSaved(module);
     window.setTimeout(() => setSaved((cur) => (cur === module ? '' : cur)), 1800);
+  }
+
+  async function commitSecurity(next: CrSettings) {
+    const s = next.security;
+    try {
+      await adminApi.patch('/control-room/security-settings', {
+        mfaOwners: s.mfaOwners,
+        mfaDispatchers: s.mfaDispatchers,
+        sessionMinutes: s.sessionMinutes,
+        lockoutAttempts: s.lockoutAttempts,
+        passwordDays: s.passwordDays,
+        deviceHeartbeat: s.deviceHeartbeat,
+      });
+    } catch {
+      /* still persist locally so UI remains usable offline/demo */
+    }
+    commit(
+      next,
+      'Security',
+      'Security policy updated',
+      `Timeout ${s.sessionMinutes}m · lockout ${s.lockoutAttempts} · MFA owners ${s.mfaOwners ? 'on' : 'off'}`,
+    );
   }
 
   if (section === 'general') {
@@ -344,9 +396,76 @@ export function SettingsCategoryPanels({
             </div>
             <div className="settings-switch-grid">
               <Switch checked={n.bell} label="Notification bell" hint="In-app inbox" onChange={(bell) => patch({ bell })} />
+              <Switch
+                checked={n.desktopPush !== false}
+                label="Desktop / browser push"
+                hint="OS notification when tab is in background"
+                onChange={(desktopPush) => patch({ desktopPush })}
+              />
               <Switch checked={n.sms} label="SMS to on-duty phones" hint="Critical and high only" onChange={(sms) => patch({ sms })} />
               <Switch checked={n.radio} label="Radio dispatch cue" hint="Short tone on assigned channel" onChange={(radio) => patch({ radio })} />
               <Switch checked={n.email} label="Email digest" hint="Hourly non-critical summary" onChange={(email) => patch({ email })} />
+            </div>
+          </div>
+
+          <div className="settings-notify__block">
+            <div className="settings-notify__block-head">
+              <h3>Per-category prefs</h3>
+              <p>Sound and push per alert family. Panic / silent cannot be permanently muted.</p>
+            </div>
+            <div className="settings-alert-prefs">
+              {(
+                [
+                  ['panic', 'Panic'],
+                  ['silent', 'Silent panic'],
+                  ['medical', 'Medical'],
+                  ['fire', 'Fire / alarm'],
+                  ['theft', 'Vehicle / theft'],
+                  ['officer', 'Officer'],
+                  ['sla', 'SLA'],
+                  ['billing', 'Billing'],
+                  ['developer', 'Developer'],
+                ] as const
+              ).map(([key, label]) => {
+                const pref = settings.alertPrefs?.[key] ?? { sound: true, push: true, email: false };
+                return (
+                  <div key={key} className="settings-alert-prefs__row">
+                    <strong>{label}</strong>
+                    <label>
+                      <input
+                        type="checkbox"
+                        checked={pref.sound}
+                        onChange={(e) =>
+                          setSettings({
+                            ...settings,
+                            alertPrefs: {
+                              ...settings.alertPrefs,
+                              [key]: { ...pref, sound: e.target.checked },
+                            },
+                          })
+                        }
+                      />
+                      Sound
+                    </label>
+                    <label>
+                      <input
+                        type="checkbox"
+                        checked={pref.push}
+                        onChange={(e) =>
+                          setSettings({
+                            ...settings,
+                            alertPrefs: {
+                              ...settings.alertPrefs,
+                              [key]: { ...pref, push: e.target.checked },
+                            },
+                          })
+                        }
+                      />
+                      Push
+                    </label>
+                  </div>
+                );
+              })}
             </div>
           </div>
 
@@ -541,20 +660,13 @@ export function SettingsCategoryPanels({
           </label>
         </div>
         <div className="settings-switch-list">
-          <Switch checked={s.mfaOwners} label="Require MFA for owners" hint="Email or authenticator at login" onChange={(mfaOwners) => setSettings({ ...settings, security: { ...s, mfaOwners } })} />
+          <Switch checked={s.mfaOwners} label="Require MFA for owners" hint="Authenticator app at login for owner and manager roles" onChange={(mfaOwners) => setSettings({ ...settings, security: { ...s, mfaOwners } })} />
           <Switch checked={s.mfaDispatchers} label="Require MFA for dispatchers" hint="Recommended for shared desks" onChange={(mfaDispatchers) => setSettings({ ...settings, security: { ...s, mfaDispatchers } })} />
           <Switch checked={s.deviceHeartbeat} label="Trusted device heartbeat" hint="Portal devices must check in to stay trusted" onChange={(deviceHeartbeat) => setSettings({ ...settings, security: { ...s, deviceHeartbeat } })} />
         </div>
         <SaveBar
           saved={saved === 'Security'}
-          onSave={() =>
-            commit(
-              settings,
-              'Security',
-              'Security policy updated',
-              `Timeout ${s.sessionMinutes}m · lockout ${s.lockoutAttempts} · MFA owners ${s.mfaOwners ? 'on' : 'off'}`,
-            )
-          }
+          onSave={() => commitSecurity(settings)}
         />
       </section>
     );

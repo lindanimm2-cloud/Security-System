@@ -137,7 +137,7 @@ export function ErrorAlert({
               ? 'Notifying…'
               : notifyMsg === 'Developer notified'
                 ? 'Notified'
-                : 'Send details to developer'}
+                : 'Notify developer'}
           </button>
         )}
         {canRetry && (

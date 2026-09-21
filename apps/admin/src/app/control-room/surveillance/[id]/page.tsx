@@ -11,8 +11,8 @@ import { adminApi, type ApiResponse } from '@/lib/api-client';
 import { dispatchIncidentHref, CONTROL_ROOM_ROUTES } from '@/lib/control-room-routes';
 import { SensorZonePanel, type SensorRow } from '@/components/portal/SensorZonePanel';
 import { CctvLiveFeed } from '@/components/portal/CctvLiveFeed';
-import { HoldToActivate } from '@/components/ops/EmergencyMode';
-import { alarmStatusLabel } from '@/lib/sa-alarm';
+import { HoldToActivate, OpsDisarmIcon, OpsSirenIcon } from '@/components/ops/EmergencyMode';
+import { alarmStatusLabel, summarizeZones } from '@/lib/sa-alarm';
 
 type SiteDetail = {
   id: string;
@@ -179,7 +179,7 @@ function SiteContent() {
           {site.alarmStatus === 'TRIGGERED' ? (
             <button
               type="button"
-              className="btn-secondary btn-sm"
+              className="ops-act ops-act--danger"
               disabled={busy != null}
               onClick={() =>
                 void run('disarm', () =>
@@ -187,20 +187,26 @@ function SiteContent() {
                 )
               }
             >
+              <OpsDisarmIcon />
               {busy === 'disarm' ? 'Silencing…' : 'Silence siren'}
             </button>
           ) : (
             <HoldToActivate
-              className="hold-activate--inline"
+              className="hold-activate--inline hold-activate--ops-well"
               label="Sound siren"
               holdLabel="Hold to sound siren…"
               holdMs={1200}
+              hideHint
+              keepLabel
               loading={busy === 'siren'}
               disabled={busy != null}
               onActivate={() =>
                 void run('siren', () => adminApi.post(`/control-room/surveillance/sites/${id}/siren`))
               }
-            />
+            >
+              <OpsSirenIcon />
+              Sound siren
+            </HoldToActivate>
           )}
         </div>
       </div>
@@ -421,7 +427,28 @@ function SiteContent() {
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden><circle cx="12" cy="12" r="3"/><path d="M5 12H3M21 12h-2M12 5V3M12 21v-2M7.05 7.05 5.636 5.636M18.364 18.364l-1.414-1.414M7.05 16.95l-1.414 1.414M18.364 5.636l-1.414 1.414"/></svg>
             <h2>Zones &amp; sensors</h2>
           </div>
-          <span className="text-muted" style={{ fontSize: '0.82rem' }}>{site.sensors?.length ?? 0} zones</span>
+          {(() => {
+            const z = summarizeZones(site.sensors ?? []);
+            if (z.fault + z.offline > 0) {
+              return (
+                <span className="status-pill status-pill--pending">
+                  {z.fault + z.offline} need check · {z.active} active
+                </span>
+              );
+            }
+            if (z.alert > 0) {
+              return (
+                <span className="status-pill status-pill--alert">
+                  {z.alert} open/alarm · {z.active} active
+                </span>
+              );
+            }
+            return (
+              <span className="status-pill status-pill--ok">
+                {z.active} active{z.disabled ? ` · ${z.disabled} disabled` : ''}
+              </span>
+            );
+          })()}
         </div>
         <SensorZonePanel
           propertyId={site.id}

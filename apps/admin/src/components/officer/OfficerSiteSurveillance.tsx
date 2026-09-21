@@ -1,6 +1,7 @@
 'use client';
 
 import { IncidentTimeline } from '@/components/incident/IncidentTimeline';
+import { CctvLiveFeed } from '@/components/portal/CctvLiveFeed';
 import { useApi } from '@/hooks/useApi';
 import { officerApi, type ApiResponse } from '@/lib/api-client';
 
@@ -29,6 +30,8 @@ type SiteContext = {
     locationLabel: string;
     channel: number;
     status: string;
+    snapshotUrl?: string | null;
+    isLiveCapable?: boolean;
     isInterior?: boolean;
     privacyLocked?: boolean;
   }[];
@@ -133,27 +136,32 @@ export function OfficerSiteSurveillance({ incidentId }: Props) {
 
       {ctx.cameras.length > 0 && (
         <div className="camera-grid officer-surveillance__grid">
-          {ctx.cameras.map((c) => (
-            <div key={c.id} className={`camera-tile ${c.privacyLocked ? 'camera-tile--locked' : ''}`}>
-              <div
-                className={`camera-tile__feed camera-tile__feed--${c.status.toLowerCase()} ${
-                  c.privacyLocked ? 'camera-tile__feed--privacy' : ''
-                }`}
-              >
-                <span className="camera-tile__live">
-                  {c.privacyLocked ? 'PRIVATE' : `CH ${c.channel}`}
-                </span>
-                {c.isInterior && !c.privacyLocked && (
-                  <span className="camera-tile__badge">Interior</span>
-                )}
-                <span className="camera-tile__name">{c.name}</span>
+          {ctx.cameras.map((c) =>
+            c.privacyLocked ? (
+              <div key={c.id} className="camera-tile camera-tile--locked">
+                <div className="camera-tile__feed camera-tile__feed--privacy">
+                  <span className="camera-tile__live">PRIVATE</span>
+                  <span className="camera-tile__name">{c.name}</span>
+                </div>
+                <span className="camera-tile__meta">{c.locationLabel}</span>
               </div>
-              <span className="camera-tile__meta">
-                {c.locationLabel}
-                {c.privacyLocked ? '' : ` · ${c.status}`}
-              </span>
-            </div>
-          ))}
+            ) : (
+              <CctvLiveFeed
+                key={c.id}
+                camera={{
+                  id: c.id,
+                  name: c.name,
+                  locationLabel: c.locationLabel,
+                  channel: c.channel,
+                  status: c.status,
+                  snapshotUrl: c.snapshotUrl,
+                  isLiveCapable: c.isLiveCapable,
+                  isInterior: c.isInterior,
+                }}
+                compact
+              />
+            ),
+          )}
         </div>
       )}
 

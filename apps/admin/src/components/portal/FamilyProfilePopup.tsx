@@ -11,6 +11,7 @@ export type FamilyProfilePerson = {
   id: string;
   name: string;
   nickname?: string | null;
+  relationship?: string | null;
   trackingEnabled: boolean;
   lastLocationAt?: string | null;
   phone?: string | null;
@@ -87,6 +88,9 @@ export function FamilyProfilePopup({
         <UserAvatar firstName={first} lastName={last} size="lg" />
         <div className="fam-profile-card__body">
           <h2 id="fam-profile-name">{display}</h2>
+          {person.relationship ? (
+            <p className="fam-profile-card__status">{person.relationship}</p>
+          ) : null}
           {person.trackingEnabled ? (
             <p className="fam-profile-card__status fam-profile-card__status--on">
               <ShieldIcon />

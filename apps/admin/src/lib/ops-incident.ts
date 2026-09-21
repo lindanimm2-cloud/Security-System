@@ -24,6 +24,18 @@ export type OpsIncident = {
   /** Only set when the originating system provided a real source. Never invent NATIVE SOS. */
   source?: string | null;
   ackedAt?: string | null;
+  /** Mobile queue preview: dash cams vs property CCTV. */
+  cctvKind?: 'dash' | 'site' | null;
+  previewCameras?: Array<{
+    id: string;
+    name: string;
+    locationLabel: string;
+    channel: number;
+    status: string;
+    snapshotUrl?: string | null;
+    isLiveCapable?: boolean;
+    isInterior?: boolean;
+  }> | null;
 };
 
 export type OpsAlertKind =
@@ -140,13 +152,14 @@ export function etaSnapshot(etaDueAt?: string | null, now = Date.now()) {
 }
 
 export function cctvLabel(incident: OpsIncident) {
+  const prefix = incident.cctvKind === 'dash' ? 'Dash' : 'CCTV';
   const total = incident.cameraCount;
-  if (total == null) return { text: 'CCTV', tone: 'muted' as const };
+  if (total == null) return { text: prefix, tone: 'muted' as const };
   const online = incident.camerasOnline ?? total;
   const offline = Math.max(0, total - online);
-  if (offline > 0) return { text: `CCTV · ${offline} OFFLINE`, tone: 'warn' as const };
-  if (online > 0) return { text: `CCTV · ${online} LIVE`, tone: 'ok' as const };
-  return { text: 'CCTV · NONE', tone: 'muted' as const };
+  if (offline > 0) return { text: `${prefix} · ${offline} OFFLINE`, tone: 'warn' as const };
+  if (online > 0) return { text: `${prefix} · ${online} LIVE`, tone: 'ok' as const };
+  return { text: `${prefix} · NONE`, tone: 'muted' as const };
 }
 
 export function mapLabel(incident: OpsIncident) {

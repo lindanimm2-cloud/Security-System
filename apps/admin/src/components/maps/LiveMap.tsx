@@ -37,7 +37,40 @@ type LiveMapProps = {
   officers: MapOfficer[];
   incidents: MapIncident[];
   flyTo?: { lat: number; lng: number } | null;
+  /** Embedded boards should leave page scroll free; full map page keeps wheel zoom. */
+  scrollWheelZoom?: boolean;
+  /** Prefer light basemap on bright control-room surfaces. */
+  lightTiles?: boolean;
 };
+
+function InvalidateMapSize() {
+  const map = useMap();
+  useEffect(() => {
+    const refresh = () => {
+      try {
+        map.invalidateSize({ animate: false });
+      } catch {
+        /* map torn down */
+      }
+    };
+    refresh();
+    const timers = [50, 200, 500, 1000].map((ms) => window.setTimeout(refresh, ms));
+    const ro =
+      typeof ResizeObserver !== 'undefined'
+        ? new ResizeObserver(() => refresh())
+        : null;
+    const el = map.getContainer();
+    ro?.observe(el);
+    window.addEventListener('resize', refresh);
+    map.whenReady(refresh);
+    return () => {
+      timers.forEach((id) => window.clearTimeout(id));
+      ro?.disconnect();
+      window.removeEventListener('resize', refresh);
+    };
+  }, [map]);
+  return null;
+}
 
 function FlyToTarget({ target }: { target: { lat: number; lng: number } | null }) {
   const map = useMap();
@@ -90,6 +123,8 @@ export default function LiveMap({
   officers = [],
   incidents = [],
   flyTo,
+  scrollWheelZoom = true,
+  lightTiles = false,
 }: LiveMapProps) {
   const [ready, setReady] = useState(false);
   useEffect(() => {
@@ -132,14 +167,19 @@ export default function LiveMap({
       <MapContainer
         center={[safeCenter.lat, safeCenter.lng]}
         zoom={12}
-        scrollWheelZoom
+        scrollWheelZoom={scrollWheelZoom}
         className="leaflet-map"
       >
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> · <a href="https://carto.com/">CARTO</a>'
-          url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+          url={
+            lightTiles
+              ? 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png'
+              : 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
+          }
         />
 
+        <InvalidateMapSize />
         <FitBoundsOnLoad users={safeUsers} officers={safeOfficers} incidents={safeIncidents} />
         <FlyToTarget target={flyTo && hasCoords(flyTo.lat, flyTo.lng) ? flyTo : null} />
 

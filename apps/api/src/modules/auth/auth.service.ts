@@ -21,12 +21,37 @@ import {
 } from './dto/client-register.dto';
 import { LoginDto } from './dto/login.dto';
 import { ADMIN_PORTAL_ROLES } from '../../common/developer-access';
+import { AuditService } from './audit.service';
+import { decryptSecret, encryptSecret } from './mfa-crypto';
+import {
+  generateBackupCodes,
+  generateTotpSecret,
+  otpauthUri,
+  verifyTotp,
+} from './totp';
+import {
+  getAssuranceProfileConfig,
+  readAssuranceProfileFromSettings,
+} from '../assurance/assurance-profiles';
 
 const ADMIN_ROLES: UserRole[] = ADMIN_PORTAL_ROLES;
 
 const CLIENT_ROLES: UserRole[] = [UserRole.USER, UserRole.FAMILY_MEMBER];
 const OFFICER_ROLES: UserRole[] = [UserRole.OFFICER];
 const TECHNICIAN_ROLES: UserRole[] = [UserRole.TECHNICIAN];
+
+/** Always require MFA for these privileged control-room roles. */
+const ALWAYS_MFA_ROLES: UserRole[] = [
+  UserRole.OWNER,
+  UserRole.SUPER_ADMIN,
+  UserRole.TENANT_ADMIN,
+  UserRole.DEVELOPER,
+];
+
+type TenantSecuritySettings = {
+  mfaOwners?: boolean;
+  mfaDispatchers?: boolean;
+};
 
 @Injectable()
 export class AuthService {
@@ -35,9 +60,14 @@ export class AuthService {
     private readonly jwtService: JwtService,
     private readonly config: ConfigService,
     private readonly loyalty: LoyaltyService,
+    private readonly audit: AuditService,
   ) {}
 
-  async login(dto: LoginDto, allowedRoles?: UserRole[]) {
+  async login(
+    dto: LoginDto,
+    allowedRoles?: UserRole[],
+    meta?: { ipAddress?: string | null; portal?: string },
+  ) {
     const tenant = await this.prisma.tenant.findFirst({
       where: { slug: dto.tenantSlug, isActive: true },
     });
@@ -54,6 +84,16 @@ export class AuthService {
     });
 
     if (!user?.passwordHash || user.status !== UserStatus.ACTIVE) {
+      await this.audit.write({
+        tenantId: tenant.id,
+        action: 'AUTH_LOGIN_FAILURE',
+        result: 'FAILURE',
+        reason: 'invalid_credentials',
+        accountUserId: user?.id ?? null,
+        ipAddress: meta?.ipAddress,
+        source: meta?.portal ?? 'auth',
+        target: dto.email.toLowerCase(),
+      });
       throw new UnauthorizedException('Invalid credentials');
     }
 
@@ -65,11 +105,80 @@ export class AuthService {
 
     const valid = await bcrypt.compare(dto.password, user.passwordHash);
     if (!valid) {
+      await this.audit.write({
+        tenantId: tenant.id,
+        action: 'AUTH_LOGIN_FAILURE',
+        result: 'FAILURE',
+        reason: 'bad_password',
+        actorUserId: user.id,
+        actorRole: user.role,
+        accountUserId: user.id,
+        ipAddress: meta?.ipAddress,
+        source: meta?.portal ?? 'auth',
+      });
       throw new UnauthorizedException('Invalid credentials');
     }
 
     if (allowedRoles && !allowedRoles.includes(user.role)) {
+      await this.audit.write({
+        tenantId: tenant.id,
+        action: 'AUTH_LOGIN_DENIED',
+        result: 'DENIED',
+        reason: 'portal_role_mismatch',
+        actorUserId: user.id,
+        actorRole: user.role,
+        accountUserId: user.id,
+        ipAddress: meta?.ipAddress,
+        source: meta?.portal ?? 'auth',
+      });
       throw new ForbiddenException('Access denied for this portal');
+    }
+
+    const mfaRequired = this.roleRequiresMfa(user.role, tenant.settings);
+    if (mfaRequired) {
+      if (!user.mfaEnabled || !user.mfaSecretEnc) {
+        const mfaToken = this.signMfaChallenge(user.id, user.tenantId, user.role, 'mfa_setup');
+        await this.audit.write({
+          tenantId: tenant.id,
+          action: 'AUTH_MFA_SETUP_REQUIRED',
+          result: 'SUCCESS',
+          actorUserId: user.id,
+          actorRole: user.role,
+          accountUserId: user.id,
+          ipAddress: meta?.ipAddress,
+          source: meta?.portal ?? 'auth',
+        });
+        return {
+          success: true,
+          data: {
+            mfaSetupRequired: true,
+            mfaToken,
+            user: this.sanitizeUser(user),
+            tenant: {
+              id: tenant.id,
+              name: tenant.name,
+              slug: tenant.slug,
+              primaryColor: tenant.primaryColor,
+            },
+          },
+        };
+      }
+
+      const mfaToken = this.signMfaChallenge(user.id, user.tenantId, user.role, 'mfa_verify');
+      return {
+        success: true,
+        data: {
+          mfaRequired: true,
+          mfaToken,
+          user: this.sanitizeUser(user),
+          tenant: {
+            id: tenant.id,
+            name: tenant.name,
+            slug: tenant.slug,
+            primaryColor: tenant.primaryColor,
+          },
+        },
+      };
     }
 
     const tokens = await this.issueTokens(user.id, user.tenantId, user.role);
@@ -77,6 +186,17 @@ export class AuthService {
     await this.prisma.user.update({
       where: { id: user.id },
       data: { updatedAt: new Date() },
+    });
+
+    await this.audit.write({
+      tenantId: tenant.id,
+      action: 'AUTH_LOGIN_SUCCESS',
+      result: 'SUCCESS',
+      actorUserId: user.id,
+      actorRole: user.role,
+      accountUserId: user.id,
+      ipAddress: meta?.ipAddress,
+      source: meta?.portal ?? 'auth',
     });
 
     return {
@@ -94,20 +214,324 @@ export class AuthService {
     };
   }
 
-  loginClient(dto: LoginDto) {
-    return this.login(dto, CLIENT_ROLES);
+  loginClient(dto: LoginDto, meta?: { ipAddress?: string | null }) {
+    return this.login(dto, CLIENT_ROLES, { ...meta, portal: 'client' });
   }
 
-  loginAdmin(dto: LoginDto) {
-    return this.login(dto, ADMIN_ROLES);
+  loginAdmin(dto: LoginDto, meta?: { ipAddress?: string | null }) {
+    return this.login(dto, ADMIN_ROLES, { ...meta, portal: 'admin' });
   }
 
-  loginOfficer(dto: LoginDto) {
-    return this.login(dto, OFFICER_ROLES);
+  loginOfficer(dto: LoginDto, meta?: { ipAddress?: string | null }) {
+    return this.login(dto, OFFICER_ROLES, { ...meta, portal: 'officer' });
   }
 
-  loginTechnician(dto: LoginDto) {
-    return this.login(dto, TECHNICIAN_ROLES);
+  loginTechnician(dto: LoginDto, meta?: { ipAddress?: string | null }) {
+    return this.login(dto, TECHNICIAN_ROLES, { ...meta, portal: 'technician' });
+  }
+
+  async startMfaSetup(mfaToken: string, ipAddress?: string | null) {
+    const challenge = this.verifyMfaChallenge(mfaToken, ['mfa_setup', 'mfa_manage']);
+    const user = await this.prisma.user.findFirst({
+      where: { id: challenge.sub, tenantId: challenge.tenantId },
+    });
+    if (!user) throw new NotFoundException('User not found');
+
+    const secret = generateTotpSecret();
+    const enc = encryptSecret(
+      secret,
+      this.config.get<string>('MFA_ENCRYPTION_KEY'),
+      this.config.get<string>('NODE_ENV', 'development'),
+    );
+    // Store pending secret until confirm (overwrite previous pending).
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: {
+        mfaSecretEnc: enc,
+        mfaEnabled: false,
+        mfaEnrolledAt: null,
+      },
+    });
+
+    const uri = otpauthUri({
+      secret,
+      accountName: user.email,
+      issuer: '4DS Nexus',
+    });
+
+    await this.audit.write({
+      tenantId: user.tenantId,
+      action: 'AUTH_MFA_SETUP_STARTED',
+      result: 'SUCCESS',
+      actorUserId: user.id,
+      actorRole: user.role,
+      accountUserId: user.id,
+      ipAddress,
+    });
+
+    return {
+      success: true,
+      data: {
+        secret,
+        otpauthUrl: uri,
+        mfaToken: this.signMfaChallenge(user.id, user.tenantId, user.role, 'mfa_setup'),
+      },
+    };
+  }
+
+  async confirmMfaSetup(
+    body: { mfaToken: string; code: string },
+    ipAddress?: string | null,
+  ) {
+    const challenge = this.verifyMfaChallenge(body.mfaToken, ['mfa_setup', 'mfa_manage']);
+    const user = await this.prisma.user.findFirst({
+      where: { id: challenge.sub, tenantId: challenge.tenantId },
+    });
+    if (!user?.mfaSecretEnc) throw new BadRequestException('Start MFA setup first');
+
+    const secret = decryptSecret(
+      user.mfaSecretEnc,
+      this.config.get<string>('MFA_ENCRYPTION_KEY'),
+      this.config.get<string>('NODE_ENV', 'development'),
+    );
+    if (!verifyTotp(secret, body.code)) {
+      await this.audit.write({
+        tenantId: user.tenantId,
+        action: 'AUTH_MFA_SETUP_FAILURE',
+        result: 'FAILURE',
+        reason: 'bad_totp',
+        actorUserId: user.id,
+        actorRole: user.role,
+        accountUserId: user.id,
+        ipAddress,
+      });
+      throw new UnauthorizedException('Invalid authenticator code');
+    }
+
+    const backupCodes = generateBackupCodes(8);
+    const hashes = await Promise.all(backupCodes.map((c) => bcrypt.hash(c, 10)));
+
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: {
+        mfaEnabled: true,
+        mfaEnrolledAt: new Date(),
+        mfaBackupCodesHash: hashes,
+      },
+    });
+
+    const tokens = await this.issueTokens(user.id, user.tenantId, user.role);
+    const full = await this.prisma.user.findUniqueOrThrow({
+      where: { id: user.id },
+      include: { tenant: true },
+    });
+
+    await this.audit.write({
+      tenantId: user.tenantId,
+      action: 'AUTH_MFA_ENROLLED',
+      result: 'SUCCESS',
+      actorUserId: user.id,
+      actorRole: user.role,
+      accountUserId: user.id,
+      ipAddress,
+    });
+
+    return {
+      success: true,
+      data: {
+        backupCodes,
+        user: this.sanitizeUser(full),
+        tenant: full.tenant
+          ? {
+              id: full.tenant.id,
+              name: full.tenant.name,
+              slug: full.tenant.slug,
+              primaryColor: full.tenant.primaryColor,
+            }
+          : null,
+        tokens,
+      },
+    };
+  }
+
+  async verifyMfaLogin(
+    body: { mfaToken: string; code: string },
+    ipAddress?: string | null,
+  ) {
+    const challenge = this.verifyMfaChallenge(body.mfaToken, ['mfa_verify']);
+    const user = await this.prisma.user.findFirst({
+      where: { id: challenge.sub, tenantId: challenge.tenantId },
+      include: { tenant: true },
+    });
+    if (!user?.mfaEnabled || !user.mfaSecretEnc) {
+      throw new BadRequestException('MFA is not enabled for this account');
+    }
+
+    const secret = decryptSecret(
+      user.mfaSecretEnc,
+      this.config.get<string>('MFA_ENCRYPTION_KEY'),
+      this.config.get<string>('NODE_ENV', 'development'),
+    );
+
+    let ok = verifyTotp(secret, body.code);
+    if (!ok) {
+      ok = await this.consumeBackupCode(user.id, body.code, user.mfaBackupCodesHash);
+    }
+    if (!ok) {
+      await this.audit.write({
+        tenantId: user.tenantId,
+        action: 'AUTH_MFA_FAILURE',
+        result: 'FAILURE',
+        reason: 'bad_code',
+        actorUserId: user.id,
+        actorRole: user.role,
+        accountUserId: user.id,
+        ipAddress,
+      });
+      throw new UnauthorizedException('Invalid authenticator code');
+    }
+
+    const tokens = await this.issueTokens(user.id, user.tenantId, user.role);
+    await this.audit.write({
+      tenantId: user.tenantId,
+      action: 'AUTH_LOGIN_SUCCESS',
+      result: 'SUCCESS',
+      reason: 'mfa_verified',
+      actorUserId: user.id,
+      actorRole: user.role,
+      accountUserId: user.id,
+      ipAddress,
+    });
+
+    return {
+      success: true,
+      data: {
+        user: this.sanitizeUser(user),
+        tenant: user.tenant
+          ? {
+              id: user.tenant.id,
+              name: user.tenant.name,
+              slug: user.tenant.slug,
+              primaryColor: user.tenant.primaryColor,
+            }
+          : null,
+        tokens,
+      },
+    };
+  }
+
+  async startMfaSetupForAuthenticatedUser(userId: string, ipAddress?: string | null) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) throw new NotFoundException('User not found');
+    const mfaToken = this.signMfaChallenge(user.id, user.tenantId, user.role, 'mfa_manage');
+    return this.startMfaSetup(mfaToken, ipAddress);
+  }
+
+  async getMfaStatus(userId: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      include: { tenant: true },
+    });
+    if (!user) throw new NotFoundException('User not found');
+    return {
+      success: true,
+      data: {
+        mfaEnabled: user.mfaEnabled,
+        mfaEnrolledAt: user.mfaEnrolledAt,
+        required: this.roleRequiresMfa(user.role, user.tenant?.settings ?? null),
+      },
+    };
+  }
+
+  private async consumeBackupCode(
+    userId: string,
+    code: string,
+    hashes: Prisma.JsonValue,
+  ): Promise<boolean> {
+    const list = Array.isArray(hashes) ? (hashes as string[]) : [];
+    const normalized = (code ?? '').replace(/\s/g, '').toUpperCase();
+    for (let i = 0; i < list.length; i += 1) {
+      const match = await bcrypt.compare(normalized, list[i]);
+      if (match) {
+        const next = list.filter((_, idx) => idx !== i);
+        await this.prisma.user.update({
+          where: { id: userId },
+          data: { mfaBackupCodesHash: next },
+        });
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private roleRequiresMfa(role: UserRole, settingsJson: Prisma.JsonValue | null): boolean {
+    if (ALWAYS_MFA_ROLES.includes(role)) return true;
+    const profile = getAssuranceProfileConfig(readAssuranceProfileFromSettings(settingsJson));
+    const security = this.readTenantSecurity(settingsJson);
+    // Default: owners-group MFA on; dispatchers off unless configured or profile requires.
+    const mfaOwners = security.mfaOwners !== false || profile.requireMfaPrivileged;
+    const mfaDispatchers =
+      security.mfaDispatchers === true || profile.requireMfaDispatchers;
+    if (mfaOwners && role === UserRole.MANAGER) return true;
+    if (
+      mfaDispatchers &&
+      (role === UserRole.DISPATCHER ||
+        role === UserRole.MEDICAL_DISPATCHER ||
+        role === UserRole.FIRE_DISPATCHER)
+    ) {
+      return true;
+    }
+    return false;
+  }
+
+  private readTenantSecurity(settingsJson: Prisma.JsonValue | null): TenantSecuritySettings {
+    if (!settingsJson || typeof settingsJson !== 'object' || Array.isArray(settingsJson)) {
+      return {};
+    }
+    const root = settingsJson as Record<string, unknown>;
+    const security = root.security;
+    if (!security || typeof security !== 'object' || Array.isArray(security)) return {};
+    return security as TenantSecuritySettings;
+  }
+
+  private signMfaChallenge(
+    userId: string,
+    tenantId: string,
+    role: UserRole,
+    purpose: 'mfa_verify' | 'mfa_setup' | 'mfa_manage',
+  ) {
+    return this.jwtService.sign(
+      { sub: userId, tenantId, role, purpose },
+      { expiresIn: purpose === 'mfa_verify' ? '5m' : '15m' },
+    );
+  }
+
+  private verifyMfaChallenge(
+    token: string,
+    allowed: Array<'mfa_verify' | 'mfa_setup' | 'mfa_manage'>,
+  ): { sub: string; tenantId: string; role: UserRole; purpose: string } {
+    try {
+      const payload = this.jwtService.verify<{
+        sub: string;
+        tenantId: string;
+        role: UserRole;
+        purpose?: string;
+      }>(token);
+      if (!payload?.sub || !payload.tenantId || !payload.purpose) {
+        throw new UnauthorizedException('Invalid MFA challenge');
+      }
+      if (!allowed.includes(payload.purpose as never)) {
+        throw new UnauthorizedException('Invalid MFA challenge purpose');
+      }
+      return {
+        sub: payload.sub,
+        tenantId: payload.tenantId,
+        role: payload.role,
+        purpose: payload.purpose,
+      };
+    } catch {
+      throw new UnauthorizedException('MFA challenge expired or invalid');
+    }
   }
 
   async getClientInvitePreview(token: string) {
@@ -604,6 +1028,7 @@ export class AuthService {
     tenantId: string;
     jobTitle?: string | null;
     phone?: string | null;
+    mfaEnabled?: boolean;
     tenant?: { id: string; name: string; slug: string; primaryColor: string | null };
   }) {
     return {
@@ -616,6 +1041,7 @@ export class AuthService {
       tenantId: user.tenantId,
       jobTitle: user.jobTitle ?? null,
       phone: user.phone ?? null,
+      mfaEnabled: Boolean(user.mfaEnabled),
       tenant: user.tenant,
     };
   }

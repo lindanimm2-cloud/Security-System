@@ -11,6 +11,12 @@ export type CrAuditEntry = {
   actor: string;
 };
 
+export type AlertCategoryPref = {
+  sound: boolean;
+  push: boolean;
+  email: boolean;
+};
+
 export type CrSettings = {
   general: {
     timezone: string;
@@ -30,7 +36,10 @@ export type CrSettings = {
     quietFrom: string;
     quietTo: string;
     panicOverride: boolean;
+    desktopPush: boolean;
   };
+  /** Per-category delivery prefs for AlertEngine */
+  alertPrefs: Record<string, AlertCategoryPref>;
   organisation: {
     name: string;
     tradingName: string;
@@ -74,6 +83,23 @@ export type CrSettings = {
   audit: CrAuditEntry[];
 };
 
+const DEFAULT_ALERT_PREFS: Record<string, AlertCategoryPref> = {
+  panic: { sound: true, push: true, email: true },
+  silent: { sound: false, push: true, email: true },
+  medical: { sound: true, push: true, email: false },
+  fire: { sound: true, push: true, email: false },
+  theft: { sound: true, push: true, email: false },
+  officer: { sound: true, push: true, email: false },
+  vehicle: { sound: true, push: true, email: false },
+  device: { sound: true, push: true, email: false },
+  sla: { sound: true, push: true, email: false },
+  message: { sound: true, push: false, email: false },
+  call: { sound: true, push: true, email: false },
+  billing: { sound: false, push: true, email: true },
+  system: { sound: false, push: true, email: false },
+  developer: { sound: false, push: true, email: false },
+};
+
 const DEFAULTS: CrSettings = {
   general: {
     timezone: 'Africa/Johannesburg',
@@ -93,16 +119,18 @@ const DEFAULTS: CrSettings = {
     quietFrom: '22:00',
     quietTo: '06:00',
     panicOverride: true,
+    desktopPush: true,
   },
+  alertPrefs: structuredClone(DEFAULT_ALERT_PREFS),
   organisation: {
-    name: '4DS Solutions',
+    name: '4DS Solutions (Pty) Ltd',
     tradingName: '4DS Nexus',
     slug: 'demo',
-    registration: '2020/445521/07',
-    vat: '4120256789',
+    registration: 'K2025567725',
+    vat: '',
     supportPhone: '+27 86 000 0000',
     afterHoursPhone: '+27 82 000 4411',
-    address: 'Umhlanga Rocks Drive, Durban North',
+    address: 'South Africa',
   },
   security: {
     sessionMinutes: '30',
@@ -114,7 +142,7 @@ const DEFAULTS: CrSettings = {
   },
   billing: {
     plan: 'Control Room Enterprise',
-    invoiceEmail: 'accounts@demo.local',
+    invoiceEmail: 'accounts@4dsnexus.co.za',
     vatInclusive: true,
     autoRetry: true,
   },
@@ -189,6 +217,7 @@ export function loadCrSettings(): CrSettings {
       ...parsed,
       general: { ...DEFAULTS.general, ...parsed.general },
       notifications: { ...DEFAULTS.notifications, ...parsed.notifications },
+      alertPrefs: { ...DEFAULT_ALERT_PREFS, ...parsed.alertPrefs },
       organisation: { ...DEFAULTS.organisation, ...parsed.organisation },
       security: { ...DEFAULTS.security, ...parsed.security },
       billing: { ...DEFAULTS.billing, ...parsed.billing },

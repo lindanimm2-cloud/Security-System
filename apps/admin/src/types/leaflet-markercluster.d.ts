@@ -7,6 +7,7 @@ declare module 'leaflet' {
     spiderfyOnMaxZoom?: boolean;
     disableClusteringAtZoom?: number;
     chunkedLoading?: boolean;
+    iconCreateFunction?: (cluster: { getChildCount: () => number }) => DivIcon;
   }
 
   class MarkerClusterGroup extends FeatureGroup {

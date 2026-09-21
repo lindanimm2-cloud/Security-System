@@ -4,6 +4,7 @@ import { CallShell } from '@/components/calls/CallShell';
 import { TabSessionBoot } from '@/components/TabSessionBoot';
 import './globals.css';
 import './control-room-polish.css';
+import './field-ops.css';
 import './portal-ambient.css';
 import './psim-hub.css';
 import './mobile-light-polish.css';
@@ -14,7 +15,16 @@ export const metadata: Metadata = {
     template: '%s — 4DS Nexus',
   },
   description:
-    '4DS Nexus — mobile protection, rapid response, and professional security supply',
+    '4DS Nexus — mobile protection, rapid response, and professional security supply. Supports compatible devices and platforms.',
+  manifest: '/manifest.webmanifest',
+  appleWebApp: {
+    capable: true,
+    title: '4DS',
+    statusBarStyle: 'black-translucent',
+  },
+  other: {
+    'mobile-web-app-capable': 'yes',
+  },
 };
 
 const themeScript = `

@@ -45,6 +45,51 @@ export class OfficerController {
     return this.officerService.updateStatus(user.tenantId, user.email, body.status);
   }
 
+  @Get('duty')
+  dutyStatus(@CurrentUser() user: AuthUser) {
+    return this.officerService.getDutyStatus(user.tenantId, user.email);
+  }
+
+  @Post('duty/start')
+  startDuty(
+    @CurrentUser() user: AuthUser,
+    @Body()
+    body: {
+      checks?: Record<string, boolean>;
+      deviceLabel?: string;
+      batteryPct?: number;
+      networkType?: string;
+      pushToken?: string;
+      appVersion?: string;
+      lat?: number;
+      lng?: number;
+    },
+  ) {
+    return this.officerService.startDuty(user.tenantId, user.email, body ?? {});
+  }
+
+  @Post('duty/end')
+  endDuty(@CurrentUser() user: AuthUser) {
+    return this.officerService.endDuty(user.tenantId, user.email);
+  }
+
+  @Post('duty/heartbeat')
+  dutyHeartbeat(
+    @CurrentUser() user: AuthUser,
+    @Body()
+    body: {
+      lat?: number;
+      lng?: number;
+      batteryPct?: number;
+      networkType?: string;
+      pushToken?: string;
+      appVersion?: string;
+      deviceLabel?: string;
+    },
+  ) {
+    return this.officerService.dutyHeartbeat(user.tenantId, user.email, body ?? {});
+  }
+
   @Post('location')
   updateLocation(@CurrentUser() user: AuthUser, @Body() body: { lat: number; lng: number }) {
     return this.officerService.updateLocation(user.tenantId, user.email, body.lat, body.lng);

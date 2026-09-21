@@ -65,6 +65,7 @@ export enum IncidentType {
   MEDICAL = 'MEDICAL',
   FIRE = 'FIRE',
   ASSAULT = 'ASSAULT',
+  CRASH = 'CRASH',
   OTHER = 'OTHER',
 }
 
@@ -92,3 +93,6 @@ export enum ResponseAgency {
   MEDICAL = 'MEDICAL',
   FIRE = 'FIRE',
 }
+
+export * from './platform';
+export * from './device-adapter';

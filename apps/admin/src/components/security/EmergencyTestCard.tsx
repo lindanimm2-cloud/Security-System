@@ -1,6 +1,6 @@
 'use client';
 
-import { HoldToActivate } from '@/components/ops/EmergencyMode';
+import { HoldToActivate, OpsPanicIcon } from '@/components/ops/EmergencyMode';
 
 export function EmergencyTestCard({
   loading,
@@ -31,10 +31,15 @@ export function EmergencyTestCard({
         label="Test panic system"
         holdMs={3000}
         tone="warn"
-        className="hold-activate--console"
+        className="hold-activate--ops-well"
+        hideHint
+        keepLabel
         loading={loading}
         onActivate={onTest}
-      />
+      >
+        <OpsPanicIcon />
+        Test panic system
+      </HoldToActivate>
       {message ? (
         <p className={`sec-test__msg ${message.toLowerCase().includes('successful') ? 'is-ok' : 'is-err'}`} role="status">
           {message}

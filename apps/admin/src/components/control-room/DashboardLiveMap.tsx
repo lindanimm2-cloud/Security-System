@@ -31,10 +31,20 @@ export function DashboardLiveMap({ focusIncidentId, className = '' }: DashboardL
     [],
   );
   const [mapData, setMapData] = useState<MapCommandData | null>(null);
+  const [lightTiles, setLightTiles] = useState(false);
 
   useEffect(() => {
     if (data?.data) setMapData(maskMapDataForScreenshot(data.data));
   }, [data]);
+
+  useEffect(() => {
+    const readTheme = () =>
+      setLightTiles(document.documentElement.getAttribute('data-theme') === 'light');
+    readTheme();
+    const obs = new MutationObserver(readTheme);
+    obs.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+    return () => obs.disconnect();
+  }, []);
 
   useEffect(() => {
     if (!shouldBackgroundPoll()) return;
@@ -134,6 +144,8 @@ export function DashboardLiveMap({ focusIncidentId, className = '' }: DashboardL
           officers={officers}
           incidents={incidents}
           flyTo={flyTo}
+          scrollWheelZoom={false}
+          lightTiles={lightTiles}
         />
         <div className="dash-live-map__hud" aria-label="Live field status">
           <div className="dash-live-map__live">

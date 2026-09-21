@@ -20,6 +20,7 @@ import { friendlyErrorMessage } from '@/lib/friendly-error';
 import { matchesSearch } from '@/lib/list-search';
 import { officerStatusLabel } from '@/lib/officer-status';
 import type { VehicleRemoteAction, VehicleRemoteState } from '@/lib/vehicle-remote';
+import type { VehicleEmergencyStatus } from '@/lib/vehicle-emergency-status';
 
 type CrewMember = {
   officerId: string;
@@ -53,9 +54,11 @@ type TrackedVehicle = {
   owner?: string;
   trackerLinked?: boolean;
   theftRecovery?: boolean;
+  emergencyStatus?: string | null;
   immobiliserOn?: boolean;
   doorsLocked?: boolean;
   hornActive?: boolean;
+  vehicleType?: string;
   lat?: number | null;
   lng?: number | null;
   updatedAt?: string | null;
@@ -243,7 +246,11 @@ function FleetContent() {
     setRemoteState({
       doorsLocked: selectedTracked.doorsLocked ?? true,
       immobiliserOn: selectedTracked.immobiliserOn ?? false,
-      theftRecovery: selectedTracked.theftRecovery ?? false,
+      theftRecovery:
+        Boolean(selectedTracked.theftRecovery) || selectedTracked.vehicleType === 'STOLEN',
+      emergencyStatus:
+        selectedTracked.emergencyStatus ??
+        (selectedTracked.theftRecovery || selectedTracked.vehicleType === 'STOLEN' ? 'STOLEN' : null),
       hornActive: selectedTracked.hornActive ?? false,
     });
   }, [
@@ -251,6 +258,8 @@ function FleetContent() {
     selectedTracked?.doorsLocked,
     selectedTracked?.immobiliserOn,
     selectedTracked?.theftRecovery,
+    selectedTracked?.emergencyStatus,
+    selectedTracked?.vehicleType,
     selectedTracked?.hornActive,
   ]);
 
@@ -382,6 +391,7 @@ function FleetContent() {
           doorsLocked?: boolean;
           immobiliserOn?: boolean;
           theftRecovery?: boolean;
+          emergencyStatus?: string | null;
           hornActive?: boolean;
         }>
       >(`/control-room/client-vehicles/${selectedTracked.id}/remote`, { action });
@@ -396,6 +406,13 @@ function FleetContent() {
         theftRecovery:
           data?.theftRecovery ??
           (action === 'panic' ? true : action === 'clearRecovery' ? false : prev?.theftRecovery ?? false),
+        emergencyStatus:
+          data?.emergencyStatus ??
+          (action === 'clearRecovery'
+            ? null
+            : action === 'panic'
+              ? prev?.emergencyStatus ?? 'STOLEN'
+              : prev?.emergencyStatus ?? null),
         hornActive: data?.hornActive ?? (action === 'horn' ? !(prev?.hornActive ?? false) : prev?.hornActive),
       }));
       const actionLabel: Record<VehicleRemoteAction, string> = {
@@ -416,6 +433,29 @@ function FleetContent() {
       return false;
     } finally {
       setBusyAction(null);
+    }
+  }
+
+  async function updateEmergencyStatus(status: VehicleEmergencyStatus) {
+    if (!selectedTracked) return;
+    try {
+      const res = await adminApi.patch<
+        ApiResponse<{ message?: string; emergencyStatus?: string; theftRecovery?: boolean }>
+      >(`/control-room/client-vehicles/${selectedTracked.id}/emergency-status`, { status });
+      setRemoteState((prev) =>
+        prev
+          ? {
+              ...prev,
+              theftRecovery: true,
+              emergencyStatus: res?.data?.emergencyStatus ?? status,
+            }
+          : prev,
+      );
+      pushActivity(res?.data?.message ?? `Status → ${status}`, 'Control room');
+      setNotice({ tone: 'success', text: res?.data?.message ?? 'Situation updated — notifications refreshed.' });
+      void reloadTracked({ silent: true });
+    } catch (ex) {
+      setNotice({ tone: 'error', text: friendlyErrorMessage(ex, 'action') });
     }
   }
 
@@ -603,6 +643,14 @@ function FleetContent() {
                         speedKph: typeof selectedTracked.speed === 'number' ? selectedTracked.speed : null,
                         batteryPct: selectedTracked.batteryPct ?? null,
                         lastUpdate: relativeUpdated(selectedTracked?.updatedAt),
+                        vehicleType: selectedTracked.vehicleType ?? selectedFleet?.vehicleType ?? null,
+                        stolen:
+                          selectedTracked.vehicleType === 'STOLEN' ||
+                          Boolean(selectedTracked.theftRecovery),
+                        emergencyStatus:
+                          remoteState.emergencyStatus ??
+                          selectedTracked.emergencyStatus ??
+                          (selectedTracked.theftRecovery ? 'STOLEN' : null),
                       }}
                       model={{
                         make: selectedFleet?.make ?? selectedTracked.make,
@@ -612,6 +660,7 @@ function FleetContent() {
                       busyAction={busyAction}
                       hidePanic={false}
                       onCommand={(action) => sendRemote(action)}
+                      onEmergencyStatusChange={updateEmergencyStatus}
                     />
                   ) : (
                     <div className="text-muted" style={{ padding: '1rem', textAlign: 'center', fontSize: '0.85rem' }}>
@@ -723,7 +772,13 @@ function FleetContent() {
                       busyAction={busyAction}
                       vehicleLabel={overviewMake || overviewTitle}
                       registration={overviewReg}
+                      emergencyStatus={
+                        remoteState.emergencyStatus ??
+                        selectedTracked.emergencyStatus ??
+                        (remoteState.theftRecovery ? 'STOLEN' : null)
+                      }
                       onCommand={(action) => sendRemote(action)}
+                      onEmergencyStatusChange={updateEmergencyStatus}
                     />
                   ) : (
                     <p className="text-muted" style={{ margin: 0 }}>

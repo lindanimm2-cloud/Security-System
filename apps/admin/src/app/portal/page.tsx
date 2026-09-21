@@ -4,6 +4,7 @@ import { ErrorAlert } from '@/components/ErrorAlert';
 
 import Link from 'next/link';
 import { useState, useEffect, useRef } from 'react';
+import { useRouter } from 'next/navigation';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { PortalLayout } from '@/components/portal/PortalLayout';
 import { useApi } from '@/hooks/useApi';
@@ -12,6 +13,7 @@ import { useCallsOptional } from '@/components/calls/CallProvider';
 import { HomeAlarmControl } from '@/components/portal/HomeAlarmControl';
 import { ClientVehicleRemote } from '@/components/vehicle/ClientVehicleRemote';
 import { clientApi, type ApiResponse } from '@/lib/api-client';
+import { vehicleEmergencyMeta } from '@/lib/vehicle-emergency-status';
 import { friendlyErrorMessage } from '@/lib/friendly-error';
 import { useSubscriptionAccess } from '@/hooks/useSubscriptionAccess';
 import { activityHref } from '@/lib/portal-routes';
@@ -29,6 +31,8 @@ import { SlidingSection } from '@/components/portal/SlidingSection';
 import { FamilyProfilePopup, type FamilyProfilePerson } from '@/components/portal/FamilyProfilePopup';
 import { EmergencyProtectionBanner } from '@/components/security/EmergencyProtectionBanner';
 import { CONTROL_ROOM_LINE } from '@/lib/control-room-line';
+import { showClientEmergencyNotification } from '@/lib/client-push';
+import { responseHref } from '@/lib/live-response';
 
 type Overview = {
   user: { firstName: string; trackingEnabled: boolean; address: string | null };
@@ -43,11 +47,12 @@ type Overview = {
     year?: number | null;
     color?: string | null;
     theftRecovery: boolean;
+    emergencyStatus?: string | null;
     immobiliserOn?: boolean;
     doorsLocked?: boolean;
     hornActive?: boolean;
   }[];
-  properties: { id: string; name: string; alarmStatus: string; alarmLinked: boolean; propertyType?: string }[];
+  properties: { id: string; name: string; alarmStatus: string; alarmLinked: boolean; propertyType?: string; zoneHealth?: { total: number; active: number; fault: number; alert: number; disabled: number } }[];
   family: { id: string; name: string; trackingEnabled: boolean; phone?: string }[];
   contacts: { id: string; name: string; phone: string; relationship: string | null; priority: number }[];
   recentIncidents: { id: string; type: string; status: string; title: string; isSilent: boolean; time: string }[];
@@ -57,6 +62,11 @@ type Overview = {
     publicRef: string;
     type: string;
     status: string;
+    stage?: string;
+    headline?: string;
+    detail?: string;
+    unitLabel?: string | null;
+    etaSeconds?: number | null;
     events: { id: string; type: string; source: string; createdAt: string; kind: 'event' | 'note'; payload?: Record<string, unknown> }[];
   } | null;
   medicalComplete: boolean;
@@ -88,6 +98,7 @@ export default function ClientPortalPage() {
 }
 
 function OverviewDashboard() {
+  const router = useRouter();
   const calls = useCallsOptional();
   const [panicLoading, setPanicLoading] = useState(false);
   const [silentLoading, setSilentLoading] = useState(false);
@@ -129,12 +140,29 @@ function OverviewDashboard() {
     }
   }, [loading]);
 
+  async function openLiveResponse(incidentId: string | null | undefined, title: string, body: string) {
+    if (!incidentId) return;
+    const href = responseHref(incidentId);
+    void showClientEmergencyNotification({
+      title,
+      body,
+      tag: `panic-${incidentId}`,
+      deepLink: href,
+      urgency: 'critical',
+      kind: 'panic',
+    });
+    router.push(href);
+  }
+
   async function handlePanic(silent: boolean) {
     if (silent) setSilentLoading(true);
     else setPanicLoading(true);
     setAlertMsg('');
     try {
-      await clientApi.post('/client/panic', { silent });
+      const res = await clientApi.post<
+        ApiResponse<{ id: string; incidentId?: string | null; transmissionStatus?: string }>
+      >('/client/panic', { silent });
+      const incidentId = res.data?.incidentId ?? null;
       setAlertMsg(silent ? 'Silent alert sent discreetly.' : 'Panic alert sent. Control room notified.');
       undo.show(
         silent ? 'Silent alert sent' : 'Panic alert sent',
@@ -147,6 +175,13 @@ function OverviewDashboard() {
           : { kind: 'critical', detail: 'Control room notified · help is on the way' },
       );
       void reload();
+      await openLiveResponse(
+        incidentId,
+        silent ? '4DS SILENT ALERT' : '4DS SECURITY ALERT',
+        silent
+          ? 'Covert distress received. Response team notified discreetly.'
+          : 'Emergency response activated. Your security team has been notified.',
+      );
     } catch (e) {
       setAlertMsg(friendlyErrorMessage(e, 'action'));
     } finally {
@@ -159,13 +194,18 @@ function OverviewDashboard() {
     setMedicalLoading(true);
     setAlertMsg('');
     try {
-      await clientApi.post('/client/medical/emergency');
+      const res = await clientApi.post<ApiResponse<{ id: string }>>('/client/medical/emergency');
       setAlertMsg('Ambulance requested. Medical profile shared with responders.');
       undo.show('Ambulance requested', undefined, {
         kind: 'medical',
         detail: 'Medical profile shared with responders',
       });
-      reload();
+      void reload();
+      await openLiveResponse(
+        res.data?.id,
+        'MEDICAL RESPONSE',
+        'Medical assistance has been requested. View live response.',
+      );
     } finally {
       setMedicalLoading(false);
     }
@@ -175,13 +215,18 @@ function OverviewDashboard() {
     setFireLoading(true);
     setAlertMsg('');
     try {
-      await clientApi.post('/client/fire/emergency');
+      const res = await clientApi.post<ApiResponse<{ id: string }>>('/client/fire/emergency');
       setAlertMsg('Fire response requested. Dispatch and fire unit notified.');
       undo.show('Fire response requested', undefined, {
         kind: 'fire',
         detail: 'Dispatch and fire unit notified',
       });
-      reload();
+      void reload();
+      await openLiveResponse(
+        res.data?.id,
+        'FIRE EMERGENCY',
+        'Fire response has been initiated. View incident.',
+      );
     } finally {
       setFireLoading(false);
     }
@@ -191,7 +236,7 @@ function OverviewDashboard() {
     setVehicleLoading(true);
     setAlertMsg('');
     try {
-      const res = await clientApi.post<ApiResponse<{ message?: string }>>(
+      const res = await clientApi.post<ApiResponse<{ message?: string; incidentId?: string | null }>>(
         `/client/vehicles/${vehicleId}/remote`,
         { action: 'panic' },
       );
@@ -201,6 +246,11 @@ function OverviewDashboard() {
         detail: 'Control room viewing dash cameras',
       });
       void reload();
+      await openLiveResponse(
+        res.data?.incidentId,
+        'VEHICLE PANIC',
+        'Your vehicle emergency alert was received. Track response.',
+      );
     } catch (e) {
       setAlertMsg(friendlyErrorMessage(e, 'action'));
     } finally {
@@ -340,9 +390,14 @@ function OverviewDashboard() {
         <section className="portal-card incident-live-response">
           <p className="dash-ops__eyebrow">Live response</p>
           <h2>
-            {d.liveResponse.publicRef} · {d.liveResponse.status.replace(/_/g, ' ')}
+            {d.liveResponse.headline ??
+              `${d.liveResponse.publicRef} · ${d.liveResponse.status.replace(/_/g, ' ')}`}
           </h2>
+          {d.liveResponse.detail ? <p className="text-muted">{d.liveResponse.detail}</p> : null}
           <IncidentTimeline items={d.liveResponse.events} compact />
+          <Link href={responseHref(d.liveResponse.id)} className="ops-act ops-act--dispatch">
+            Open live response
+          </Link>
         </section>
       ) : null}
 
@@ -403,7 +458,7 @@ function OverviewDashboard() {
                   id: 'inc',
                   title: `${d.stats.activeIncidents} active alert${d.stats.activeIncidents === 1 ? '' : 's'}`,
                   detail: 'Tap for status and responder updates',
-                  href: '/portal/incidents',
+                  href: d.liveResponse ? responseHref(d.liveResponse.id) : '/portal/incidents',
                 },
               ]
             : []),
@@ -428,8 +483,11 @@ function OverviewDashboard() {
               <p className="ec-kicker">Live response</p>
               <h2>What&apos;s happening</h2>
             </div>
-            <Link href="/portal/incidents" className="link-sm">
-              Full history
+            <Link
+              href={d.liveResponse ? responseHref(d.liveResponse.id) : '/portal/incidents'}
+              className="link-sm"
+            >
+              {d.liveResponse ? 'Open live response' : 'Full history'}
             </Link>
           </div>
           <ul className="activity-list">
@@ -446,7 +504,14 @@ function OverviewDashboard() {
                         : 'activity-item--warn'
                   }`}
                 >
-                  <Link href="/portal/incidents" className="activity-item-link">
+                  <Link
+                    href={
+                      d.liveResponse && i.id === d.liveResponse.id
+                        ? responseHref(i.id)
+                        : `/portal/response/${i.id}`
+                    }
+                    className="activity-item-link"
+                  >
                     <div>
                       <div className="activity-title">
                         {i.title ?? i.type}
@@ -581,7 +646,9 @@ function OverviewDashboard() {
                     href={`/portal/vehicles/${v.id}`}
                     className={`status-pill status-pill--link ${v.theftRecovery ? 'status-pill--alert' : 'status-pill--ok'}`}
                   >
-                    {v.theftRecovery ? 'Recovery mode' : 'Secure'}
+                    {v.theftRecovery
+                      ? vehicleEmergencyMeta(v.emergencyStatus).label
+                      : 'Secure'}
                   </Link>
                 </li>
               ))}

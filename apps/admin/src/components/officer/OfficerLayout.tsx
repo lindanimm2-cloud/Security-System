@@ -3,6 +3,7 @@
 import { AuthGuard } from '@/components/AuthGuard';
 import { OfficerShell } from '@/components/OfficerShell';
 import { OfficerStatusProvider } from '@/components/officer/OfficerStatusProvider';
+import { OperationalReadyGate } from '@/components/officer/OperationalReadyGate';
 
 export function OfficerLayout({
   children,
@@ -15,9 +16,11 @@ export function OfficerLayout({
     <AuthGuard portal="officer" loginPath="/officer/login">
       {(session) => (
         <OfficerStatusProvider>
-          <OfficerShell session={session} title={title}>
-            {children}
-          </OfficerShell>
+          <OperationalReadyGate>
+            <OfficerShell session={session} title={title}>
+              {children}
+            </OfficerShell>
+          </OperationalReadyGate>
         </OfficerStatusProvider>
       )}
     </AuthGuard>

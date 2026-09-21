@@ -2,7 +2,8 @@
 
 import { FormEvent, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { HoldToActivate } from '@/components/ops/EmergencyMode';
+import { useRouter } from 'next/navigation';
+import { HoldToActivate, OpsFireIcon, OpsMedicalIcon, OpsPanicIcon } from '@/components/ops/EmergencyMode';
 import { PortalLayout } from '@/components/portal/PortalLayout';
 import { EmergencyDispatchCallCard } from '@/components/portal/EmergencyCallButton';
 import { SecurityArticle, SecurityDocFrame } from '@/components/security/SecurityDocFrame';
@@ -10,6 +11,8 @@ import { CONTROL_ROOM_LINE } from '@/lib/control-room-line';
 import { clientApi, type ApiResponse } from '@/lib/api-client';
 import { friendlyErrorMessage } from '@/lib/friendly-error';
 import { DEMO_PASSWORD } from '@/lib/demo/users';
+import { responseHref } from '@/lib/live-response';
+import { showClientEmergencyNotification } from '@/lib/client-push';
 
 type SessionPayload = {
   sessionId: string;
@@ -28,12 +31,13 @@ export default function EmergencyAccessPage() {
 }
 
 function EmergencyAccess() {
+  const router = useRouter();
   const [password, setPassword] = useState('');
   const [otp, setOtp] = useState('');
   const [session, setSession] = useState<SessionPayload | null>(null);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
-  const [panic, setPanic] = useState<{ id: string; transmissionStatus: string } | null>(null);
+  const [panic, setPanic] = useState<{ id: string; transmissionStatus: string; incidentId?: string | null } | null>(null);
   const [remaining, setRemaining] = useState('');
 
   useEffect(() => {
@@ -76,8 +80,25 @@ function EmergencyAccess() {
     setBusy(true);
     setError('');
     try {
-      await clientApi.post(kind === 'medical' ? '/client/medical/emergency' : '/client/fire/emergency');
-      setPanic({ id: kind, transmissionStatus: 'SENT' });
+      const res = await clientApi.post<ApiResponse<{ id: string }>>(
+        kind === 'medical' ? '/client/medical/emergency' : '/client/fire/emergency',
+      );
+      setPanic({ id: kind, transmissionStatus: 'SENT', incidentId: res.data?.id });
+      if (res.data?.id) {
+        const href = responseHref(res.data.id);
+        void showClientEmergencyNotification({
+          title: kind === 'medical' ? 'MEDICAL RESPONSE' : 'FIRE EMERGENCY',
+          body:
+            kind === 'medical'
+              ? 'Medical assistance has been requested. View live response.'
+              : 'Fire response has been initiated. View incident.',
+          tag: `assist-${res.data.id}`,
+          deepLink: href,
+          urgency: 'critical',
+          kind: 'panic',
+        });
+        router.push(href);
+      }
     } catch (err) {
       setError(friendlyErrorMessage(err, 'action'));
     } finally {
@@ -89,14 +110,25 @@ function EmergencyAccess() {
     if (!session) return;
     setBusy(true);
     try {
-      const res = await clientApi.post<ApiResponse<{ id: string; transmissionStatus: string }>>(
-        '/client/security/emergency/panic',
-        {
-          emergencySessionToken: session.token,
-          source: 'WEB_EMERGENCY_ACCESS',
-        },
-      );
+      const res = await clientApi.post<
+        ApiResponse<{ id: string; transmissionStatus: string; incidentId?: string | null }>
+      >('/client/security/emergency/panic', {
+        emergencySessionToken: session.token,
+        source: 'WEB_EMERGENCY_ACCESS',
+      });
       setPanic(res.data);
+      if (res.data?.incidentId) {
+        const href = responseHref(res.data.incidentId);
+        void showClientEmergencyNotification({
+          title: '4DS SECURITY ALERT',
+          body: 'Emergency response activated. Your security team has been notified.',
+          tag: `panic-${res.data.incidentId}`,
+          deepLink: href,
+          urgency: 'critical',
+          kind: 'panic',
+        });
+        router.push(href);
+      }
     } catch (err) {
       setError(friendlyErrorMessage(err, 'action'));
     } finally {
@@ -184,21 +216,44 @@ function EmergencyAccess() {
                 </div>
               ) : (
                 <div className="sec-execute">
-                  <HoldToActivate label="Panic" holdMs={3000} disabled={busy} onActivate={() => void activatePanic()} />
                   <HoldToActivate
+                    className="hold-activate--ops-well"
+                    label="Panic"
+                    holdMs={3000}
+                    hideHint
+                    keepLabel
+                    disabled={busy}
+                    onActivate={() => void activatePanic()}
+                  >
+                    <OpsPanicIcon />
+                    Panic
+                  </HoldToActivate>
+                  <HoldToActivate
+                    className="hold-activate--ops-well"
                     label="Medical emergency"
                     holdMs={2000}
                     tone="medical"
+                    hideHint
+                    keepLabel
                     disabled={busy}
                     onActivate={() => void requestAssist('medical')}
-                  />
+                  >
+                    <OpsMedicalIcon />
+                    Medical emergency
+                  </HoldToActivate>
                   <HoldToActivate
+                    className="hold-activate--ops-well"
                     label="Fire / property emergency"
                     holdMs={2000}
                     tone="warn"
+                    hideHint
+                    keepLabel
                     disabled={busy}
                     onActivate={() => void requestAssist('fire')}
-                  />
+                  >
+                    <OpsFireIcon />
+                    Fire / property emergency
+                  </HoldToActivate>
                 </div>
               )}
               {error ? <p className="alert alert--error">{error}</p> : null}

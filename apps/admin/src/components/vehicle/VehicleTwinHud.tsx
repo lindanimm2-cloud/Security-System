@@ -96,7 +96,7 @@ function headerCopy(
   profile: OpsProfile,
   destination?: string | null,
 ): { title: string; hint?: string } {
-  if (profile === 'RECOVERY') return { title: 'Theft recovery', hint: destination ?? undefined };
+  if (profile === 'RECOVERY') return { title: 'Emergency · recovery', hint: destination ?? undefined };
   if (profile === 'SECURE') return { title: 'Ignition cut · secure' };
   if (profile === 'RESPONSE') {
     return {

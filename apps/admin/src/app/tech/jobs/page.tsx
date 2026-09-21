@@ -7,7 +7,7 @@ import { MetricStrip } from '@/components/ui/MetricStrip';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { useApi } from '@/hooks/useApi';
 import { techApi } from '@/lib/api-client';
-import { mergeChecklist, nextWorkflowStatus, type ChecklistItem } from '@/lib/tech-workflow';
+import { mergeChecklist, nextWorkflowStatus, requiresChecklistToComplete, SKIP_SIGNATURE_REASON, type ChecklistItem } from '@/lib/tech-workflow';
 import { useMemo, useState } from 'react';
 import { ListSearch } from '@/components/ui/ListSearch';
 import { matchesSearch } from '@/lib/list-search';
@@ -63,12 +63,13 @@ function TechJobsContent() {
       });
   }, [liveJobs, search]);
 
-  async function advance(job: InstallJob) {
+  async function advance(job: InstallJob, opts?: { skipSignature?: boolean }) {
     const next = nextWorkflowStatus(job.status);
     if (!next) return;
+    const reason = opts?.skipSignature ? SKIP_SIGNATURE_REASON : overrideReason.trim();
     if (next === 'COMPLETED') {
       const tests = mergeChecklist(job.tests);
-      if (!tests.every((t) => t.done) && !overrideReason.trim()) {
+      if (requiresChecklistToComplete(job.status) && !tests.every((t) => t.done) && !reason) {
         setActionError('Complete the installation checklist, or enter an override reason.');
         return;
       }
@@ -76,11 +77,12 @@ function TechJobsContent() {
     const prev = job.status;
     setBusyId(job.id);
     setActionError('');
+    if (opts?.skipSignature) setOverrideReason(SKIP_SIGNATURE_REASON);
     setJobs((list) => (list ?? liveJobs).map((row) => (row.id === job.id ? { ...row, status: next } : row)));
     try {
       await techApi.patch(`/store/tech/jobs/${job.id}/status`, {
         status: next,
-        overrideReason: overrideReason || undefined,
+        overrideReason: reason || undefined,
       });
       void reload({ silent: true });
     } catch (e) {
@@ -177,6 +179,7 @@ function TechJobsContent() {
               overrideReason={overrideReason}
               onOverrideReason={setOverrideReason}
               onAdvance={() => void advance(job)}
+              onSkipSignature={() => void advance(job, { skipSignature: true })}
               onToggleCheck={(item) => void toggleCheck(job, item)}
               onSaveSerial={(serial) => void saveSerial(job, serial)}
             />

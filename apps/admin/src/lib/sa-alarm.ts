@@ -98,13 +98,15 @@ export function sensorTypeLabel(type: string): string {
 
 export function sensorStatusLabel(status: string): string {
   const map: Record<string, string> = {
-    SECURE: 'Secure',
-    NORMAL: 'Secure',
+    SECURE: 'Active',
+    NORMAL: 'Active',
     ALERT: 'Alert',
+    ALARM: 'Alarm',
     OPEN: 'Open',
     FAULT: 'Fault',
     TAMPER: 'Tamper',
-    BYPASSED: 'Bypassed',
+    BYPASSED: 'Disabled',
+    DISABLED: 'Disabled',
     OFFLINE: 'Offline',
   };
   return map[status] ?? status.replace(/_/g, ' ').toLowerCase();
@@ -114,7 +116,58 @@ export function sensorStatusTone(status: string, bypassed?: boolean): string {
   if (bypassed) return 'pending';
   const key = status.toUpperCase();
   if (key === 'SECURE' || key === 'NORMAL') return 'ok';
-  if (key === 'ALERT' || key === 'OPEN' || key === 'TAMPER') return 'alert';
-  if (key === 'FAULT' || key === 'OFFLINE') return 'pending';
+  if (key === 'ALERT' || key === 'ALARM' || key === 'OPEN' || key === 'TAMPER') return 'alert';
+  if (key === 'FAULT' || key === 'OFFLINE' || key === 'BYPASSED' || key === 'DISABLED') return 'pending';
   return status.toLowerCase();
+}
+
+/** Zone health buckets for summary strips. */
+export function summarizeZones(
+  sensors: Array<{ status: string; bypassed?: boolean }>,
+): {
+  total: number;
+  active: number;
+  alert: number;
+  fault: number;
+  offline: number;
+  disabled: number;
+  healthy: boolean;
+  attention: boolean;
+} {
+  let active = 0;
+  let alert = 0;
+  let fault = 0;
+  let offline = 0;
+  let disabled = 0;
+  for (const s of sensors) {
+    const key = s.status.toUpperCase();
+    if (s.bypassed || key === 'BYPASSED' || key === 'DISABLED') {
+      disabled += 1;
+      continue;
+    }
+    if (key === 'FAULT' || key === 'TAMPER') {
+      fault += 1;
+      continue;
+    }
+    if (key === 'OFFLINE') {
+      offline += 1;
+      continue;
+    }
+    if (key === 'ALARM' || key === 'ALERT' || key === 'OPEN') {
+      alert += 1;
+      continue;
+    }
+    active += 1;
+  }
+  const attention = fault + offline + alert > 0;
+  return {
+    total: sensors.length,
+    active,
+    alert,
+    fault,
+    offline,
+    disabled,
+    healthy: !attention && disabled === 0,
+    attention,
+  };
 }

@@ -9,6 +9,7 @@ export type JwtPayload = {
   sub: string;
   tenantId: string;
   role: string;
+  purpose?: string;
 };
 
 @Injectable()
@@ -25,6 +26,11 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   }
 
   async validate(payload: JwtPayload) {
+    // MFA challenge JWTs must not authenticate session routes.
+    if (payload.purpose) {
+      throw new UnauthorizedException();
+    }
+
     const user = await this.prisma.user.findUnique({
       where: { id: payload.sub },
       select: {

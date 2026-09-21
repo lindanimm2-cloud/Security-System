@@ -40,7 +40,7 @@ function TechSettingsContent() {
           { id: 'jobs', label: 'Install jobs', icon: 'install', href: '/tech/jobs' },
           { id: 'map', label: 'Job map', icon: 'live-map', href: '/tech/map' },
           { id: 'inventory', label: 'Inventory', icon: 'store', href: '/tech/inventory' },
-          { id: 'cameras', label: 'Cameras', icon: 'surveillance', href: '/tech/cameras' },
+          { id: 'cameras', label: 'CCTV kits', icon: 'surveillance', href: '/tech/cameras' },
         ],
       },
     ],

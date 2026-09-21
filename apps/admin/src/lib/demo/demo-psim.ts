@@ -1,6 +1,7 @@
 import type { NormalizedSecurityEvent } from '../psim/security-events';
 import type { IntegrationEntry } from '../psim/integration-catalog';
 import { DEMO_DISPATCH_RULES, PSIM_INTEGRATIONS } from '../psim/integration-catalog';
+import { demoAccessDoorsForPsim } from './demo-physical-control';
 
 export type AlarmFeedRow = {
   id: string;
@@ -22,6 +23,23 @@ export type AccessDoorRow = {
   lastEvent: string;
   lastEventAt: string;
   readerCount: number;
+  kind?: string;
+  state?: string;
+  health?: string;
+  controllerOnline?: boolean;
+  networkOnline?: boolean;
+  powerOnline?: boolean;
+  sensorNormal?: boolean;
+  motorNormal?: boolean;
+  cameraId?: string | null;
+  cameraName?: string | null;
+  cameraSnapshotUrl?: string | null;
+  cameraStreamUrl?: string | null;
+  cameraStatus?: string | null;
+  openSince?: string | null;
+  lastCommandAt?: string | null;
+  propertyId?: string;
+  propertyType?: string;
 };
 
 export type PatrolRouteRow = {
@@ -104,44 +122,7 @@ export const demoAlarmFeed: AlarmFeedRow[] = [
   },
 ];
 
-export const demoAccessDoors: AccessDoorRow[] = [
-  {
-    id: 'door-1',
-    name: 'Main lobby',
-    site: 'Gateway Office Park',
-    status: 'SECURE',
-    lastEvent: 'Card IN — Lerato M.',
-    lastEventAt: new Date(now - 12 * 60_000).toISOString(),
-    readerCount: 2,
-  },
-  {
-    id: 'door-2',
-    name: 'Server room',
-    site: 'Gateway Office Park',
-    status: 'FORCED',
-    lastEvent: 'Forced open alarm',
-    lastEventAt: new Date(now - 6 * 60_000).toISOString(),
-    readerCount: 1,
-  },
-  {
-    id: 'door-3',
-    name: 'Loading bay',
-    site: 'Prospecton DC',
-    status: 'OPEN',
-    lastEvent: 'Remote unlock — dispatch',
-    lastEventAt: new Date(now - 2 * 60_000).toISOString(),
-    readerCount: 1,
-  },
-  {
-    id: 'door-4',
-    name: 'East gate',
-    site: 'Hillcrest Estate',
-    status: 'OFFLINE',
-    lastEvent: 'Reader offline',
-    lastEventAt: new Date(now - 45 * 60_000).toISOString(),
-    readerCount: 2,
-  },
-];
+export const demoAccessDoors: AccessDoorRow[] = demoAccessDoorsForPsim();
 
 export const demoPatrolRoutes: PatrolRouteRow[] = [
   {
@@ -315,8 +296,9 @@ export const demoSecurityEvents: NormalizedSecurityEvent[] = [
 ];
 
 export function psimOverviewStats() {
+  const doors = demoAccessDoorsForPsim();
   const unackedAlarms = demoAlarmFeed.filter((a) => a.status === 'NEW').length;
-  const forcedDoors = demoAccessDoors.filter((d) => d.status === 'FORCED').length;
+  const forcedDoors = doors.filter((d) => d.status === 'FORCED').length;
   const latePatrols = demoPatrolRoutes.filter((p) => p.status === 'LATE' || p.status === 'MISSED').length;
   const nonCompliant = demoCompliance.filter((c) => c.status !== 'COMPLIANT').length;
   const liveIntegrations = PSIM_INTEGRATIONS.filter((i) => i.status === 'LIVE').length;

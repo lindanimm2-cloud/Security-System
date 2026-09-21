@@ -133,6 +133,7 @@ export type MapVehicle = {
   doorsLocked?: boolean;
   immobiliserOn?: boolean;
   theftRecovery?: boolean;
+  emergencyStatus?: string | null;
 };
 
 export type MapProperty = {

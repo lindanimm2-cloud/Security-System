@@ -11,6 +11,7 @@ export type AuthUser = {
   tenantId: string;
   jobTitle?: string | null;
   phone?: string | null;
+  mfaEnabled?: boolean;
   tenant?: {
     id: string;
     name: string;
@@ -25,6 +26,14 @@ export type AuthSession = {
   /** Where this client session was established — site logins cannot open portal without re-auth */
   authSource?: 'site' | 'portal';
 };
+
+export type MfaChallenge = {
+  kind: 'verify' | 'setup';
+  mfaToken: string;
+  user: AuthUser;
+};
+
+export type LoginResult = AuthSession | MfaChallenge;
 
 const CLIENT_KEY = '4ds_client_session';
 const ADMIN_KEY = '4ds_admin_session';
@@ -127,7 +136,7 @@ export async function login(
   password: string,
   tenantSlug: string,
   options?: { authSource?: ClientAuthSource },
-): Promise<AuthSession> {
+): Promise<LoginResult> {
   const authSource =
     portal === 'client' ? (options?.authSource ?? 'portal') : undefined;
 
@@ -164,22 +173,131 @@ export async function login(
     throw new Error(msg ?? json?.error?.message ?? 'Login failed');
   }
 
+  const data = json.data ?? {};
+  if (data.mfaSetupRequired && data.mfaToken) {
+    return {
+      kind: 'setup',
+      mfaToken: data.mfaToken as string,
+      user: data.user as AuthUser,
+    };
+  }
+  if (data.mfaRequired && data.mfaToken) {
+    return {
+      kind: 'verify',
+      mfaToken: data.mfaToken as string,
+      user: data.user as AuthUser,
+    };
+  }
+
+  const session: AuthSession = {
+    user: data.user,
+    accessToken: data.tokens.accessToken,
+    ...(authSource ? { authSource } : {}),
+  };
+
+  persistLoginSession(portal, session, authSource);
+  return session;
+}
+
+function persistLoginSession(
+  portal: AuthPortal,
+  session: AuthSession,
+  authSource?: ClientAuthSource,
+) {
+  if (typeof window === 'undefined') return;
+  if (portal === 'client' && authSource) {
+    persistClientSession(session, authSource);
+  } else {
+    writeSessionRaw(sessionKey(portal), JSON.stringify(session));
+    notifyAuthChanged();
+  }
+}
+
+export async function verifyMfaLogin(
+  portal: AuthPortal,
+  mfaToken: string,
+  code: string,
+  options?: { authSource?: ClientAuthSource },
+): Promise<AuthSession> {
+  const authSource =
+    portal === 'client' ? (options?.authSource ?? 'portal') : undefined;
+  let res: Response;
+  try {
+    res = await fetch(`${getApiUrl()}/auth/mfa/verify`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ mfaToken, code }),
+    });
+  } catch {
+    throw new Error('Request failed');
+  }
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(parseAuthError(json, 'MFA verification failed'));
+
   const session: AuthSession = {
     user: json.data.user,
     accessToken: json.data.tokens.accessToken,
     ...(authSource ? { authSource } : {}),
   };
-
-  if (typeof window !== 'undefined') {
-    if (portal === 'client' && authSource) {
-      persistClientSession(session, authSource);
-    } else {
-      writeSessionRaw(sessionKey(portal), JSON.stringify(session));
-      notifyAuthChanged();
-    }
-  }
-
+  persistLoginSession(portal, session, authSource);
   return session;
+}
+
+export async function startMfaSetup(mfaToken: string): Promise<{
+  secret: string;
+  otpauthUrl: string;
+  mfaToken: string;
+}> {
+  let res: Response;
+  try {
+    res = await fetch(`${getApiUrl()}/auth/mfa/setup/start`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ mfaToken }),
+    });
+  } catch {
+    throw new Error('Request failed');
+  }
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(parseAuthError(json, 'Could not start MFA setup'));
+  return json.data;
+}
+
+export async function confirmMfaSetup(
+  portal: AuthPortal,
+  mfaToken: string,
+  code: string,
+  options?: { authSource?: ClientAuthSource },
+): Promise<{ session: AuthSession; backupCodes: string[] }> {
+  const authSource =
+    portal === 'client' ? (options?.authSource ?? 'portal') : undefined;
+  let res: Response;
+  try {
+    res = await fetch(`${getApiUrl()}/auth/mfa/setup/confirm`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ mfaToken, code }),
+    });
+  } catch {
+    throw new Error('Request failed');
+  }
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(parseAuthError(json, 'MFA setup failed'));
+
+  const session: AuthSession = {
+    user: json.data.user,
+    accessToken: json.data.tokens.accessToken,
+    ...(authSource ? { authSource } : {}),
+  };
+  persistLoginSession(portal, session, authSource);
+  return {
+    session,
+    backupCodes: Array.isArray(json.data.backupCodes) ? json.data.backupCodes : [],
+  };
+}
+
+export function isMfaChallenge(result: LoginResult): result is MfaChallenge {
+  return 'kind' in result && (result.kind === 'verify' || result.kind === 'setup');
 }
 
 export type ClientRegisterPayload = {

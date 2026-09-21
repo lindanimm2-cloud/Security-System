@@ -588,27 +588,70 @@ export class StoreService {
 
     return {
       success: true,
-      data: jobs.map((j) => ({
-        ...j,
-        technicianName: j.technician
-          ? `${j.technician.firstName} ${j.technician.lastName}`
-          : 'Unassigned',
-      })),
+      data: jobs.map((j) => this.formatInstallJob(j)),
       stats: {
         scheduled: jobs.filter((j) => j.status === 'SCHEDULED').length,
-        inProgress: jobs.filter((j) =>
-          ['EN_ROUTE', 'IN_PROGRESS'].includes(j.status),
-        ).length,
+        inProgress: jobs.filter((j) => this.isActiveInstallStatus(j.status)).length,
         completed: jobs.filter((j) => j.status === 'COMPLETED').length,
       },
+    };
+  }
+
+  private isActiveInstallStatus(status: string) {
+    return [
+      'EN_ROUTE',
+      'ARRIVED',
+      'SITE_CHECK',
+      'INSTALL',
+      'IN_PROGRESS',
+      'TESTING',
+      'CLIENT_APPROVAL',
+    ].includes(status);
+  }
+
+  private formatInstallJob(j: {
+    id: string;
+    title: string;
+    description: string | null;
+    jobType: string;
+    status: InstallJobStatus;
+    clientName: string;
+    clientPhone: string | null;
+    address: string;
+    scheduledAt: Date;
+    completedAt: Date | null;
+    equipmentNotes: string | null;
+    serial: string | null;
+    checklist: unknown;
+    overrideReason: string | null;
+    lat: unknown;
+    lng: unknown;
+    technician?: {
+      id: string;
+      firstName: string;
+      lastName: string;
+      email?: string;
+      jobTitle?: string | null;
+      phone?: string | null;
+    } | null;
+  }) {
+    return {
+      ...j,
+      serial: j.serial ?? undefined,
+      overrideReason: j.overrideReason ?? undefined,
+      tests: Array.isArray(j.checklist) ? j.checklist : undefined,
+      technicianName: j.technician
+        ? `${j.technician.firstName} ${j.technician.lastName}`
+        : 'Unassigned',
     };
   }
 
   async updateInstallJobStatus(
     tenantId: string,
     jobId: string,
-    status: InstallJobStatus,
+    status: InstallJobStatus | string,
     technicianId?: string,
+    overrideReason?: string,
   ) {
     const job = await this.prisma.installJob.findFirst({
       where: {
@@ -619,11 +662,17 @@ export class StoreService {
     });
     if (!job) throw new NotFoundException('Install job not found');
 
+    const normalized =
+      status === 'IN_PROGRESS' ? InstallJobStatus.INSTALL : (status as InstallJobStatus);
+
     const updated = await this.prisma.installJob.update({
       where: { id: jobId },
       data: {
-        status,
-        completedAt: status === 'COMPLETED' ? new Date() : job.completedAt,
+        status: normalized,
+        completedAt: normalized === 'COMPLETED' ? new Date() : job.completedAt,
+        ...(typeof overrideReason === 'string'
+          ? { overrideReason: overrideReason.trim() || null }
+          : {}),
       },
       include: {
         technician: {
@@ -634,13 +683,56 @@ export class StoreService {
 
     return {
       success: true,
-      data: {
-        ...updated,
-        technicianName: updated.technician
-          ? `${updated.technician.firstName} ${updated.technician.lastName}`
-          : 'Unassigned',
-      },
+      data: this.formatInstallJob(updated),
     };
+  }
+
+  async updateInstallJobChecklist(
+    tenantId: string,
+    jobId: string,
+    technicianId: string,
+    tests: Array<{ id: string; label: string; done: boolean }>,
+  ) {
+    const job = await this.prisma.installJob.findFirst({
+      where: { id: jobId, tenantId, technicianId },
+    });
+    if (!job) throw new NotFoundException('Install job not found');
+
+    const updated = await this.prisma.installJob.update({
+      where: { id: jobId },
+      data: { checklist: tests },
+      include: {
+        technician: {
+          select: { id: true, firstName: true, lastName: true, jobTitle: true },
+        },
+      },
+    });
+
+    return { success: true, data: this.formatInstallJob(updated) };
+  }
+
+  async updateInstallJobSerial(
+    tenantId: string,
+    jobId: string,
+    technicianId: string,
+    serial: string,
+  ) {
+    const job = await this.prisma.installJob.findFirst({
+      where: { id: jobId, tenantId, technicianId },
+    });
+    if (!job) throw new NotFoundException('Install job not found');
+
+    const updated = await this.prisma.installJob.update({
+      where: { id: jobId },
+      data: { serial: serial.trim() || null },
+      include: {
+        technician: {
+          select: { id: true, firstName: true, lastName: true, jobTitle: true },
+        },
+      },
+    });
+
+    return { success: true, data: this.formatInstallJob(updated) };
   }
 
   async upsertInstallJob(
@@ -737,12 +829,10 @@ export class StoreService {
         })),
         stats: {
           scheduled: jobs.filter((j) => j.status === 'SCHEDULED').length,
-          active: jobs.filter((j) =>
-            ['EN_ROUTE', 'IN_PROGRESS'].includes(j.status),
-          ).length,
+          active: jobs.filter((j) => this.isActiveInstallStatus(j.status)).length,
           completed: jobs.filter((j) => j.status === 'COMPLETED').length,
         },
-        jobs,
+        jobs: jobs.map((j) => this.formatInstallJob({ ...j, technician: null })),
       },
     };
   }

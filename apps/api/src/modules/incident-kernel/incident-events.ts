@@ -38,7 +38,15 @@ export const PlatformEvent = {
 
 export type PlatformEventType = (typeof PlatformEvent)[keyof typeof PlatformEvent];
 
-export type EventSource = 'portal' | 'control-room' | 'officer' | 'tech' | 'medical' | 'system';
+export type EventSource =
+  | 'portal'
+  | 'control-room'
+  | 'officer'
+  | 'tech'
+  | 'medical'
+  | 'system'
+  | 'voice'
+  | 'crash';
 
 export const DISPATCH_EVENT_BY_STATUS: Record<string, PlatformEventType> = {
   ASSIGNED: PlatformEvent.DISPATCH_CREATED,

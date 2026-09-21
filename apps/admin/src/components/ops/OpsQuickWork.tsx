@@ -201,17 +201,22 @@ export function OpsCompactStats({
 
 export function OpsSection({
   title,
+  subtitle,
   action,
   children,
 }: {
   title: string;
+  subtitle?: string;
   action?: React.ReactNode;
   children: React.ReactNode;
 }) {
   return (
     <section className="ops-section">
       <div className="ops-section__head">
-        <h2>{title}</h2>
+        <div className="ops-section__titles">
+          <h2>{title}</h2>
+          {subtitle ? <p className="ops-section__subtitle">{subtitle}</p> : null}
+        </div>
         {action}
       </div>
       {children}

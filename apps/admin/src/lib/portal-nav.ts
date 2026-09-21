@@ -36,6 +36,8 @@ export const PORTAL_NAV: PortalNavSection[] = [
       { href: '/portal/security/replace-device', label: 'Replace Primary', icon: 'devices', requiresAccess: 'emergency' },
       { href: '/portal/security/emergency-access', label: 'Emergency Access', icon: 'key', requiresAccess: 'emergency' },
       { href: '/portal/security/permissions', label: 'Permissions', icon: 'officers', requiresAccess: 'emergency' },
+      { href: '/portal/security/emergency-setup', label: 'Emergency setup', icon: 'devices', requiresAccess: 'emergency' },
+      { href: '/apps', label: 'Get the 4DS app', icon: 'devices' },
       { href: '/portal/contacts', label: 'Emergency Contacts', icon: 'contacts', requiresAccess: 'emergency' },
       { href: '/portal/medical', label: 'Medical', icon: 'medical', requiresAccess: 'medical' },
       { href: '/portal/incidents', label: 'Response history', icon: 'incidents', requiresAccess: 'emergency' },

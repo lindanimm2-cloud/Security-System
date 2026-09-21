@@ -3,6 +3,8 @@ import path from "path";
 import { fileURLToPath } from "url";
 import { spawnSync } from "child_process";
 
+import { PROVIDER, ISSUE, ON_SIGNATURE, ACG } from "../brand/doc-info.mjs";
+
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const outHtml = path.join(__dirname, "ACG_Security_4DS_Nexus_Software_Services_Agreement.html");
 const outPdf = path.join(
@@ -10,8 +12,12 @@ const outPdf = path.join(
   "ACG_Security_4DS_Nexus_Software_Services_Agreement.pdf"
 );
 
+const logoSrcDir = path.join(__dirname, "..", "brand");
 const logoDark = "4ds-logo-header.png";
 const logoLight = "4ds-logo-cover.png";
+for (const file of [logoDark, logoLight]) {
+  fs.copyFileSync(path.join(logoSrcDir, file), path.join(__dirname, file));
+}
 
 const css = `
 :root {
@@ -67,18 +73,18 @@ html, body {
   margin-top: 4px;
 }
 .logo {
-  height: 26px;
+  height: 28px;
   width: auto;
   display: block;
-  background: #000;
+  background: transparent;
   border: 0 !important;
   box-shadow: none !important;
   object-fit: contain;
 }
 .logo-lg {
-  height: 42px;
+  height: 52px;
   width: auto;
-  background: #000;
+  background: transparent;
   padding: 0;
 }
 .cover-hero {
@@ -306,7 +312,7 @@ function header(num, title) {
 
 function footer(page) {
   return `<div class="page-footer">
-  <span>4DS Solutions | ACG Security Software Services Agreement</span>
+  <span>${PROVIDER.short} • ${ACG.client} • ${ACG.agreementCode} • v${ISSUE.version} • Confidential</span>
   <span>${String(page).padStart(2, "0")}</span>
 </div>`;
 }
@@ -345,10 +351,11 @@ pages.push(`<section class="page cover">
   </div>
   <p class="cover-intro">This Agreement establishes the contractual framework for the design, development, configuration, deployment, support and optional operation of the ACG Security digital security platform. Features are selected by the Client in the Feature Selection Schedule and only selected features form part of the contracted scope.</p>
   <div class="meta-grid">
-    <div class="label">Prepared for:</div><div class="value">ACG Security</div>
-    <div class="label">Agreement date:</div><div class="value"></div>
-    <div class="label">Client legal entity:</div><div class="value"></div>
-    <div class="label">Client registration no.:</div><div class="value"></div>
+    <div class="label">Prepared for:</div><div class="value">${ACG.client}</div>
+    <div class="label">Document:</div><div class="value">${ACG.agreementCode} · v${ISSUE.version} · ${ISSUE.date}</div>
+    <div class="label">Agreement date:</div><div class="value">${ON_SIGNATURE}</div>
+    <div class="label">Client legal entity:</div><div class="value">${ON_SIGNATURE}</div>
+    <div class="label">Client registration no.:</div><div class="value">${ON_SIGNATURE}</div>
     <div class="label">Selected commercial model:</div>
     <div class="checks">
       <span class="chk"><span class="box"></span> Ownership</span>
@@ -367,13 +374,13 @@ pages.push(`<section class="page cover">
   <div class="cover-foot">
     <div class="prepared">
       <strong>Prepared by:</strong>
-      Owner: Lindani Maphumulo<br/>
-      4DS Solutions (Pty) Ltd<br/>
-      K2025567725<br/>
-      South Africa<br/>
-      www.4dsnexus.co.za
+      ${PROVIDER.owner}<br/>
+      ${PROVIDER.legal}<br/>
+      ${PROVIDER.reg}<br/>
+      ${PROVIDER.country}<br/>
+      ${PROVIDER.web}
     </div>
-    <div>www.4dsnexus.co.za</div>
+    <div>${ACG.agreementClass}</div>
   </div>
 </section>`);
 
@@ -432,7 +439,7 @@ pages.push(page(`${header("02", "Parties & Appointment")}
 <table>
 <thead><tr><th style="width:42mm">PARTY</th><th>DETAILS</th></tr></thead>
 <tbody>
-<tr><td><strong>Provider</strong></td><td>4DS Solutions (Pty) Ltd — K2025567725 — South Africa</td></tr>
+<tr><td><strong>Provider</strong></td><td>${PROVIDER.legal} — ${PROVIDER.reg} — ${PROVIDER.country}</td></tr>
 <tr><td><strong>Client</strong></td><td>ACG Security — Legal name: _______________________________</td></tr>
 <tr><td><strong>Client registration</strong></td><td>________________________________________________________</td></tr>
 <tr><td><strong>Client address</strong></td><td>________________________________________________________</td></tr>

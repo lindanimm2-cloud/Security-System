@@ -16,6 +16,13 @@ import { UserAvatar } from '@/components/ui/UserAvatar';
 import { getSession } from '@/lib/auth';
 import { canManageUserPasswords, validateNewPassword } from '@/lib/password-access';
 import { matchesSearch } from '@/lib/list-search';
+import {
+  EMPTY_FAMILY_LINK,
+  FamilyLinkFields,
+  familyLinkToPayload,
+  validateFamilyLink,
+  type FamilyLinkState,
+} from '@/components/control-room/FamilyLinkFields';
 
 type TeamMember = {
   user: { id: string; firstName: string; lastName: string; role: string };
@@ -57,6 +64,15 @@ type ManagedUser = {
   inviteUrl?: string | null;
 };
 
+type ControlFamily = {
+  id: string;
+  name: string;
+  ownerUserId: string;
+  ownerName: string;
+  ownerEmail: string;
+  memberCount: number;
+};
+
 type UserFormState = {
   id?: string;
   email: string;
@@ -70,6 +86,7 @@ type UserFormState = {
   status: string;
   branch: { id: string; name: string; code: string } | null;
   teams: { id: string; name: string; branchId: string; isLead: boolean }[];
+  familyLink: FamilyLinkState;
 };
 
 const ROLES = [
@@ -142,6 +159,10 @@ function TeamsContent() {
     useApi(() => adminApi.get<ApiResponse<Branch[]>>('/control-room/branches'), []);
   const { data: usersData, loading: usersLoading, error: usersError, reload: reloadUsers } =
     useApi(() => adminApi.get<ApiResponse<ManagedUser[]>>('/control-room/users'), []);
+  const { data: familiesData } = useApi(
+    () => adminApi.get<ApiResponse<ControlFamily[]>>('/control-room/families'),
+    [],
+  );
 
   const [branchName, setBranchName] = useState('');
   const [branchCode, setBranchCode] = useState('');
@@ -162,6 +183,18 @@ function TeamsContent() {
 
   const branches = branchesData?.data ?? [];
   const users = usersData?.data ?? [];
+  const families = familiesData?.data ?? [];
+  const primaryOptions = useMemo(
+    () =>
+      users
+        .filter((u) => u.role === 'USER' || u.role === 'FAMILY_MEMBER')
+        .map((u) => ({
+          id: u.id,
+          label: `${u.firstName} ${u.lastName}`.trim() || u.email,
+          email: u.email,
+        })),
+    [users],
+  );
   const filteredUsers = useMemo(
     () =>
       users.filter((u) =>
@@ -198,6 +231,7 @@ function TeamsContent() {
       status: 'PENDING_VERIFICATION',
       branch: null,
       teams: [],
+      familyLink: EMPTY_FAMILY_LINK,
     });
   }
 
@@ -218,6 +252,7 @@ function TeamsContent() {
       status: user.status,
       branch: user.branch,
       teams: [...user.teams],
+      familyLink: EMPTY_FAMILY_LINK,
     });
   }
 
@@ -299,6 +334,17 @@ function TeamsContent() {
           setFormError('Email is required for new users.');
           return;
         }
+        if (isClientRole) {
+          const linkState =
+            userForm.role === 'FAMILY_MEMBER' && userForm.familyLink.mode === 'none'
+              ? { ...userForm.familyLink, mode: 'member' as const }
+              : userForm.familyLink;
+          const familyError = validateFamilyLink(linkState, { role: userForm.role });
+          if (familyError) {
+            setFormError(familyError);
+            return;
+          }
+        }
         if (!isClientRole) {
           if (!canSetPasswords) {
             setFormError('Only owners, developers, and tenant admins can create staff logins.');
@@ -310,6 +356,13 @@ function TeamsContent() {
             return;
           }
         }
+        const familyPayload = isClientRole
+          ? familyLinkToPayload(
+              userForm.role === 'FAMILY_MEMBER' && userForm.familyLink.mode === 'none'
+                ? { ...userForm.familyLink, mode: 'member' }
+                : userForm.familyLink,
+            )
+          : {};
         const res = await adminApi.post<
           ApiResponse<ManagedUser & { inviteToken?: string | null; inviteUrl?: string | null }>
         >('/control-room/users', {
@@ -318,6 +371,7 @@ function TeamsContent() {
           ...(canSetPasswords && userForm.password.trim()
             ? { password: userForm.password.trim() }
             : {}),
+          ...familyPayload,
         });
 
         const invitePath = res.data?.inviteUrl;
@@ -585,6 +639,8 @@ function TeamsContent() {
         <UserFormModal
           form={userForm}
           branches={branches}
+          families={families}
+          primaries={primaryOptions}
           saving={saving}
           error={formError}
           canSetPasswords={canSetPasswords}
@@ -595,6 +651,13 @@ function TeamsContent() {
               setUserForm({
                 ...next,
                 status: isClient ? 'PENDING_VERIFICATION' : 'ACTIVE',
+                familyLink:
+                  next.role === 'FAMILY_MEMBER'
+                    ? {
+                        ...next.familyLink,
+                        mode: next.familyLink.mode === 'none' ? 'member' : next.familyLink.mode,
+                      }
+                    : next.familyLink,
               });
             } else {
               setUserForm(next);
@@ -650,6 +713,8 @@ function TeamsContent() {
 function UserFormModal({
   form,
   branches,
+  families,
+  primaries,
   saving,
   error,
   canSetPasswords,
@@ -660,6 +725,8 @@ function UserFormModal({
 }: {
   form: UserFormState;
   branches: Branch[];
+  families: ControlFamily[];
+  primaries: { id: string; label: string; email?: string }[];
   saving: boolean;
   error: string;
   canSetPasswords: boolean;
@@ -798,6 +865,17 @@ function UserFormModal({
               (e.g. NX-XXXXXX) for the panic app registration.
             </p>
           )}
+
+          {!isEdit && isClientRole ? (
+            <FamilyLinkFields
+              value={form.familyLink}
+              onChange={(familyLink) => onChange({ ...form, familyLink })}
+              primaries={primaries}
+              families={families}
+              requireMember={form.role === 'FAMILY_MEMBER'}
+              disabled={saving}
+            />
+          ) : null}
 
           <label>
             Phone

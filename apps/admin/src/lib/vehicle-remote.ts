@@ -17,6 +17,8 @@ export type VehicleRemoteState = {
   doorsLocked: boolean;
   immobiliserOn: boolean;
   theftRecovery: boolean;
+  /** Situation label while recovery is on (STOLEN, HIJACKING, ACCIDENT, …). */
+  emergencyStatus?: string | null;
   hornActive?: boolean;
   /** Panic / SOS — overrides component colours with full-vehicle red pulse. */
   panicActive?: boolean;

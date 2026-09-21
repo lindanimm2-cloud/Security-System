@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { HoldToActivate } from '@/components/ops/EmergencyMode';
 import { Vehicle3DViewer } from '@/components/vehicle/Vehicle3DViewer';
 import {
   deriveVehicle3DState,
@@ -8,6 +9,9 @@ import {
 } from '@/components/vehicle/vehicle3d-state';
 import type { VehicleModelSpec } from '@/lib/vehicle-model-assets';
 import type { VehicleRemoteAction, VehicleRemoteState } from '@/lib/vehicle-remote';
+import { vehicleEmergencyMeta } from '@/lib/vehicle-emergency-status';
+import { VehicleEmergencyStatusPicker } from '@/components/vehicle/VehicleEmergencyStatusPicker';
+import type { VehicleEmergencyStatus } from '@/lib/vehicle-emergency-status';
 
 type FeedbackPhase = 'loading' | 'success' | 'error';
 
@@ -25,6 +29,12 @@ export type VehicleRemoteMeta = {
   destination?: string | null;
   lastUpdate?: string | null;
   fuelPct?: number | null;
+  /** Ops classification e.g. STOLEN, CLIENT, ARMED_RESPONSE */
+  vehicleType?: string | null;
+  /** Explicit stolen flag when type is not set */
+  stolen?: boolean | null;
+  /** Active situation while recovery is on */
+  emergencyStatus?: string | null;
 };
 
 type VehicleRemoteVisualProps = {
@@ -38,6 +48,7 @@ type VehicleRemoteVisualProps = {
   hidePanic?: boolean;
   label?: string;
   onCommand: (action: VehicleRemoteAction) => void | boolean | Promise<void | boolean>;
+  onEmergencyStatusChange?: (status: VehicleEmergencyStatus) => void | Promise<void>;
 };
 
 const FEEDBACK_MS = 2200;
@@ -67,6 +78,50 @@ function partCaption(open: boolean, locked: boolean) {
   return 'UNLOCKED';
 }
 
+const PART_HOLD_MS = 1100;
+
+type PartHoldProps = {
+  slot: string;
+  name: string;
+  open: boolean;
+  locked: boolean;
+  panic: boolean;
+  disabled?: boolean;
+  loading?: boolean;
+  onToggle: () => void;
+};
+
+function PartHoldLabel({
+  slot,
+  name,
+  open,
+  locked,
+  panic,
+  disabled,
+  loading,
+  onToggle,
+}: PartHoldProps) {
+  const tone = partTone(open, locked, panic);
+  const caption = partCaption(open, locked);
+  const action = locked ? 'unlock' : 'lock';
+  return (
+    <HoldToActivate
+      label={`${name} ${caption}. Hold to ${action}.`}
+      holdMs={PART_HOLD_MS}
+      keepLabel
+      hideHint
+      tone="warn"
+      disabled={disabled || open || panic}
+      loading={loading}
+      className={`vehicle-car__part vehicle-car__part--${slot} is-${tone} hold-activate--part`}
+      onActivate={onToggle}
+    >
+      <em>{name}</em>
+      <strong>{caption}</strong>
+    </HoldToActivate>
+  );
+}
+
 export function VehicleRemoteVisual({
   state,
   model = null,
@@ -77,8 +132,10 @@ export function VehicleRemoteVisual({
   appearance = 'default',
   label,
   onCommand,
+  onEmergencyStatusChange,
 }: VehicleRemoteVisualProps) {
   const [feedback, setFeedback] = useState<Partial<Record<VehicleRemoteAction, FeedbackPhase>>>({});
+  const [statusBusy, setStatusBusy] = useState(false);
   const timersRef = useRef<Partial<Record<VehicleRemoteAction, number>>>({});
 
   useEffect(() => {
@@ -143,19 +200,31 @@ export function VehicleRemoteVisual({
   );
 
   const panic = component.panic || Boolean(state.panicActive);
+  const classifiedStolen =
+    Boolean(meta?.stolen) ||
+    String(meta?.vehicleType ?? '')
+      .trim()
+      .toUpperCase() === 'STOLEN';
+  const inRecovery = Boolean(component.theftRecovery);
+  /** Ops label: classified STOLEN and/or active theft-recovery. */
+  const stolen = classifiedStolen || inRecovery;
+  const emergency = vehicleEmergencyMeta(
+    meta?.emergencyStatus ?? (stolen || inRecovery ? 'STOLEN' : null),
+  );
   const secure =
     !panic &&
+    !stolen &&
     component.locked &&
     !component.immobiliserOn &&
-    !component.theftRecovery &&
+    !inRecovery &&
     !Object.values(component.doors).some((d) => d.open) &&
     !component.boot.open &&
     !component.bonnet.open;
 
   const securityHeadline = panic
     ? 'PANIC ACTIVE'
-    : component.theftRecovery
-      ? 'THEFT RECOVERY'
+    : stolen || inRecovery
+      ? emergency.short
       : component.immobiliserOn
         ? 'IGNITION DISABLED'
         : secure
@@ -164,9 +233,29 @@ export function VehicleRemoteVisual({
 
   const securityTone = panic
     ? 'panic'
-    : component.theftRecovery || component.immobiliserOn || !secure
+    : stolen
       ? 'warn'
-      : 'ok';
+      : component.immobiliserOn
+        ? 'cut'
+        : !secure
+          ? 'warn'
+          : 'ok';
+
+  const statusLabel = panic
+    ? 'Panic'
+    : stolen || inRecovery
+      ? emergency.badge
+      : 'Normal';
+
+  async function changeEmergencyStatus(next: VehicleEmergencyStatus) {
+    if (!onEmergencyStatusChange || statusBusy || disabled || anyBusy) return;
+    setStatusBusy(true);
+    try {
+      await onEmergencyStatusChange(next);
+    } finally {
+      setStatusBusy(false);
+    }
+  }
 
   return (
     <section
@@ -177,6 +266,8 @@ export function VehicleRemoteVisual({
         `vehicle-car--${appearance}`,
         variant === 'compact' ? 'vehicle-car--compact' : 'vehicle-car--full',
         panic ? 'vehicle-car--panic' : '',
+        stolen ? 'vehicle-car--recovery' : '',
+        !panic && !stolen && component.immobiliserOn ? 'vehicle-car--cut' : '',
       ]
         .filter(Boolean)
         .join(' ')}
@@ -210,6 +301,7 @@ export function VehicleRemoteVisual({
           theme="ops"
           showReset={false}
           showHud={false}
+          showAlerts={false}
           telemetry={{
             speedKph: meta?.speedKph,
             online: meta?.online,
@@ -224,38 +316,61 @@ export function VehicleRemoteVisual({
           }}
         />
 
-        <div className="vehicle-car__part-hud" aria-hidden="true">
-          {(component.bonnet.open || panic) && (
-            <span className={`vehicle-car__part vehicle-car__part--bonnet is-${partTone(component.bonnet.open, Boolean(component.bonnet.locked ?? component.locked), panic)}`}>
-              <em>Bonnet</em>
-              <strong>{partCaption(component.bonnet.open, Boolean(component.bonnet.locked ?? component.locked))}</strong>
-            </span>
-          )}
+        <div className="vehicle-car__part-hud" role="group" aria-label="Door and panel locks">
+          <PartHoldLabel
+            slot="bonnet"
+            name="Bonnet"
+            open={component.bonnet.open}
+            locked={Boolean(component.bonnet.locked ?? component.locked)}
+            panic={panic}
+            disabled={disabled || anyBusy}
+            loading={feedback.lock === 'loading' || feedback.unlock === 'loading' || busyAction === 'lock' || busyAction === 'unlock'}
+            onToggle={() =>
+              void runCommand(Boolean(component.bonnet.locked ?? component.locked) ? 'unlock' : 'lock')
+            }
+          />
           {DOOR_LABELS.map(({ id, short, slot }) => {
             const d = component.doors[id];
             const locked = Boolean(d.locked ?? component.locked);
-            if (!d.open && !panic) return null;
             return (
-              <span
+              <PartHoldLabel
                 key={id}
-                className={`vehicle-car__part vehicle-car__part--${slot} is-${partTone(d.open, locked, panic)}`}
-              >
-                <em>{short}</em>
-                <strong>{partCaption(d.open, locked)}</strong>
-              </span>
+                slot={slot}
+                name={short}
+                open={d.open}
+                locked={locked}
+                panic={panic}
+                disabled={disabled || anyBusy}
+                loading={
+                  feedback.lock === 'loading' ||
+                  feedback.unlock === 'loading' ||
+                  busyAction === 'lock' ||
+                  busyAction === 'unlock'
+                }
+                onToggle={() => void runCommand(locked ? 'unlock' : 'lock')}
+              />
             );
           })}
-          {(component.boot.open || panic) && (
-            <span className={`vehicle-car__part vehicle-car__part--boot is-${partTone(component.boot.open, Boolean(component.boot.locked ?? component.locked), panic)}`}>
-              <em>Boot</em>
-              <strong>{partCaption(component.boot.open, Boolean(component.boot.locked ?? component.locked))}</strong>
-            </span>
-          )}
+          <PartHoldLabel
+            slot="boot"
+            name="Boot"
+            open={component.boot.open}
+            locked={Boolean(component.boot.locked ?? component.locked)}
+            panic={panic}
+            disabled={disabled || anyBusy}
+            loading={feedback.lock === 'loading' || feedback.unlock === 'loading' || busyAction === 'lock' || busyAction === 'unlock'}
+            onToggle={() =>
+              void runCommand(Boolean(component.boot.locked ?? component.locked) ? 'unlock' : 'lock')
+            }
+          />
         </div>
 
         <div className="vehicle-car__status-overlay" aria-live="polite">
           {panic ? <span className="vehicle-car__status-badge is-panic">Panic active</span> : null}
-          {state.theftRecovery ? (
+          {(stolen || inRecovery) && !panic ? (
+            <span className="vehicle-car__status-badge is-stolen">{emergency.badge}</span>
+          ) : null}
+          {inRecovery ? (
             <button
               type="button"
               className={`vehicle-car__status-badge is-recovery is-action ${clearPhase ? `is-${clearPhase}` : ''}`}
@@ -263,11 +378,24 @@ export function VehicleRemoteVisual({
               onClick={() => void runCommand('clearRecovery')}
               title="Exit recovery mode"
             >
-              {clearPhase === 'loading' ? 'Clearing…' : 'Recovery mode · tap to exit'}
+              {clearPhase === 'loading' ? 'Clearing…' : emergency.recoveryLine}
             </button>
+          ) : null}
+          {component.immobiliserOn && !panic ? (
+            <span className="vehicle-car__status-badge is-cut">Ignition cut</span>
           ) : null}
         </div>
       </div>
+
+      {inRecovery && onEmergencyStatusChange ? (
+        <VehicleEmergencyStatusPicker
+          status={emergency.value}
+          disabled={disabled}
+          busy={statusBusy || anyBusy}
+          compact={variant === 'compact'}
+          onChange={changeEmergencyStatus}
+        />
+      ) : null}
 
       <div className="vehicle-car__caption">
         <p className="vehicle-car__caption-kicker">Digital twin</p>
@@ -284,13 +412,18 @@ export function VehicleRemoteVisual({
 
       <div className={`vehicle-car__state-bar is-${securityTone}`} role="status">
         <span className={online ? 'is-ok' : 'is-off'}>{online ? '● Online' : '○ Offline'}</span>
-        <span className={component.locked ? 'is-ok' : 'is-warn'}>
+        <span className={component.locked ? 'is-ok' : 'is-unlocked'}>
           {component.locked ? 'Doors locked' : 'Doors unlocked'}
         </span>
-        <span className={component.immobiliserOn ? 'is-warn' : 'is-ok'}>
+        <span className={component.immobiliserOn ? 'is-cut' : 'is-ok'}>
           {component.immobiliserOn ? 'Ignition disabled' : 'Ignition enabled'}
         </span>
         <span className={gps ? 'is-live' : 'is-off'}>{gps ? 'GPS linked' : 'GPS offline'}</span>
+        {(classifiedStolen || stolen || inRecovery) && !panic ? (
+          <span className="is-stolen">
+            {inRecovery ? `${emergency.badge} · Recovery` : emergency.badge}
+          </span>
+        ) : null}
         {panic ? <span className="is-panic">Panic active</span> : null}
       </div>
 
@@ -326,12 +459,28 @@ export function VehicleRemoteVisual({
         </div>
         <ul className="vehicle-car__security-list">
           <li>
+            <span>Status</span>
+            <em>{statusLabel}</em>
+          </li>
+          <li>
+            <span>Classification</span>
+            <em>
+              {classifiedStolen
+                ? 'Stolen'
+                : String(meta?.vehicleType ?? '')
+                    .trim()
+                    .replace(/_/g, ' ') || 'Client'}
+            </em>
+          </li>
+          <li>
             <span>Doors</span>
             <em>{component.locked ? 'Locked' : Object.values(component.doors).some((d) => d.open) ? 'Open' : 'Unlocked'}</em>
           </li>
           <li>
             <span>Ignition</span>
-            <em>{component.immobiliserOn ? 'Disabled' : 'Enabled'}</em>
+            <em className={component.immobiliserOn ? 'is-cut' : undefined}>
+              {component.immobiliserOn ? 'Disabled' : 'Enabled'}
+            </em>
           </li>
           <li>
             <span>Alarm</span>

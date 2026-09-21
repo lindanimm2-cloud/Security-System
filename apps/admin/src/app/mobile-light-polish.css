@@ -1586,14 +1586,21 @@ html[data-theme='dark'] .shell--ops .sidebar-nav-section-title {
 }
 
 html[data-theme='dark'] .shell--ops .ops-act,
-html[data-theme='dark'] .shell--ops .btn-primary:not(.btn-primary--accent):not(.btn-primary--calm):not(.btn-primary--danger):not(.btn-primary--filled),
 html[data-theme='dark'] .shell--ops .btn-secondary,
 html[data-theme='dark'] .shell--ops .btn-ghost,
-html[data-theme='dark'] .shell--ops .btn-sm:not(.btn-ok):not(.btn-danger):not(.btn-sm--resolve) {
-  background: #2b2b2b !important;
-  color: #ffffff !important;
-  border: 1.5px solid #4a4a4a !important;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04) !important;
+html[data-theme='dark'] .shell--ops .btn-sm:not(.btn-primary):not(.btn-ok):not(.btn-danger):not(.btn-sm--resolve):not(.btn-primary--accent):not(.btn-primary--filled) {
+  background: var(--btn-charcoal, #141414) !important;
+  color: var(--btn-muted-label, #707070) !important;
+  border: 1.5px solid rgba(255, 255, 255, 0.08) !important;
+  box-shadow: none !important;
+}
+
+html[data-theme='dark'] .shell--ops .btn-primary:not(.btn-primary--calm):not(.btn-primary--danger),
+html[data-theme='dark'] .shell--ops .btn-sm.btn-primary:not(.btn-primary--calm):not(.btn-primary--danger) {
+  background: var(--btn-charcoal, #141414) !important;
+  color: var(--btn-amber, #d49b5a) !important;
+  border: 1.5px solid var(--btn-amber-border, rgba(212, 155, 90, 0.72)) !important;
+  box-shadow: none !important;
 }
 
 html[data-theme='dark'] .shell--ops .ops-act {
@@ -1632,12 +1639,18 @@ html[data-theme='dark'] .shell--ops .btn-danger {
 }
 
 html[data-theme='dark'] .shell--ops .btn-primary--accent,
-html[data-theme='dark'] .shell--ops .btn-primary--danger,
 html[data-theme='dark'] .shell--ops .btn-primary--filled {
-  background: linear-gradient(180deg, #f05252 0%, #ef4444 42%, #dc2626 100%) !important;
-  color: #fff !important;
-  border: none !important;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18) !important;
+  background: var(--btn-charcoal, #141414) !important;
+  color: var(--btn-amber, #d49b5a) !important;
+  border: 1.5px solid var(--btn-amber-border, rgba(212, 155, 90, 0.72)) !important;
+  box-shadow: none !important;
+}
+
+html[data-theme='dark'] .shell--ops .btn-primary--danger {
+  background: transparent !important;
+  color: #f87171 !important;
+  border: 1px solid color-mix(in srgb, #f87171 55%, transparent) !important;
+  box-shadow: none !important;
 }
 
 html[data-theme='dark'] .shell--ops .vehicle-remote__btn {

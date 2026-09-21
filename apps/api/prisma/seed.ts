@@ -411,13 +411,23 @@ async function main() {
   }
   await prisma.familyMember.upsert({
     where: { familyId_userId: { familyId: family.id, userId: client.id } },
-    update: {},
-    create: { familyId: family.id, userId: client.id, nickname: 'Sarah' },
+    update: { relationship: 'Account holder', nickname: 'Sarah' },
+    create: {
+      familyId: family.id,
+      userId: client.id,
+      nickname: 'Sarah',
+      relationship: 'Account holder',
+    },
   });
   await prisma.familyMember.upsert({
     where: { familyId_userId: { familyId: family.id, userId: familyUser2.id } },
-    update: {},
-    create: { familyId: family.id, userId: familyUser2.id, nickname: 'James' },
+    update: { relationship: 'Spouse', nickname: 'James' },
+    create: {
+      familyId: family.id,
+      userId: familyUser2.id,
+      nickname: 'James',
+      relationship: 'Spouse',
+    },
   });
 
   await prisma.dispatch.deleteMany({ where: { tenantId: tenant.id } });
@@ -878,9 +888,9 @@ async function main() {
       camerasLinked: true,
       monitoringEnabled: true,
       shareInteriorCameras: false,
-      panelVendor: 'Paradox',
-      panelModel: 'MG5050',
-      communicatorType: 'DUAL_PATH',
+      panelVendor: 'mixbox',
+      panelModel: 'PG-103',
+      communicatorType: 'WIFI_4G',
       monitoringAccount: '4DS-DUR-0142',
       partitionLabel: 'Partition 1',
       lat: DURBAN.morningside.lat,
@@ -993,6 +1003,60 @@ async function main() {
 
   const fenceSensor = await prisma.sensor.findFirst({
     where: { propertyId: property.id, zoneNumber: 4 },
+  });
+
+  const morningsideKit = await prisma.cctvSystem.create({
+    data: {
+      tenantId: tenant.id,
+      propertyId: property.id,
+      name: 'Pro View 4-Channel AHD Kit',
+      brand: 'Pro View',
+      model: '4 CHANNEL AHD CCTV KIT',
+      kitSku: 'PROVIEW-AHD-4',
+      supplier: 'Big Brother Security Wholesalers',
+      recorderType: 'DVR',
+      channelCount: 4,
+      connectivity: 'AHD',
+      recorderSerial: 'PV-AHD-DVR-7741',
+      cloudId: 'PV-APP-3310',
+      hddInstalled: false,
+      mobileAppEnabled: true,
+      techNotes: 'DVR does not include hard drive. 4×20m cables + 1-4 way splitter installed.',
+      status: 'ONLINE',
+      installedAt: new Date(),
+    },
+  });
+
+  await prisma.alarmSystem.create({
+    data: {
+      tenantId: tenant.id,
+      propertyId: property.id,
+      name: 'mixbox PG-103 WiFi+4G Dual Network',
+      brand: 'mixbox',
+      model: 'PG-103',
+      kitSku: 'MIXBOX-PG103',
+      supplier: 'ICASA approved',
+      connectivity: 'WIFI_4G',
+      panelSerial: 'MX-PG103-884201',
+      imei: '359632109874521',
+      wifiMac: 'A4:CF:12:88:42:01',
+      wifiSsid: '4DS-Home-Alarm',
+      cloudId: 'MX-CLOUD-4421',
+      wirelessFrequency: '433.92MHz',
+      wirelessCoding: 'EV1527',
+      gsmBands: '2G/4G',
+      wifiStandard: 'IEEE802.11b/g/n',
+      inputVoltage: 'DC5V (TYPE-C)',
+      backupBattery: '3.7V/1000mAh lithium',
+      icasaCert: 'TA-2021/3152',
+      rfidEnabled: true,
+      touchKeypad: true,
+      mobileAppEnabled: true,
+      zoneCount: 8,
+      techNotes: 'WiFi+4G dual path. Touch keypad + RFID. Siren on AUX <650mA.',
+      status: 'ONLINE',
+      installedAt: new Date(),
+    },
   });
 
   const camFront = await prisma.camera.create({
@@ -1219,7 +1283,7 @@ async function main() {
       sortOrder: 1,
     },
   });
-  await prisma.documentFolder.create({
+  const folderPolicies = await prisma.documentFolder.create({
     data: {
       tenantId: tenant.id,
       name: 'Policies & Compliance',
@@ -1319,6 +1383,48 @@ async function main() {
         fileSizeKb: 95,
         tags: ['officer', 'template'],
         uploadedBy: 'Demo Admin',
+      },
+      {
+        tenantId: tenant.id,
+        folderId: folderPolicies.id,
+        category: 'TRAINING',
+        title: 'Owner user manual',
+        description: '4DS-BOLOLO-UM-OWN-01 · v1.0 · Owner desk on 4DS Nexus',
+        fileName: 'Bololo_Security_Owner_User_Manual.pdf',
+        fileType: 'application/pdf',
+        fileUrl: '/documents/Bololo_Security_Owner_User_Manual.pdf',
+        fileSizeKb: 845,
+        tags: ['manual', 'owner'],
+        uploadedBy: 'Lindani Maphumulo',
+        isPinned: true,
+      },
+      {
+        tenantId: tenant.id,
+        folderId: folderPolicies.id,
+        category: 'TRAINING',
+        title: 'Control Room user manual',
+        description: '4DS-BOLOLO-UM-CR-01 · v1.0 · Dispatcher console',
+        fileName: 'Bololo_Security_Control_Room_User_Manual.pdf',
+        fileType: 'application/pdf',
+        fileUrl: '/documents/Bololo_Security_Control_Room_User_Manual.pdf',
+        fileSizeKb: 847,
+        tags: ['manual', 'control-room'],
+        uploadedBy: 'Lindani Maphumulo',
+        isPinned: true,
+      },
+      {
+        tenantId: tenant.id,
+        folderId: folderPolicies.id,
+        category: 'LEGAL_COMPLIANCE',
+        title: 'Software development & revenue-share agreement',
+        description: '4DS-BOLOLO-SRA-2026-001 · v1.0 · Confidential commercial agreement',
+        fileName: 'Bololo_Security_4DS_Software_Development_Revenue_Share_Agreement.pdf',
+        fileType: 'application/pdf',
+        fileUrl: '/documents/Bololo_Security_4DS_Software_Development_Revenue_Share_Agreement.pdf',
+        fileSizeKb: 2172,
+        tags: ['contract', 'legal'],
+        uploadedBy: 'Lindani Maphumulo',
+        isPinned: true,
       },
     ],
   });
@@ -1568,6 +1674,85 @@ async function main() {
       stock: 18,
       imageEmoji: '📷',
       featured: true,
+    },
+    {
+      sku: 'HILOOK-4CH',
+      name: 'HiLook 4-Channel Analog CCTV Kit',
+      description:
+        '4x outdoor bullet cameras, 4-channel DVR, cables, power splitter. Compatible with mobile viewing.',
+      category: ProductCategory.CCTV,
+      priceCents: 179900,
+      stock: 24,
+      imageEmoji: '📷',
+      featured: true,
+      specs: {
+        channels: 4,
+        connectivity: 'ANALOG',
+        brand: 'HiLook',
+        includesHdd: false,
+      },
+    },
+    {
+      sku: 'DAHUA-2MP-8CH',
+      name: 'Dahua 2Mp Bullet 8Ch Full Kit',
+      description:
+        '8x 2MP outdoor bullet cameras, 8-channel recorder, LAN connectivity, night vision, mobile compatible.',
+      category: ProductCategory.CCTV,
+      priceCents: 309900,
+      stock: 12,
+      imageEmoji: '📷',
+      featured: true,
+      specs: {
+        channels: 8,
+        connectivity: 'LAN',
+        brand: 'Dahua',
+        resolution: '2MP',
+        includesHdd: false,
+      },
+    },
+    {
+      sku: 'PROVIEW-AHD-4',
+      name: 'Pro View 4-Channel AHD CCTV Kit',
+      description:
+        '4-channel network AHD DVR (no HDD), 4x colour IR outdoor cameras, 4x20m cables, power splitter, mouse and remote. Big Brother wholesaler kit.',
+      category: ProductCategory.CCTV,
+      priceCents: 179900,
+      stock: 20,
+      imageEmoji: '📷',
+      featured: true,
+      specs: {
+        channels: 4,
+        connectivity: 'AHD',
+        brand: 'Pro View',
+        supplier: 'Big Brother Security Wholesalers',
+        includesHdd: false,
+      },
+    },
+    {
+      sku: 'MIXBOX-PG103',
+      name: 'mixbox PG-103 WiFi+4G Dual Network Alarm',
+      description:
+        'WiFi+4G dual-network alarm controller with touch keypad, RFID, app control. ICASA TA-2021/3152. 433.92MHz EV1527 wireless.',
+      category: ProductCategory.ALARMS,
+      priceCents: 149900,
+      stock: 30,
+      imageEmoji: '🚨',
+      featured: true,
+      specs: {
+        model: 'PG-103',
+        brand: 'mixbox',
+        connectivity: 'WIFI_4G',
+        wirelessFrequency: '433.92MHz',
+        wirelessCoding: 'EV1527',
+        gsmBands: '2G/4G',
+        wifiStandard: 'IEEE802.11b/g/n',
+        inputVoltage: 'DC5V (TYPE-C)',
+        backupBattery: '3.7V/1000mAh',
+        icasaCert: 'TA-2021/3152',
+        rfid: true,
+        touchKeypad: true,
+        app: true,
+      },
     },
     {
       sku: 'CCTV-DOME',
@@ -2185,6 +2370,7 @@ async function main() {
           featured: p.featured,
           requiresLicense: 'requiresLicense' in p ? Boolean(p.requiresLicense) : false,
           isActive: true,
+          specs: 'specs' in p && p.specs ? p.specs : {},
         },
       }),
     );

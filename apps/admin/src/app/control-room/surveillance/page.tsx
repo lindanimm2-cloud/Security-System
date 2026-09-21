@@ -186,6 +186,9 @@ function SurveillanceContent() {
           <p className="cam-viewer__eyebrow">Control room</p>
         </div>
         <div className="cam-viewer__tools">
+          <Link href={CONTROL_ROOM_ROUTES.cctvSystems} className="btn btn-ghost btn-sm">
+            Register kit
+          </Link>
           <div className="ops-cctv__tabs" role="tablist" aria-label="Feed source">
             <button
               type="button"

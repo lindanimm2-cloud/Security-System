@@ -1,6 +1,18 @@
-import type { AccessMap } from '@/lib/subscription-plans';
+/**
+ * Legacy portal permission defs — kept for profile section compatibility.
+ * Full emergency catalog lives in emergency-permissions.ts.
+ */
 
-export type PortalPermissionKind = 'location' | 'notifications' | 'microphone' | 'camera';
+import type { AccessMap } from '@/lib/subscription-plans';
+import {
+  EMERGENCY_PERMISSION_DEFS,
+  type EmergencyPermissionId,
+} from '@/lib/emergency-permissions';
+
+export type PortalPermissionKind = Extract<
+  EmergencyPermissionId,
+  'location' | 'notifications' | 'microphone' | 'camera'
+>;
 
 export type PortalPermissionState = 'granted' | 'denied' | 'prompt' | 'unsupported' | 'checking';
 
@@ -9,40 +21,20 @@ export type PortalPermissionDef = {
   label: string;
   description: string;
   features: string;
-  /** At least one access flag must be true (empty = always for subscribed clients). */
   requiresAny: (keyof AccessMap)[];
 };
 
-export const PORTAL_PERMISSION_DEFS: PortalPermissionDef[] = [
-  {
-    id: 'location',
-    label: 'Location',
-    description: 'Share GPS during panic, tracking, and vehicle recovery.',
-    features: 'Personal · Family · Vehicle · Emergency',
-    requiresAny: ['personal', 'family', 'vehicle', 'emergency'],
-  },
-  {
-    id: 'notifications',
-    label: 'Notifications',
-    description: 'Dispatch updates, incident alerts, and family safety messages.',
-    features: 'All protection plans',
-    requiresAny: [],
-  },
-  {
-    id: 'microphone',
-    label: 'Microphone',
-    description: 'Speak to control room on call and silent safety line.',
-    features: 'Emergency · Dispatch calls',
-    requiresAny: ['emergency'],
-  },
-  {
-    id: 'camera',
-    label: 'Camera',
-    description: 'View live home CCTV and share evidence when needed.',
-    features: 'Home security',
-    requiresAny: ['home'],
-  },
-];
+const CORE_IDS: PortalPermissionKind[] = ['location', 'notifications', 'microphone', 'camera'];
+
+export const PORTAL_PERMISSION_DEFS: PortalPermissionDef[] = EMERGENCY_PERMISSION_DEFS.filter((d) =>
+  CORE_IDS.includes(d.id as PortalPermissionKind),
+).map((d) => ({
+  id: d.id as PortalPermissionKind,
+  label: d.label,
+  description: d.why,
+  features: d.group === 'recommended' ? 'Emergency protection' : 'Optional',
+  requiresAny: d.requiresAny,
+}));
 
 export function permissionAppliesToPlan(
   def: PortalPermissionDef,

@@ -283,14 +283,15 @@ export const demoProperties: {
   name: string;
   alarmStatus: string;
   alarmLinked: boolean;
+  propertyType?: string;
 }[] = [
-  { id: 'demo-prop-1', name: 'Home — Umhlanga', alarmStatus: 'ARMED', alarmLinked: true },
-  { id: 'demo-prop-2', name: 'Flat — Ballito', alarmStatus: 'DISARMED', alarmLinked: true },
-  { id: 'demo-prop-3', name: 'Warehouse — Prospecton', alarmStatus: 'ARMED', alarmLinked: true },
-  { id: 'demo-prop-4', name: 'Retail — Gateway', alarmStatus: 'TRIGGERED', alarmLinked: true },
-  { id: 'demo-prop-5', name: 'Farmstead — Hillcrest', alarmStatus: 'ARMED', alarmLinked: true },
-  { id: 'demo-prop-6', name: 'Clinic — Umhlanga Ridge', alarmStatus: 'ARMED_STAY', alarmLinked: true },
-  { id: 'demo-prop-7', name: 'Guest house — Morningside', alarmStatus: 'DISARMED', alarmLinked: true },
+  { id: 'demo-prop-1', name: 'Home — Umhlanga', alarmStatus: 'ARMED', alarmLinked: true, propertyType: 'HOUSE' },
+  { id: 'demo-prop-2', name: 'Flat — Ballito', alarmStatus: 'DISARMED', alarmLinked: true, propertyType: 'APARTMENT' },
+  { id: 'demo-prop-3', name: 'Warehouse — Prospecton', alarmStatus: 'ARMED', alarmLinked: true, propertyType: 'WAREHOUSE' },
+  { id: 'demo-prop-4', name: 'Retail — Gateway', alarmStatus: 'TRIGGERED', alarmLinked: true, propertyType: 'MALL' },
+  { id: 'demo-prop-5', name: 'Farmstead — Hillcrest', alarmStatus: 'ARMED', alarmLinked: true, propertyType: 'HOUSE' },
+  { id: 'demo-prop-6', name: 'Clinic — Umhlanga Ridge', alarmStatus: 'ARMED_STAY', alarmLinked: true, propertyType: 'OFFICE' },
+  { id: 'demo-prop-7', name: 'Guest house — Morningside', alarmStatus: 'DISARMED', alarmLinked: true, propertyType: 'HOUSE' },
 ];
 
 const nowIso = () => new Date().toISOString();
@@ -301,7 +302,7 @@ export const demoSurveillanceSites: DemoSurveillanceSite[] = [
     id: 'demo-prop-1',
     name: 'Home — Umhlanga',
     address: '12 Lagoon Dr, Umhlanga',
-    propertyType: 'RESIDENTIAL',
+    propertyType: 'HOUSE',
     alarmStatus: 'ARMED',
     alarmLinked: true,
     camerasLinked: true,
@@ -326,8 +327,6 @@ export const demoSurveillanceSites: DemoSurveillanceSite[] = [
     },
     cameraCount: 4,
     onlineCameras: 4,
-    sensorCount: 8,
-    alertSensors: 1,
     openEvents: 2,
     cameras: [
       cam('demo-cam-1', 'Front gate', 'Driveway', 1),
@@ -340,7 +339,13 @@ export const demoSurveillanceSites: DemoSurveillanceSite[] = [
       sensor('demo-sens-2', 'Lounge window', 2, 'WINDOW', 'Living room'),
       sensor('demo-sens-3', 'Back gate PIR', 3, 'PIR', 'Rear garden', { status: 'ALERT' }),
       sensor('demo-sens-4', 'Garage side door', 4, 'DOOR', 'Side garage'),
+      sensor('demo-sens-5', 'Passage PIR', 5, 'PIR', 'Hallway', { isPerimeter: false }),
+      sensor('demo-sens-6', 'Kitchen smoke', 6, 'SMOKE', 'Kitchen', { is24Hour: true, status: 'FAULT' }),
+      sensor('demo-sens-7', 'Yard beam', 7, 'OUTDOOR_BEAM', 'Side yard', { status: 'OFFLINE' }),
+      sensor('demo-sens-8', 'Study window', 8, 'WINDOW', 'Study', { bypassed: true, status: 'BYPASSED' }),
     ],
+    sensorCount: 8,
+    alertSensors: 3,
     gateCode: '4411',
     accessNotes: 'Contact client before entry. Dog on premises.',
     keyHolder: 'Nomsa Client · +27 82 123 4567',
@@ -359,10 +364,10 @@ export const demoSurveillanceSites: DemoSurveillanceSite[] = [
       {
         id: 'demo-veh-1',
         registration: 'ND 123-456',
-        make: 'Toyota',
-        model: 'Fortuner',
+        make: 'Mercedes-Benz',
+        model: 'C-Class',
         color: 'White',
-        year: 2022,
+        year: 2024,
         trackerStatus: 'ONLINE',
         speed: 42,
         lastSeen: minsAgo(3),
@@ -489,7 +494,7 @@ export const demoSurveillanceSites: DemoSurveillanceSite[] = [
     id: 'demo-prop-3',
     name: 'Warehouse — Prospecton',
     address: '44 Industrial Rd, Prospecton',
-    propertyType: 'COMMERCIAL',
+    propertyType: 'WAREHOUSE',
     alarmStatus: 'ARMED',
     alarmLinked: true,
     camerasLinked: true,
@@ -980,7 +985,7 @@ export const demoVehicleCameraFeeds: DemoVehicleFeed[] = [
   {
     vehicleId: 'demo-veh-1',
     registration: 'ND 123-456',
-    label: 'Toyota Fortuner',
+    label: 'Mercedes-Benz C-Class',
     cameras: [
       cam('demo-vcam-1', 'Dash forward', 'Windscreen', 1),
       cam('demo-vcam-2', 'Cabin', 'Interior', 2, { isInterior: true, placement: 'INTERIOR' }),
@@ -990,7 +995,7 @@ export const demoVehicleCameraFeeds: DemoVehicleFeed[] = [
   {
     vehicleId: 'demo-veh-2',
     registration: 'ND 882-441',
-    label: 'VW Polo',
+    label: 'Audi TT RS',
     cameras: [cam('demo-vcam-21', 'Dash forward', 'Windscreen', 1)],
   },
   {
@@ -1048,6 +1053,7 @@ export type DemoClientVehicle = {
   vin: string;
   trackerLinked: boolean;
   theftRecovery: boolean;
+  emergencyStatus?: string | null;
   immobiliserOn: boolean;
   doorsLocked?: boolean;
   insuranceInfo: string;
@@ -1063,14 +1069,15 @@ export const demoClientVehicles: DemoClientVehicle[] = [
   {
     id: 'demo-veh-1',
     registration: 'ND 123-456',
-    make: 'Toyota',
-    model: 'Fortuner',
-    variant: 'GD-6',
-    year: 2022,
+    make: 'Mercedes-Benz',
+    model: 'C-Class',
+    variant: 'W206',
+    year: 2024,
     color: 'White',
-    vin: 'JTMDN123456789012',
+    vin: 'W1KAF4HB0PR123456',
     trackerLinked: true,
     theftRecovery: true,
+    emergencyStatus: 'STOLEN',
     immobiliserOn: false,
     insuranceInfo: 'Santam comprehensive',
     ownerName: 'Nomsa Client',
@@ -1083,11 +1090,11 @@ export const demoClientVehicles: DemoClientVehicle[] = [
   {
     id: 'demo-veh-2',
     registration: 'ND 882-441',
-    make: 'Volkswagen',
-    model: 'Polo',
-    year: 2021,
+    make: 'Audi',
+    model: 'TT RS',
+    year: 2019,
     color: 'Silver',
-    vin: 'WVWZZZ6RZHY123456',
+    vin: 'TRUZZZ8J0K1123456',
     trackerLinked: true,
     theftRecovery: false,
     immobiliserOn: false,
@@ -1268,16 +1275,25 @@ export function demoMapClients() {
 }
 
 export function demoMapProperties() {
-  return demoSurveillanceSites.map((s) => ({
-    id: s.id,
-    lat: s.lat,
-    lng: s.lng,
-    propertyType: s.mapAlarm ?? 'ALARM_OK',
-    name: s.name,
-    address: s.address,
-    alarmStatus: s.alarmStatus,
-    owner: s.owner.name,
-  }));
+  return demoSurveillanceSites.map((s) => {
+    const siteKind = (s.propertyType || 'HOUSE').toUpperCase();
+    const alarm = (s.mapAlarm || 'ALARM_OK').toUpperCase();
+    let propertyType = 'REGISTERED_HOME';
+    if (alarm === 'ALARM_ACTIVE' || alarm === 'ALARM_TRIGGERED') propertyType = 'ALARM_ACTIVE';
+    else if (siteKind === 'WAREHOUSE' || siteKind === 'MALL' || siteKind === 'ESTATE') propertyType = 'GUARDED_ESTATE';
+    else if (siteKind === 'HOUSE' || siteKind === 'APARTMENT' || siteKind === 'FLAT') propertyType = 'REGISTERED_HOME';
+    else if (alarm === 'ALARM_OK' || alarm === 'ALARM_STAY') propertyType = 'REGISTERED_HOME';
+    return {
+      id: s.id,
+      lat: s.lat,
+      lng: s.lng,
+      propertyType,
+      name: s.name,
+      address: s.address,
+      alarmStatus: s.alarmStatus,
+      owner: s.owner.name,
+    };
+  });
 }
 
 export function demoMapVehicles() {
@@ -1296,5 +1312,6 @@ export function demoMapVehicles() {
     doorsLocked: v.doorsLocked ?? true,
     immobiliserOn: v.immobiliserOn,
     theftRecovery: v.theftRecovery,
+    emergencyStatus: v.emergencyStatus ?? (v.theftRecovery ? 'STOLEN' : null),
   }));
 }

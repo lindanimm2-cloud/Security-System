@@ -22,14 +22,14 @@ export function getCompanyProfile(): CompanyProfile {
   const org = settings.organisation;
   const billing = settings.billing;
   return {
-    legalName: org.name?.trim() || '4DS Solutions',
+    legalName: org.name?.trim() || '4DS Solutions (Pty) Ltd',
     tradingName: org.tradingName?.trim() || '4DS Nexus',
-    registration: org.registration?.trim() || '',
+    registration: org.registration?.trim() || 'K2025567725',
     vatNumber: org.vat?.trim() || '',
-    address: org.address?.trim() || '',
+    address: org.address?.trim() || 'South Africa',
     supportPhone: org.supportPhone?.trim() || '',
     afterHoursPhone: org.afterHoursPhone?.trim() || '',
-    invoiceEmail: billing.invoiceEmail?.trim() || '',
+    invoiceEmail: billing.invoiceEmail?.trim() || 'accounts@4dsnexus.co.za',
     logoUrl: COMPANY_LOGO_SRC,
     vatInclusive: billing.vatInclusive,
     plan: billing.plan?.trim() || 'Subscription',

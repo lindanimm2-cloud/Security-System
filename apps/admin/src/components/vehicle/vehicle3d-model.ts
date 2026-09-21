@@ -51,6 +51,8 @@ export type VehicleMeshMap = {
 };
 
 const LOCK_RED = VEHICLE_VISUAL.panicRed;
+const CUT_ROSE = VEHICLE_VISUAL.immobiliserRose;
+const UNLOCK_AMBER = VEHICLE_VISUAL.unlockAmber;
 const RECOVERY_AMBER = VEHICLE_VISUAL.recoveryAmber;
 const OPEN_BLUE = VEHICLE_VISUAL.openBlue;
 const LOCK_GREEN = VEHICLE_VISUAL.lockGreen;
@@ -977,6 +979,49 @@ function lerpMat(
   mat.emissiveIntensity = Math.min(emissiveIntensity, 0.65);
 }
 
+/** Strong whole-vehicle wash (ignition cut / panic / recovery) — readable on textured paint. */
+function washMat(
+  mat: THREE.MeshStandardMaterial,
+  tint: number,
+  mix: number,
+  emissiveIntensity: number,
+): void {
+  if (mat.transparent && mat.opacity < 0.88) return;
+  const base = (mat.userData.baseColor as number) ?? mat.color.getHex();
+  mat.color.copy(new THREE.Color(base).lerp(new THREE.Color(tint), Math.min(Math.max(mix, 0), 0.92)));
+  mat.emissive.setHex(tint);
+  mat.emissiveIntensity = Math.min(Math.max(emissiveIntensity, 0), 1);
+  mat.needsUpdate = true;
+}
+
+function washWholeCar(
+  meshes: VehicleMeshMap,
+  allShell: THREE.Mesh[],
+  tint: number,
+  mix: number,
+  emissive: number,
+): void {
+  for (const mesh of allShell) {
+    eachStandard(mesh, (mat) => washMat(mat, tint, mix, emissive));
+  }
+  for (const mat of meshes.paintMaterials) {
+    washMat(mat, tint, mix, emissive);
+  }
+}
+
+function showOverlays(meshes: VehicleMeshMap, tint: number, opacity: number, emissive: number): void {
+  for (const overlay of meshes.doorOverlays) {
+    overlay.visible = true;
+    const mat = asStandard(overlay.material);
+    if (!mat) continue;
+    mat.color.setHex(tint);
+    mat.emissive.setHex(tint);
+    mat.emissiveIntensity = emissive;
+    mat.opacity = opacity;
+    mat.needsUpdate = true;
+  }
+}
+
 function tintMeshes(meshes: THREE.Mesh[], tint: number, mix: number, emissive: number): void {
   for (const mesh of meshes) {
     eachStandard(mesh, (mat) => lerpMat(mat, tint, mix, emissive));
@@ -1071,9 +1116,9 @@ export function highlightComponent(
 
   if (!targets.length) return;
 
-  if (status === 'open') tintDoorMeshes(targets, OPEN_BLUE, 0.32, 0.28 + pulse * 0.16);
-  else if (status === 'unlocked') return; // natural materials — status bar carries unlock
-  else if (status === 'locked') return; // natural materials — status bar carries lock
+  if (status === 'open') tintDoorMeshes(targets, OPEN_BLUE, 0.36, 0.32 + pulse * 0.18);
+  else if (status === 'unlocked') tintDoorMeshes(targets, UNLOCK_AMBER, 0.3, 0.22 + pulse * 0.12);
+  else if (status === 'locked') tintDoorMeshes(targets, LOCK_GREEN, 0.34, 0.28 + pulse * 0.16);
   else if (status === 'tamper' || status === 'panic') tintDoorMeshes(targets, LOCK_RED, 0.48, 0.4 + pulse * 0.25);
   else if (status === 'offline') tintDoorMeshes(targets, VEHICLE_VISUAL.offlineGrey, 0.35, 0);
 }
@@ -1082,11 +1127,12 @@ export function highlightComponent(
  * Security state → materials + panel animation.
  *
  * Colour language (telematics / ops):
- * - Body paint stays authored GLB materials
- * - OPEN door/boot/bonnet → blue highlight on that part only
- * - TAMPER → red on affected part only
- * - LOCKED / UNLOCKED / ONLINE → no vehicle tint (status strip only)
- * - Panic → controlled whole-vehicle red + ground glow (shape still readable)
+ * - Body paint stays authored GLB materials when idle
+ * - Doors LOCKED → green · UNLOCKED → amber · OPEN → blue (doors only)
+ * - Boot/bonnet OPEN → blue
+ * - Ignition cut / immobiliser → rose whole-vehicle wash + ground glow (not door-only)
+ * - Theft recovery / stolen → amber body wash + ground glow
+ * - Panic → bright whole-vehicle red + ground glow
  * - Offline → subtle desaturation
  */
 export function applyVehicleVisualState(
@@ -1137,22 +1183,72 @@ export function applyVehicleComponentState(
   const glow = meshes.underGlow.material as THREE.MeshBasicMaterial;
   const ring = meshes.scanRing.material as THREE.MeshBasicMaterial;
 
+  const openDoorPass = () => {
+    for (const { id, part, side } of [
+      { id: 'frontLeft' as const, part: meshes.parts.doorFrontLeft, side: 'left' as const },
+      { id: 'frontRight' as const, part: meshes.parts.doorFrontRight, side: 'right' as const },
+      {
+        id: 'rearLeft' as const,
+        part: meshes.parts.doorRearLeft.meshes.length ? meshes.parts.doorRearLeft : meshes.parts.doorFrontLeft,
+        side: 'left' as const,
+      },
+      {
+        id: 'rearRight' as const,
+        part: meshes.parts.doorRearRight.meshes.length ? meshes.parts.doorRearRight : meshes.parts.doorFrontRight,
+        side: 'right' as const,
+      },
+    ]) {
+      if (!component.doors[id].open) continue;
+      const targets = doorMeshesForSlot(meshes, part, side);
+      if (targets.length) tintDoorMeshes(targets, OPEN_BLUE, 0.36, 0.32 + pulse * 0.18);
+    }
+    if (component.bonnet.open) tintDoorMeshes(meshes.parts.bonnet.meshes, OPEN_BLUE, 0.36, 0.32 + pulse * 0.18);
+    if (component.boot.open) tintDoorMeshes(meshes.parts.boot.meshes, OPEN_BLUE, 0.36, 0.32 + pulse * 0.18);
+  };
+
   if (component.panic) {
-    for (const mesh of allShell) {
-      eachStandard(mesh, (mat) => lerpMat(mat, LOCK_RED, 0.42, 0.38 + pulse * 0.28));
-    }
-    for (const mat of meshes.paintMaterials) {
-      lerpMat(mat, LOCK_RED, 0.42, 0.38 + pulse * 0.28);
-    }
+    washWholeCar(meshes, allShell, LOCK_RED, 0.78, 0.72 + pulse * 0.28);
+    showOverlays(meshes, LOCK_RED, 0.42 + pulse * 0.12, 0.75 + pulse * 0.2);
     meshes.underGlow.visible = true;
     meshes.scanRing.visible = true;
     glow.color.setHex(LOCK_RED);
-    glow.opacity = 0.38 + pulse * 0.22;
+    glow.opacity = 0.55 + pulse * 0.28;
     ring.color.setHex(LOCK_RED);
-    ring.opacity = 0.5 + pulse * 0.25;
+    ring.opacity = 0.65 + pulse * 0.28;
     meshes.scanRing.rotation.z = pulse * Math.PI * 0.55;
     for (const marker of meshes.lockMarkers) marker.visible = false;
-    for (const overlay of meshes.doorOverlays) overlay.visible = false;
+    return;
+  }
+
+  // Theft recovery / stolen — amber wash before normal door cues
+  if (component.theftRecovery) {
+    washWholeCar(meshes, allShell, RECOVERY_AMBER, 0.62, 0.48 + pulse * 0.22);
+    showOverlays(meshes, RECOVERY_AMBER, 0.32 + pulse * 0.1, 0.55 + pulse * 0.18);
+    meshes.underGlow.visible = true;
+    meshes.scanRing.visible = true;
+    glow.color.setHex(RECOVERY_AMBER);
+    glow.opacity = 0.4 + pulse * 0.18;
+    ring.color.setHex(RECOVERY_AMBER);
+    ring.opacity = 0.5 + pulse * 0.2;
+    meshes.scanRing.rotation.z = pulse * Math.PI * 0.4;
+    for (const marker of meshes.lockMarkers) marker.visible = false;
+    openDoorPass();
+    return;
+  }
+
+  // Ignition cut / immobiliser — rose whole-car wash (distinct from panic red + unlock amber)
+  if (component.immobiliserOn) {
+    washWholeCar(meshes, allShell, CUT_ROSE, 0.82, 0.7 + pulse * 0.28);
+    showOverlays(meshes, CUT_ROSE, 0.48 + pulse * 0.14, 0.8 + pulse * 0.2);
+    meshes.underGlow.visible = true;
+    meshes.scanRing.visible = true;
+    glow.color.setHex(CUT_ROSE);
+    glow.opacity = 0.52 + pulse * 0.22;
+    ring.color.setHex(CUT_ROSE);
+    ring.opacity = 0.62 + pulse * 0.22;
+    meshes.scanRing.rotation.z = pulse * Math.PI * 0.45;
+    for (const marker of meshes.lockMarkers) marker.visible = false;
+    openDoorPass();
     return;
   }
 
@@ -1172,7 +1268,7 @@ export function applyVehicleComponentState(
     return;
   }
 
-  // Component highlights: OPEN → blue only. Lock/online never tint the car.
+  // Doors only: locked green · unlocked amber · open blue
   const doorMap: Array<{ id: VehicleDoorId; part: VehiclePartGroup; side: 'left' | 'right' }> = [
     { id: 'frontLeft', part: meshes.parts.doorFrontLeft, side: 'left' },
     { id: 'frontRight', part: meshes.parts.doorFrontRight, side: 'right' },
@@ -1188,55 +1284,79 @@ export function applyVehicleComponentState(
     },
   ];
 
+  let anyDoorTinted = false;
   const painted = new Set<THREE.Mesh>();
   for (const { id, part, side } of doorMap) {
     const st = component.doors[id];
-    if (!st.open) continue;
     const targets = doorMeshesForSlot(meshes, part, side).filter((m) => !painted.has(m));
     if (!targets.length) continue;
     targets.forEach((m) => painted.add(m));
-    tintDoorMeshes(targets, OPEN_BLUE, 0.34, 0.3 + pulse * 0.18);
-  }
-
-  if (component.bonnet.open) {
-    tintDoorMeshes(meshes.parts.bonnet.meshes, OPEN_BLUE, 0.34, 0.3 + pulse * 0.18);
-  }
-  if (component.boot.open) {
-    tintDoorMeshes(meshes.parts.boot.meshes, OPEN_BLUE, 0.34, 0.3 + pulse * 0.18);
-  }
-
-  const showGlow = component.immobiliserOn || component.theftRecovery;
-  meshes.underGlow.visible = showGlow;
-  meshes.scanRing.visible = showGlow;
-
-  if (component.immobiliserOn) {
-    glow.color.setHex(LOCK_RED);
-    glow.opacity = 0.28 + pulse * 0.14;
-    ring.color.setHex(LOCK_RED);
-    ring.opacity = 0.38 + pulse * 0.18;
-  } else if (component.theftRecovery) {
-    glow.color.setHex(RECOVERY_AMBER);
-    glow.opacity = 0.16 + pulse * 0.1;
-    ring.color.setHex(RECOVERY_AMBER);
-    ring.opacity = 0.24 + pulse * 0.12;
-  } else {
-    glow.opacity = 0;
-    ring.opacity = 0;
-  }
-
-  // Never show green/amber door slabs — they wash the whole stage
-  for (const overlay of meshes.doorOverlays) {
-    overlay.visible = false;
-    const mat = asStandard(overlay.material);
-    if (mat) {
-      mat.opacity = 0;
-      mat.emissiveIntensity = 0;
+    if (st.open) {
+      tintDoorMeshes(targets, OPEN_BLUE, 0.38, 0.34 + pulse * 0.2);
+      anyDoorTinted = true;
+    } else if (component.locked || st.locked) {
+      tintDoorMeshes(targets, LOCK_GREEN, 0.34, 0.28 + pulse * 0.16);
+      anyDoorTinted = true;
+    } else {
+      tintDoorMeshes(targets, UNLOCK_AMBER, 0.3, 0.24 + pulse * 0.14);
+      anyDoorTinted = true;
     }
   }
 
-  // Lock markers off by default — lock state lives in the status strip
+  if (!anyDoorTinted && meshes.doors.length) {
+    if (component.locked) tintDoorMeshes(meshes.doors, LOCK_GREEN, 0.34, 0.28 + pulse * 0.16);
+    else tintDoorMeshes(meshes.doors, UNLOCK_AMBER, 0.3, 0.24 + pulse * 0.14);
+    anyDoorTinted = true;
+  }
+
+  if (component.bonnet.open) {
+    tintDoorMeshes(meshes.parts.bonnet.meshes, OPEN_BLUE, 0.38, 0.34 + pulse * 0.2);
+  }
+  if (component.boot.open) {
+    tintDoorMeshes(meshes.parts.boot.meshes, OPEN_BLUE, 0.38, 0.34 + pulse * 0.2);
+  }
+
+  const showGlow = false;
+  meshes.underGlow.visible = showGlow;
+  meshes.scanRing.visible = showGlow;
+
+  glow.opacity = 0;
+  ring.opacity = 0;
+
+  // Flank overlays when GLB has no door meshes
+  if (meshes.doorOverlays.length && !meshes.hasAuthoredDoors) {
+    const overlayTint = component.locked ? LOCK_GREEN : UNLOCK_AMBER;
+    for (const overlay of meshes.doorOverlays) {
+      overlay.visible = true;
+      const mat = asStandard(overlay.material);
+      if (mat) {
+        mat.color.setHex(overlayTint);
+        mat.emissive.setHex(overlayTint);
+        mat.opacity = 0.5 + pulse * 0.08;
+        mat.emissiveIntensity = 0.7 + pulse * 0.2;
+      }
+    }
+  } else {
+    for (const overlay of meshes.doorOverlays) {
+      overlay.visible = false;
+      const mat = asStandard(overlay.material);
+      if (mat) {
+        mat.opacity = 0;
+        mat.emissiveIntensity = 0;
+      }
+    }
+  }
+
   for (const marker of meshes.lockMarkers) {
-    marker.visible = false;
+    const mat = asStandard((marker as THREE.Mesh).material);
+    const show = component.locked;
+    marker.visible = show;
+    if (mat) {
+      mat.color.setHex(LOCK_GREEN);
+      mat.emissive.setHex(LOCK_GREEN);
+      mat.opacity = show ? 0.9 : 0;
+      mat.emissiveIntensity = show ? 0.75 + pulse * 0.18 : 0;
+    }
   }
 
   meshes.scanRing.rotation.z = pulse * Math.PI * 0.35;
@@ -1256,7 +1376,7 @@ export function applyVehicleComponentState(
         mat.emissiveIntensity = 1.15;
       }
       if ((n.includes('tail') || n.includes('rear')) && (component.immobiliserOn || component.panic)) {
-        mat.emissive.setHex(LOCK_RED);
+        mat.emissive.setHex(component.panic ? LOCK_RED : CUT_ROSE);
         mat.emissiveIntensity = 1.15 + pulse * 0.35;
       }
     });

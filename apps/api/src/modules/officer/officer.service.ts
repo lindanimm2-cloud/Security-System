@@ -76,8 +76,7 @@ export class OfficerService {
           status: officer.status,
           zone: officer.zone,
           avgResponseSec: officer.avgResponseSec,
-          lat: officer.currentLat ? Number(officer.currentLat) : null,
-          lng: officer.currentLng ? Number(officer.currentLng) : null,
+          ...this.dutySnapshot(officer),
         },
         stats: {
           activeAssignments: activeDispatches.length,
@@ -280,7 +279,12 @@ export class OfficerService {
     const officer = await this.resolveOfficer(tenantId, email);
     const updated = await this.prisma.officer.update({
       where: { id: officer.id },
-      data: { status },
+      data: {
+        status,
+        ...(status === OfficerStatus.OFF_DUTY
+          ? { dutyModeActive: false }
+          : {}),
+      },
     });
     const active = await this.prisma.dispatch.findFirst({
       where: { officerId: officer.id, tenantId, status: { notIn: ['COMPLETED', 'CANCELLED'] } },
@@ -291,9 +295,246 @@ export class OfficerService {
       incidentId: active?.incidentId,
       type: PlatformEvent.UNIT_STATUS_UPDATED,
       source: 'officer',
-      payload: { officerId: officer.id, status },
+      payload: {
+        officerId: officer.id,
+        status,
+        dutyModeActive: updated.dutyModeActive,
+      },
     });
-    return { success: true, data: updated };
+    return { success: true, data: this.formatDutyOfficer(updated) };
+  }
+
+  /** Persistent Operational Mode status — cloud source of truth. */
+  async getDutyStatus(tenantId: string, email: string) {
+    const officer = await this.resolveOfficer(tenantId, email);
+    return { success: true, data: this.formatDutyOfficer(officer) };
+  }
+
+  async startDuty(
+    tenantId: string,
+    email: string,
+    body: {
+      checks?: Record<string, boolean>;
+      deviceLabel?: string;
+      batteryPct?: number;
+      networkType?: string;
+      pushToken?: string;
+      appVersion?: string;
+      lat?: number;
+      lng?: number;
+    },
+  ) {
+    const officer = await this.resolveOfficer(tenantId, email);
+    const now = new Date();
+    const checks = {
+      ...(typeof body.checks === 'object' && body.checks ? body.checks : {}),
+      checkedAt: now.toISOString(),
+    };
+    const updated = await this.prisma.officer.update({
+      where: { id: officer.id },
+      data: {
+        dutyModeActive: true,
+        dutyStartedAt: now,
+        lastHeartbeatAt: now,
+        status:
+          officer.status === OfficerStatus.OFF_DUTY ? OfficerStatus.AVAILABLE : officer.status,
+        deviceLabel: body.deviceLabel?.trim() || officer.deviceLabel,
+        batteryPct: clampBattery(body.batteryPct) ?? officer.batteryPct,
+        networkType: body.networkType?.trim() || officer.networkType,
+        pushToken: body.pushToken?.trim() || officer.pushToken,
+        appVersion: body.appVersion?.trim() || officer.appVersion,
+        operationalChecks: checks,
+        ...(typeof body.lat === 'number' && typeof body.lng === 'number'
+          ? { currentLat: body.lat, currentLng: body.lng }
+          : {}),
+      },
+    });
+    await this.kernel.recordEvent({
+      tenantId,
+      type: PlatformEvent.UNIT_STATUS_UPDATED,
+      source: 'officer',
+      payload: {
+        officerId: officer.id,
+        status: updated.status,
+        dutyModeActive: true,
+        event: 'duty.started',
+      },
+    });
+    this.realtime.emitPlatformEvent(tenantId, PlatformEvent.UNIT_STATUS_UPDATED, {
+      entityType: 'officer',
+      id: officer.id,
+      status: updated.status,
+      dutyModeActive: true,
+      event: 'duty.started',
+    });
+    return { success: true, data: this.formatDutyOfficer(updated) };
+  }
+
+  async endDuty(tenantId: string, email: string) {
+    const officer = await this.resolveOfficer(tenantId, email);
+    const updated = await this.prisma.officer.update({
+      where: { id: officer.id },
+      data: {
+        dutyModeActive: false,
+        status: OfficerStatus.OFF_DUTY,
+        lastHeartbeatAt: new Date(),
+      },
+    });
+    await this.kernel.recordEvent({
+      tenantId,
+      type: PlatformEvent.UNIT_STATUS_UPDATED,
+      source: 'officer',
+      payload: {
+        officerId: officer.id,
+        status: updated.status,
+        dutyModeActive: false,
+        event: 'duty.ended',
+      },
+    });
+    this.realtime.emitPlatformEvent(tenantId, PlatformEvent.UNIT_STATUS_UPDATED, {
+      entityType: 'officer',
+      id: officer.id,
+      status: updated.status,
+      dutyModeActive: false,
+      event: 'duty.ended',
+    });
+    return { success: true, data: this.formatDutyOfficer(updated) };
+  }
+
+  async dutyHeartbeat(
+    tenantId: string,
+    email: string,
+    body: {
+      lat?: number;
+      lng?: number;
+      batteryPct?: number;
+      networkType?: string;
+      pushToken?: string;
+      appVersion?: string;
+      deviceLabel?: string;
+    },
+  ) {
+    const officer = await this.resolveOfficer(tenantId, email);
+    if (!officer.dutyModeActive) {
+      throw new BadRequestException('Duty Mode is not active');
+    }
+    const now = new Date();
+    const updated = await this.prisma.officer.update({
+      where: { id: officer.id },
+      data: {
+        lastHeartbeatAt: now,
+        batteryPct: clampBattery(body.batteryPct) ?? officer.batteryPct,
+        networkType: body.networkType?.trim() || officer.networkType,
+        pushToken: body.pushToken?.trim() || officer.pushToken,
+        appVersion: body.appVersion?.trim() || officer.appVersion,
+        deviceLabel: body.deviceLabel?.trim() || officer.deviceLabel,
+        ...(typeof body.lat === 'number' && typeof body.lng === 'number'
+          ? { currentLat: body.lat, currentLng: body.lng }
+          : {}),
+      },
+    });
+    if (typeof body.lat === 'number' && typeof body.lng === 'number') {
+      const active = await this.prisma.dispatch.findFirst({
+        where: {
+          officerId: officer.id,
+          tenantId,
+          status: { notIn: ['COMPLETED', 'CANCELLED'] },
+        },
+        select: { incidentId: true },
+      });
+      this.realtime.emitPlatformEvent(
+        tenantId,
+        PlatformEvent.UNIT_LOCATION_UPDATED,
+        {
+          entityType: 'officer',
+          id: officer.id,
+          lat: body.lat,
+          lng: body.lng,
+          incidentId: active?.incidentId ?? null,
+          dutyModeActive: true,
+          heartbeatAt: now.toISOString(),
+        },
+        { incidentId: active?.incidentId },
+      );
+    }
+    return { success: true, data: this.formatDutyOfficer(updated) };
+  }
+
+  private dutySnapshot(officer: {
+    dutyModeActive: boolean;
+    dutyStartedAt: Date | null;
+    lastHeartbeatAt: Date | null;
+    deviceLabel: string | null;
+    batteryPct: number | null;
+    networkType: string | null;
+    pushToken: string | null;
+    appVersion: string | null;
+    operationalChecks: unknown;
+    currentLat: { toString(): string } | null;
+    currentLng: { toString(): string } | null;
+  }) {
+    const lastHeartbeatAt = officer.lastHeartbeatAt?.toISOString() ?? null;
+    const staleMs = 3 * 60 * 1000;
+    const heartbeatAgeMs = officer.lastHeartbeatAt
+      ? Date.now() - officer.lastHeartbeatAt.getTime()
+      : null;
+    const deviceOnline =
+      officer.dutyModeActive &&
+      heartbeatAgeMs != null &&
+      heartbeatAgeMs <= staleMs;
+    const deviceLink = !officer.dutyModeActive
+      ? 'STANDBY'
+      : !officer.lastHeartbeatAt
+        ? 'NO_SIGNAL'
+        : deviceOnline
+          ? 'ONLINE'
+          : 'OFFLINE';
+
+    return {
+      dutyModeActive: officer.dutyModeActive,
+      dutyStartedAt: officer.dutyStartedAt?.toISOString() ?? null,
+      lastHeartbeatAt,
+      deviceLabel: officer.deviceLabel,
+      batteryPct: officer.batteryPct,
+      networkType: officer.networkType,
+      hasPushToken: Boolean(officer.pushToken),
+      appVersion: officer.appVersion,
+      operationalChecks: officer.operationalChecks ?? null,
+      deviceLink,
+      deviceTrusted: deviceLink === 'ONLINE' || deviceLink === 'STANDBY',
+      lat: officer.currentLat ? Number(officer.currentLat) : null,
+      lng: officer.currentLng ? Number(officer.currentLng) : null,
+    };
+  }
+
+  private formatDutyOfficer(officer: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    email: string;
+    status: OfficerStatus;
+    zone: string | null;
+    dutyModeActive: boolean;
+    dutyStartedAt: Date | null;
+    lastHeartbeatAt: Date | null;
+    deviceLabel: string | null;
+    batteryPct: number | null;
+    networkType: string | null;
+    pushToken: string | null;
+    appVersion: string | null;
+    operationalChecks: unknown;
+    currentLat: { toString(): string } | null;
+    currentLng: { toString(): string } | null;
+  }) {
+    return {
+      id: officer.id,
+      firstName: officer.firstName,
+      lastName: officer.lastName,
+      email: officer.email,
+      status: officer.status,
+      zone: officer.zone,
+      ...this.dutySnapshot(officer),
+    };
   }
 
   async updateLocation(tenantId: string, email: string, lat: number, lng: number) {
@@ -885,4 +1126,9 @@ function startOfToday() {
 
 function formatResponse(sec: number) {
   return `${Math.floor(sec / 60)}m ${sec % 60}s`;
+}
+
+function clampBattery(value: number | undefined | null): number | null {
+  if (typeof value !== 'number' || Number.isNaN(value)) return null;
+  return Math.max(0, Math.min(100, Math.round(value)));
 }

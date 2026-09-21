@@ -2,10 +2,9 @@
 
 import { ErrorAlert } from '@/components/ErrorAlert';
 import Link from 'next/link';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { OfficerLayout } from '@/components/officer/OfficerLayout';
 import { OfficerActiveAssignment } from '@/components/officer/OfficerActiveAssignment';
-import { OfficerStatusBadge } from '@/components/officer/StatusBadges';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { useApi } from '@/hooks/useApi';
 import { DispatchStatusBadge } from '@/components/officer/StatusBadges';
@@ -16,7 +15,6 @@ import {
 } from '@/lib/officer-task-theme';
 import { officerApi, type ApiResponse } from '@/lib/api-client';
 import { shouldBackgroundPoll } from '@/lib/demo/is-demo-mode';
-import { OpsMyShiftHeader } from '@/components/ops/OpsMyShiftHeader';
 import {
   OpsCompactStats,
   OpsNeedsYou,
@@ -25,7 +23,11 @@ import {
 } from '@/components/ops/OpsQuickWork';
 import { OpsSwipeRow } from '@/components/ops/OpsSwipeRow';
 import { OpsUndoToast, useUndoToast } from '@/components/ops/OpsUndoToast';
-import { EmergencyModeBanner, HoldToActivate } from '@/components/ops/EmergencyMode';
+import { EmergencyModeBanner, HoldToActivate, OpsPanicIcon } from '@/components/ops/EmergencyMode';
+import { officerStatusLabel } from '@/lib/officer-status';
+import { triggerEmergencyVibration } from '@/lib/emergency-vibration';
+import { showClientEmergencyNotification } from '@/lib/client-push';
+import { CrossDeviceIncidentCard } from '@/components/platform/CrossDeviceIncidentCard';
 
 type Dashboard = {
   officer: {
@@ -34,6 +36,8 @@ type Dashboard = {
     status: string;
     zone: string | null;
     avgResponseSec: number;
+    dutyModeActive?: boolean;
+    deviceLink?: string;
   };
   stats: {
     activeAssignments: number;
@@ -81,7 +85,7 @@ function nextDispatchAction(status: string): {
 
 export default function OfficerDashboardPage() {
   return (
-    <OfficerLayout title="Field Home">
+    <OfficerLayout title="Field Operations">
       <DashboardContent />
     </OfficerLayout>
   );
@@ -102,6 +106,8 @@ function DashboardContent() {
   );
   const [localQueue, setLocalQueue] = useState<DispatchItem[] | null>(null);
   const undo = useUndoToast();
+  const knownDispatchIds = useRef(new Set<string>());
+  const dispatchSeeded = useRef(false);
 
   useEffect(() => {
     if (!shouldBackgroundPoll()) return;
@@ -113,6 +119,30 @@ function DashboardContent() {
     if (!data?.data) return;
     setLocalActive(data.data.activeDispatch);
     setLocalQueue(data.data.queue);
+
+    const incoming = [
+      ...(data.data.activeDispatch ? [data.data.activeDispatch] : []),
+      ...data.data.queue,
+    ];
+    if (!dispatchSeeded.current) {
+      for (const item of incoming) knownDispatchIds.current.add(item.id);
+      dispatchSeeded.current = true;
+      return;
+    }
+
+    for (const item of incoming) {
+      if (knownDispatchIds.current.has(item.id)) continue;
+      knownDispatchIds.current.add(item.id);
+      triggerEmergencyVibration('officer');
+      void showClientEmergencyNotification({
+        title: 'NEW P1 RESPONSE',
+        body: `${item.incident.type} · ${item.incident.address ?? item.incident.client} — Accept → En route`,
+        tag: `officer-dispatch-${item.id}`,
+        deepLink: '/officer/queue',
+        urgency: 'critical',
+        kind: 'officer',
+      });
+    }
   }, [data]);
 
   const d = data?.data;
@@ -205,9 +235,11 @@ function DashboardContent() {
         incidentId: active?.incident.id ?? null,
       });
       setSosMsg('SOS sent to the control room and your supervisor.');
+      triggerEmergencyVibration('panic');
       void reload({ silent: true });
     } catch {
       setSosMsg('SOS queued for the control room (demo).');
+      triggerEmergencyVibration('panic');
     } finally {
       setSosBusy(false);
     }
@@ -248,6 +280,12 @@ function DashboardContent() {
         ]
       : []),
     {
+      id: 'patrol',
+      title: 'Patrol site photos',
+      detail: 'Photograph required sites on your shift',
+      href: '/officer/patrol',
+    },
+    {
       id: 'messages',
       title: 'Dispatch chat',
       detail: 'Check for control room messages',
@@ -264,8 +302,21 @@ function DashboardContent() {
     { kind: 'Supervisor', label: 'Call supervisor' },
   ] as const;
 
+  const syncTime = new Date().toLocaleTimeString('en-ZA', {
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
+  });
+  const dateLabel = new Date().toLocaleDateString('en-ZA', {
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  }).toUpperCase();
+
   return (
-    <div className="dash-ops dash-ops--officer">
+    <div className="dash-ops dash-ops--officer field-cmd">
       {(sosMsg || (active && ['CRITICAL', 'HIGH'].includes(active.incident.priority.toUpperCase()))) && (
         <EmergencyModeBanner
           title={sosMsg ? 'Officer SOS active' : `${active!.incident.type} — priority response`}
@@ -294,39 +345,151 @@ function DashboardContent() {
         />
       )}
 
-      <OpsMyShiftHeader
-        title={`${d.officer.firstName} · Field Home`}
-        subtitle={
-          active
-            ? `Current job · ${active.incident.type}`
-            : waiting.length
-              ? `${waiting.length} in queue · on standby`
-              : 'No active assignment'
-        }
-        chips={[
-          { id: 'queue', label: 'Your Jobs', count: waiting.length, tone: 'warn' },
-          { id: 'all', label: 'Board', count: (active ? 1 : 0) + waiting.length },
-          { id: 'urgent', label: 'Urgent', count: urgentCount, tone: 'urgent' },
-          {
-            id: 'messages',
-            label: 'Messages',
-            count: 0,
-            tone: 'neutral',
-          },
-        ]}
-        activeChip={filter}
-        onChip={(id) => {
-          if (id === 'messages') {
-            window.location.href = '/officer/messages';
-            return;
-          }
-          setFilter(id);
-        }}
-      />
+      {sosMsg ? (
+        <div className="field-cmd__xd">
+          <CrossDeviceIncidentCard />
+        </div>
+      ) : null}
+
+      <header className="field-cmd-header">
+        <div className="field-cmd-header__top">
+          <div>
+            <p className="field-cmd-header__kicker">4DS Field</p>
+            <h1 className="field-cmd-header__title">Field Operations</h1>
+            <div className="field-cmd-header__meta">
+              <span>Officer · {d.officer.firstName}</span>
+              <span>{dateLabel}</span>
+              {d.officer.zone ? <span>{d.officer.zone}</span> : null}
+            </div>
+          </div>
+          <span className="field-status-pill">
+            <span className="field-status-pill__dot" aria-hidden />
+            Online / {officerStatusLabel(d.officer.status)}
+          </span>
+        </div>
+        <Link
+          href="/officer/duty"
+          className={`duty-home-strip ${d.officer.dutyModeActive ? 'is-active' : ''}`}
+        >
+          <span>
+            {d.officer.dutyModeActive ? '🟢 Duty Mode active' : 'Start Duty Mode'}
+          </span>
+          <span className="duty-home-strip__meta">
+            Persistent Operational Mode · device security
+          </span>
+        </Link>
+
+        <div className="field-metrics" role="tablist" aria-label="Field metrics">
+          {[
+            {
+              id: 'queue',
+              label: 'Assigned',
+              value: waiting.length,
+              hint: 'Active queue',
+              tone: 'warn' as const,
+            },
+            {
+              id: 'all',
+              label: 'Operations',
+              value: (active ? 1 : 0) + waiting.length,
+              hint: 'Board items',
+              tone: 'neutral' as const,
+            },
+            {
+              id: 'urgent',
+              label: 'Priority',
+              value: urgentCount,
+              hint: 'Action required',
+              tone: 'urgent' as const,
+            },
+            {
+              id: 'messages',
+              label: 'Comms',
+              value: 0,
+              hint: 'Unread',
+              tone: 'neutral' as const,
+            },
+          ].map((m) => (
+            <button
+              key={m.id}
+              type="button"
+              role="tab"
+              aria-selected={filter === m.id}
+              className={`field-metric field-metric--${m.tone} ${filter === m.id ? 'is-active' : ''}`}
+              onClick={() => {
+                if (m.id === 'messages') {
+                  window.location.href = '/officer/messages';
+                  return;
+                }
+                setFilter(m.id);
+              }}
+            >
+              <span className="field-metric__label">{m.label}</span>
+              <strong>{String(m.value).padStart(2, '0')}</strong>
+              <span className="field-metric__hint">{m.hint}</span>
+            </button>
+          ))}
+        </div>
+      </header>
+
+      {active ? (
+        <OfficerActiveAssignment
+          dispatch={active}
+          actionLoading={actionLoading}
+          onAction={runAction}
+        />
+      ) : (
+        <section className="field-ops-panel" aria-label="Current assignment">
+          <div className="field-ops-panel__head">
+            <p className="field-ops-panel__kicker">Field Operations</p>
+            <span className="field-ops-panel__status">
+              <span className="field-status-pill__dot" aria-hidden />
+              Online · on shift
+            </span>
+          </div>
+          <p className="field-ops-panel__label">Current assignment</p>
+          <h2>No active job</h2>
+          <p className="field-ops-panel__detail">
+            Awaiting dispatch assignment. You remain available for the next call.
+          </p>
+          <div className="field-ops-panel__actions">
+            <Link href="/officer/queue" className="btn-primary">
+              Open assignment queue
+            </Link>
+            <Link href="/officer/map" className="btn-secondary">
+              Live map
+            </Link>
+            <Link href="/officer/patrol" className="btn-secondary">
+              Patrol
+            </Link>
+          </div>
+          <div className="field-sys-row" aria-label="Field systems">
+            <div className="field-sys-item">
+              <span className="field-sys-item__label">Last sync</span>
+              <span className="field-sys-item__value">{syncTime}</span>
+            </div>
+            <div className="field-sys-item">
+              <span className="field-sys-item__label">GPS status</span>
+              <span className="field-sys-item__value">
+                <span className="field-sys-item__dot" aria-hidden />
+                Active
+              </span>
+            </div>
+            <div className="field-sys-item">
+              <span className="field-sys-item__label">Network</span>
+              <span className="field-sys-item__value">
+                <span className="field-sys-item__dot" aria-hidden />
+                Online
+              </span>
+            </div>
+          </div>
+        </section>
+      )}
 
       {(showQueue || showUrgentOnly) && (
         <OpsSection
-          title="Your Jobs"
+          title="Field operations / Queue"
+          subtitle="Field assignments"
           action={
             <Link href="/officer/queue" className="link-sm">
               View all
@@ -334,11 +497,17 @@ function DashboardContent() {
           }
         >
           {filteredWaiting.length === 0 ? (
-            <p className="text-muted" style={{ margin: 0 }}>
-              {showUrgentOnly
-                ? 'No high-priority jobs in your queue right now.'
-                : 'No queued jobs yet. New assignments from dispatch will appear here.'}
-            </p>
+            <div className="field-empty" role="status">
+              <span className="field-empty__status">
+                <span className="field-empty__dot" aria-hidden />
+                Queue clear
+              </span>
+              <p>
+                {showUrgentOnly
+                  ? 'No priority items require action.'
+                  : 'No queued jobs yet. New assignments from dispatch will appear here.'}
+              </p>
+            </div>
           ) : (
             <div className="ops-queue-list">
               {filteredWaiting.slice(0, 5).map((item) => {
@@ -401,36 +570,6 @@ function DashboardContent() {
         </OpsSection>
       )}
 
-      {active ? (
-        <OfficerActiveAssignment
-          dispatch={active}
-          actionLoading={actionLoading}
-          onAction={runAction}
-        />
-      ) : (
-        <section className="officer-standby portal-card">
-          <div className="ec-dispatch__top">
-            <p className="ec-kicker">4DS Field</p>
-            <span className="ec-online">
-              <span className="ec-dot" aria-hidden />
-              Online · on shift
-            </span>
-          </div>
-          <h2>No active job</h2>
-          <p className="text-muted">
-            You are available. Open Your Jobs when dispatch assigns the next call.
-          </p>
-          <div className="officer-standby__actions">
-            <Link href="/officer/queue" className="btn-primary">
-              Open Your Jobs
-            </Link>
-            <Link href="/officer/map" className="btn-secondary">
-              Map
-            </Link>
-          </div>
-        </section>
-      )}
-
       {active && primary && (
         <OpsQuickWork
           hint={active.incident.client}
@@ -474,11 +613,17 @@ function DashboardContent() {
 
       <div className="protect-tile protect-tile--panic" style={{ marginBottom: '0.75rem' }}>
         <HoldToActivate
+          className="hold-activate--ops-well"
           label="Officer SOS"
           holdLabel="Hold to alert control room and supervisor…"
+          hideHint
+          keepLabel
           loading={sosBusy}
           onActivate={() => sendSos()}
-        />
+        >
+          <OpsPanicIcon />
+          Officer SOS
+        </HoldToActivate>
       </div>
 
       <div className="check-grid" aria-label="Quick check-ins">
@@ -501,16 +646,6 @@ function DashboardContent() {
 
       <OpsNeedsYou items={needsItems} viewAllHref="/officer/messages" />
 
-      <div className="officer-hero portal-card officer-hero--compact">
-        <div>
-          <h2>
-            {d.officer.firstName} {d.officer.lastName}
-          </h2>
-          <p className="text-muted">{d.officer.zone ?? 'Unassigned zone'}</p>
-        </div>
-        <OfficerStatusBadge status={d.officer.status} linkToProfile />
-      </div>
-
       <OpsCompactStats
         items={[
           {
@@ -527,6 +662,34 @@ function DashboardContent() {
           { label: 'Avg', value: d.stats.avgResponseFormatted },
         ]}
       />
+
+      <section className="field-system-strip" aria-label="System status">
+        <p className="field-system-strip__title">System status</p>
+        <div className="field-system-strip__grid">
+          <div className="field-sys-item">
+            <span className="field-sys-item__label">Network</span>
+            <span className="field-sys-item__value">
+              <span className="field-sys-item__dot" aria-hidden />
+              Online
+            </span>
+          </div>
+          <div className="field-sys-item">
+            <span className="field-sys-item__label">GPS</span>
+            <span className="field-sys-item__value">
+              <span className="field-sys-item__dot" aria-hidden />
+              Active
+            </span>
+          </div>
+          <div className="field-sys-item">
+            <span className="field-sys-item__label">Sync</span>
+            <span className="field-sys-item__value">
+              <span className="field-sys-item__dot" aria-hidden />
+              OK
+            </span>
+          </div>
+        </div>
+        <p className="field-system-strip__sync">Last sync {syncTime}</p>
+      </section>
 
       <OpsUndoToast toast={undo.toast} onDismiss={undo.clear} />
     </div>

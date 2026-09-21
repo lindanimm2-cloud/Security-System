@@ -6,7 +6,7 @@ import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { SketchIcon } from '@/components/icons/SketchIcon';
 import { clientApi, type ApiResponse } from '@/lib/api-client';
 import { ARM_MODE_OPTIONS, alarmStatusLabel, isArmedStatus, type ArmMode } from '@/lib/sa-alarm';
-import { HoldToActivate } from '@/components/ops/EmergencyMode';
+import { HoldToActivate, OpsSirenIcon } from '@/components/ops/EmergencyMode';
 import { portalAmbientFromAlarm } from '@/lib/portal-ambient';
 import { usePortalAmbientOptional } from '@/components/portal/PortalAmbientProvider';
 
@@ -15,6 +15,14 @@ type Property = {
   name: string;
   alarmStatus: string;
   alarmLinked?: boolean;
+  propertyType?: string;
+  zoneHealth?: {
+    total: number;
+    active: number;
+    fault: number;
+    alert: number;
+    disabled: number;
+  };
 };
 
 type Props = {
@@ -109,7 +117,7 @@ export function HomeAlarmControl({
           <div className="home-sec__body">
             <div className="home-sec__feeds">{feeds}</div>
             <div className="home-sec__pad">
-              <p className="home-alarm-card__eyebrow">Home alarm</p>
+              <p className="home-alarm-card__eyebrow">Home security</p>
               <h2>Home Security</h2>
               <p className="home-alarm-card__desc">Away, Stay and Night arm for SA panels.</p>
               <Link href="/portal/subscription/upgrade?addon=HOME_SECURITY" className="btn-secondary btn-inline">
@@ -119,7 +127,7 @@ export function HomeAlarmControl({
           </div>
         ) : (
           <>
-            <p className="home-alarm-card__eyebrow">Home alarm</p>
+            <p className="home-alarm-card__eyebrow">Home security</p>
             <h2>Home Security</h2>
             <p className="home-alarm-card__desc">Away, Stay and Night arm for SA panels.</p>
             <Link href="/portal/subscription/upgrade?addon=HOME_SECURITY" className="btn-secondary btn-inline">
@@ -138,7 +146,7 @@ export function HomeAlarmControl({
           <div className="home-sec__body">
             <div className="home-sec__feeds">{feeds}</div>
             <div className="home-sec__pad">
-              <p className="home-alarm-card__eyebrow">Home alarm</p>
+              <p className="home-alarm-card__eyebrow">Home security</p>
               <h2>Home Security</h2>
               <p className="home-alarm-card__desc">No properties linked yet.</p>
               <Link href="/portal/home" className="btn-secondary btn-inline">
@@ -148,7 +156,7 @@ export function HomeAlarmControl({
           </div>
         ) : (
           <>
-            <p className="home-alarm-card__eyebrow">Home alarm</p>
+            <p className="home-alarm-card__eyebrow">Home security</p>
             <h2>Home Security</h2>
             <p className="home-alarm-card__desc">No properties linked yet.</p>
             <Link href="/portal/home" className="btn-secondary btn-inline">
@@ -168,21 +176,29 @@ export function HomeAlarmControl({
   const colorKey = activeOpt?.colorKey ?? (isTriggered ? 'triggered' : 'disarm');
   const statusClass = primaryStatus.toLowerCase().replace(/_/g, '-');
 
-  function renderModeButtons() {
-    return (
+  const modePad = (
+    <section className="alarm-mode-pad" aria-label="Alarm mode">
+      <p className="alarm-mode-pad__kicker">Alarm mode</p>
       <div className={`arm-mode-row ${isDashboard ? 'arm-mode-row--dashboard' : ''}`}>
         {ARM_MODE_OPTIONS.map((opt) => {
           const active = primaryStatus === opt.value;
           const key = `${primary.id}-${opt.value}`;
           return (
-            <button
+            <HoldToActivate
               key={opt.value}
-              type="button"
-              title={opt.hint}
-              aria-pressed={active}
-              className={`arm-mode-btn arm-mode-btn--${opt.colorKey} ${active ? 'arm-mode-btn--active' : ''}`}
-              disabled={!!loadingId}
-              onClick={() => void setMode(primary, opt.value)}
+              className={`arm-mode-btn arm-mode-btn--${opt.colorKey} ${active ? 'arm-mode-btn--active' : ''} hold-activate--arm-mode`}
+              label={opt.label}
+              holdLabel={`Hold for ${opt.label}…`}
+              holdMs={900}
+              hideHint
+              keepLabel
+              tone="neutral"
+              loading={loadingId === key}
+              disabled={!!loadingId || active}
+              onActivate={() => {
+                if (active) return;
+                void setMode(primary, opt.value);
+              }}
             >
               {loadingId === key ? (
                 <LoadingSpinner label="" size="sm" />
@@ -200,49 +216,41 @@ export function HomeAlarmControl({
                   {active ? <span className="arm-mode-btn__dot" aria-hidden /> : null}
                 </>
               )}
-            </button>
+            </HoldToActivate>
           );
         })}
       </div>
-    );
-  }
-
-  const hint = (
-    <p className="home-alarm-card__hint">
-      {isTriggered
-        ? 'Siren sounding · responders notified. Disarm to silence.'
-        : activeOpt?.hint ?? alarmStatusLabel(primaryStatus)}
-      {primary.alarmLinked === false ? ' · Panel not linked' : ''}
-    </p>
-  );
-
-  const sirenControl = isTriggered ? null : (
-    <HoldToActivate
-      className="hold-activate--inline home-alarm-card__siren"
-      label="Sound siren on property"
-      holdLabel="Hold to sound siren…"
-      holdMs={1200}
-      loading={loadingId === `${primary.id}-siren`}
-      disabled={!!loadingId}
-      onActivate={() => void soundSiren(primary)}
-    />
-  );
-
-  const pad = (
-    <section className="alarm-mode-pad" aria-label="Alarm mode">
-      <p className="alarm-mode-pad__kicker">Alarm mode</p>
-      {renderModeButtons()}
-      {hint}
-      {sirenControl}
-      {!isTriggered ? (
-        <p className="home-alarm-card__hint">
-          Rings the outdoor siren even if the panel is disarmed — use when CCTV shows a break-in.
-        </p>
-      ) : null}
+      <p className="home-alarm-card__hint">
+        {isTriggered
+          ? 'Siren sounding · responders notified. Disarm to silence.'
+          : activeOpt?.hint ?? alarmStatusLabel(primaryStatus)}
+        {primary.alarmLinked === false ? ' · Panel not linked' : ''}
+      </p>
+      {isTriggered ? null : (
+        <>
+          <HoldToActivate
+            className="hold-activate--inline home-alarm-card__siren hold-activate--ops-well"
+            label="Sound siren on property"
+            holdLabel="Hold to sound siren…"
+            holdMs={1200}
+            hideHint
+            keepLabel
+            loading={loadingId === `${primary.id}-siren`}
+            disabled={!!loadingId}
+            onActivate={() => void soundSiren(primary)}
+          >
+            <OpsSirenIcon />
+            Sound siren on property
+          </HoldToActivate>
+          <p className="home-alarm-card__hint">
+            Rings the outdoor siren even if the panel is disarmed — use when CCTV shows a break-in.
+          </p>
+        </>
+      )}
     </section>
   );
 
-  const card = (
+  return (
     <section
       className={`portal-card home-alarm-card home-alarm-card--${colorKey} ${isDashboard ? 'home-alarm-card--dashboard' : ''} ${merged ? 'home-sec' : ''} ${armed ? 'home-alarm-card--armed' : ''} ${isTriggered ? 'home-alarm-card--triggered' : ''}`}
       aria-label="Home security"
@@ -255,11 +263,12 @@ export function HomeAlarmControl({
             <SketchIcon name="shield" size={isDashboard ? 22 : 26} />
           </div>
           <div className="home-alarm-card__identity-copy">
-            <p className="home-alarm-card__eyebrow">{merged ? 'Home security' : 'Home alarm'}</p>
+            <p className="home-alarm-card__eyebrow">Home security</p>
             <h2>{primary.name}</h2>
             {!isDashboard ? (
               <p className="home-alarm-card__desc">
-                Away, Stay and Night modes for Paradox, DSC, IDS, Ajax and Nemtek panels.
+                Away, Stay and Night modes for Paradox, DSC, IDS, Ajax and Nemtek panels. Press and hold
+                to change mode.
               </p>
             ) : null}
           </div>
@@ -274,17 +283,62 @@ export function HomeAlarmControl({
         </div>
       </div>
 
-      {msg && !isDashboard ? <div className="alert alert--success home-alarm-card__feedback">{msg}</div> : null}
+      {msg ? <div className="alert alert--success home-alarm-card__feedback">{msg}</div> : null}
+
+      {modePad}
+
+      {merged ? <div className="home-sec__feeds">{feeds}</div> : null}
 
       {isDashboard ? (
-        merged ? <div className="home-sec__feeds">{feeds}</div> : null
-      ) : (
-        <>
-          {renderModeButtons()}
-          {hint}
-          {sirenControl}
-        </>
-      )}
+        <div className="home-dash-zones" aria-label="Zones sensors and alarm status">
+          <Link href={`/portal/home/${primary.id}`} className="home-dash-zones__item">
+            <span className="home-dash-zones__label">Alarm</span>
+            <span
+              className={`home-dash-zones__value ${
+                isTriggered
+                  ? 'home-dash-zones__value--alert'
+                  : armed
+                    ? 'home-dash-zones__value--ok'
+                    : 'home-dash-zones__value--muted'
+              }`}
+            >
+              {isTriggered ? 'Triggered' : armed ? 'Armed · active' : 'Disarmed'}
+            </span>
+          </Link>
+          <Link href={`/portal/home/${primary.id}`} className="home-dash-zones__item">
+            <span className="home-dash-zones__label">Zones</span>
+            <span
+              className={`home-dash-zones__value ${
+                (primary.zoneHealth?.fault ?? 0) > 0
+                  ? 'home-dash-zones__value--warn'
+                  : 'home-dash-zones__value--ok'
+              }`}
+            >
+              {(primary.zoneHealth?.fault ?? 0) > 0
+                ? `${primary.zoneHealth?.fault} fault · ${primary.zoneHealth?.active ?? 0} active`
+                : `${primary.zoneHealth?.active ?? primary.zoneHealth?.total ?? 0} active`}
+            </span>
+          </Link>
+          <Link href={`/portal/home/${primary.id}`} className="home-dash-zones__item">
+            <span className="home-dash-zones__label">Sensors</span>
+            <span
+              className={`home-dash-zones__value ${
+                (primary.zoneHealth?.alert ?? 0) > 0
+                  ? 'home-dash-zones__value--alert'
+                  : (primary.zoneHealth?.disabled ?? 0) > 0
+                    ? 'home-dash-zones__value--muted'
+                    : 'home-dash-zones__value--ok'
+              }`}
+            >
+              {(primary.zoneHealth?.alert ?? 0) > 0
+                ? `${primary.zoneHealth?.alert} open/alarm`
+                : (primary.zoneHealth?.disabled ?? 0) > 0
+                  ? `${primary.zoneHealth?.total ?? 0} total · ${primary.zoneHealth?.disabled} off`
+                  : `${primary.zoneHealth?.total ?? 0} monitoring`}
+            </span>
+          </Link>
+        </div>
+      ) : null}
 
       <div className="home-alarm-card__actions">
         <Link href={`/portal/home/${primary.id}`} className="home-alarm-card__manage">
@@ -311,20 +365,27 @@ export function HomeAlarmControl({
         <ul className="home-alarm-card__list">
           {properties.slice(1).map((p) => {
             const pStatus = optimisticStatus[p.id] ?? p.alarmStatus;
+            const nextMode: ArmMode = isArmedStatus(pStatus) ? 'DISARMED' : 'ARMED';
+            const nextLabel = isArmedStatus(pStatus) ? 'Disarm' : 'Away';
             return (
               <li key={p.id} className="home-alarm-card__list-item">
                 <span>{p.name}</span>
                 <span className={`status-pill status-pill--${pStatus.toLowerCase().replace(/_/g, '-')}`}>
                   {alarmStatusLabel(pStatus)}
                 </span>
-                <button
-                  type="button"
-                  className="btn-sm btn-secondary"
+                <HoldToActivate
+                  className="hold-activate--inline hold-activate--ops-well hold-activate--ops-well-sm"
+                  label={nextLabel}
+                  holdLabel={`Hold to ${nextLabel.toLowerCase()}…`}
+                  holdMs={900}
+                  hideHint
+                  keepLabel
+                  loading={loadingId === `${p.id}-${nextMode}`}
                   disabled={!!loadingId}
-                  onClick={() => void setMode(p, isArmedStatus(pStatus) ? 'DISARMED' : 'ARMED')}
+                  onActivate={() => void setMode(p, nextMode)}
                 >
-                  {isArmedStatus(pStatus) ? 'Disarm' : 'Away'}
-                </button>
+                  {nextLabel}
+                </HoldToActivate>
               </li>
             );
           })}
@@ -332,16 +393,4 @@ export function HomeAlarmControl({
       ) : null}
     </section>
   );
-
-  if (isDashboard) {
-    return (
-      <>
-        {pad}
-        {msg ? <div className="alert alert--success home-alarm-card__feedback">{msg}</div> : null}
-        {card}
-      </>
-    );
-  }
-
-  return card;
 }

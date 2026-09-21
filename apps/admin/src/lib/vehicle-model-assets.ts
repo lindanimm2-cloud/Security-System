@@ -5,8 +5,9 @@
  * Only assets listed in AVAILABLE_VEHICLE_ASSETS are served.
  * Unknown make/model falls back to a default GLB so every vehicle still shows 3D.
  *
- * Primary car set: Vivekkk-1/3D-Models (Cars/*.glb).
- * Best structured: bmw-2018, ferrari-599, toyota-supra-mk4 (DoorL/R / Hood / Boot).
+ * Cars: FormDrive (mustang, tesla-model-3) + existing sport/paint set.
+ * SUV / off-road: 3d-car-viewing Quaternius CC0 mainstream models.
+ * Utility: JAC 1045 truck only (no BMW catalog).
  */
 
 export type VehicleModelSpec = {
@@ -32,12 +33,19 @@ export const AVAILABLE_VEHICLE_ASSETS: Record<
   string,
   { assetUrl: string; label: string; aliases?: string[] }
 > = {
-  // —— Vivekkk-1 structured (door / hood / boot meshes) ——
-  'bmw-2018': {
-    assetUrl: '/vehicles/bmw-2018/model.glb',
-    label: 'BMW 2018',
+  // —— FormDrive (nesdesignco) ——
+  'ford-mustang-2005': {
+    assetUrl: '/vehicles/ford-mustang-2005/model.glb',
+    label: 'Ford Mustang 2005',
+    aliases: ['mustang', 'ford-mustang', 'mustang-2005'],
+  },
+  'tesla-model-3': {
+    assetUrl: '/vehicles/tesla-model-3/model.glb',
+    label: 'Tesla Model 3',
     aliases: [
-      'bmw',
+      'model-3',
+      'tesla-model-3-2018',
+      'tesla-3',
       'mercedes-benz-c-class',
       'mercedes-c-class',
       'mercedes-c',
@@ -45,11 +53,25 @@ export const AVAILABLE_VEHICLE_ASSETS: Record<
       'vw-polo',
       'audi-tt-rs',
       'audi-tt',
-      'car-concept',
+      'sedan',
       'concept-car',
       'concept',
     ],
   },
+
+  // —— 3d-car-viewing (jiaxiantao) Quaternius CC0 ——
+  'suv-mainstream': {
+    assetUrl: '/vehicles/suv-mainstream/model.glb',
+    label: 'SUV',
+    aliases: ['suv', 'bmw-x5', 'toyota-fortuner', 'toyota-land-cruiser', 'toyota-landcruiser'],
+  },
+  'offroad-mainstream': {
+    assetUrl: '/vehicles/offroad-mainstream/model.glb',
+    label: 'Off-road',
+    aliases: ['offroad', 'off-road', 'rover', '4x4'],
+  },
+
+  // —— Existing sport / paint body set ——
   'ferrari-599': {
     assetUrl: '/vehicles/ferrari-599/model.glb',
     label: 'Ferrari 599',
@@ -59,18 +81,6 @@ export const AVAILABLE_VEHICLE_ASSETS: Record<
     assetUrl: '/vehicles/toyota-supra-mk4/model.glb',
     label: 'Toyota Supra MK4',
     aliases: ['toyota-supra', 'supra', 'supra-mk4', 'a80', 'mk4'],
-  },
-
-  // —— Vivekkk-1 paint-body (display + recolour; no door split) ——
-  'bmw-m8': {
-    assetUrl: '/vehicles/bmw-m8/model.glb',
-    label: 'BMW M8',
-    aliases: ['m8', 'bmw-m8-2020', '2020-bmw-m8'],
-  },
-  'bmw-x6m': {
-    assetUrl: '/vehicles/bmw-x6m/model.glb',
-    label: 'BMW X6 M',
-    aliases: ['bmw-x6', 'x6m', 'x6-m', 'bmw-x5'],
   },
   'dodge-challenger-rt': {
     assetUrl: '/vehicles/dodge-challenger-rt/model.glb',
@@ -102,13 +112,13 @@ export const AVAILABLE_VEHICLE_ASSETS: Record<
     label: 'Concept Car 037',
     aliases: ['free-concept-car', 'concept-037', 'cc0-concept'],
   },
-
-  // —— Existing non-Vivek fleet ——
   'honda-cr-v': {
     assetUrl: '/vehicles/honda-cr-v/model.glb',
     label: 'Honda CR-V',
-    aliases: ['honda-crv', 'honda-cr-v', 'toyota-fortuner', 'toyota-land-cruiser', 'toyota-landcruiser'],
+    aliases: ['honda-crv', 'honda-cr-v', 'honda'],
   },
+
+  // —— Utility (truck only — no BMW) ——
   'jac-1045-truck': {
     assetUrl: '/vehicles/jac-1045-truck/model.glb',
     label: 'JAC 1045 Truck',
@@ -122,16 +132,19 @@ export const AVAILABLE_VEHICLE_ASSETS: Record<
       'ford-ranger',
       'isuzu-d-max',
       'isuzu-dmax',
+      'toyota-hilux',
+      'hilux',
+      'truck',
     ],
   },
   'generic-vehicle': {
-    assetUrl: '/vehicles/bmw-2018/model.glb',
+    assetUrl: '/vehicles/tesla-model-3/model.glb',
     label: 'Vehicle',
-    aliases: ['toyota-hilux', 'hilux', 'nissan', 'bmw-r-1250-gs'],
+    aliases: ['nissan', 'generic'],
   },
 };
 
-const DEFAULT_VEHICLE_SLUG = 'bmw-2018';
+const DEFAULT_VEHICLE_SLUG = 'tesla-model-3';
 
 /** Slug used for /vehicles/<slug>/model.glb */
 export function vehicleAssetSlug(make?: string | null, model?: string | null): string {
@@ -175,12 +188,23 @@ function pickFallbackSlug(slug: string): string {
   ) {
     return 'jac-1045-truck';
   }
-  if (s.includes('x6') || s.includes('x5') || s.includes('suv') || s.includes('fortuner') || s.includes('land-cruiser')) {
-    return 'bmw-x6m';
+  if (
+    s.includes('x6') ||
+    s.includes('x5') ||
+    s.includes('suv') ||
+    s.includes('fortuner') ||
+    s.includes('land-cruiser') ||
+    s.includes('cr-v') ||
+    s.includes('crv')
+  ) {
+    if (s.includes('cr-v') || s.includes('crv') || s.includes('honda')) return 'honda-cr-v';
+    return 'suv-mainstream';
   }
-  if (s.includes('cr-v') || s.includes('crv') || s.includes('honda')) {
-    return 'honda-cr-v';
+  if (s.includes('offroad') || s.includes('off-road') || s.includes('4x4') || s.includes('rover')) {
+    return 'offroad-mainstream';
   }
+  if (s.includes('mustang')) return 'ford-mustang-2005';
+  if (s.includes('model-3') || s.includes('model3')) return 'tesla-model-3';
   if (s.includes('challenger') || s.includes('dodge')) return 'dodge-challenger-rt';
   if (s.includes('tesla') || s.includes('roadster')) return 'tesla-roadster';
   if (s.includes('ferrari') || s.includes('599')) return 'ferrari-599';
@@ -188,7 +212,6 @@ function pickFallbackSlug(slug: string): string {
   if (s.includes('bugatti') || s.includes('bolide')) return 'bugatti-bolide';
   if (s.includes('gt40') || s.includes('gt-40')) return 'ford-gt40';
   if (s.includes('lancia')) return 'lancia-037';
-  if (s.includes('m8')) return 'bmw-m8';
   if (
     s.includes('polo') ||
     s.includes('c-class') ||
@@ -197,7 +220,8 @@ function pickFallbackSlug(slug: string): string {
     s.includes('sedan') ||
     s.includes('bmw')
   ) {
-    return 'bmw-2018';
+    // BMW make/model still resolves to a non-BMW GLB (concept sedan)
+    return 'tesla-model-3';
   }
   return DEFAULT_VEHICLE_SLUG;
 }

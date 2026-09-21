@@ -11,10 +11,11 @@ import { SensorZonePanel, type SensorRow } from '@/components/portal/SensorZoneP
 import { useSubscriptionAccess } from '@/hooks/useSubscriptionAccess';
 import { useApi } from '@/hooks/useApi';
 import { clientApi, type ApiResponse } from '@/lib/api-client';
+import { PropertyCommandPanel } from '@/components/access/PropertyCommandPanel';
 import { EmptyState } from '@/components/ui/EmptyState';
-import { HoldToActivate } from '@/components/ops/EmergencyMode';
+import { HoldToActivate, OpsPanicIcon, OpsSirenIcon } from '@/components/ops/EmergencyMode';
 import { IncidentTimeline } from '@/components/incident/IncidentTimeline';
-import { ARM_MODE_OPTIONS, alarmStatusLabel, type ArmMode } from '@/lib/sa-alarm';
+import { ARM_MODE_OPTIONS, alarmStatusLabel, summarizeZones, type ArmMode } from '@/lib/sa-alarm';
 
 type Camera = {
   id: string;
@@ -199,20 +200,24 @@ function SiteContent() {
         </section>
       )}
 
-      <section className="alarm-mode-pad" aria-label="Alarm mode">
+      <section className="alarm-mode-pad portal-card" aria-label="Alarm mode">
         <p className="alarm-mode-pad__kicker">Alarm mode</p>
         <div className="arm-mode-row arm-mode-row--dashboard">
           {ARM_MODE_OPTIONS.map((opt) => {
             const active = displayStatus === opt.value;
             return (
-              <button
+              <HoldToActivate
                 key={opt.value}
-                type="button"
-                title={opt.hint}
-                aria-pressed={active}
-                className={`arm-mode-btn arm-mode-btn--${opt.colorKey} ${active ? 'arm-mode-btn--active' : ''}`}
-                disabled={!!loadingId}
-                onClick={() => void setMode(opt.value)}
+                className={`arm-mode-btn arm-mode-btn--${opt.colorKey} ${active ? 'arm-mode-btn--active' : ''} hold-activate--arm-mode`}
+                label={opt.label}
+                holdLabel={`Hold for ${opt.label}…`}
+                holdMs={900}
+                hideHint
+                keepLabel
+                tone="neutral"
+                loading={loadingId === opt.value}
+                disabled={!!loadingId || active}
+                onActivate={() => void setMode(opt.value)}
               >
                 {loadingId === opt.value ? (
                   <span style={{ fontSize: '1.1rem' }}>…</span>
@@ -230,51 +235,87 @@ function SiteContent() {
                     {active ? <span className="arm-mode-btn__dot" aria-hidden /> : null}
                   </>
                 )}
-              </button>
+              </HoldToActivate>
             );
           })}
         </div>
         <p className="home-alarm-card__hint">
           {ARM_MODE_OPTIONS.find((opt) => opt.value === displayStatus)?.hint ??
             alarmStatusLabel(displayStatus)}
+          {' · Press and hold to change mode'}
         </p>
         <HoldToActivate
-          className="hold-activate--inline"
+          className="hold-activate--inline hold-activate--ops-well"
           label="Hold to panic"
           holdLabel="Hold to panic…"
           holdMs={1200}
+          hideHint
+          keepLabel
           loading={loadingId === 'panic'}
           disabled={!!loadingId}
           onActivate={() => void homePanic()}
-        />
+        >
+          <OpsPanicIcon />
+          Hold to panic
+        </HoldToActivate>
         {displayStatus === 'TRIGGERED' ? (
           <p className="home-alarm-card__hint">Siren sounding on the property. Disarm to silence.</p>
         ) : (
           <HoldToActivate
-            className="hold-activate--inline"
+            className="hold-activate--inline hold-activate--ops-well"
             label="Sound siren on property"
             holdLabel="Hold to sound siren…"
             holdMs={1200}
+            hideHint
+            keepLabel
             loading={loadingId === 'siren'}
             disabled={!!loadingId}
             onActivate={() => void soundSiren()}
-          />
+          >
+            <OpsSirenIcon />
+            Sound siren on property
+          </HoldToActivate>
         )}
       </section>
 
       {(site.gateCode || site.keyHolder || site.accessNotes) && (
         <section className="portal-card">
-          <h2>Access</h2>
+          <h2>Access notes</h2>
           {site.gateCode && <p><strong>Gate code:</strong> {site.gateCode}</p>}
           {site.keyHolder && <p><strong>Key holder:</strong> {site.keyHolder}</p>}
           {site.accessNotes && <p className="text-muted">{site.accessNotes}</p>}
         </section>
       )}
 
+      <section className="portal-card prop-cmd-wrap">
+        <PropertyCommandPanel mode="portal" propertyId={site.id} propertyType={site.propertyType} />
+      </section>
+
       <section className="portal-card">
         <div className="card-header-row">
           <h2>Zones &amp; sensors</h2>
-          <span className="text-muted">{site.sensors?.length ?? 0} zones</span>
+          {(() => {
+            const z = summarizeZones(site.sensors ?? []);
+            if (z.fault + z.offline > 0) {
+              return (
+                <span className="status-pill status-pill--pending">
+                  {z.fault + z.offline} need check · {z.active} active
+                </span>
+              );
+            }
+            if (z.alert > 0) {
+              return (
+                <span className="status-pill status-pill--alert">
+                  {z.alert} open/alarm · {z.active} active
+                </span>
+              );
+            }
+            return (
+              <span className="status-pill status-pill--ok">
+                {z.active} active{z.disabled ? ` · ${z.disabled} disabled` : ''}
+              </span>
+            );
+          })()}
         </div>
         <SensorZonePanel
           propertyId={site.id}
@@ -335,7 +376,7 @@ function SiteContent() {
                   ...c,
                   isInterior: c.isInterior,
                 }}
-                featured={c.channel === 1}
+                featured
               />
             ))}
           </div>

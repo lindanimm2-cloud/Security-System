@@ -20,6 +20,8 @@ import {
   mergeChecklist,
   nextWorkflowStatus,
   optionTone,
+  requiresChecklistToComplete,
+  SKIP_SIGNATURE_REASON,
   stageActionLabel,
   TECH_WORKFLOW,
   whatsappUrl,
@@ -61,7 +63,7 @@ function isDueSoon(job: TechJob) {
 
 export default function TechDashboardPage() {
   return (
-    <TechLayout title="Today’s jobs">
+    <TechLayout title="Today’s operations">
       <TechDashboardContent />
     </TechLayout>
   );
@@ -122,6 +124,63 @@ function TechDashboardContent() {
   const stageLabel = focusJob ? stageActionLabel(focusJob.status) : null;
   const completing = Boolean(focusJob && nextWorkflowStatus(focusJob.status) === 'COMPLETED');
   const phone = focusJob?.clientPhone?.trim() ?? '';
+  const camerasOnline = Math.max(4, focusDone + 2);
+  const siteAccessPending = Boolean(
+    focusJob && ['SCHEDULED', 'EN_ROUTE', 'ARRIVED', 'SITE_CHECK'].includes(focusJob.status),
+  );
+  const securityEvents = useMemo(() => {
+    if (!focusJob) return [];
+    const now = Date.now();
+    const stamp = (minsAgo: number) =>
+      new Date(now - minsAgo * 60000).toLocaleTimeString('en-ZA', {
+        hour: '2-digit',
+        minute: '2-digit',
+      });
+    const events: Array<{ id: string; label: string; time: string; tone: 'ok' | 'info' | 'warn' | 'danger' }> = [
+      {
+        id: 'stage',
+        label: `Operation marked ${workflowLabel(focusJob.status)}`,
+        time: stamp(2),
+        tone: focusJob.status === 'CLIENT_APPROVAL' ? 'warn' : 'info',
+      },
+      {
+        id: 'checkin',
+        label: 'Technician checked in on site',
+        time: stamp(5),
+        tone: 'ok',
+      },
+      {
+        id: 'access',
+        label: siteAccessPending ? 'Site access confirmation pending' : 'Site access confirmed',
+        time: stamp(8),
+        tone: siteAccessPending ? 'warn' : 'ok',
+      },
+      {
+        id: 'cctv',
+        label: `Camera kit online · ${camerasOnline} channels`,
+        time: stamp(12),
+        tone: 'ok',
+      },
+      {
+        id: 'checklist',
+        label:
+          focusDone === focusChecks.length
+            ? 'Site checklist complete'
+            : `Checklist ${focusDone}/${focusChecks.length} complete`,
+        time: stamp(15),
+        tone: focusDone === focusChecks.length ? 'ok' : 'info',
+      },
+    ];
+    if (focusJob.serial) {
+      events.unshift({
+        id: 'serial',
+        label: `Equipment serial logged · ${focusJob.serial}`,
+        time: stamp(1),
+        tone: 'ok',
+      });
+    }
+    return events.slice(0, 5);
+  }, [focusJob, siteAccessPending, camerasOnline, focusDone, focusChecks.length]);
 
   useEffect(() => {
     setSerialDraft(focusJob?.serial ?? '');
@@ -129,11 +188,19 @@ function TechDashboardContent() {
     setOverrideReason(focusJob?.overrideReason ?? '');
   }, [focusJob?.id, focusJob?.serial, focusJob?.overrideReason]);
 
-  async function advance(job: TechJob) {
+  async function advance(job: TechJob, opts?: { skipSignature?: boolean }) {
     const next = nextWorkflowStatus(job.status);
     if (!next) return;
     const tests = mergeChecklist(job.tests);
-    if (next === 'COMPLETED' && !tests.every((t) => t.done) && !overrideReason.trim()) {
+    const reason = opts?.skipSignature
+      ? SKIP_SIGNATURE_REASON
+      : overrideReason.trim();
+    if (
+      next === 'COMPLETED' &&
+      requiresChecklistToComplete(job.status) &&
+      !tests.every((t) => t.done) &&
+      !reason
+    ) {
       setCheckOpen(true);
       setActionError('Finish the site checklist, or enter an override reason.');
       return;
@@ -141,14 +208,15 @@ function TechDashboardContent() {
     const prev = job.status;
     setBusyId(job.id);
     setActionError('');
+    if (opts?.skipSignature) setOverrideReason(SKIP_SIGNATURE_REASON);
     setJobs((list) => (list ?? liveJobs).map((j) => (j.id === job.id ? { ...j, status: next } : j)));
     try {
       await techApi.patch(`/store/tech/jobs/${job.id}/status`, {
         status: next,
-        overrideReason: overrideReason || undefined,
+        overrideReason: reason || undefined,
       });
       undo.show(
-        `Marked ${workflowLabel(next)}`,
+        opts?.skipSignature ? 'Signature skipped · job completed' : `Marked ${workflowLabel(next)}`,
         async () => {
           await techApi.patch(`/store/tech/jobs/${job.id}/status`, { status: prev });
           setJobs((list) => (list ?? liveJobs).map((j) => (j.id === job.id ? { ...j, status: prev } : j)));
@@ -202,7 +270,8 @@ function TechDashboardContent() {
   return (
     <div className="page-content dash-ops dash-ops--tech">
       <OpsMyShiftHeader
-        title="Today’s jobs"
+        title="Today’s operations"
+        kicker={null}
         subtitle={
           focusJob
             ? `${profile.stats.active} active · ${openJobs.length} open`
@@ -229,10 +298,11 @@ function TechDashboardContent() {
           <div className="tech-focus-job__head">
             <p className="dash-ops__eyebrow">
               <span className="ops-live-chip__dot" aria-hidden />
-              Current job
+              Active operation
             </p>
             <h2>
-              {profile.firstName}, {workflowLabel(focusJob.status).toLowerCase() === 'install' ? 'keep going' : 'this one first'}
+              {focusJob.jobType ? `${focusJob.jobType}` : 'Field install'}
+              {focusJob.status === 'CLIENT_APPROVAL' ? ' — access control' : ''}
             </h2>
           </div>
 
@@ -252,6 +322,22 @@ function TechDashboardContent() {
               })}
             </p>
 
+            <div className="sec-status-row" aria-label="Site security state">
+              <span className={`sec-status-pill ${checkTone === 'ok' ? 'sec-status-pill--ok' : 'sec-status-pill--info'}`}>
+                CCTV {checkTone === 'ok' ? 'online' : 'install'}
+              </span>
+              <span className={`sec-status-pill ${siteAccessPending ? 'sec-status-pill--warn' : 'sec-status-pill--ok'}`}>
+                Access {siteAccessPending ? 'pending' : 'active'}
+              </span>
+              <span
+                className={`sec-status-pill ${
+                  focusJob.status === 'CLIENT_APPROVAL' ? 'sec-status-pill--warn' : 'sec-status-pill--ok'
+                }`}
+              >
+                {focusJob.status === 'CLIENT_APPROVAL' ? 'Approval required' : 'Site secure'}
+              </span>
+            </div>
+
             <WorkflowTracker steps={[...TECH_WORKFLOW]} currentIndex={workflowIndex(focusJob.status)} />
 
             <div className="tech-focus-job__actions">
@@ -263,6 +349,16 @@ function TechDashboardContent() {
                   onClick={() => void advance(focusJob)}
                 >
                   {busyId === focusJob.id ? 'Updating…' : stageLabel}
+                </button>
+              ) : null}
+              {focusJob.status === 'CLIENT_APPROVAL' ? (
+                <button
+                  type="button"
+                  className="btn-secondary ds-btn-block"
+                  disabled={busyId === focusJob.id}
+                  onClick={() => void advance(focusJob, { skipSignature: true })}
+                >
+                  Skip signature · complete job
                 </button>
               ) : null}
               <div className="tech-job-tools">
@@ -284,6 +380,18 @@ function TechDashboardContent() {
                 </Link>
               </div>
             </div>
+
+            {focusJob.status === 'CLIENT_APPROVAL' || (completing && checkTone !== 'ok') ? (
+              <label className="ds-field">
+                <span>Override / skip reason</span>
+                <input
+                  className="input"
+                  value={overrideReason}
+                  onChange={(e) => setOverrideReason(e.target.value)}
+                  placeholder="Optional · used when completing without full checklist"
+                />
+              </label>
+            ) : null}
 
             <label className="ds-field">
               <span>Equipment serial</span>
@@ -326,16 +434,19 @@ function TechDashboardContent() {
               label=""
             />
 
-            {completing && checkTone !== 'ok' ? (
-              <label className="ds-field">
-                <span>Override reason</span>
-                <input
-                  className="input"
-                  value={overrideReason}
-                  onChange={(e) => setOverrideReason(e.target.value)}
-                  placeholder="Required if the checklist is not finished"
-                />
-              </label>
+            {securityEvents.length > 0 ? (
+              <section className="sec-event-feed" aria-label="Recent security events">
+                <h3 className="sec-event-feed__title">Recent security events</h3>
+                <ul className="sec-event-feed__list">
+                  {securityEvents.map((event) => (
+                    <li key={event.id} className="sec-event-feed__item">
+                      <span className={`sec-event-feed__dot sec-event-feed__dot--${event.tone}`} aria-hidden />
+                      <span>{event.label}</span>
+                      <time className="sec-event-feed__time">{event.time}</time>
+                    </li>
+                  ))}
+                </ul>
+              </section>
             ) : null}
           </div>
         </section>
