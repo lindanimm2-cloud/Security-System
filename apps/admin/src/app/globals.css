@@ -22447,26 +22447,27 @@ html[data-theme='light'] .shell--admin .assurance-vuln-list > li,
   flex: 0 0 auto;
   margin-top: 0.35rem;
   padding: 0.75rem 1rem;
-  border: 1.5px solid #7f1d1d;
-  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
   font-weight: 700;
   font-size: 0.95rem;
   letter-spacing: 0.01em;
   cursor: pointer;
-  color: #fff;
-  background: #991b1b;
+  color: #f4f4f5;
+  background: #1a1a1c;
   box-shadow: none;
   transition: background 0.12s ease, border-color 0.12s ease, opacity 0.12s ease;
 }
 
 .login-submit:hover:not(:disabled) {
-  background: #b91c1c;
-  border-color: #991b1b;
+  background: #2e2e32;
+  border-color: rgba(255, 255, 255, 0.18);
+  color: #ffffff;
 }
 
 .login-submit:active:not(:disabled) {
-  background: #7f1d1d;
-  border-color: #641616;
+  background: #141416;
+  border-color: rgba(255, 255, 255, 0.1);
 }
 
 .login-submit:disabled {
@@ -39681,15 +39682,15 @@ html[data-theme='light'] body,
 }
 
 [data-theme='light'] .login-submit {
-  background: #b91c1c;
-  border-color: #991b1b;
+  background: #111111;
+  border-color: #111111;
   box-shadow: none;
   color: #fff;
 }
 
 [data-theme='light'] .login-submit:hover:not(:disabled) {
-  background: #dc2626;
-  border-color: #b91c1c;
+  background: #2a2a2a;
+  border-color: #2a2a2a;
 }
 
 [data-theme='light'] .register-actions__back {

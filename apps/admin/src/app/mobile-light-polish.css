@@ -1846,9 +1846,8 @@ html[data-theme='dark'] .shell--ops :is(
   .btn-sm--resolve,
   .ops-strip__chip,
   .ops-cctv__chip,
-  .ops-cctv__tab,
-  .login-submit
-):not(:where(.sec-permissions *, .login-page *, .nx-auth-forms *, .portal-status-light, .portal-status-light *)) {
+  .ops-cctv__tab
+):not(:where(.sec-permissions *, .portal-status-light, .portal-status-light *)) {
   background: #1a1a1c !important;
   color: #c8c8cc !important;
   border: 1px solid rgba(255, 255, 255, 0.1) !important;
@@ -1861,10 +1860,45 @@ html[data-theme='dark'] .shell--ops :is(
   .ops-strip__chip--on,
   .ops-cctv__chip--on,
   .ops-cctv__tab--on
-):not(:where(.sec-permissions *, .login-page *, .nx-auth-forms *)) {
+):not(:where(.sec-permissions *)) {
   background: #323234 !important;
   color: #ffffff !important;
   border-color: rgba(255, 255, 255, 0.16) !important;
+}
+
+/* Login + register + shop auth — same charcoal pills on every profile entry */
+.login-page :is(.login-submit, .btn-primary, .btn-secondary, .btn-ghost, .btn-metal, .login-portal-btn, .login-oauth-btn),
+.register-page :is(.login-submit, .btn-primary, .btn-secondary, .btn-ghost, .register-actions__next, .login-oauth-btn),
+.nx-auth-forms :is(.btn-primary, .btn-secondary, .btn-ghost, .login-submit, .nx-oauth-btn),
+.nx-auth-tab--active {
+  background: #1a1a1c !important;
+  color: #f4f4f5 !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  border-radius: 999px !important;
+  box-shadow: none !important;
+}
+
+.login-page :is(.login-submit, .btn-primary, .login-portal-btn, .login-oauth-btn):hover:not(:disabled),
+.register-page :is(.login-submit, .register-actions__next, .login-oauth-btn):hover:not(:disabled),
+.nx-auth-forms :is(.btn-primary, .login-submit, .nx-oauth-btn):hover:not(:disabled) {
+  background: #2e2e32 !important;
+  color: #ffffff !important;
+  border-color: rgba(255, 255, 255, 0.18) !important;
+}
+
+/* Profile pages across portals */
+.shell--ops :is(
+  .page-content--profile,
+  .portal-profile,
+  .officer-profile,
+  .tech-profile,
+  .profile-section
+) :is(.btn-primary, .btn-secondary, .btn-ghost, .btn-sm, .btn-ok, .btn-danger, .btn-warn):not(:where(.sec-permissions *)) {
+  background: #1a1a1c !important;
+  color: #c8c8cc !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  border-radius: 999px !important;
+  box-shadow: none !important;
 }
 
 html[data-theme='dark'] .shell--ops .sidebar-link--active,
