@@ -1866,24 +1866,70 @@ html[data-theme='dark'] .shell--ops :is(
   border-color: rgba(255, 255, 255, 0.16) !important;
 }
 
-/* Login + register + shop auth — same charcoal pills on every profile entry */
-.login-page :is(.login-submit, .btn-primary, .btn-secondary, .btn-ghost, .btn-metal, .login-portal-btn, .login-oauth-btn),
-.register-page :is(.login-submit, .btn-primary, .btn-secondary, .btn-ghost, .register-actions__next, .login-oauth-btn),
-.nx-auth-forms :is(.btn-primary, .btn-secondary, .btn-ghost, .login-submit, .nx-oauth-btn),
-.nx-auth-tab--active {
-  background: #1a1a1c !important;
-  color: #f4f4f5 !important;
-  border: 1px solid rgba(255, 255, 255, 0.12) !important;
-  border-radius: 999px !important;
+/* Login restored: keep red Sign in; only soft-grey the former white surfaces in light mode */
+.login-page .login-submit,
+.register-page .login-submit,
+.nx-auth-forms .login-submit {
+  background: #991b1b !important;
+  border: 1.5px solid #7f1d1d !important;
+  border-radius: 8px !important;
+  color: #ffffff !important;
   box-shadow: none !important;
 }
 
-.login-page :is(.login-submit, .btn-primary, .login-portal-btn, .login-oauth-btn):hover:not(:disabled),
-.register-page :is(.login-submit, .register-actions__next, .login-oauth-btn):hover:not(:disabled),
-.nx-auth-forms :is(.btn-primary, .login-submit, .nx-oauth-btn):hover:not(:disabled) {
-  background: #2e2e32 !important;
+html[data-theme='light'] .login-page .login-submit,
+html[data-theme='light'] .register-page .login-submit,
+html[data-theme='light'] .nx-auth-forms .login-submit {
+  background: #b91c1c !important;
+  border-color: #991b1b !important;
+}
+
+.login-page .login-submit:hover:not(:disabled),
+.register-page .login-submit:hover:not(:disabled) {
+  background: #b91c1c !important;
+  border-color: #991b1b !important;
+}
+
+html[data-theme='light'] .login-page .login-submit:hover:not(:disabled) {
+  background: #dc2626 !important;
+  border-color: #b91c1c !important;
+}
+
+/* Light mode: soft grey instead of stark white on secondary / portal buttons */
+html[data-theme='light'] :is(
+  .login-portal-btn,
+  .login-oauth-btn,
+  .nx-oauth-btn:not(.nx-oauth-btn--apple),
+  .btn-secondary,
+  .btn-ghost,
+  .btn-metal,
+  .register-actions__back,
+  .login-card,
+  .nx-auth-tab
+):not(:where(.sec-permissions *, .login-submit, .btn-primary.login-submit)) {
+  background: #e8eaed !important;
+  border-color: #c5cad3 !important;
+  color: #1f2937 !important;
+  box-shadow: none !important;
+}
+
+html[data-theme='light'] :is(
+  .login-portal-btn,
+  .login-oauth-btn,
+  .nx-oauth-btn:not(.nx-oauth-btn--apple),
+  .btn-secondary,
+  .btn-ghost,
+  .register-actions__back
+):hover:not(:disabled) {
+  background: #dde1e6 !important;
+  border-color: #b0b7c3 !important;
+  color: #111827 !important;
+}
+
+html[data-theme='light'] .nx-oauth-btn--apple {
+  background: #2a2a2c !important;
+  border-color: #2a2a2c !important;
   color: #ffffff !important;
-  border-color: rgba(255, 255, 255, 0.18) !important;
 }
 
 /* Profile pages across portals */
@@ -1899,6 +1945,18 @@ html[data-theme='dark'] .shell--ops :is(
   border: 1px solid rgba(255, 255, 255, 0.1) !important;
   border-radius: 999px !important;
   box-shadow: none !important;
+}
+
+html[data-theme='light'] .shell--ops :is(
+  .page-content--profile,
+  .portal-profile,
+  .officer-profile,
+  .tech-profile,
+  .profile-section
+) :is(.btn-primary, .btn-secondary, .btn-ghost, .btn-sm):not(:where(.sec-permissions *)) {
+  background: #e8eaed !important;
+  color: #1f2937 !important;
+  border: 1px solid #c5cad3 !important;
 }
 
 html[data-theme='dark'] .shell--ops .sidebar-link--active,
@@ -1962,7 +2020,6 @@ html[data-theme='dark'] .shell--ops .sidebar--collapsed .officer-sidebar-link--a
   .org-emergency-btn,
   .org-emergency-btn--danger,
   .org-emergency-btn--warn,
-  .org-sidebar__link,
   .soc-head a,
   .soc-cam-slider__arrow,
   .org-page-header__actions a,
@@ -1973,22 +2030,48 @@ html[data-theme='dark'] .shell--ops .sidebar--collapsed .officer-sidebar-link--a
   background: #1a1a1c !important;
   color: #f4f4f5 !important;
   border: 1px solid rgba(255, 255, 255, 0.12) !important;
-  border-radius: 999px !important;
+  border-radius: 10px !important;
   box-shadow: none !important;
   text-shadow: none !important;
   filter: none !important;
+  padding-inline: 0.85rem !important;
 }
 
 .org-shell :is(
   .org-btn,
   .org-btn--danger,
   .org-emergency-btn,
-  .soc-head a,
-  .org-sidebar__link
+  .soc-head a
 ):hover {
   background: #2e2e32 !important;
   color: #ffffff !important;
   border-color: rgba(255, 255, 255, 0.18) !important;
+}
+
+/* Footer links: quiet text rows, not full pills */
+.org-shell .org-sidebar__foot {
+  gap: 0.15rem !important;
+  padding-top: 0.75rem !important;
+}
+
+.org-shell .org-sidebar__link {
+  display: block !important;
+  width: 100% !important;
+  background: transparent !important;
+  border: 0 !important;
+  border-radius: 8px !important;
+  color: #9a9288 !important;
+  font-size: 0.78rem !important;
+  font-weight: 500 !important;
+  padding: 0.45rem 0.55rem !important;
+  text-align: left !important;
+  box-shadow: none !important;
+}
+
+.org-shell .org-sidebar__link:hover {
+  background: rgba(255, 255, 255, 0.05) !important;
+  color: #f4f4f5 !important;
+  border-color: transparent !important;
 }
 
 .org-shell :is(
