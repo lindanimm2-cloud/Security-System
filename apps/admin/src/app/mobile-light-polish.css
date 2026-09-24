@@ -1946,3 +1946,91 @@ html[data-theme='dark'] .shell--ops .sidebar--collapsed .officer-sidebar-link--a
   width: 0;
   height: 0;
 }
+
+/* Organization portal — plain charcoal chrome (matches ops pills) */
+.org-shell,
+.org-shell .org-main,
+.org-shell .org-page {
+  background: #050505 !important;
+  background-image: none !important;
+  color: #f3efe8 !important;
+}
+
+.org-shell :is(
+  .org-btn,
+  .org-btn--danger,
+  .org-emergency-btn,
+  .org-emergency-btn--danger,
+  .org-emergency-btn--warn,
+  .org-sidebar__link,
+  .soc-head a,
+  .soc-cam-slider__arrow,
+  .org-page-header__actions a,
+  .org-page-header__actions button,
+  button.org-btn,
+  a.org-btn
+) {
+  background: #1a1a1c !important;
+  color: #f4f4f5 !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  border-radius: 999px !important;
+  box-shadow: none !important;
+  text-shadow: none !important;
+  filter: none !important;
+}
+
+.org-shell :is(
+  .org-btn,
+  .org-btn--danger,
+  .org-emergency-btn,
+  .soc-head a,
+  .org-sidebar__link
+):hover {
+  background: #2e2e32 !important;
+  color: #ffffff !important;
+  border-color: rgba(255, 255, 255, 0.18) !important;
+}
+
+.org-shell :is(
+  .org-context-card,
+  .soc-banner,
+  .org-active-emergency,
+  .org-kpi,
+  .soc-cctv,
+  .soc-map,
+  .soc-panel,
+  .cctv
+) {
+  border-color: rgba(255, 255, 255, 0.1) !important;
+  background: #121416 !important;
+  box-shadow: none !important;
+}
+
+.org-shell .org-context-card__logo {
+  background: #2a2a2c !important;
+  color: #f4f4f5 !important;
+}
+
+.org-shell .org-nav a.is-active,
+.org-shell .org-nav a.is-prominent {
+  background: #2c2c2e !important;
+  color: #ffffff !important;
+  border-radius: 999px !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  box-shadow: none !important;
+}
+
+.org-shell .soc-banner p,
+.org-shell .org-active-emergency p,
+.org-shell .org-active-emergency strong {
+  color: #c8c8cc !important;
+}
+
+.org-shell :is(
+  .soc-systems__item.is-danger svg,
+  .soc-status__item.is-danger svg,
+  .soc-status__item.is-danger strong,
+  .org-overview-map__legend .is-danger
+) {
+  color: #c8c8cc !important;
+}
