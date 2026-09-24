@@ -14,6 +14,7 @@ import {
   type VibrationProfileId,
 } from '@/lib/emergency-vibration';
 import { detectWebNativeSos, NATIVE_SOS_DISCLAIMER } from '@/lib/device-security';
+import { EmPermIcon } from '@/components/security/EmPermIcon';
 import { clientApi } from '@/lib/api-client';
 import { useEffect, useState } from 'react';
 
@@ -278,7 +279,9 @@ function EmergencyPermissionsContent() {
                 <li key={row.id} className="portal-permissions__item">
                   <div className="portal-permissions__copy">
                     <strong>
-                      <span aria-hidden>{row.icon} </span>
+                      <span className="em-setup__icon" aria-hidden>
+                        <EmPermIcon id={row.id} size={16} />
+                      </span>
                       {row.label}
                       {row.required ? null : <span className="sec-optional"> Optional</span>}
                     </strong>
@@ -314,7 +317,9 @@ function EmergencyPermissionsContent() {
                     <li key={row.id} className="portal-permissions__item">
                       <div className="portal-permissions__copy">
                         <strong>
-                          <span aria-hidden>{row.icon} </span>
+                          <span className="em-setup__icon" aria-hidden>
+                            <EmPermIcon id={row.id} size={16} />
+                          </span>
                           {row.label}
                         </strong>
                         <p className="text-muted">{row.why}</p>

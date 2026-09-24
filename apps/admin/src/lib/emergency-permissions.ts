@@ -33,7 +33,6 @@ export type EmergencyPermissionDef = {
   id: EmergencyPermissionId;
   label: string;
   why: string;
-  icon: string;
   required: boolean;
   recommended: boolean;
   group: 'recommended' | 'optional';
@@ -48,7 +47,6 @@ export const EMERGENCY_PERMISSION_DEFS: EmergencyPermissionDef[] = [
     id: 'notifications',
     label: 'Notifications',
     why: 'Receive security alerts and live response updates.',
-    icon: '🔔',
     required: true,
     recommended: true,
     group: 'recommended',
@@ -60,7 +58,6 @@ export const EMERGENCY_PERMISSION_DEFS: EmergencyPermissionDef[] = [
     id: 'alert_sound',
     label: 'Alert sound',
     why: 'Hear emergency alerts even when the screen is locked (where the OS allows).',
-    icon: '🔊',
     required: true,
     recommended: true,
     group: 'recommended',
@@ -72,7 +69,6 @@ export const EMERGENCY_PERMISSION_DEFS: EmergencyPermissionDef[] = [
     id: 'vibration',
     label: 'Vibration',
     why: 'Feel emergency alerts with configurable vibration patterns.',
-    icon: '📳',
     required: true,
     recommended: true,
     group: 'recommended',
@@ -84,7 +80,6 @@ export const EMERGENCY_PERMISSION_DEFS: EmergencyPermissionDef[] = [
     id: 'location',
     label: 'Location',
     why: 'Share location during emergencies so responders can reach you.',
-    icon: '📍',
     required: true,
     recommended: true,
     group: 'recommended',
@@ -96,7 +91,6 @@ export const EMERGENCY_PERMISSION_DEFS: EmergencyPermissionDef[] = [
     id: 'phone',
     label: 'Phone',
     why: 'Call control room or emergency services quickly from the response screen.',
-    icon: '📞',
     required: true,
     recommended: true,
     group: 'recommended',
@@ -108,7 +102,6 @@ export const EMERGENCY_PERMISSION_DEFS: EmergencyPermissionDef[] = [
     id: 'microphone',
     label: 'Microphone',
     why: 'Emergency calls and voice communication with the control room.',
-    icon: '🎙️',
     required: false,
     recommended: true,
     group: 'recommended',
@@ -120,7 +113,6 @@ export const EMERGENCY_PERMISSION_DEFS: EmergencyPermissionDef[] = [
     id: 'camera',
     label: 'Camera',
     why: 'Evidence capture and incident reporting when needed.',
-    icon: '📷',
     required: false,
     recommended: false,
     group: 'optional',
@@ -132,7 +124,6 @@ export const EMERGENCY_PERMISSION_DEFS: EmergencyPermissionDef[] = [
     id: 'contacts',
     label: 'Contacts',
     why: 'Pick personal emergency and family contacts faster.',
-    icon: '👥',
     required: false,
     recommended: false,
     group: 'optional',
@@ -144,7 +135,6 @@ export const EMERGENCY_PERMISSION_DEFS: EmergencyPermissionDef[] = [
     id: 'bluetooth',
     label: 'Bluetooth',
     why: 'Optional connected emergency devices (wearables, panic buttons).',
-    icon: '🔵',
     required: false,
     recommended: false,
     group: 'optional',
@@ -156,7 +146,6 @@ export const EMERGENCY_PERMISSION_DEFS: EmergencyPermissionDef[] = [
     id: 'background',
     label: 'Background activity',
     why: 'Keep emergency features responsive when the app is in the background.',
-    icon: '🔋',
     required: false,
     recommended: true,
     group: 'recommended',
@@ -168,7 +157,6 @@ export const EMERGENCY_PERMISSION_DEFS: EmergencyPermissionDef[] = [
     id: 'sos',
     label: 'SOS',
     why: 'Enable emergency activation. Native SOS remains controlled by the phone OS.',
-    icon: '🆘',
     required: false,
     recommended: true,
     group: 'recommended',
