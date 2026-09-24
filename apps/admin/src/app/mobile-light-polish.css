@@ -660,23 +660,19 @@ html[data-theme='light'] .link-sm {
 
 html[data-theme='light'] {
   --cr-surface: #ffffff;
-  --cr-surface-hover: #f4f6f8;
-  --cr-surface-active: #eef1f5;
-  --cr-edge: rgba(15, 23, 42, 0.1);
-  --cr-edge-strong: rgba(15, 23, 42, 0.16);
-  --cr-shadow: 0 10px 28px rgba(15, 23, 42, 0.08);
-  --cr-shadow-soft: 0 4px 14px rgba(15, 23, 42, 0.06);
-  --glass: rgba(255, 255, 255, 0.9);
-  --glass-border: rgba(15, 23, 42, 0.08);
-  --topbar-bg: rgba(255, 255, 255, 0.82);
+  --cr-surface-hover: #eef2f6;
+  --cr-surface-active: #e0e7ff;
+  --cr-edge: #b6c0cc;
+  --cr-edge-strong: #98a2b3;
+  --cr-shadow: none;
+  --cr-shadow-soft: none;
+  --glass: #ffffff;
+  --glass-border: #b6c0cc;
+  --topbar-bg: #ffffff;
   --menu-bg: #ffffff;
-  --monitor: #d5dae1;
-  --neu-raised-sm:
-    0 1px 2px rgba(15, 23, 42, 0.05),
-    0 4px 12px rgba(15, 23, 42, 0.04);
-  --neu-raised:
-    0 1px 2px rgba(15, 23, 42, 0.04),
-    0 10px 28px rgba(15, 23, 42, 0.07);
+  --monitor: #0f172a;
+  --neu-raised-sm: none;
+  --neu-raised: none;
 }
 
 html[data-theme='light'] .page-content,
@@ -1598,8 +1594,8 @@ html[data-theme='dark'] .shell--ops .btn-sm:not(.btn-primary):not(.btn-ok):not(.
 html[data-theme='dark'] .shell--ops .btn-primary:not(.btn-primary--calm):not(.btn-primary--danger),
 html[data-theme='dark'] .shell--ops .btn-sm.btn-primary:not(.btn-primary--calm):not(.btn-primary--danger) {
   background: var(--btn-charcoal, #141414) !important;
-  color: var(--btn-amber, #d49b5a) !important;
-  border: 1.5px solid var(--btn-amber-border, rgba(212, 155, 90, 0.72)) !important;
+  color: var(--btn-amber, #f4f4f5) !important;
+  border: 1.5px solid var(--btn-amber-border, rgba(255, 255, 255, 0.72)) !important;
   box-shadow: none !important;
 }
 
@@ -1641,8 +1637,8 @@ html[data-theme='dark'] .shell--ops .btn-danger {
 html[data-theme='dark'] .shell--ops .btn-primary--accent,
 html[data-theme='dark'] .shell--ops .btn-primary--filled {
   background: var(--btn-charcoal, #141414) !important;
-  color: var(--btn-amber, #d49b5a) !important;
-  border: 1.5px solid var(--btn-amber-border, rgba(212, 155, 90, 0.72)) !important;
+  color: var(--btn-amber, #f4f4f5) !important;
+  border: 1.5px solid var(--btn-amber-border, rgba(255, 255, 255, 0.72)) !important;
   box-shadow: none !important;
 }
 
@@ -1721,4 +1717,198 @@ html[data-theme='light'] .shell--admin.shell--ops .btn-primary {
   background: var(--field-navy, #172b3a) !important;
   border-color: var(--field-navy, #172b3a) !important;
   color: #ffffff !important;
+}
+
+/* Plain ops chrome — charcoal pills, no red incident wash.
+   Leave login, emergency permissions, and the home/away/stay light alone. */
+html[data-theme='dark'] .shell--ops .ops-inc,
+html[data-theme='dark'] .shell--ops .ops-inc--on,
+html[data-theme='dark'] .shell--ops .ops-inc--panic,
+html[data-theme='dark'] .shell--ops .ops-inc--panic.ops-inc--on,
+html[data-theme='dark'] .shell--ops .ops-inc--fire,
+html[data-theme='dark'] .shell--ops .ops-inc--p1,
+html[data-theme='dark'] .shell--ops .ops-inc--p1.ops-inc--on,
+html[data-theme='dark'] .shell--ops .ops-inc--medical,
+html[data-theme='dark'] .shell--ops .ops-inc--p2,
+html[data-theme='dark'] .shell--ops .ops-inc--sla,
+html[data-theme='light'] .ops-inc--panic,
+html[data-theme='light'] .ops-inc--panic.ops-inc--on,
+html[data-theme='light'] .ops-inc--fire,
+html[data-theme='light'] .ops-inc--p1.ops-inc--on {
+  background: #1c1c1e !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  border-left-color: rgba(255, 255, 255, 0.08) !important;
+  box-shadow: none !important;
+  outline: none !important;
+}
+
+html[data-theme='light'] .shell--ops .ops-inc,
+html[data-theme='light'] .shell--ops .ops-inc--on,
+html[data-theme='light'] .shell--ops .ops-inc--panic,
+html[data-theme='light'] .shell--ops .ops-inc--panic.ops-inc--on,
+html[data-theme='light'] .shell--ops .ops-inc--fire,
+html[data-theme='light'] .shell--ops .ops-inc--p1.ops-inc--on {
+  background: #ffffff !important;
+  border: 1px solid #dde2e7 !important;
+  border-left-color: #dde2e7 !important;
+  box-shadow: none !important;
+}
+
+html[data-theme='dark'] .shell--ops .ops-inc__kind,
+html[data-theme='dark'] .shell--ops .ops-inc__device,
+html[data-theme='dark'] .shell--ops .ops-inc__sla,
+html[data-theme='dark'] .shell--ops .ops-inc__state,
+html[data-theme='dark'] .shell--ops .ops-inc__state--dispatched,
+html[data-theme='dark'] .shell--ops .ops-inc__state--responding,
+html[data-theme='dark'] .shell--ops .ops-inc__state--on-scene,
+html[data-theme='dark'] .shell--ops .ops-inc__unit-kicker,
+html[data-theme='light'] .ops-inc--panic .ops-inc__kind,
+html[data-theme='light'] .ops-inc--sla .ops-inc__sla,
+html[data-theme='light'] .ops-inc__state--dispatched,
+html[data-theme='light'] .ops-inc__unit-kicker,
+html[data-theme='light'] .ops-inc__device {
+  color: #c8c8cc !important;
+  text-shadow: none !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+html[data-theme='dark'] .shell--ops .ops-inc__pri,
+html[data-theme='dark'] .shell--ops .ops-inc__pri--P1,
+html[data-theme='dark'] .shell--ops .ops-inc__pri--P2,
+html[data-theme='dark'] .shell--ops .ops-inc__pri--P3,
+html[data-theme='light'] .ops-inc__pri--P1,
+html[data-theme='light'] .ops-inc__pri--P2 {
+  background: #2a2a2c !important;
+  color: #f4f4f5 !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  box-shadow: none !important;
+}
+
+html[data-theme='dark'] .shell--ops .ops-act,
+html[data-theme='dark'] .shell--ops .ops-act--dispatch,
+html[data-theme='dark'] .shell--ops .ops-act--resolve,
+html[data-theme='dark'] .shell--ops .ops-act--warn,
+html[data-theme='dark'] .shell--ops .ops-act--danger,
+html[data-theme='dark'] .shell--ops .ops-act--open,
+html[data-theme='light'] .shell--ops .ops-act,
+html[data-theme='light'] .shell--ops .ops-act--dispatch,
+html[data-theme='light'] .shell--ops .ops-act--resolve,
+html[data-theme='light'] .shell--ops .ops-act--warn,
+html[data-theme='light'] .shell--ops .ops-act--danger,
+html[data-theme='light'] .ops-act,
+html[data-theme='light'] .ops-act--dispatch,
+html[data-theme='light'] .ops-act--resolve,
+html[data-theme='light'] .ops-act--danger {
+  background: #1a1a1c !important;
+  color: #d4d4d8 !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  border-radius: 999px !important;
+  box-shadow: none !important;
+  filter: none !important;
+  text-shadow: none !important;
+}
+
+html[data-theme='dark'] .shell--ops .ops-act svg,
+html[data-theme='dark'] .shell--ops .ops-act--dispatch svg,
+html[data-theme='dark'] .shell--ops .ops-act--resolve svg,
+html[data-theme='dark'] .shell--ops .ops-act--warn svg,
+html[data-theme='dark'] .shell--ops .ops-act--danger svg,
+html[data-theme='dark'] .shell--ops .ops-act--open svg {
+  color: inherit !important;
+  filter: none !important;
+}
+
+html[data-theme='dark'] .shell--ops .ops-act:hover:not(:disabled),
+html[data-theme='dark'] .shell--ops .ops-act--open,
+html[data-theme='light'] .shell--ops .ops-act:hover:not(:disabled) {
+  background: #2e2e32 !important;
+  color: #ffffff !important;
+  border-color: rgba(255, 255, 255, 0.18) !important;
+  box-shadow: none !important;
+  filter: none !important;
+}
+
+html[data-theme='dark'] .shell--ops :is(
+  .btn-primary,
+  .btn-secondary,
+  .btn-ghost,
+  .btn-sm,
+  .btn-ok,
+  .btn-danger,
+  .btn-warn,
+  .btn--cyan,
+  .btn--gold,
+  .btn-metal,
+  .btn-sm--cyan,
+  .btn-sm--gold,
+  .btn-sm--warn,
+  .btn-sm--resolve,
+  .ops-strip__chip,
+  .ops-cctv__chip,
+  .ops-cctv__tab,
+  .login-submit
+):not(:where(.sec-permissions *, .login-page *, .nx-auth-forms *, .portal-status-light, .portal-status-light *)) {
+  background: #1a1a1c !important;
+  color: #c8c8cc !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  border-radius: 999px !important;
+  box-shadow: none !important;
+}
+
+html[data-theme='dark'] .shell--ops :is(
+  .btn-primary,
+  .ops-strip__chip--on,
+  .ops-cctv__chip--on,
+  .ops-cctv__tab--on
+):not(:where(.sec-permissions *, .login-page *, .nx-auth-forms *)) {
+  background: #323234 !important;
+  color: #ffffff !important;
+  border-color: rgba(255, 255, 255, 0.16) !important;
+}
+
+html[data-theme='dark'] .shell--ops .sidebar-link--active,
+html[data-theme='dark'] .shell--ops .portal-sidebar-link--active,
+html[data-theme='dark'] .shell--ops .officer-sidebar-link--active,
+html[data-theme='dark'] .org-nav a.is-active,
+html[data-theme='light'] .shell--ops .sidebar-link--active,
+html[data-theme='light'] .shell--ops .portal-sidebar-link--active,
+html[data-theme='light'] .shell--ops .officer-sidebar-link--active,
+.org-nav a.is-active {
+  background: #2c2c2e !important;
+  color: #ffffff !important;
+  border-radius: 999px !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  box-shadow: none !important;
+  font-weight: 650 !important;
+}
+
+html[data-theme='dark'] .shell--ops .sidebar--collapsed .sidebar-link--active,
+html[data-theme='dark'] .shell--ops .sidebar--collapsed .portal-sidebar-link--active,
+html[data-theme='dark'] .shell--ops .sidebar--collapsed .officer-sidebar-link--active {
+  border-radius: 12px !important;
+  border: 1px solid rgba(255, 255, 255, 0.22) !important;
+  background: #2a2a2c !important;
+  box-shadow: none !important;
+}
+
+.org-sidebar {
+  min-height: 0;
+  max-height: 100dvh;
+  overflow: hidden;
+}
+
+.org-nav {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.org-nav::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
 }

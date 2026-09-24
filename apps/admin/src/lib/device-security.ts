@@ -1,9 +1,13 @@
 const DEVICE_KEY = '4ds-sec-device-id';
 
-export const CONSENT_VERSION = '2026-08-18';
-export const POLICY_VERSION = '1.0';
+export const CONSENT_VERSION = '2026-09-24';
+export const POLICY_VERSION = '1.1';
 export const NATIVE_SOS_DISCLAIMER =
   'Emergency SOS functionality is dependent on the device manufacturer, operating system, device model, operating-system version, permissions and regional availability. Native Emergency SOS may operate independently of this application.';
+
+/** Short notice shown next to medical-profile consent / registration terms. */
+export const MEDICAL_PROFILE_CONSENT_NOTICE =
+  'By saving a medical profile you consent to authorised emergency and medical responders accessing your health and medical-scheme details only when a medical emergency is active, under POPIA and your contracted protection service.';
 
 export function getOrCreateLocalDeviceId(): string {
   if (typeof window === 'undefined') return '';

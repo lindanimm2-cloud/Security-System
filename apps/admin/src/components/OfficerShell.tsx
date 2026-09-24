@@ -139,30 +139,26 @@ export function OfficerShell({
           className={`officer-sidebar ${menuOpen ? 'officer-sidebar--open' : ''} ${collapsed ? 'sidebar--collapsed' : ''}`}
         >
           <div className="officer-sidebar-brand">
-            <div className="field-sidebar-head">
-              {collapsed ? (
-                <BrandMark variant="officer" compact showProduct={false} />
-              ) : (
-                <>
-                  <div className="field-sidebar-head__brand">
-                    <p className="field-sidebar-head__kicker">4DS Field</p>
-                    <p className="field-sidebar-head__title">Field Operations</p>
+            {!collapsed ? (
+              <div className="field-sidebar-head">
+                <div className="field-sidebar-head__brand">
+                  <p className="field-sidebar-head__kicker">4DS Field</p>
+                  <p className="field-sidebar-head__title">Field Operations</p>
+                </div>
+                <div className="field-sidebar-officer">
+                  <span className="field-sidebar-officer__dot" aria-hidden />
+                  <div className="field-sidebar-officer__meta">
+                    <span className="field-sidebar-officer__name">
+                      {session.user.firstName} {session.user.lastName}
+                    </span>
+                    <span className="field-sidebar-officer__role">
+                      Officer · {onShift ? officerStatusLabel(status ?? 'AVAILABLE') : 'Off duty'}
+                      {onShift ? ' · Online' : ''}
+                    </span>
                   </div>
-                  <div className="field-sidebar-officer">
-                    <span className="field-sidebar-officer__dot" aria-hidden />
-                    <div className="field-sidebar-officer__meta">
-                      <span className="field-sidebar-officer__name">
-                        {session.user.firstName} {session.user.lastName}
-                      </span>
-                      <span className="field-sidebar-officer__role">
-                        Officer · {onShift ? officerStatusLabel(status ?? 'AVAILABLE') : 'Off duty'}
-                        {onShift ? ' · Online' : ''}
-                      </span>
-                    </div>
-                  </div>
-                </>
-              )}
-            </div>
+                </div>
+              </div>
+            ) : null}
             <SidebarCollapseButton collapsed={collapsed} onClick={toggle} />
           </div>
           <nav className="officer-sidebar-nav" aria-label="Field operations">

@@ -114,8 +114,8 @@
 :is(.shell--ops, .shell--officer) .btn-primary--accent,
 :is(.shell--ops, .shell--officer) .btn-primary--filled {
   background: var(--btn-charcoal, #141414);
-  color: var(--btn-amber, #d49b5a);
-  border: 1.5px solid var(--btn-amber-border, rgba(212, 155, 90, 0.72));
+  color: var(--btn-amber, #f4f4f5);
+  border: 1.5px solid var(--btn-amber-border, rgba(255, 255, 255, 0.72));
   box-shadow: none;
 }
 
@@ -1320,6 +1320,36 @@
 :is(.shell--ops, .shell--officer) .settings-hub {
   max-width: 28rem;
   padding-bottom: 1.5rem;
+}
+
+.shell--portal .settings-hub {
+  max-width: min(62rem, 100%);
+  width: 100%;
+}
+
+@media (min-width: 900px) {
+  .shell--portal .settings-hub__layout {
+    width: 100%;
+    grid-template-columns: minmax(15rem, 18rem) minmax(0, 1fr);
+  }
+
+  .shell--portal .settings-hub__sections {
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 17rem), 1fr));
+  }
+}
+
+.shell--portal .settings-hub__section,
+.shell--portal .settings-hub__list,
+.shell--portal .settings-hub__row,
+.shell--portal .settings-hub__label {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.shell--portal .settings-hub__label strong,
+.shell--portal .settings-hub__label em {
+  white-space: normal;
+  overflow-wrap: break-word;
 }
 
 :is(.shell--ops, .shell--officer) .settings-hub__top {

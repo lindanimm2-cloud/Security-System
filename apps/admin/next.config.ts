@@ -18,6 +18,12 @@ const nextConfig: NextConfig = {
   eslint: { ignoreDuringBuilds: true },
   /* Keep the HMR badge off the mobile dock; in-app toasts use --app-toast-bottom. */
   devIndicators: false,
+  async redirects() {
+    return [
+      { source: '/terms', destination: '/legal#terms', permanent: false },
+      { source: '/privacy', destination: '/legal#privacy', permanent: false },
+    ];
+  },
 };
 
 export default nextConfig;

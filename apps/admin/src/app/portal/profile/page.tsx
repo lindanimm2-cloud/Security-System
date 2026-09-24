@@ -16,6 +16,12 @@ import { PortalLayout } from '@/components/portal/PortalLayout';
 import { FamilyProfilePopup, type FamilyProfilePerson } from '@/components/portal/FamilyProfilePopup';
 import { useApi } from '@/hooks/useApi';
 import { clientApi, type ApiResponse } from '@/lib/api-client';
+import {
+  DEFAULT_PHONE_COUNTRY,
+  formatInternationalPhone,
+  parseInternationalPhone,
+} from '@/lib/phone-countries';
+import { PhoneWithCountryField } from '@/components/ui/PhoneWithCountryField';
 
 type Profile = {
   email: string;
@@ -59,7 +65,8 @@ function ProfileContent() {
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveMsg, setSaveMsg] = useState('');
-  const [phone, setPhone] = useState('');
+  const [phoneCountry, setPhoneCountry] = useState(DEFAULT_PHONE_COUNTRY);
+  const [phoneNational, setPhoneNational] = useState('');
   const [tracking, setTracking] = useState(true);
   const [selectedFamily, setSelectedFamily] = useState<FamilyProfilePerson | null>(null);
 
@@ -82,7 +89,9 @@ function ProfileContent() {
 
   useEffect(() => {
     if (data?.data) {
-      setPhone(data.data.phone ?? '');
+      const parsed = parseInternationalPhone(data.data.phone);
+      setPhoneCountry(parsed.countryIso);
+      setPhoneNational(parsed.nationalNumber);
       setTracking(data.data.trackingEnabled);
     }
   }, [data]);
@@ -101,6 +110,7 @@ function ProfileContent() {
     setSaving(true);
     setSaveMsg('');
     try {
+      const phone = formatInternationalPhone(phoneCountry, phoneNational);
       await clientApi.patch('/client/profile', { phone, trackingEnabled: tracking });
       setSaveMsg('Profile saved.');
       setEditing(false);
@@ -111,7 +121,9 @@ function ProfileContent() {
   }
 
   function cancelEdit() {
-    setPhone(p.phone ?? '');
+    const parsed = parseInternationalPhone(p.phone);
+    setPhoneCountry(parsed.countryIso);
+    setPhoneNational(parsed.nationalNumber);
     setTracking(p.trackingEnabled);
     setEditing(false);
     setSaveMsg('');
@@ -384,14 +396,14 @@ function ProfileContent() {
               <span>Email</span>
               <input value={p.email} disabled />
             </label>
-            <label className="form-field">
-              <span>Phone</span>
-              <input
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                placeholder="+27 82 000 0000"
-              />
-            </label>
+            <PhoneWithCountryField
+              label="Phone"
+              variant="form"
+              countryIso={phoneCountry}
+              nationalNumber={phoneNational}
+              onCountryChange={setPhoneCountry}
+              onNumberChange={setPhoneNational}
+            />
             <label className="form-field">
               <span>Organization</span>
               <input value={p.tenant.name} disabled />

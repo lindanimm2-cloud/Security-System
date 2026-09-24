@@ -8,6 +8,7 @@ import {
 } from '@/lib/auth';
 import { friendlyErrorMessage } from '@/lib/friendly-error';
 import { ErrorAlert } from '@/components/ErrorAlert';
+import { LegalPolicyLink } from '@/components/legal/LegalPolicyLink';
 import { LoadingButton } from '@/components/LoadingButton';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { setActionKind } from '@/lib/action-status';
@@ -256,7 +257,9 @@ export function SiteAuthForms({
               checked={oauthAccept}
               onChange={(e) => setOauthAccept(e.target.checked)}
             />
-            <span>I accept the terms of use</span>
+            <span>
+              I accept the <LegalPolicyLink label="terms of use & privacy notice" />
+            </span>
           </label>
           {error && <ErrorAlert error={error} />}
           <div className="nx-section-cta">
@@ -415,7 +418,9 @@ export function SiteAuthForms({
                   checked={acceptTerms}
                   onChange={(e) => setAcceptTerms(e.target.checked)}
                 />
-                <span>I accept the terms of use and privacy notice</span>
+                <span>
+                  I accept the <LegalPolicyLink label="terms of use & privacy notice" />
+                </span>
               </label>
               {error && <ErrorAlert error={error} />}
               <LoadingButton

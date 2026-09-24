@@ -88,7 +88,7 @@ export function DashboardCctvWall() {
     () => adminApi.get<ApiResponse<ClientVehicle[]>>('/control-room/client-vehicles'),
     [],
   );
-  const [tab, setTab] = useState<FeedTab>('dash');
+  const [tab, setTab] = useState<FeedTab>('sites');
   const [focusVehicleId, setFocusVehicleId] = useState<string | null>(null);
   const [pickedVehicleId, setPickedVehicleId] = useState<string | null>(null);
   const [pickedSiteId, setPickedSiteId] = useState<string | null>(null);

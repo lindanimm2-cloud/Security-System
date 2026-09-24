@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { FormEvent, Suspense, useEffect, useState } from 'react';
 import {
   AuthPortal,
@@ -19,6 +19,7 @@ import { clearActionKind, getActionKind, setActionKind } from '@/lib/action-stat
 import { friendlyErrorMessage } from '@/lib/friendly-error';
 import { adminHomeForRole } from '@/lib/admin-home';
 import { DEMO_PASSWORD } from '@/lib/demo/users';
+import { LegalPolicyLink } from './legal/LegalPolicyLink';
 import { BrandMark } from './BrandMark';
 import { ButtonSpinner } from './ButtonSpinner';
 import { LoadingSpinner } from './LoadingSpinner';
@@ -83,6 +84,7 @@ function LoginFormInner({
   demoEmail,
 }: LoginFormProps) {
   const router = useRouter();
+  const pathname = usePathname();
   const searchParams = useSearchParams();
   const asDeveloper = portal === 'admin' && searchParams.get('as') === 'developer';
   const presetEmail =
@@ -117,6 +119,7 @@ function LoginFormInner({
   const [setupToken, setSetupToken] = useState<string | null>(null);
   const [backupCodes, setBackupCodes] = useState<string[] | null>(null);
   const [pendingSessionRole, setPendingSessionRole] = useState<string | null>(null);
+  const [pendingPortal, setPendingPortal] = useState<string | null>(null);
 
   useEffect(() => {
     const pending = getActionKind();
@@ -138,6 +141,10 @@ function LoginFormInner({
       /* ignore */
     }
   }, [portal]);
+
+  useEffect(() => {
+    setPendingPortal(null);
+  }, [pathname]);
 
   function finishSignIn(session: AuthSession) {
     applyTabTitle(session, portal);
@@ -467,7 +474,9 @@ function LoginFormInner({
                   checked={oauthAccept}
                   onChange={(e) => setOauthAccept(e.target.checked)}
                 />
-                I accept the terms of use
+                <span>
+                  I accept the <LegalPolicyLink label="terms of use & privacy notice" />
+                </span>
               </label>
               {error && <div className="login-error">{error}</div>}
               <button type="submit" className="login-submit" disabled={loading}>
@@ -613,12 +622,34 @@ function LoginFormInner({
           </div>
 
           <div className="login-portal-switch">
-            {otherPortals.map((p) => (
-              <Link key={p.href} href={p.href} className="login-portal-btn">
-                <SketchIcon name={p.icon} size={17} />
-                {p.label}
-              </Link>
-            ))}
+            {otherPortals.map((p) => {
+              const waiting = pendingPortal === p.href;
+              return (
+                <Link
+                  key={p.href}
+                  href={p.href}
+                  className={`login-portal-btn${waiting ? ' login-portal-btn--busy' : ''}`}
+                  aria-busy={waiting || undefined}
+                  aria-label={waiting ? `Loading ${p.label}` : p.label}
+                  onClick={(e) => {
+                    if (pendingPortal) {
+                      e.preventDefault();
+                      return;
+                    }
+                    setPendingPortal(p.href);
+                  }}
+                >
+                  {waiting ? (
+                    <ButtonSpinner />
+                  ) : (
+                    <>
+                      <SketchIcon name={p.icon} size={17} />
+                      {p.label}
+                    </>
+                  )}
+                </Link>
+              );
+            })}
           </div>
 
           <div className="login-demo-hint login-demo-hint--v2">

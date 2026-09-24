@@ -79,6 +79,11 @@ export class ClientRegisterDto {
 
   @IsOptional()
   @ValidateNested()
+  @Type(() => EmergencyContactDto)
+  emergencyContact2?: EmergencyContactDto;
+
+  @IsOptional()
+  @ValidateNested()
   @Type(() => MedicalProfileDto)
   medical?: MedicalProfileDto;
 
@@ -112,6 +117,11 @@ export class ClientRegisterCompleteDto {
   @ValidateNested()
   @Type(() => EmergencyContactDto)
   emergencyContact?: EmergencyContactDto;
+
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => EmergencyContactDto)
+  emergencyContact2?: EmergencyContactDto;
 
   @IsOptional()
   @ValidateNested()

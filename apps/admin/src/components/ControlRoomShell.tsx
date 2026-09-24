@@ -199,12 +199,6 @@ export function ControlRoomShell({
         className={`sidebar ${menuOpen ? 'sidebar--open' : ''} ${collapsed ? 'sidebar--collapsed' : ''}`}
       >
         <div className="sidebar-brand">
-          <BrandMark
-            variant="control"
-            compact={collapsed}
-            showProduct={false}
-            href={homeHref}
-          />
           <SidebarCollapseButton collapsed={collapsed} onClick={toggle} />
         </div>
         <nav ref={sidebarNavRef} className="sidebar-nav" aria-label="Control panel">

@@ -164,18 +164,12 @@
 }
 
 .ops-inc--panic {
-  background: linear-gradient(
-    135deg,
-    color-mix(in srgb, #ef4444 10%, transparent),
-    transparent 62%
-  );
+  background: transparent;
 }
 
 .ops-inc--panic.ops-inc--on {
-  border-color: color-mix(in srgb, #ef4444 35%, transparent);
-  box-shadow:
-    inset 3px 0 0 #ef4444,
-    0 0 24px color-mix(in srgb, #ef4444 12%, transparent);
+  border-color: rgba(255, 255, 255, 0.08);
+  box-shadow: none;
 }
 
 .ops-inc__hit {
@@ -269,8 +263,8 @@
 }
 
 .ops-inc--sla .ops-inc__sla {
-  color: #fca5a5;
-  text-shadow: 0 0 12px color-mix(in srgb, #ef4444 25%, transparent);
+  color: var(--muted);
+  text-shadow: none;
 }
 
 .ops-inc__unit {

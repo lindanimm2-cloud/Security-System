@@ -13,6 +13,11 @@ import {
 } from '@/components/portal/EmergencyCallButton';
 import { clientApi, type ApiResponse } from '@/lib/api-client';
 import { OpsMenuDropdown } from '@/components/ops/OpsMenuDropdown';
+import { PhoneWithCountryField } from '@/components/ui/PhoneWithCountryField';
+import {
+  DEFAULT_PHONE_COUNTRY,
+  formatInternationalPhone,
+} from '@/lib/phone-countries';
 
 type Contact = {
   id: string;
@@ -79,14 +84,28 @@ function ContactsContent() {
   const [showForm, setShowForm] = useState(false);
   const [showAbout, setShowAbout] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [form, setForm] = useState({ name: '', phone: '', relationship: '' });
+  const [form, setForm] = useState({
+    name: '',
+    phoneCountry: DEFAULT_PHONE_COUNTRY,
+    phoneNational: '',
+    relationship: '',
+  });
 
   async function handleAdd(e: FormEvent) {
     e.preventDefault();
     setSaving(true);
     try {
-      await clientApi.post('/client/contacts', form);
-      setForm({ name: '', phone: '', relationship: '' });
+      await clientApi.post('/client/contacts', {
+        name: form.name,
+        phone: formatInternationalPhone(form.phoneCountry, form.phoneNational),
+        relationship: form.relationship,
+      });
+      setForm({
+        name: '',
+        phoneCountry: DEFAULT_PHONE_COUNTRY,
+        phoneNational: '',
+        relationship: '',
+      });
       setShowForm(false);
       reload();
     } finally {
@@ -158,10 +177,15 @@ function ContactsContent() {
             Name
             <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
           </label>
-          <label>
-            Phone
-            <input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} required />
-          </label>
+          <PhoneWithCountryField
+            label="Phone"
+            variant="form"
+            countryIso={form.phoneCountry}
+            nationalNumber={form.phoneNational}
+            onCountryChange={(phoneCountry) => setForm({ ...form, phoneCountry })}
+            onNumberChange={(phoneNational) => setForm({ ...form, phoneNational })}
+            required
+          />
           <label>
             Relationship
             <UiSelect

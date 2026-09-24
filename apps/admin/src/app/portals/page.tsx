@@ -33,6 +33,17 @@ export default function PortalsPage() {
             <span className="landing-card-cta">Sign in as client</span>
           </Link>
 
+          <Link href="/org" className="landing-card landing-card--admin">
+            <p className="ec-kicker">Business</p>
+            <BrandMark variant="portal" href={false} compact />
+            <h2>Organization Portal</h2>
+            <p>
+              Malls, estates, companies, and multi-site properties — operations
+              dashboard, gates, incidents, and access control.
+            </p>
+            <span className="landing-card-cta">Open organization portal</span>
+          </Link>
+
           <Link href="/login" className="landing-card landing-card--admin">
             <p className="ec-kicker">Operations</p>
             <BrandMark variant="control" href={false} compact />

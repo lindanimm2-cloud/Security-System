@@ -38,8 +38,19 @@ function formatListTime(iso: string) {
 }
 
 function previewText(msg: SupportChatMessage | null) {
-  if (!msg?.content?.trim()) return 'No messages yet';
-  return msg.content.trim();
+  if (!msg) return 'No messages yet';
+  const body = msg.content.replace(/^«reply:[^»]*»\n?/, '').trim();
+  if (msg.attachments?.length) {
+    const kind = msg.attachments[0].kind;
+    if (kind === 'IMAGE') return 'Photo';
+    if (kind === 'VIDEO') return 'Video';
+    if (kind === 'AUDIO') return 'Voice note';
+    return msg.attachments[0].fileName || 'Attachment';
+  }
+  if (!body) return 'No messages yet';
+  if (body.startsWith('🎤')) return 'Voice note';
+  if (body.startsWith('📷')) return 'Photo';
+  return body;
 }
 
 export function ClientChatHub() {

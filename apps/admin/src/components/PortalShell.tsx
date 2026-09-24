@@ -174,7 +174,6 @@ function PortalShellInner({
         className={`portal-sidebar ${menuOpen ? 'portal-sidebar--open' : ''} ${collapsed ? 'sidebar--collapsed' : ''}`}
       >
         <div className="portal-sidebar-brand">
-          <BrandMark variant="portal" compact={collapsed} showProduct={!collapsed} />
           <SidebarCollapseButton collapsed={collapsed} onClick={toggle} />
         </div>
         <nav className="portal-sidebar-nav">
@@ -205,6 +204,30 @@ function PortalShellInner({
           <div className="portal-sidebar-user sidebar-user-copy">
             {session.user.firstName} {session.user.lastName}
           </div>
+          <Link
+            href="/org"
+            className="btn-ghost btn-ghost--full sidebar-signout sidebar-website"
+            title="Organization portal"
+            aria-label="Organization portal"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
+              <path
+                d="M4 20.5V9.2L12 5l8 4.2v11.3"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+              <path
+                d="M9.5 20.5v-5h5v5"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+            <span>Organization</span>
+          </Link>
           <SidebarWebsiteLink />
           <button
             type="button"

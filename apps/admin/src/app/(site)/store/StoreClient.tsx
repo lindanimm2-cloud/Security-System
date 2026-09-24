@@ -309,7 +309,7 @@ export default function StorePage() {
               Installation services
             </Link>
             <Link href="/portals" className="nx-btn nx-btn--ghost-light">
-              Employee login
+              Login
             </Link>
           </div>
         </div>

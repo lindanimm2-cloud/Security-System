@@ -1035,7 +1035,7 @@ export function handleDeviceSecurityDemo(args: {
   if (clean === '/client/security/consent' && m === 'POST') {
     consentAccepted = Boolean(payload.accepted);
     pushAudit('CONSENT_RECORDED', actor);
-    return ok({ accepted: consentAccepted, version: '2026-08-18', policyVersion: '1.0' });
+    return ok({ accepted: consentAccepted, version: '2026-09-24', policyVersion: '1.1' });
   }
   if (clean === '/client/security/settings' && m === 'POST') {
     if (typeof payload.trackingMode === 'string') trackingMode = payload.trackingMode as typeof trackingMode;

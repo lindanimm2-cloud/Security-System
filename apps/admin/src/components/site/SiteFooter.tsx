@@ -26,6 +26,9 @@ export function SiteFooter() {
             <li>
               <Link href="/contact">Contact</Link>
             </li>
+            <li>
+              <Link href="/legal">Terms &amp; privacy</Link>
+            </li>
           </ul>
         </div>
         <div>
@@ -67,7 +70,7 @@ export function SiteFooter() {
               <Link href="/portal/login">Protection portal</Link>
             </li>
             <li>
-              <Link href="/portals">Employee login</Link>
+              <Link href="/portals">Login</Link>
             </li>
             <li>
               <a href="mailto:hello@4dsnexus.co.za">hello@4dsnexus.co.za</a>

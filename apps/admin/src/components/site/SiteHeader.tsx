@@ -54,7 +54,7 @@ export function SiteHeader() {
             <Link href="/account">Client account</Link>
             <Link href="/contact">Sales desk</Link>
             <Link href="/portals" className="nx-utility-employee">
-              Employee login
+              Login
             </Link>
           </div>
         </div>
@@ -95,7 +95,7 @@ export function SiteHeader() {
               className="nx-btn nx-btn--employee nx-btn--sm"
               onClick={() => setOpen(false)}
             >
-              Employee login
+              Login
             </Link>
             <button
               type="button"
@@ -166,7 +166,7 @@ export function SiteHeader() {
               }
               onClick={() => setOpen(false)}
             >
-              Employee login
+              Login
             </Link>
             <ThemeToggle />
           </nav>

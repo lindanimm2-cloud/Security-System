@@ -3,16 +3,25 @@
 import { FormEvent, useState } from 'react';
 import { clientApi, type ApiResponse } from '@/lib/api-client';
 import { friendlyErrorMessage } from '@/lib/friendly-error';
+import { formatSplitAddress } from '@/lib/phone-countries';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
+import { SplitAddressFields, type SplitAddressValue } from '@/components/ui/SplitAddressFields';
 
 type Props = {
   onRegistered?: () => void;
   compact?: boolean;
 };
 
+const EMPTY_ADDRESS: SplitAddressValue = {
+  street: '',
+  suburb: '',
+  city: '',
+  postalCode: '',
+};
+
 export function PropertyRegisterForm({ onRegistered, compact }: Props) {
   const [name, setName] = useState('');
-  const [address, setAddress] = useState('');
+  const [addressParts, setAddressParts] = useState<SplitAddressValue>(EMPTY_ADDRESS);
   const [gateCode, setGateCode] = useState('');
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState('');
@@ -24,6 +33,7 @@ export function PropertyRegisterForm({ onRegistered, compact }: Props) {
     setError('');
     setMsg('');
     try {
+      const address = formatSplitAddress(addressParts);
       const res = await clientApi.post<
         ApiResponse<{ id: string; status: string; message?: string }>
       >('/client/properties/register', { name, address, gateCode: gateCode || undefined });
@@ -32,7 +42,7 @@ export function PropertyRegisterForm({ onRegistered, compact }: Props) {
           'Property submitted. Our control room will verify and link your alarm & cameras.',
       );
       setName('');
-      setAddress('');
+      setAddressParts(EMPTY_ADDRESS);
       setGateCode('');
       onRegistered?.();
     } catch (err) {
@@ -58,23 +68,15 @@ export function PropertyRegisterForm({ onRegistered, compact }: Props) {
           required
         />
       </label>
-      <label className="form-field">
-        <span>Address</span>
-        <input
-          value={address}
-          onChange={(e) => setAddress(e.target.value)}
-          placeholder="Street, suburb, city"
-          required
-        />
-      </label>
-      <label className="form-field">
-        <span>Gate code (optional)</span>
-        <input
-          value={gateCode}
-          onChange={(e) => setGateCode(e.target.value)}
-          placeholder="For responder access"
-        />
-      </label>
+      <SplitAddressFields
+        title="Primary site address"
+        value={addressParts}
+        onChange={setAddressParts}
+        showGate
+        gateCode={gateCode}
+        onGateCodeChange={setGateCode}
+        gateLabel="Gate / access notes (optional)"
+      />
       {error ? <div className="alert alert--error">{error}</div> : null}
       {msg ? <div className="alert alert--success">{msg}</div> : null}
       <button type="submit" className="btn-primary" disabled={busy}>

@@ -141,7 +141,7 @@ export default function HomePage() {
           </p>
           <div className="nx-hero-actions">
             <Link href="/portals" className="nx-btn nx-btn--primary">
-              Employee login
+              Login
             </Link>
             <Link href="/contact" className="nx-btn nx-btn--ghost-light">
               Request a quote

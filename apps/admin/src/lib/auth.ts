@@ -309,11 +309,16 @@ export type ClientRegisterPayload = {
   phone: string;
   accountKind?: 'store' | 'protection';
   emergencyContact?: { name: string; phone: string; relationship: string };
+  emergencyContact2?: { name: string; phone: string; relationship: string };
   medical?: {
     bloodType?: string;
     allergies?: string;
     medications?: string;
     emergencyNotes?: string;
+    doctorContact?: string;
+    medicalAidType?: string;
+    medicalAidMemberNumber?: string;
+    medicalAidPlan?: string;
   };
   acceptTerms: boolean;
 };
@@ -336,12 +341,33 @@ export type ClientRegisterCompletePayload = {
   firstName?: string;
   lastName?: string;
   emergencyContact?: { name: string; phone: string; relationship: string };
+  emergencyContact2?: { name: string; phone: string; relationship: string };
   medical?: {
     bloodType?: string;
     allergies?: string;
     medications?: string;
     emergencyNotes?: string;
+    doctorContact?: string;
+    medicalAidType?: string;
+    medicalAidMemberNumber?: string;
+    medicalAidPlan?: string;
   };
+  property?: { name: string; address: string; gateCode?: string };
+  vehicle?: {
+    registration: string;
+    make: string;
+    model: string;
+    year?: number;
+    colour?: string;
+  };
+  familyMembers?: Array<{
+    firstName: string;
+    lastName: string;
+    email: string;
+    phone?: string;
+    relationship: string;
+  }>;
+  safeZones?: Array<{ name: string; lat?: number; lng?: number; radiusM?: number }>;
   acceptTerms: boolean;
 };
 

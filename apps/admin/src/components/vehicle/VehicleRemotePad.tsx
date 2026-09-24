@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import { HoldToActivate } from '@/components/ops/EmergencyMode';
 import { OpsCommandTile } from '@/components/ops/OpsUi';
 import type { VehicleRemoteAction, VehicleRemoteState } from '@/lib/vehicle-remote';
@@ -229,7 +230,7 @@ export function VehicleRemotePad({
               title="Horn / lights"
               description="Pulse horn and hazards"
               stateLabel={stateLabel('horn', state.hornActive ? 'Active' : 'Ready')}
-              tone="purple"
+              tone="muted"
               active={Boolean(state.hornActive)}
               holdMs={1200}
               icon={<HornIcon />}
@@ -295,55 +296,73 @@ export function VehicleRemotePad({
           </div>
         )}
 
-        {killOpen && !cut ? (
-          <div className="ops-kill-confirm" role="alertdialog" aria-labelledby="ops-kill-title">
-            <div className="ops-kill-confirm__head">
-              <span aria-hidden>⚠</span>
-              <div>
-                <strong id="ops-kill-title">Disable ignition?</strong>
-                {(vehicleLabel || registration) && (
-                  <p className="ops-kill-confirm__unit">
-                    {[vehicleLabel, registration].filter(Boolean).join(' · ')}
-                  </p>
-                )}
-                <p className="text-muted" style={{ margin: '0.35rem 0 0', fontSize: '0.82rem' }}>
-                  This will prevent the vehicle from starting. Only continue when operationally safe and
-                  authorized.
-                </p>
-              </div>
-            </div>
-            <label>
-              <input
-                type="checkbox"
-                checked={killAck}
-                onChange={(e) => setKillAck(e.target.checked)}
-              />
-              <span>I understand the risks and want to continue.</span>
-            </label>
-            <div className="ops-kill-confirm__actions">
-              <button
-                type="button"
-                className="btn-ghost"
+        {killOpen && !cut
+          ? createPortal(
+              <div
+                className="ops-kill-modal"
+                role="presentation"
                 onClick={() => {
                   setKillOpen(false);
                   setKillAck(false);
                 }}
               >
-                Cancel
-              </button>
-              <HoldToActivate
-                label={label('immobilise', 'Confirm disable', 'Disabling…')}
-                holdMs={1400}
-                tone="danger"
-                keepLabel
-                disabled={!killAck || disabled || anyBusy || isBusy('immobilise')}
-                loading={feedback.immobilise === 'loading' || busyAction === 'immobilise'}
-                className="hold-activate--console btn-danger"
-                onActivate={() => void runCommand('immobilise')}
-              />
-            </div>
-          </div>
-        ) : null}
+                <div
+                  className="ops-kill-confirm"
+                  role="alertdialog"
+                  aria-modal="true"
+                  aria-labelledby="ops-kill-title"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <div className="ops-kill-confirm__head">
+                    <span aria-hidden>⚠</span>
+                    <div>
+                      <strong id="ops-kill-title">Disable ignition?</strong>
+                      {(vehicleLabel || registration) && (
+                        <p className="ops-kill-confirm__unit">
+                          {[vehicleLabel, registration].filter(Boolean).join(' · ')}
+                        </p>
+                      )}
+                      <p className="text-muted" style={{ margin: '0.35rem 0 0', fontSize: '0.82rem' }}>
+                        This will prevent the vehicle from starting. Only continue when operationally safe and
+                        authorized.
+                      </p>
+                    </div>
+                  </div>
+                  <label>
+                    <input
+                      type="checkbox"
+                      checked={killAck}
+                      onChange={(e) => setKillAck(e.target.checked)}
+                    />
+                    <span>I understand the risks and want to continue.</span>
+                  </label>
+                  <div className="ops-kill-confirm__actions">
+                    <button
+                      type="button"
+                      className="btn-ghost"
+                      onClick={() => {
+                        setKillOpen(false);
+                        setKillAck(false);
+                      }}
+                    >
+                      Cancel
+                    </button>
+                    <HoldToActivate
+                      label={label('immobilise', 'Confirm disable', 'Disabling…')}
+                      holdMs={1400}
+                      tone="danger"
+                      keepLabel
+                      disabled={!killAck || disabled || anyBusy || isBusy('immobilise')}
+                      loading={feedback.immobilise === 'loading' || busyAction === 'immobilise'}
+                      className="hold-activate--console btn-danger"
+                      onActivate={() => void runCommand('immobilise')}
+                    />
+                  </div>
+                </div>
+              </div>,
+              document.body,
+            )
+          : null}
 
         {children}
       </section>

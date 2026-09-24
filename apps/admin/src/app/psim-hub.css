@@ -451,7 +451,7 @@
   margin: 0;
   font-variant-numeric: tabular-nums;
   font-weight: 600;
-  color: var(--warning, #b8860b);
+  color: var(--warning, #111111);
 }
 
 .prop-cmd__event {

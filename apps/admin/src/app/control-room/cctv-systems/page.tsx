@@ -13,6 +13,8 @@ import { useApi } from '@/hooks/useApi';
 import { adminApi, type ApiResponse } from '@/lib/api-client';
 import { CONTROL_ROOM_ROUTES } from '@/lib/control-room-routes';
 import { matchesSearch } from '@/lib/list-search';
+import { formatSplitAddress } from '@/lib/phone-countries';
+import { SplitAddressFields, type SplitAddressValue } from '@/components/ui/SplitAddressFields';
 
 type SiteType = { value: string; label: string };
 
@@ -185,7 +187,12 @@ function CctvSystemsContent() {
   const [clientUserId, setClientUserId] = useState('');
   const [propertyId, setPropertyId] = useState('');
   const [siteName, setSiteName] = useState('');
-  const [siteAddress, setSiteAddress] = useState('');
+  const [siteAddressParts, setSiteAddressParts] = useState<SplitAddressValue>({
+    street: '',
+    suburb: '',
+    city: '',
+    postalCode: '',
+  });
   const [propertyType, setPropertyType] = useState('HOUSE');
   const [accessNotes, setAccessNotes] = useState('');
   const [gateCode, setGateCode] = useState('');
@@ -302,7 +309,7 @@ function CctvSystemsContent() {
     setClientUserId('');
     setPropertyId('');
     setSiteName('');
-    setSiteAddress('');
+    setSiteAddressParts({ street: '', suburb: '', city: '', postalCode: '' });
     setPropertyType('HOUSE');
     setAccessNotes('');
     setGateCode('');
@@ -340,7 +347,7 @@ function CctvSystemsContent() {
           mode === 'new-site'
             ? {
                 name: siteName,
-                address: siteAddress,
+                address: formatSplitAddress(siteAddressParts),
                 propertyType,
                 accessNotes: accessNotes || undefined,
                 gateCode: gateCode || undefined,
@@ -493,20 +500,18 @@ function CctvSystemsContent() {
                     required
                   />
                 </label>
-                <label className="form-field form-field--full">
-                  <span>Address</span>
-                  <input
-                    value={siteAddress}
-                    onChange={(e) => setSiteAddress(e.target.value)}
-                    placeholder="Street, suburb, city"
-                    required
+                <div className="form-field form-field--full">
+                  <SplitAddressFields
+                    title="Primary site address"
+                    value={siteAddressParts}
+                    onChange={setSiteAddressParts}
+                    showGate
+                    gateCode={gateCode}
+                    onGateCodeChange={setGateCode}
+                    gateLabel="Gate / access code"
                   />
-                </label>
-                <label className="form-field">
-                  <span>Gate / access code</span>
-                  <input value={gateCode} onChange={(e) => setGateCode(e.target.value)} />
-                </label>
-                <label className="form-field">
+                </div>
+                <label className="form-field form-field--full">
                   <span>Access notes (tech)</span>
                   <input
                     value={accessNotes}

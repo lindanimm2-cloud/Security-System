@@ -7,20 +7,15 @@ import { PortalLayout } from '@/components/portal/PortalLayout';
 export default function PortalControlRoomChatPage() {
   return (
     <PortalLayout>
-      <div className="page-content page-content--chat">
-        <div className="page-header">
-          <div>
-            <h1>Control room chat</h1>
-            <p className="text-muted">
-              <Link href="/portal/emergency" className="interactive-text">
-                Emergency Hub
-              </Link>
-              {' · '}
-              <Link href="/portal/family/chat" className="interactive-text">
-                Family chat
-              </Link>
-            </p>
-          </div>
+      <div className="page-content page-content--chat page-content--messaging">
+        <div className="cr-chat-page-links">
+          <Link href="/portal/emergency" className="interactive-text">
+            Emergency Hub
+          </Link>
+          <span aria-hidden>·</span>
+          <Link href="/portal/family/chat" className="interactive-text">
+            Family chat
+          </Link>
         </div>
         <ControlRoomChat />
       </div>

@@ -217,7 +217,7 @@ function EmergencyPermissionsContent() {
   }
 
   return (
-    <div className="page-content sec-page">
+    <div className="page-content sec-page sec-permissions">
       <SecurityDocFrame
         docId="SCH-PERM-01"
         kicker="Schedule C"

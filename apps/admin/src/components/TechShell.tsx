@@ -135,7 +135,6 @@ export function TechShell({
         className={`officer-sidebar ${menuOpen ? 'officer-sidebar--open' : ''} ${collapsed ? 'sidebar--collapsed' : ''}`}
       >
         <div className="officer-sidebar-brand">
-          <BrandMark variant="officer" compact={collapsed} showProduct={!collapsed} />
           <SidebarCollapseButton collapsed={collapsed} onClick={toggle} />
         </div>
         <nav className="officer-sidebar-nav">

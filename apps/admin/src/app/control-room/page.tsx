@@ -380,21 +380,22 @@ function OverviewContent() {
             ) : null}
           </div>
 
-          <section className="ops-board__map" aria-label="Live map">
-            {canAccess(CONTROL_ROOM_ROUTES.map) ? (
-              <SectionErrorBoundary label="Live map">
-                <DashboardLiveMap focusIncidentId={focusIncidentId} />
+          <div className="ops-board__stage">
+            {canAccess(CONTROL_ROOM_ROUTES.surveillance) ? (
+              <SectionErrorBoundary label="CCTV">
+                <DashboardCctvWall />
               </SectionErrorBoundary>
-            ) : (
-              <div className="empty-state">Map access not available for this role.</div>
-            )}
-          </section>
-
-          {canAccess(CONTROL_ROOM_ROUTES.surveillance) ? (
-            <SectionErrorBoundary label="CCTV">
-              <DashboardCctvWall />
-            </SectionErrorBoundary>
-          ) : null}
+            ) : null}
+            <section className="ops-board__map" aria-label="Live map">
+              {canAccess(CONTROL_ROOM_ROUTES.map) ? (
+                <SectionErrorBoundary label="Live map">
+                  <DashboardLiveMap focusIncidentId={focusIncidentId} />
+                </SectionErrorBoundary>
+              ) : (
+                <div className="empty-state">Map access not available for this role.</div>
+              )}
+            </section>
+          </div>
         </div>
 
         {canAccess(CONTROL_ROOM_ROUTES.fleet) ? (

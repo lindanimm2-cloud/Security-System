@@ -823,6 +823,7 @@ export class AuthService {
         user.tenantId,
         user.id,
         dto.emergencyContact,
+        dto.emergencyContact2,
         dto.medical,
       );
 
@@ -939,6 +940,7 @@ export class AuthService {
     tenantId: string,
     userId: string,
     emergencyContact?: EmergencyContactDto,
+    emergencyContact2?: EmergencyContactDto,
     medical?: MedicalProfileDto,
   ) {
     if (emergencyContact) {
@@ -950,6 +952,20 @@ export class AuthService {
           phone: emergencyContact.phone.trim(),
           relationship: emergencyContact.relationship.trim(),
           priority: 1,
+          notifyOnPanic: true,
+        },
+      });
+    }
+
+    if (emergencyContact2) {
+      await tx.emergencyContact.create({
+        data: {
+          tenantId,
+          userId,
+          name: emergencyContact2.name.trim(),
+          phone: emergencyContact2.phone.trim(),
+          relationship: emergencyContact2.relationship.trim(),
+          priority: 2,
           notifyOnPanic: true,
         },
       });

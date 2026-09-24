@@ -1193,6 +1193,9 @@ let demoMedical = {
   emergencyNotes: 'Insulin stored in fridge. Contact James if unresponsive.',
   doctorContact: 'Dr Naidoo · +27 31 555 0199',
   ambulancePreference: 'Netcare 911',
+  medicalAidType: 'Discovery Health',
+  medicalAidMemberNumber: 'DH-88429103',
+  medicalAidPlan: 'Executive',
   isComplete: true,
 };
 
@@ -1362,12 +1365,22 @@ let demoSalesLeads: DemoSalesLead[] = [
 
 let demoAdminProducts = getDemoProducts().map((p) => ({ ...p, isActive: true }));
 
+type DemoClientChatAttachment = {
+  id: string;
+  fileName: string;
+  fileType: string;
+  fileUrl: string;
+  fileSize: number;
+  kind: 'IMAGE' | 'VIDEO' | 'FILE' | 'AUDIO';
+};
+
 type DemoClientChatMessage = {
   id: string;
   clientUserId: string;
   content: string;
   createdAt: string;
   sender: { id: string; firstName: string; lastName: string; role: string };
+  attachments?: DemoClientChatAttachment[];
 };
 
 const demoClientChatByClient = new Map<string, DemoClientChatMessage[]>();
@@ -3265,6 +3278,14 @@ export async function handleDemoRequest<T>({
         typeof payload.ambulancePreference === 'string'
           ? payload.ambulancePreference
           : demoMedical.ambulancePreference,
+      medicalAidType:
+        typeof payload.medicalAidType === 'string' ? payload.medicalAidType : demoMedical.medicalAidType,
+      medicalAidMemberNumber:
+        typeof payload.medicalAidMemberNumber === 'string'
+          ? payload.medicalAidMemberNumber
+          : demoMedical.medicalAidMemberNumber,
+      medicalAidPlan:
+        typeof payload.medicalAidPlan === 'string' ? payload.medicalAidPlan : demoMedical.medicalAidPlan,
       isComplete: true,
     };
     return ok({ ...demoMedical }) as T;
@@ -4209,8 +4230,84 @@ export async function handleDemoRequest<T>({
   }
   if (clean === '/client/messages' && m === 'POST') {
     const clientUserId = user?.id ?? 'demo-user-client-demo-local';
-    const content = String(payload.content ?? '').trim();
-    if (!content) return { success: false as const, message: 'Message cannot be empty' } as T;
+    let content = String(payload.content ?? '').trim();
+    const incoming = Array.isArray(payload.attachments)
+      ? (payload.attachments as {
+          fileName?: string;
+          fileType?: string;
+          fileUrl?: string;
+          fileSize?: number;
+          kind?: 'IMAGE' | 'VIDEO' | 'FILE' | 'AUDIO';
+        }[])
+      : [];
+    const attachments: DemoClientChatAttachment[] = incoming
+      .filter((a) => a.fileUrl)
+      .slice(0, 5)
+      .map((a, index) => ({
+        id: `demo-cr-att-${Date.now()}-${index}`,
+        fileName: String(a.fileName ?? 'file'),
+        fileType: String(a.fileType ?? 'application/octet-stream'),
+        fileUrl: String(a.fileUrl),
+        fileSize: Number(a.fileSize ?? 0),
+        kind:
+          a.kind === 'IMAGE' || a.kind === 'VIDEO' || a.kind === 'AUDIO'
+            ? a.kind
+            : String(a.fileType ?? '').startsWith('audio/')
+              ? ('AUDIO' as const)
+              : ('FILE' as const),
+      }));
+    if (!content && attachments.length === 0) {
+      return { success: false as const, message: 'Message cannot be empty' } as T;
+    }
+    if (!content && attachments.length) {
+      const kind = attachments[0].kind;
+      content =
+        kind === 'AUDIO'
+          ? '🎤 Voice note'
+          : kind === 'IMAGE'
+            ? '📷 Photo'
+            : kind === 'VIDEO'
+              ? '🎥 Video'
+              : attachments.length === 1
+                ? `Sent ${attachments[0].fileName}`
+                : `Sent ${attachments.length} attachments`;
+    }
+    // Reply markers may already be wrapped by the client; also accept replyToId.
+    const replyToId = typeof payload.replyToId === 'string' ? payload.replyToId : '';
+    if (replyToId && !content.startsWith('«reply:')) {
+      const thread = ensureDemoClientChat(clientUserId);
+      const quoted = thread.find((item) => item.id === replyToId);
+      if (quoted) {
+        const quotedBody = quoted.content.replace(/^«reply:[^»]*»\n?/, '').trim();
+        const preview = quoted.attachments?.[0]
+          ? quoted.attachments[0].kind === 'IMAGE'
+            ? 'Photo'
+            : quoted.attachments[0].kind === 'VIDEO'
+              ? 'Video'
+              : quoted.attachments[0].kind === 'AUDIO'
+                ? 'Voice note'
+                : quoted.attachments[0].fileName || 'Attachment'
+          : quotedBody.startsWith('Sent ')
+            ? 'Attachment'
+            : quotedBody.replace(/\s+/g, ' ').slice(0, 80) || 'Message';
+        const staffRoles = new Set([
+          'DISPATCHER',
+          'SUPERVISOR',
+          'MANAGER',
+          'TENANT_ADMIN',
+          'OWNER',
+          'SUPER_ADMIN',
+          'SALES',
+          'DEVELOPER',
+          'OFFICER',
+        ]);
+        const name =
+          staffRoles.has(quoted.sender.role)
+            ? 'Control room'
+            : `${quoted.sender.firstName} ${quoted.sender.lastName}`.trim();
+        content = `«reply:${quoted.id}|${name}|${preview}»\n${content}`;
+      }
+    }
     const msg: DemoClientChatMessage = {
       id: `demo-cr-${Date.now()}`,
       clientUserId,
@@ -4222,6 +4319,7 @@ export async function handleDemoRequest<T>({
         lastName: user?.lastName ?? 'Client',
         role: user?.role ?? 'USER',
       },
+      attachments,
     };
     ensureDemoClientChat(clientUserId).push(msg);
     const { clientUserId: _c, ...data } = msg;
@@ -4430,6 +4528,62 @@ export async function handleDemoRequest<T>({
         insuranceInfo: v.insuranceInfo,
       })),
     ) as T;
+  }
+  if (clean === '/client/vehicles' && m === 'POST') {
+    const registration = String(payload.registration ?? '').trim().toUpperCase();
+    const make = String(payload.make ?? '').trim();
+    const model = String(payload.model ?? '').trim();
+    if (!registration || !make || !model) {
+      return { success: false as const, message: 'Registration, make, and model are required' } as T;
+    }
+    const ownerId = user?.id ?? 'demo-user-client-demo-local';
+    const ownerName = `${user?.firstName ?? 'Client'} ${user?.lastName ?? ''}`.trim() || 'Client';
+    const colour =
+      (typeof payload.colour === 'string' && payload.colour.trim()) ||
+      (typeof payload.color === 'string' && payload.color.trim()) ||
+      'Silver';
+    const yearRaw = payload.year;
+    const parsedYear =
+      typeof yearRaw === 'number'
+        ? yearRaw
+        : typeof yearRaw === 'string' && yearRaw.trim()
+          ? Number(yearRaw)
+          : NaN;
+    const created: (typeof demoClientVehicles)[number] = {
+      id: `demo-veh-${Date.now()}`,
+      registration,
+      make,
+      model,
+      year: Number.isFinite(parsedYear) ? parsedYear : new Date().getFullYear(),
+      color: colour,
+      vin: 'PENDING',
+      trackerLinked: false,
+      theftRecovery: false,
+      immobiliserOn: false,
+      doorsLocked: true,
+      insuranceInfo: '',
+      ownerName,
+      ownerId,
+      lat: demoClientLocation.lat,
+      lng: demoClientLocation.lng,
+      speed: 0,
+      trackerStatus: 'PENDING',
+    };
+    demoClientVehicles.unshift(created);
+    return ok({
+      id: created.id,
+      registration: created.registration,
+      make: created.make,
+      model: created.model,
+      year: created.year,
+      color: created.color,
+      trackerLinked: false,
+      theftRecovery: false,
+      immobiliserOn: false,
+      doorsLocked: true,
+      status: 'PENDING_VERIFICATION',
+      message: 'Vehicle registered. Control room will verify tracker linking.',
+    }) as T;
   }
   if (clean === '/client/subscription' && m === 'GET') {
     return ok({

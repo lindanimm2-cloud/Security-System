@@ -11,7 +11,8 @@ export type SketchIconName =
   | 'monitor'
   | 'officer'
   | 'secure'
-  | 'arrow-left';
+  | 'arrow-left'
+  | 'arrow-right';
 
 const ICONS: Record<SketchIconName, ReactNode> = {
   shield: (
@@ -56,10 +57,9 @@ const ICONS: Record<SketchIconName, ReactNode> = {
   ),
   'sign-in': (
     <>
-      <path d="M8.2 12h9.8" />
-      <path d="M14.8 8.4L18.4 12l-3.6 3.6" />
-      <path d="M5.6 5.8V6.8a2.2 2.2 0 0 0 2.2 2.2h3.2" />
-      <path d="M5.6 18.2v-1a2.2 2.2 0 0 1 2.2-2.2h3.2" />
+      <path d="M10 4.8H6.4A2.2 2.2 0 0 0 4.2 7v10a2.2 2.2 0 0 0 2.2 2.2H10" />
+      <path d="M10.8 12h9" />
+      <path d="M16.4 8.4 20 12l-3.6 3.6" />
     </>
   ),
   monitor: (
@@ -84,6 +84,12 @@ const ICONS: Record<SketchIconName, ReactNode> = {
     <>
       <path d="M19.2 12H5.4" />
       <path d="M10.2 6.8L5.2 12l5 5.2" />
+    </>
+  ),
+  'arrow-right': (
+    <>
+      <path d="M4.8 12h13.8" />
+      <path d="M13.8 6.8 18.8 12l-5 5.2" />
     </>
   ),
 };

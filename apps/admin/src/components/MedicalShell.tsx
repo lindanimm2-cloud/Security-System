@@ -80,7 +80,6 @@ export function MedicalShell({
 
       <aside className={`sidebar ${menuOpen ? 'sidebar--open' : ''} ${collapsed ? 'sidebar--collapsed' : ''}`}>
         <div className="sidebar-brand">
-          <BrandMark variant="medical" compact={collapsed} showProduct={!collapsed} />
           <SidebarCollapseButton collapsed={collapsed} onClick={toggle} />
         </div>
         <nav className="sidebar-nav">

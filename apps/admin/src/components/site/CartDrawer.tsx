@@ -9,6 +9,14 @@ import type { LoyaltySummary } from '@/components/loyalty/LoyaltySummaryCard';
 import { clientApi, publicApi, type ApiResponse } from '@/lib/api-client';
 import { useCart } from './CartProvider';
 import { useSiteClient } from './SiteClientProvider';
+import { PhoneWithCountryField } from '@/components/ui/PhoneWithCountryField';
+import { SplitAddressFields, type SplitAddressValue } from '@/components/ui/SplitAddressFields';
+import {
+  DEFAULT_PHONE_COUNTRY,
+  formatInternationalPhone,
+  formatSplitAddress,
+  parseInternationalPhone,
+} from '@/lib/phone-countries';
 
 type Step = 'cart' | 'checkout' | 'done';
 
@@ -37,8 +45,12 @@ export function CartDrawer() {
   const [form, setForm] = useState({
     customerName: '',
     customerEmail: '',
-    customerPhone: '',
-    shippingAddress: '',
+    customerPhoneCountry: DEFAULT_PHONE_COUNTRY,
+    customerPhoneNational: '',
+    shippingStreet: '',
+    shippingSuburb: '',
+    shippingCity: '',
+    shippingPostalCode: '',
     notes: '',
   });
 
@@ -49,11 +61,15 @@ export function CartDrawer() {
 
   useEffect(() => {
     if (!ready || !profile) return;
+    const parsed = parseInternationalPhone(profile.phone);
     setForm((prev) => ({
       ...prev,
       customerName: prev.customerName || fullName || '',
       customerEmail: prev.customerEmail || profile.email,
-      customerPhone: prev.customerPhone || profile.phone || '',
+      customerPhoneCountry: prev.customerPhoneNational
+        ? prev.customerPhoneCountry
+        : parsed.countryIso,
+      customerPhoneNational: prev.customerPhoneNational || parsed.nationalNumber,
     }));
   }, [ready, profile, fullName]);
 
@@ -94,6 +110,12 @@ export function CartDrawer() {
     setPlacing(true);
     setError('');
     try {
+      const shippingAddress = formatSplitAddress({
+        street: form.shippingStreet,
+        suburb: form.shippingSuburb,
+        city: form.shippingCity,
+        postalCode: form.shippingPostalCode,
+      });
       const res = await publicApi<{
         success: boolean;
         data: { orderNumber: string };
@@ -101,7 +123,14 @@ export function CartDrawer() {
         method: 'POST',
         body: JSON.stringify({
           tenantSlug: profile?.tenant.slug ?? 'demo',
-          ...form,
+          customerName: form.customerName,
+          customerEmail: form.customerEmail,
+          customerPhone: formatInternationalPhone(
+            form.customerPhoneCountry,
+            form.customerPhoneNational,
+          ),
+          shippingAddress,
+          notes: form.notes,
           customerUserId: session?.user.id,
           discountCode: discountCode.trim() || undefined,
           items: cart.map((l) => ({
@@ -403,27 +432,37 @@ export function CartDrawer() {
                 }
               />
             </label>
-            <label>
-              Phone
-              <input
-                value={form.customerPhone}
-                onChange={(e) =>
-                  setForm({ ...form, customerPhone: e.target.value })
-                }
-              />
-            </label>
-            <label>
-              Delivery / site address
-              <textarea
-                required
-                rows={3}
-                placeholder="Street, suburb, city, gate codes…"
-                value={form.shippingAddress}
-                onChange={(e) =>
-                  setForm({ ...form, shippingAddress: e.target.value })
-                }
-              />
-            </label>
+            <PhoneWithCountryField
+              label="Phone"
+              variant="form"
+              className="nx-checkout-phone"
+              countryIso={form.customerPhoneCountry}
+              nationalNumber={form.customerPhoneNational}
+              onCountryChange={(customerPhoneCountry) =>
+                setForm({ ...form, customerPhoneCountry })
+              }
+              onNumberChange={(customerPhoneNational) =>
+                setForm({ ...form, customerPhoneNational })
+              }
+            />
+            <SplitAddressFields
+              title="Delivery / site address"
+              value={{
+                street: form.shippingStreet,
+                suburb: form.shippingSuburb,
+                city: form.shippingCity,
+                postalCode: form.shippingPostalCode,
+              }}
+              onChange={(next: SplitAddressValue) =>
+                setForm({
+                  ...form,
+                  shippingStreet: next.street,
+                  shippingSuburb: next.suburb,
+                  shippingCity: next.city,
+                  shippingPostalCode: next.postalCode,
+                })
+              }
+            />
             <label>
               Notes (install / licence)
               <textarea

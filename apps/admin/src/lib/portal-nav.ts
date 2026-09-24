@@ -32,12 +32,6 @@ export const PORTAL_NAV: PortalNavSection[] = [
       { href: '/portal/protect', label: 'Protect', icon: 'emergency', requiresAccess: 'emergency' },
       { href: '/portal/emergency', label: 'Emergency Hub', icon: 'hub', requiresAccess: 'emergency' },
       { href: '/portal/security', label: 'Emergency Protection', icon: 'officers', requiresAccess: 'emergency' },
-      { href: '/portal/security/devices', label: 'Trusted Devices', icon: 'devices', requiresAccess: 'emergency' },
-      { href: '/portal/security/replace-device', label: 'Replace Primary', icon: 'devices', requiresAccess: 'emergency' },
-      { href: '/portal/security/emergency-access', label: 'Emergency Access', icon: 'key', requiresAccess: 'emergency' },
-      { href: '/portal/security/permissions', label: 'Permissions', icon: 'officers', requiresAccess: 'emergency' },
-      { href: '/portal/security/emergency-setup', label: 'Emergency setup', icon: 'devices', requiresAccess: 'emergency' },
-      { href: '/apps', label: 'Get the 4DS app', icon: 'devices' },
       { href: '/portal/contacts', label: 'Emergency Contacts', icon: 'contacts', requiresAccess: 'emergency' },
       { href: '/portal/medical', label: 'Medical', icon: 'medical', requiresAccess: 'medical' },
       { href: '/portal/incidents', label: 'Response history', icon: 'incidents', requiresAccess: 'emergency' },
@@ -71,7 +65,7 @@ export const PORTAL_NAV: PortalNavSection[] = [
     icon: 'personal',
     items: [
       { href: '/portal/personal', label: 'Personal Security', icon: 'personal', requiresAccess: 'personal' },
-      { href: '/portal/requests', label: 'Service Requests', icon: 'incidents', requiresAccess: 'personal' },
+      { href: '/portal/requests', label: 'Service Requests', icon: 'services', requiresAccess: 'personal' },
     ],
   },
   {
@@ -84,8 +78,6 @@ export const PORTAL_NAV: PortalNavSection[] = [
       { href: '/portal/updates', label: 'Security Updates', icon: 'updates' },
       { href: '/portal/profile', label: 'Profile', icon: 'profile' },
       { href: '/portal/settings', label: 'Settings', icon: 'account' },
-      { href: '/portal/security/activity', label: 'Security Activity', icon: 'history' },
-      { href: '/portal/security/lockdown', label: 'Account Protection', icon: 'lock' },
     ],
   },
 ];
