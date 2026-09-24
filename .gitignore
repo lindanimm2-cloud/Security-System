@@ -12,6 +12,17 @@ apps/mobile/android/
 apps/mobile/ios/
 .expo/
 .tmp-*.js
+.tmp-verify/
+.tmp-glb-inspect.txt
 .nx-css-recovered.css
 nx-site-recovered-full.css
 .vercel/
+apps/admin/public/vehicles/_source/
+
+# Client documents and tenant-branded packs stay local
+apps/admin/public/documents/
+docs/agreement/
+docs/manuals/
+docs/brand/
+*Bololo*
+*bololo*

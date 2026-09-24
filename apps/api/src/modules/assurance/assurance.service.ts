@@ -310,7 +310,7 @@ export class AssuranceService {
         label: 'Supplier readiness pack',
         done: false,
         required: cfg.supplierPackRequired,
-        href: '/documents/Bololo_Security_4DS_Software_Development_Revenue_Share_Agreement.pdf',
+        href: '/control-room/documents',
       },
     ];
   }
