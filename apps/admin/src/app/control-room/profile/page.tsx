@@ -14,6 +14,7 @@ import { useActionHandoff } from '@/hooks/useActionHandoff';
 import { adminApi, type ApiResponse } from '@/lib/api-client';
 import { clearSession, getSession, updateSessionUser, type AuthSession } from '@/lib/auth';
 import { roleDisplayLabel } from '@/lib/role-labels';
+import { DEMO_PASSWORD } from '@/lib/demo/users';
 
 type StaffProfile = {
   id: string;
@@ -438,7 +439,7 @@ function ProfileContent() {
               <div className="profile-summary-item">
                 <dt>Password</dt>
                 <dd>
-                  <code>Demo123!</code>
+                  <code>{DEMO_PASSWORD}</code>
                 </dd>
               </div>
               <div className="profile-summary-item">

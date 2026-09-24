@@ -5,7 +5,7 @@ const TENANT = {
   primaryColor: '#c9302c',
 };
 
-export const DEMO_PASSWORD = 'Demo123!';
+export const DEMO_PASSWORD = 'Nexus#Safe26';
 const REGISTERED_CLIENTS_KEY = '4ds_demo_registered_clients';
 const PASSWORD_OVERRIDES_KEY = '4ds_demo_password_overrides';
 

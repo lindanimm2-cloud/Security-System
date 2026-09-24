@@ -18,6 +18,7 @@ import { applyTabTitle, bootTabSession } from '@/lib/tab-session';
 import { clearActionKind, getActionKind, setActionKind } from '@/lib/action-status';
 import { friendlyErrorMessage } from '@/lib/friendly-error';
 import { adminHomeForRole } from '@/lib/admin-home';
+import { DEMO_PASSWORD } from '@/lib/demo/users';
 import { BrandMark } from './BrandMark';
 import { ButtonSpinner } from './ButtonSpinner';
 import { LoadingSpinner } from './LoadingSpinner';
@@ -97,7 +98,7 @@ function LoginFormInner({
             ? 'tech.cameras@4ds.local'
             : 'client@demo.local');
   const [email, setEmail] = useState(presetEmail);
-  const [password, setPassword] = useState('Demo123!');
+  const [password, setPassword] = useState(DEMO_PASSWORD);
   const [tenantSlug, setTenantSlug] = useState('demo');
   const [remember, setRemember] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -632,7 +633,7 @@ function LoginFormInner({
                       ? 'ndlovu@4ds.local'
                       : 'client@demo.local')}
             </code>
-            {' / '}<code>Demo123!</code>
+            {' / '}<code>{DEMO_PASSWORD}</code>
             {portal !== 'client' && (
               <>
                 {' · '}org <code>demo</code>

@@ -18,10 +18,10 @@ that was the old localhost API probe. New deploys do not request it.
 ### Demo credentials
 | Portal | Email | Password | Tenant |
 |--------|-------|----------|--------|
-| Control room | `admin@demo.local` | `Demo123!` | `demo` |
-| Client | `client@demo.local` | `Demo123!` | `demo` |
-| Officer | `ndlovu@4ds.local` | `Demo123!` | `demo` |
-| Technician | `tech.cameras@4ds.local` | `Demo123!` | `demo` |
+| Control room | `admin@demo.local` | `Nexus#Safe26` | `demo` |
+| Client | `client@demo.local` | `Nexus#Safe26` | `demo` |
+| Officer | `ndlovu@4ds.local` | `Nexus#Safe26` | `demo` |
+| Technician | `tech.cameras@4ds.local` | `Nexus#Safe26` | `demo` |
 | Invite | `NX-DEMO01` | — | — |
 
 A red **Pitch demo mode** banner appears while demo mode is on.

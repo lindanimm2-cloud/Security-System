@@ -11,6 +11,7 @@ import { ErrorAlert } from '@/components/ErrorAlert';
 import { LoadingButton } from '@/components/LoadingButton';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { setActionKind } from '@/lib/action-status';
+import { DEMO_PASSWORD } from '@/lib/demo/users';
 
 export type SiteAuthMode = 'signin' | 'register';
 type OAuthProvider = 'google' | 'apple';
@@ -42,7 +43,7 @@ export function SiteAuthForms({
   const [email, setEmail] = useState(
     mode === 'signin' ? 'client@demo.local' : '',
   );
-  const [password, setPassword] = useState(mode === 'signin' ? 'Demo123!' : '');
+  const [password, setPassword] = useState(mode === 'signin' ? DEMO_PASSWORD : '');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [tenantSlug, setTenantSlug] = useState('demo');
   const [firstName, setFirstName] = useState('');
@@ -325,7 +326,7 @@ export function SiteAuthForms({
                 Sign in to account
               </LoadingButton>
               <p className="nx-muted nx-checkout-fineprint">
-                Demo: <code>client@demo.local</code> / <code>Demo123!</code> ·
+                Demo: <code>client@demo.local</code> / <code>{DEMO_PASSWORD}</code> ·
                 tenant <code>demo</code>
               </p>
               <button

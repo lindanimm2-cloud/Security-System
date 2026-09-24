@@ -68,7 +68,7 @@ npm run dev:admin  # http://localhost:3000
 | Control Room Dashboard | http://localhost:3000/control-room |
 | API Health | http://localhost:4000/v1/health |
 
-**Demo logins** (tenant: `demo`, password: `Demo123!`):
+**Demo logins** (tenant: `demo`, password: `Nexus#Safe26`):
 - Client: `client@demo.local`
 - Admin: `admin@demo.local`
 

@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { BrandMark } from '@/components/BrandMark';
 import { ThemeToggle } from '@/components/ThemeToggle';
+import { DEMO_PASSWORD } from '@/lib/demo/users';
 
 export default function PortalsPage() {
   return (
@@ -94,7 +95,7 @@ export default function PortalsPage() {
         </div>
 
         <p className="landing-demo">
-          Demo password <code>Demo123!</code> · tenant <code>demo</code>
+          Demo password <code>{DEMO_PASSWORD}</code> · tenant <code>demo</code>
           <br />
           Owner <code>owner@4ds.local</code> · Supervisor <code>supervisor@4ds.local</code> · Medical{' '}
           <code>medical@4ds.local</code> · Developer <code>developer@4ds.local</code> · Sales{' '}

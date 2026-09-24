@@ -1,6 +1,7 @@
 'use client';
 
 import { isDemoMode } from '@/lib/demo/is-demo-mode';
+import { DEMO_PASSWORD } from '@/lib/demo/users';
 
 export function DemoModeBanner() {
   if (!isDemoMode()) return null;
@@ -9,7 +10,7 @@ export function DemoModeBanner() {
       <strong>Pitch demo mode</strong>
       <span>
         Running on Vercel without a live API — seeded data · password{' '}
-        <code>Demo123!</code> · tenant <code>demo</code>
+        <code>{DEMO_PASSWORD}</code> · tenant <code>demo</code>
       </span>
     </div>
   );

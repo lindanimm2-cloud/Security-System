@@ -32,7 +32,7 @@ const DURBAN = {
 } as const;
 
 async function main() {
-  const passwordHash = await bcrypt.hash('Demo123!', 10);
+  const passwordHash = await bcrypt.hash('Nexus#Safe26', 10);
 
   const tenant = await prisma.tenant.upsert({
     where: { slug: 'demo' },
@@ -2620,7 +2620,7 @@ async function main() {
 
   console.log('Seed complete:', {
     tenant: tenant.slug,
-    password: 'Demo123!',
+    password: 'Nexus#Safe26',
     superAdmin: 'superadmin@4ds.local',
     owner: 'owner@4ds.local',
     developer: developer.email,
