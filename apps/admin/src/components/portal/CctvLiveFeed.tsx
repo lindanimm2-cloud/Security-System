@@ -7,6 +7,7 @@ import {
   useId,
   useRef,
   useState,
+  type CSSProperties,
   type KeyboardEvent,
   type MouseEvent,
   type PointerEvent,
@@ -15,9 +16,15 @@ import {
 } from 'react';
 import {
   detectTouchDevice,
+  formatPlaybackSpeed,
   getVisibleControls,
+  nextFastForwardSpeed,
+  nextPlaybackSpeed,
   type CctvControlId,
+  type CctvPlaybackSpeed,
 } from '@/lib/cctv-player-controls';
+import { startCctvAmbient, type CctvAmbientHandle } from '@/lib/cctv-audio';
+import { openCctvMiniPlayer } from '@/lib/cctv-mini-player';
 
 export type CctvCamera = {
   id: string;
@@ -33,6 +40,8 @@ export type CctvCamera = {
 type CctvLiveFeedProps = {
   camera: CctvCamera;
   href?: string;
+  /** Stay on the current screen and open context instead of navigating. */
+  onSelect?: () => void;
   featured?: boolean;
   compact?: boolean;
   className?: string;
@@ -100,31 +109,55 @@ function FeedControls({
   camera,
   stageRef,
   muted,
+  volume,
   recording,
   paused,
   isFullscreen,
+  isPlayback,
+  reverse,
+  speed,
   visibleIds,
   toolbarVisible,
   peekExpand,
   density,
+  volumeOpen,
   onMute,
+  onVolume,
+  onVolumeOpen,
+  onMini,
   onRecord,
   onPlay,
+  onRewind,
+  onForward,
+  onSpeed,
+  onLive,
   onReveal,
 }: {
   camera: CctvCamera;
   stageRef: RefObject<HTMLDivElement | null>;
   muted: boolean;
+  volume: number;
   recording: boolean;
   paused: boolean;
   isFullscreen: boolean;
+  isPlayback: boolean;
+  reverse: boolean;
+  speed: CctvPlaybackSpeed;
   visibleIds: CctvControlId[];
   toolbarVisible: boolean;
   peekExpand: boolean;
   density: 'minimal' | 'compact' | 'full';
+  volumeOpen: boolean;
   onMute: () => void;
+  onVolume: (value: number) => void;
+  onVolumeOpen: (open: boolean) => void;
+  onMini: () => void;
   onRecord: () => void;
   onPlay: () => void;
+  onRewind: () => void;
+  onForward: () => void;
+  onSpeed: () => void;
+  onLive: () => void;
   onReveal: () => void;
 }) {
   const toggleFullscreen = useCallback(() => {
@@ -179,6 +212,7 @@ function FeedControls({
 
   const show = (id: CctvControlId) => visibleIds.includes(id);
   const expandOnlyPeek = peekExpand && !toolbarVisible && show('expand');
+  const volPct = Math.round((muted ? 0 : volume) * 100);
 
   return (
     <div
@@ -207,6 +241,21 @@ function FeedControls({
             <ExpandIcon exit={isFullscreen} />
           </CtrlBtn>
         ) : null}
+        {toolbarVisible && show('rewind') ? (
+          <CtrlBtn
+            title={
+              isPlayback && reverse
+                ? `Rewinding ${formatPlaybackSpeed(speed, true)} — tap for forward`
+                : 'Rewind recorded footage'
+            }
+            active={isPlayback && reverse}
+            onClick={onRewind}
+          >
+            <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+              <path d="M11 18V6l-8.5 6L11 18zm.5-6 8.5 6V6l-8.5 6z" />
+            </svg>
+          </CtrlBtn>
+        ) : null}
         {toolbarVisible && show('play') ? (
           <CtrlBtn title={paused ? 'Play' : 'Pause'} active={paused} onClick={onPlay}>
             {paused ? (
@@ -221,20 +270,106 @@ function FeedControls({
             )}
           </CtrlBtn>
         ) : null}
+        {toolbarVisible && show('forward') ? (
+          <CtrlBtn
+            title={
+              isPlayback && !reverse && speed > 1
+                ? `Fast forward ${formatPlaybackSpeed(speed, false)} — tap to change`
+                : 'Fast forward recorded footage'
+            }
+            active={isPlayback && !reverse && speed > 1}
+            onClick={onForward}
+          >
+            <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+              <path d="M13 6v12l8.5-6L13 6zM4.5 6v12l8.5-6-8.5-6z" />
+            </svg>
+          </CtrlBtn>
+        ) : null}
+        {toolbarVisible && show('speed') ? (
+          <CtrlBtn
+            title={`Playback speed ${formatPlaybackSpeed(speed, reverse)} — tap to change`}
+            active={isPlayback && speed !== 1}
+            onClick={onSpeed}
+          >
+            <span className="cctv-feed__speed">{formatPlaybackSpeed(speed, reverse)}</span>
+          </CtrlBtn>
+        ) : null}
+        {toolbarVisible && show('live') ? (
+          <CtrlBtn title="Return to live" active onClick={onLive}>
+            <span className="cctv-feed__live-jump">LIVE</span>
+          </CtrlBtn>
+        ) : null}
         {toolbarVisible && show('mute') ? (
-          <CtrlBtn title={muted ? 'Unmute' : 'Mute'} active={muted} onClick={onMute}>
-            {muted ? (
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
-                <path d="M11 5 6 9H2v6h4l5 4V5z" />
-                <line x1="23" y1="9" x2="17" y2="15" />
-                <line x1="17" y1="9" x2="23" y2="15" />
-              </svg>
-            ) : (
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
-                <path d="M11 5 6 9H2v6h4l5 4V5z" />
-                <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07" />
-              </svg>
-            )}
+          <div
+            className={`cctv-feed__audio ${volumeOpen ? 'is-open' : ''}`}
+            onMouseLeave={(e) => {
+              if (e.buttons !== 0) return;
+              onVolumeOpen(false);
+            }}
+            onClick={(e) => e.stopPropagation()}
+            onPointerDown={(e) => {
+              e.stopPropagation();
+              onVolumeOpen(true);
+            }}
+          >
+            <span
+              className="cctv-feed__audio-hit"
+              onMouseEnter={() => onVolumeOpen(true)}
+              onFocusCapture={() => onVolumeOpen(true)}
+            >
+              <CtrlBtn
+                title={muted ? 'Unmute camera audio' : `Mute · ${volPct}%`}
+                active={muted}
+                onClick={onMute}
+              >
+                {muted || volPct === 0 ? (
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+                    <path d="M11 5 6 9H2v6h4l5 4V5z" />
+                    <line x1="23" y1="9" x2="17" y2="15" />
+                    <line x1="17" y1="9" x2="23" y2="15" />
+                  </svg>
+                ) : volPct < 45 ? (
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+                    <path d="M11 5 6 9H2v6h4l5 4V5z" />
+                    <path d="M15.54 8.46a5 5 0 0 1 0 7.07" />
+                  </svg>
+                ) : (
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+                    <path d="M11 5 6 9H2v6h4l5 4V5z" />
+                    <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07" />
+                  </svg>
+                )}
+              </CtrlBtn>
+            </span>
+            <label className="cctv-feed__vol" title={`Volume ${volPct}%`}>
+              <span className="sr-only">Camera volume</span>
+              <input
+                type="range"
+                min={0}
+                max={100}
+                step={1}
+                value={volPct}
+                aria-valuetext={`${volPct} percent`}
+                style={{ ['--cctv-vol' as string]: `${volPct}%` }}
+                onClick={(e) => e.stopPropagation()}
+                onPointerDown={(e) => {
+                  e.stopPropagation();
+                  onVolumeOpen(true);
+                }}
+                onChange={(e) => {
+                  onVolume(Number(e.target.value) / 100);
+                  onVolumeOpen(true);
+                }}
+              />
+            </label>
+          </div>
+        ) : null}
+        {toolbarVisible && show('mini') ? (
+          <CtrlBtn title="Open mini player" onClick={onMini}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+              <rect x="3" y="4" width="18" height="14" rx="2" />
+              <rect x="12" y="12" width="7" height="5" rx="1" fill="currentColor" stroke="none" />
+            </svg>
           </CtrlBtn>
         ) : null}
         {toolbarVisible && show('snapshot') ? (
@@ -274,20 +409,31 @@ function FeedInner({
   featured,
   compact,
   showControls = true,
+  href,
+  onSelect,
 }: {
   camera: CctvCamera;
   featured?: boolean;
   compact?: boolean;
   showControls?: boolean;
+  href?: string;
+  onSelect?: () => void;
 }) {
   const stageRef = useRef<HTMLDivElement>(null);
   const feedRef = useRef<HTMLDivElement>(null);
   const touchTimer = useRef<number | null>(null);
   const idleTimer = useRef<number | null>(null);
+  const audioRef = useRef<CctvAmbientHandle | null>(null);
+  const lastVolume = useRef(0.45);
 
   const [muted, setMuted] = useState(true);
+  const [volume, setVolume] = useState(0.45);
+  const [volumeOpen, setVolumeOpen] = useState(false);
   const [recording, setRecording] = useState(false);
   const [paused, setPaused] = useState(false);
+  const [isPlayback, setIsPlayback] = useState(false);
+  const [reverse, setReverse] = useState(false);
+  const [speed, setSpeed] = useState<CctvPlaybackSpeed>(1);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
@@ -321,13 +467,32 @@ function FeedInner({
     return () => ro.disconnect();
   }, []);
 
+  useEffect(() => {
+    if (offline || muted) {
+      audioRef.current?.stop();
+      audioRef.current = null;
+      return;
+    }
+    if (!audioRef.current) {
+      audioRef.current = startCctvAmbient({ muted: false, volume });
+    } else {
+      audioRef.current.setVolume(volume);
+    }
+  }, [muted, volume, offline]);
+
+  useEffect(() => {
+    return () => {
+      audioRef.current?.stop();
+      audioRef.current = null;
+    };
+  }, []);
+
   const bumpFullscreenIdle = useCallback(() => {
     if (idleTimer.current != null) window.clearTimeout(idleTimer.current);
     if (!document.fullscreenElement) return;
     setIsTouchRevealed(true);
     idleTimer.current = window.setTimeout(() => {
       setIsTouchRevealed((open) => {
-        // Keep open while keyboard focus remains on a control.
         return open && document.activeElement
           ? Boolean(stageRef.current?.contains(document.activeElement))
           : false;
@@ -383,11 +548,24 @@ function FeedInner({
     isTouchRevealed,
     containerWidth,
     isTouchDevice,
+    isPlayback,
   });
+
+  function enterPlayback(opts?: { reverse?: boolean }) {
+    setIsPlayback(true);
+    setPaused(false);
+    if (opts?.reverse != null) setReverse(opts.reverse);
+  }
+
+  function returnToLive() {
+    setIsPlayback(false);
+    setReverse(false);
+    setSpeed(1);
+    setPaused(false);
+  }
 
   function onStagePointerDown(e: PointerEvent<HTMLDivElement>) {
     if (!isTouchDevice) return;
-    // First tap reveals controls; don't fire accidental actions on the stage itself.
     if (!visibility.toolbarVisible) {
       e.preventDefault();
       e.stopPropagation();
@@ -397,6 +575,45 @@ function FeedInner({
     } else {
       scheduleTouchHide();
     }
+  }
+
+  function setVolumeValue(next: number) {
+    const v = Math.min(1, Math.max(0, next));
+    setVolume(v);
+    if (v > 0.01) {
+      lastVolume.current = v;
+      setMuted(false);
+    } else {
+      setMuted(true);
+    }
+  }
+
+  function toggleMute() {
+    setMuted((m) => {
+      if (m) {
+        setVolume(lastVolume.current > 0.05 ? lastVolume.current : 0.45);
+        return false;
+      }
+      lastVolume.current = volume > 0.05 ? volume : lastVolume.current;
+      return true;
+    });
+  }
+
+  function popMiniPlayer() {
+    openCctvMiniPlayer(
+      {
+        id: camera.id,
+        name: camera.name,
+        locationLabel: camera.locationLabel,
+        channel: camera.channel,
+        status: camera.status,
+        snapshotUrl: camera.snapshotUrl,
+        isLiveCapable: camera.isLiveCapable,
+        isInterior: camera.isInterior,
+        href,
+      },
+      { muted, volume },
+    );
   }
 
   return (
@@ -410,15 +627,28 @@ function FeedInner({
         live ? 'cctv-feed--live' : '',
         recording ? 'cctv-feed--user-rec' : '',
         paused ? 'cctv-feed--paused' : '',
+        isPlayback ? 'cctv-feed--playback' : '',
+        isPlayback && reverse ? 'cctv-feed--rewinding' : '',
+        isPlayback && !reverse && speed > 1 ? 'cctv-feed--fast-forward' : '',
         isFullscreen ? 'cctv-feed--fs' : '',
         visibility.toolbarVisible ? 'cctv-feed--controls-open' : '',
+        muted ? 'cctv-feed--muted' : 'cctv-feed--audio-on',
       ]
         .filter(Boolean)
         .join(' ')}
+      style={
+        isPlayback && !paused
+          ? ({
+              ['--cctv-playback-rate' as string]: String(speed),
+            } as CSSProperties)
+          : undefined
+      }
       onMouseEnter={() => {
         if (!isTouchDevice) setIsHovered(true);
       }}
-      onMouseLeave={() => setIsHovered(false)}
+      onMouseLeave={() => {
+        setIsHovered(false);
+      }}
       onFocusCapture={() => {
         setIsFocused(true);
         reveal();
@@ -427,6 +657,7 @@ function FeedInner({
         const next = e.relatedTarget as Node | null;
         if (next && feedRef.current?.contains(next)) return;
         setIsFocused(false);
+        setVolumeOpen(false);
       }}
     >
       <div
@@ -437,6 +668,24 @@ function FeedInner({
           if (isFullscreen) bumpFullscreenIdle();
         }}
       >
+        {onSelect ? (
+          <button
+            type="button"
+            className="cctv-feed__open"
+            aria-label={`Focus ${camera.name}`}
+            onClick={(e) => {
+              e.stopPropagation();
+              onSelect();
+            }}
+          />
+        ) : href ? (
+          <Link
+            href={href}
+            className="cctv-feed__open"
+            aria-label={`View ${camera.name}`}
+            tabIndex={-1}
+          />
+        ) : null}
         {camera.snapshotUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={camera.snapshotUrl} alt="" className="cctv-feed__img" />
@@ -452,6 +701,13 @@ function FeedInner({
               <i aria-hidden />
               {compact ? null : ' REC'}
             </span>
+          ) : isPlayback ? (
+            <span className="cctv-feed__rec cctv-feed__rec--playback">
+              <i aria-hidden />
+              {compact
+                ? null
+                : ` ${reverse ? 'REW' : speed > 1 ? 'FF' : 'PLAY'} ${formatPlaybackSpeed(speed, false)}`}
+            </span>
           ) : live ? (
             <span className="cctv-feed__rec">
               <i aria-hidden />
@@ -465,6 +721,7 @@ function FeedInner({
           <span className="cctv-feed__meta">
             {camera.isInterior ? <span className="cctv-feed__badge">Interior</span> : null}
             <span className="cctv-feed__ch">CH {camera.channel}</span>
+            {!muted ? <span className="cctv-feed__audio-pill">AUDIO</span> : null}
           </span>
         </div>
         {showControls ? (
@@ -472,23 +729,72 @@ function FeedInner({
             camera={camera}
             stageRef={stageRef}
             muted={muted}
+            volume={volume}
             recording={recording}
             paused={paused}
             isFullscreen={isFullscreen}
+            isPlayback={isPlayback}
+            reverse={reverse}
+            speed={speed}
             visibleIds={visibility.controls}
             toolbarVisible={visibility.toolbarVisible}
             peekExpand={visibility.peekExpand}
             density={visibility.density}
-            onMute={() => setMuted((m) => !m)}
+            volumeOpen={volumeOpen}
+            onMute={toggleMute}
+            onVolume={setVolumeValue}
+            onVolumeOpen={setVolumeOpen}
+            onMini={popMiniPlayer}
             onRecord={() => setRecording((r) => !r)}
-            onPlay={() => setPaused((p) => !p)}
+            onPlay={() => {
+              if (!isPlayback) enterPlayback({ reverse: false });
+              setPaused((p) => !p);
+            }}
+            onRewind={() => {
+              if (!isPlayback) {
+                enterPlayback({ reverse: true });
+                return;
+              }
+              setReverse((r) => !r);
+              setPaused(false);
+            }}
+            onForward={() => {
+              if (!isPlayback || reverse) {
+                enterPlayback({ reverse: false });
+                setSpeed((s) => (s < 2 ? 2 : s));
+                setPaused(false);
+                return;
+              }
+              setSpeed((s) => nextFastForwardSpeed(s));
+              setPaused(false);
+            }}
+            onSpeed={() => {
+              if (!isPlayback) enterPlayback({ reverse: false });
+              setSpeed((s) => nextPlaybackSpeed(s));
+              setPaused(false);
+            }}
+            onLive={returnToLive}
             onReveal={reveal}
           />
         ) : null}
       </div>
       <div className="cctv-feed__footer">
-        <strong>{camera.name}</strong>
-        {compact ? null : <span className="cctv-feed__loc">{camera.locationLabel}</span>}
+        {onSelect ? (
+          <button type="button" className="cctv-feed__footer-link" onClick={onSelect}>
+            <strong>{camera.name}</strong>
+            {compact ? null : <span className="cctv-feed__loc">{camera.locationLabel}</span>}
+          </button>
+        ) : href ? (
+          <Link href={href} className="cctv-feed__footer-link" aria-label={`View ${camera.name}`}>
+            <strong>{camera.name}</strong>
+            {compact ? null : <span className="cctv-feed__loc">{camera.locationLabel}</span>}
+          </Link>
+        ) : (
+          <>
+            <strong>{camera.name}</strong>
+            {compact ? null : <span className="cctv-feed__loc">{camera.locationLabel}</span>}
+          </>
+        )}
       </div>
     </div>
   );
@@ -497,22 +803,22 @@ function FeedInner({
 export function CctvLiveFeed({
   camera,
   href,
+  onSelect,
   featured,
   compact,
   className = '',
   showControls = true,
 }: CctvLiveFeedProps) {
-  const body = (
-    <FeedInner camera={camera} featured={featured} compact={compact} showControls={showControls} />
+  return (
+    <div className={`cctv-feed-link ${className}`.trim()}>
+      <FeedInner
+        camera={camera}
+        featured={featured}
+        compact={compact}
+        showControls={showControls}
+        href={href}
+        onSelect={onSelect}
+      />
+    </div>
   );
-
-  if (href) {
-    return (
-      <Link href={href} className={`cctv-feed-link ${className}`.trim()} aria-label={`View ${camera.name}`}>
-        {body}
-      </Link>
-    );
-  }
-
-  return <div className={className.trim()}>{body}</div>;
 }

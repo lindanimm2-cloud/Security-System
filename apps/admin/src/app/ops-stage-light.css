@@ -1,0 +1,1004 @@
+/* Ops-stage light + search chrome — loads after ops-control.css */
+
+/* Wrapper only — avoid double chrome when ListSearch nests inside */
+.ops-stage .list-search-bar:has(.list-search) {
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  min-height: 0 !important;
+}
+
+html[data-theme='light'] .ops-stage .list-search,
+html[data-theme='light'] .ops-stage .list-search-bar {
+  background: #ffffff !important;
+  border: 1px solid rgba(23, 33, 43, 0.14) !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7) !important;
+  color: #17212b !important;
+}
+
+html[data-theme='light'] .ops-stage .list-search:focus-within,
+html[data-theme='light'] .ops-stage .list-search-bar:focus-within {
+  background: #ffffff !important;
+  border-color: rgba(23, 33, 43, 0.28) !important;
+}
+
+html[data-theme='light'] .ops-stage .list-search-bar:has(.list-search),
+html[data-theme='light'] .ops-stage .list-search-bar:has(.list-search):focus-within {
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+
+html[data-theme='light'] .ops-stage .list-search input,
+html[data-theme='light'] .ops-stage .list-search-bar input {
+  background: transparent !important;
+  color: #17212b !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+
+html[data-theme='light'] .ops-stage .list-search input::placeholder,
+html[data-theme='light'] .ops-stage .list-search-bar input::placeholder {
+  color: #8a96a3 !important;
+}
+
+html[data-theme='light'] .ops-stage input:not([type='checkbox']):not([type='radio']):not([type='range']),
+html[data-theme='light'] .ops-stage select,
+html[data-theme='light'] .ops-stage textarea {
+  background: #ffffff !important;
+  border: 1px solid rgba(23, 33, 43, 0.14) !important;
+  color: #17212b !important;
+}
+
+html[data-theme='light'] .ops-stage .tech-profile-card {
+  background: #ffffff !important;
+  border: 1px solid rgba(23, 33, 43, 0.12) !important;
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.85) inset,
+    5px 5px 12px rgba(163, 177, 198, 0.45),
+    -5px -5px 12px rgba(255, 255, 255, 0.85) !important;
+  color: #17212b !important;
+}
+
+html[data-theme='light'] .ops-stage .data-table tbody tr:hover td,
+html[data-theme='light'] .ops-stage .table-wrap tbody tr:hover td {
+  background: rgba(23, 33, 43, 0.04) !important;
+}
+
+html[data-theme='light'] .ops-stage .list-search__icon {
+  color: #5c6975 !important;
+}
+
+/* ── List pages: grow with content; stage scrolls (don't crush tables) ── */
+.ops-stage > .page-content:not(.page-content--settings):not(.page-content--profile):not(.settings-desk):not(.profile-desk) {
+  flex: 1 0 auto !important;
+  min-height: 100% !important;
+  height: auto !important;
+  overflow: visible !important;
+}
+
+.ops-stage > .page-content:not(.page-content--settings):not(.page-content--profile):not(.settings-desk):not(.profile-desk) > * {
+  flex-shrink: 0 !important;
+}
+
+.ops-stage .customers-toolbar {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  align-items: center !important;
+  gap: 0.65rem !important;
+  padding: 0.75rem 0.9rem !important;
+  margin-bottom: 0.85rem !important;
+  position: relative !important;
+  z-index: 2 !important;
+}
+
+.ops-stage .customers-toolbar .list-search-bar,
+.ops-stage .customers-toolbar .list-search {
+  flex: 1 1 220px !important;
+  min-width: 180px !important;
+}
+
+.ops-stage .customers-card {
+  position: relative !important;
+  z-index: 1 !important;
+  margin-top: 0 !important;
+  max-height: none !important;
+  height: auto !important;
+  overflow: hidden !important;
+}
+
+.ops-stage .customers-card .table-wrap {
+  max-height: none !important;
+  height: auto !important;
+  overflow-x: auto !important;
+  overflow-y: visible !important;
+  -webkit-overflow-scrolling: touch;
+}
+
+.ops-stage .customers-card .data-table {
+  width: 100% !important;
+  min-width: 1100px !important;
+  table-layout: auto !important;
+  border-collapse: separate !important;
+  border-spacing: 0 !important;
+}
+
+.ops-stage .customers-card .data-table th,
+.ops-stage .customers-card .data-table td {
+  padding: 0.7rem 0.75rem !important;
+  vertical-align: middle !important;
+}
+
+.ops-stage .customers-card .data-table th:nth-child(1),
+.ops-stage .customers-card .data-table td:nth-child(1) {
+  min-width: 11.5rem;
+}
+
+.ops-stage .customers-card .data-table th:nth-child(4),
+.ops-stage .customers-card .data-table td:nth-child(4) {
+  min-width: 13.5rem;
+}
+
+.ops-stage .customers-card .data-table th:nth-child(5),
+.ops-stage .customers-card .data-table td:nth-child(5) {
+  min-width: 7.5rem;
+}
+
+.ops-stage .customers-card .data-table th:nth-child(6),
+.ops-stage .customers-card .data-table td:nth-child(6),
+.ops-stage .customers-card .data-table th:nth-child(7),
+.ops-stage .customers-card .data-table td:nth-child(7) {
+  min-width: 5.5rem;
+  white-space: nowrap;
+}
+
+.ops-stage .customers-card .data-table th:nth-child(8),
+.ops-stage .customers-card .data-table td:nth-child(8),
+.ops-stage .customers-card .data-table td.customers-actions {
+  min-width: 9.75rem !important;
+  width: 9.75rem !important;
+  white-space: nowrap !important;
+}
+
+.ops-stage .coverage-badges {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  align-items: center !important;
+  gap: 0.3rem !important;
+  min-width: 12.5rem;
+  max-width: 16rem;
+}
+
+.ops-stage .coverage-badge {
+  white-space: nowrap;
+}
+
+.ops-stage .customers-actions {
+  display: inline-flex !important;
+  flex-direction: row !important;
+  flex-wrap: nowrap !important;
+  align-items: center !important;
+  justify-content: flex-end !important;
+  gap: 0.4rem !important;
+  min-width: 9.75rem !important;
+  width: 100% !important;
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  box-sizing: border-box !important;
+}
+
+.ops-stage .customers-actions .btn-sm {
+  flex: 0 0 auto;
+  min-width: 4.25rem;
+  justify-content: center;
+}
+
+.ops-stage .customers-codes {
+  margin-top: 0.85rem !important;
+}
+
+.ops-stage .customers-codes .status-list {
+  list-style: none;
+  margin: 0.65rem 0 0;
+  padding: 0;
+  display: grid;
+  gap: 0.45rem;
+}
+
+.ops-stage .customers-codes .status-list-item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.35rem 1rem;
+  padding: 0.55rem 0.7rem;
+  border-radius: 8px;
+  border: 1px solid var(--vms-line, rgba(255, 255, 255, 0.08));
+  background: var(--vms-panel-2, rgba(255, 255, 255, 0.03));
+}
+
+html[data-theme='light'] .ops-stage .customers-card,
+html[data-theme='light'] .ops-stage .customers-toolbar,
+html[data-theme='light'] .ops-stage .customers-codes {
+  background: #ffffff !important;
+  border: 1px solid rgba(23, 33, 43, 0.12) !important;
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.85) inset,
+    0 8px 18px rgba(23, 33, 43, 0.05) !important;
+  color: #17212b !important;
+}
+
+html[data-theme='light'] .ops-stage .customers-card .data-table th {
+  background: #f3f5f8 !important;
+  color: #5c6975 !important;
+  border-bottom: 1px solid rgba(23, 33, 43, 0.1) !important;
+}
+
+html[data-theme='light'] .ops-stage .customers-card .data-table td {
+  border-bottom: 1px solid rgba(23, 33, 43, 0.08) !important;
+  color: #17212b !important;
+}
+
+html[data-theme='light'] .ops-stage .customers-card .text-muted,
+html[data-theme='light'] .ops-stage .customers-codes .text-muted {
+  color: #5c6975 !important;
+}
+
+html[data-theme='light'] .ops-stage .customers-card .badge {
+  background: #eef2f5 !important;
+  color: #3d4a57 !important;
+  border: 1px solid rgba(23, 33, 43, 0.08) !important;
+}
+
+html[data-theme='light'] .ops-stage .customers-toolbar .list-search {
+  box-shadow: inset 0 1px 2px rgba(23, 33, 43, 0.06) !important;
+}
+
+html[data-theme='light'] .ops-stage .customers-stats .stat-card {
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.9) inset,
+    0 2px 6px rgba(23, 33, 43, 0.06) !important;
+}
+
+html[data-theme='light'] .ops-stage .coverage-badge--on {
+  background: rgba(47, 143, 91, 0.14) !important;
+  color: #1f6b45 !important;
+}
+
+html[data-theme='light'] .ops-stage .coverage-badge--off {
+  background: #eef2f5 !important;
+  color: #8a96a3 !important;
+  opacity: 1 !important;
+}
+
+html[data-theme='light'] .ops-stage .sub-badge--essential {
+  background: rgba(37, 99, 235, 0.12) !important;
+  color: #1d4ed8 !important;
+}
+
+html[data-theme='light'] .ops-stage .sub-badge--premium {
+  background: rgba(180, 83, 9, 0.14) !important;
+  color: #9a3412 !important;
+}
+
+html[data-theme='light'] .ops-stage .status-pill--active {
+  background: #e8f5ee !important;
+  color: #1f6b45 !important;
+  border-color: rgba(47, 143, 91, 0.28) !important;
+}
+
+html[data-theme='light'] .ops-stage .status-pill--past_due,
+html[data-theme='light'] .ops-stage .status-pill--past-due {
+  background: #fff1e8 !important;
+  color: #9a3412 !important;
+  border-color: rgba(180, 83, 9, 0.28) !important;
+}
+
+html[data-theme='light'] .ops-stage .customers-codes .status-list-item {
+  background: #f3f5f8 !important;
+  border-color: rgba(23, 33, 43, 0.1) !important;
+}
+
+html[data-theme='light'] .ops-stage .customers-stats .stat-value {
+  color: #1f6b45 !important;
+}
+
+/* ── Teams / User Management ── */
+.ops-stage .teams-grid {
+  display: grid !important;
+  grid-template-columns: 1fr !important;
+  gap: 0.85rem !important;
+  margin-bottom: 0.85rem !important;
+}
+
+.ops-stage .teams-card {
+  max-height: none !important;
+  height: auto !important;
+  overflow: visible !important;
+  padding: 1rem 1.1rem 1.15rem !important;
+}
+
+.ops-stage .teams-card h2 {
+  margin: 0 0 0.75rem !important;
+  font-size: 1.02rem !important;
+  font-weight: 700 !important;
+  letter-spacing: -0.01em;
+}
+
+.ops-stage .teams-card .list-search-bar,
+.ops-stage .teams-card .list-search {
+  margin-bottom: 0.75rem !important;
+}
+
+/* Nested table: single inset panel (no double neu chrome) */
+.ops-stage .teams-card .table-wrap {
+  margin-top: 0 !important;
+  max-height: none !important;
+  height: auto !important;
+  overflow-x: auto !important;
+  overflow-y: visible !important;
+  -webkit-overflow-scrolling: touch;
+  border: 1px solid var(--vms-line, rgba(255, 255, 255, 0.1)) !important;
+  border-radius: 10px !important;
+  background: var(--vms-panel-2, rgba(255, 255, 255, 0.03)) !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+}
+
+.ops-stage .teams-card .data-table {
+  width: 100% !important;
+  min-width: 960px !important;
+  border-collapse: separate !important;
+  border-spacing: 0 !important;
+}
+
+.ops-stage .teams-card .data-table th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--vms-panel, #141414) !important;
+  color: var(--vms-muted, #9aa3ad) !important;
+  border-bottom: 1px solid var(--vms-line, rgba(255, 255, 255, 0.1)) !important;
+  white-space: nowrap;
+  vertical-align: middle !important;
+}
+
+.ops-stage .teams-card .data-table td {
+  vertical-align: middle !important;
+  border-bottom: 1px solid color-mix(in srgb, var(--vms-line, rgba(255, 255, 255, 0.1)) 70%, transparent) !important;
+}
+
+.ops-stage .teams-card .data-table th:first-child,
+.ops-stage .teams-card .data-table td:first-child {
+  width: 3rem;
+  min-width: 3rem;
+  padding-left: 0.75rem !important;
+  padding-right: 0.35rem !important;
+}
+
+.ops-stage .teams-card .data-table th:last-child,
+.ops-stage .teams-card .data-table td:last-child {
+  width: 1%;
+  white-space: nowrap;
+  padding-right: 0.75rem !important;
+}
+
+.ops-stage .teams-card .branch-item {
+  border-radius: 10px !important;
+  border: 1px solid var(--vms-line, rgba(255, 255, 255, 0.1)) !important;
+  background: var(--vms-panel-2, rgba(255, 255, 255, 0.03)) !important;
+}
+
+.ops-stage .teams-card .team-chip {
+  border-radius: 999px !important;
+  border: 1px solid var(--vms-line, rgba(255, 255, 255, 0.1)) !important;
+  background: var(--vms-panel, rgba(0, 0, 0, 0.25)) !important;
+}
+
+html[data-theme='light'] .ops-stage .teams-card {
+  background: #ffffff !important;
+  border: 1px solid rgba(23, 33, 43, 0.12) !important;
+  border-radius: 14px !important;
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.85) inset,
+    0 8px 18px rgba(23, 33, 43, 0.05) !important;
+  color: #17212b !important;
+}
+
+html[data-theme='light'] .ops-stage .teams-card .table-wrap {
+  background: #ffffff !important;
+  border: 1px solid rgba(23, 33, 43, 0.1) !important;
+  box-shadow: none !important;
+}
+
+html[data-theme='light'] .ops-stage .teams-card .data-table th {
+  background: #f3f5f8 !important;
+  color: #5c6975 !important;
+  border-bottom: 1px solid rgba(23, 33, 43, 0.1) !important;
+}
+
+html[data-theme='light'] .ops-stage .teams-card .data-table td {
+  color: #17212b !important;
+  border-bottom: 1px solid rgba(23, 33, 43, 0.08) !important;
+}
+
+html[data-theme='light'] .ops-stage .teams-card .text-muted {
+  color: #5c6975 !important;
+}
+
+html[data-theme='light'] .ops-stage .teams-card .badge {
+  background: #eef2f5 !important;
+  color: #3d4a57 !important;
+  border: 1px solid rgba(23, 33, 43, 0.08) !important;
+}
+
+html[data-theme='light'] .ops-stage .teams-card .branch-item {
+  background: #f3f5f8 !important;
+  border-color: rgba(23, 33, 43, 0.1) !important;
+}
+
+html[data-theme='light'] .ops-stage .teams-card .team-chip {
+  background: #ffffff !important;
+  border-color: rgba(23, 33, 43, 0.12) !important;
+  color: #17212b !important;
+}
+
+html[data-theme='dark'] .ops-stage .teams-card {
+  background: var(--vms-panel, #141414) !important;
+  border: 1px solid var(--vms-line, rgba(255, 255, 255, 0.1)) !important;
+  border-radius: 12px !important;
+  box-shadow: none !important;
+  color: var(--vms-text, #e8eaed) !important;
+}
+
+html[data-theme='dark'] .ops-stage .teams-card .table-wrap {
+  background: rgba(0, 0, 0, 0.22) !important;
+  border-color: var(--vms-line, rgba(255, 255, 255, 0.1)) !important;
+}
+
+html[data-theme='dark'] .ops-stage .teams-card .data-table th {
+  background: rgba(255, 255, 255, 0.04) !important;
+  color: #a8b0b8 !important;
+}
+
+/* ── Documents library (folder icons stuck on #0b0b0b) ── */
+.ops-stage .documents-page .documents-folder-card__icon {
+  background: color-mix(in srgb, var(--folder-accent, #94a3b8) 18%, #141416) !important;
+  border: 1px solid color-mix(in srgb, var(--folder-accent, #94a3b8) 32%, var(--vms-line, rgba(255, 255, 255, 0.1))) !important;
+  color: color-mix(in srgb, var(--folder-accent, #94a3b8) 78%, #ffffff) !important;
+}
+
+.ops-stage .documents-page .documents-back {
+  border: 1px solid var(--vms-line, rgba(255, 255, 255, 0.1)) !important;
+  background: var(--vms-panel, #141414) !important;
+  color: var(--vms-text, #e8eaed) !important;
+  border-radius: 6px !important;
+  min-height: 26px !important;
+  font-size: 0.72rem !important;
+}
+
+.ops-stage .documents-page .documents-back:hover {
+  border-color: color-mix(in srgb, #3b82f6 40%, var(--vms-line, rgba(255, 255, 255, 0.1))) !important;
+  background: color-mix(in srgb, #3b82f6 8%, var(--vms-panel, #141414)) !important;
+}
+
+html[data-theme='light'] .ops-stage .documents-page .documents-folder-card {
+  background: #ffffff !important;
+  border: 1px solid rgba(23, 33, 43, 0.12) !important;
+  color: #17212b !important;
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.85) inset,
+    0 4px 12px rgba(23, 33, 43, 0.04) !important;
+}
+
+html[data-theme='light'] .ops-stage .documents-page .documents-folder-card:hover {
+  background: #f7f8fa !important;
+  border-color: rgba(23, 33, 43, 0.2) !important;
+}
+
+html[data-theme='light'] .ops-stage .documents-page .documents-folder-card__icon {
+  background: color-mix(in srgb, var(--folder-accent, #64748b) 14%, #ffffff) !important;
+  border-color: color-mix(in srgb, var(--folder-accent, #64748b) 30%, rgba(23, 33, 43, 0.12)) !important;
+  color: color-mix(in srgb, var(--folder-accent, #64748b) 55%, #17212b) !important;
+}
+
+html[data-theme='light'] .ops-stage .documents-page .documents-folder-card__name {
+  color: #17212b !important;
+}
+
+html[data-theme='light'] .ops-stage .documents-page .documents-folder-card__blurb,
+html[data-theme='light'] .ops-stage .documents-page .documents-folder-card__updated,
+html[data-theme='light'] .ops-stage .documents-page .documents-folder-card__files {
+  color: #5c6975 !important;
+}
+
+html[data-theme='light'] .ops-stage .documents-page .documents-folder-card__open {
+  color: #3b82f6 !important;
+}
+
+html[data-theme='light'] .ops-stage .documents-page .documents-search,
+html[data-theme='light'] .ops-stage .documents-page .documents-chip,
+html[data-theme='light'] .ops-stage .documents-page .docs-table-wrap {
+  background: #ffffff !important;
+  border-color: rgba(23, 33, 43, 0.12) !important;
+  color: #17212b !important;
+}
+
+html[data-theme='light'] .ops-stage .documents-page .documents-search input {
+  color: #17212b !important;
+}
+
+html[data-theme='light'] .ops-stage .documents-page .documents-chip {
+  color: #5c6975 !important;
+}
+
+html[data-theme='light'] .ops-stage .documents-page .documents-chip--on {
+  background: #17212b !important;
+  border-color: #17212b !important;
+  color: #f9fafb !important;
+}
+
+html[data-theme='light'] .ops-stage .documents-page .documents-chip--on span {
+  color: #f9fafb !important;
+}
+
+html[data-theme='light'] .ops-stage .documents-page .documents-back {
+  background: #ffffff !important;
+  border-color: rgba(23, 33, 43, 0.14) !important;
+  color: #17212b !important;
+}
+
+html[data-theme='light'] .ops-stage .documents-page .documents-back:hover {
+  background: #f3f5f8 !important;
+  border-color: rgba(23, 33, 43, 0.24) !important;
+}
+
+html[data-theme='light'] .ops-stage .documents-page .documents-activity {
+  background: #ffffff !important;
+  border: 1px solid rgba(23, 33, 43, 0.1) !important;
+  color: #17212b !important;
+}
+
+html[data-theme='light'] .ops-stage .documents-page .documents-activity__item,
+html[data-theme='light'] .ops-stage .documents-page .documents-activity__item p {
+  color: #17212b !important;
+}
+
+html[data-theme='light'] .ops-stage .documents-page .documents-activity__item time {
+  color: #5c6975 !important;
+}
+
+html[data-theme='light'] .ops-stage .documents-page .documents-pinned__card {
+  background: #ffffff !important;
+  border: 1px solid rgba(23, 33, 43, 0.12) !important;
+  color: #17212b !important;
+}
+
+html[data-theme='light'] .ops-stage .documents-page .documents-pinned__card:hover {
+  background: #f7f8fa !important;
+  border-color: rgba(23, 33, 43, 0.2) !important;
+}
+
+html[data-theme='light'] .ops-stage .documents-page .documents-pinned__icon {
+  background: #f3f5f8 !important;
+  border-color: rgba(23, 33, 43, 0.12) !important;
+  color: #3d4a57 !important;
+}
+
+html[data-theme='light'] .ops-stage .documents-page .documents-pinned__card strong {
+  color: #17212b !important;
+}
+
+html[data-theme='light'] .ops-stage .documents-page .documents-pinned__card em {
+  color: #5c6975 !important;
+}
+
+html[data-theme='light'] .ops-stage .documents-page .documents-section__title {
+  color: #5c6975 !important;
+}
+
+html[data-theme='light'] .ops-stage .documents-page .docs-table th {
+  background: #f3f5f8 !important;
+  color: #5c6975 !important;
+}
+
+html[data-theme='light'] .ops-stage .documents-page .docs-table td {
+  color: #17212b !important;
+  border-bottom-color: rgba(23, 33, 43, 0.08) !important;
+}
+
+/* Dark mode: tint pinned icons too (same #0b0b0b trap) */
+.ops-stage .documents-page .documents-pinned__icon {
+  background: color-mix(in srgb, var(--folder-accent, #94a3b8) 14%, #0b0b0b) !important;
+  border-color: color-mix(in srgb, var(--folder-accent, #94a3b8) 28%, var(--vms-line, rgba(255, 255, 255, 0.1))) !important;
+  color: color-mix(in srgb, var(--folder-accent, #94a3b8) 70%, #fff) !important;
+}
+
+/* ── Fleet / Vehicle Control (metrics + tabs stuck on #0b0b0b) ── */
+html[data-theme='light'] .ops-stage .fleet-page .ops-metrics--compact {
+  background: #ffffff !important;
+  border: 1px solid rgba(23, 33, 43, 0.12) !important;
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.85) inset,
+    0 2px 8px rgba(23, 33, 43, 0.05) !important;
+}
+
+html[data-theme='light'] .ops-stage .fleet-page .ops-metrics--compact .ops-metric {
+  border-right-color: rgba(23, 33, 43, 0.1) !important;
+  background: transparent !important;
+  color: #17212b !important;
+}
+
+html[data-theme='light'] .ops-stage .fleet-page .ops-metrics--compact .ops-metric:first-child,
+html[data-theme='light'] .ops-stage .fleet-page .ops-metrics--compact .ops-metric--active {
+  background: rgba(59, 130, 246, 0.12) !important;
+  border-right-color: transparent !important;
+}
+
+html[data-theme='light'] .ops-stage .fleet-page .ops-metrics--compact .ops-metric__label {
+  color: #5c6975 !important;
+}
+
+html[data-theme='light'] .ops-stage .fleet-page .ops-metrics--compact .ops-metric__value {
+  color: #17212b !important;
+}
+
+html[data-theme='light'] .ops-stage .fleet-page .ops-metrics--compact .ops-status__dot {
+  background: #3b82f6 !important;
+  box-shadow: none !important;
+}
+
+html[data-theme='light'] .ops-stage .fleet-page .ops-vehicle-toolbar .list-search-bar,
+html[data-theme='light'] .ops-stage .fleet-page .ops-vehicle-toolbar .list-search,
+html[data-theme='light'] .ops-stage .fleet-page .ops-vehicle-picker .ops-menu__trigger {
+  background: #ffffff !important;
+  border: 1px solid rgba(23, 33, 43, 0.14) !important;
+  color: #17212b !important;
+  box-shadow: inset 0 1px 2px rgba(23, 33, 43, 0.05) !important;
+}
+
+html[data-theme='light'] .ops-stage .fleet-page .ops-vehicle-toolbar .list-search-bar input,
+html[data-theme='light'] .ops-stage .fleet-page .ops-vehicle-toolbar .list-search input {
+  color: #17212b !important;
+}
+
+html[data-theme='light'] .ops-stage .fleet-page .ops-vehicle-toolbar .list-search input::placeholder {
+  color: #8a96a3 !important;
+}
+
+html[data-theme='light'] .ops-stage .fleet-page .ops-tabs {
+  background: #ffffff !important;
+  border: 1px solid rgba(23, 33, 43, 0.12) !important;
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.85) inset,
+    0 2px 8px rgba(23, 33, 43, 0.05) !important;
+}
+
+html[data-theme='light'] .ops-stage .fleet-page .ops-tabs__btn {
+  color: #5c6975 !important;
+  background: transparent !important;
+}
+
+html[data-theme='light'] .ops-stage .fleet-page .ops-tabs__btn:hover {
+  color: #17212b !important;
+  background: rgba(23, 33, 43, 0.04) !important;
+}
+
+html[data-theme='light'] .ops-stage .fleet-page .ops-tabs__btn--on {
+  background: #17212b !important;
+  color: #f8fafc !important;
+}
+
+html[data-theme='light'] .ops-stage .fleet-page .ops-vehicle-hero__title,
+html[data-theme='light'] .ops-stage .fleet-page .ops-vehicle-hero__facts dd {
+  color: #17212b !important;
+}
+
+html[data-theme='light'] .ops-stage .fleet-page .ops-vehicle-hero__sub,
+html[data-theme='light'] .ops-stage .fleet-page .ops-vehicle-hero__facts dt,
+html[data-theme='light'] .ops-stage .fleet-page .ops-vehicle-empty--inline {
+  color: #5c6975 !important;
+}
+
+html[data-theme='light'] .ops-stage .fleet-page .ops-vehicle-hero__facts {
+  background: #ffffff !important;
+  border: 1px solid rgba(23, 33, 43, 0.1) !important;
+}
+
+html[data-theme='light'] .ops-stage .fleet-page .ops-vehicle-empty:not(.ops-vehicle-empty--inline),
+html[data-theme='light'] .ops-stage .fleet-page .ops-safety-note,
+html[data-theme='light'] .ops-stage .fleet-page .ops-panel {
+  background: #ffffff !important;
+  border: 1px solid rgba(23, 33, 43, 0.12) !important;
+  color: #17212b !important;
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.85) inset,
+    0 4px 12px rgba(23, 33, 43, 0.04) !important;
+}
+
+html[data-theme='light'] .ops-stage .fleet-page .ops-safety-note strong {
+  color: #1d4ed8 !important;
+}
+
+html[data-theme='light'] .ops-stage .fleet-page .ops-panel__title,
+html[data-theme='light'] .ops-stage .fleet-page .ops-panel .text-muted,
+html[data-theme='light'] .ops-stage .fleet-page .ops-panel p {
+  color: #5c6975 !important;
+}
+
+html[data-theme='light'] .ops-stage .fleet-page .ops-status {
+  background: #eef2f5 !important;
+  border: 1px solid rgba(23, 33, 43, 0.1) !important;
+  color: #3d4a57 !important;
+}
+
+html[data-theme='light'] .ops-stage .fleet-page .ops-status--ok {
+  background: #e8f5ee !important;
+  border-color: rgba(47, 143, 91, 0.28) !important;
+  color: #1f6b45 !important;
+}
+
+html[data-theme='light'] .ops-stage .fleet-page .ops-vehicle-hero {
+  border-bottom-color: rgba(23, 33, 43, 0.1) !important;
+}
+
+/* More menu + property trigger — keep readable in both themes */
+#ops-more-menu.ops-rail__more {
+  color: #f0f0f0 !important;
+  color-scheme: dark;
+}
+
+#ops-more-menu .ops-rail__more-head,
+#ops-more-menu .ops-rail__more-head strong {
+  color: #f0f0f0 !important;
+}
+
+#ops-more-menu .ops-rail__more-head button {
+  color: #c8c8c8 !important;
+}
+
+#ops-more-menu .ops-rail__heading,
+#ops-more-menu .ops-rail__solo {
+  color: #e8e8e8 !important;
+}
+
+#ops-more-menu .ops-rail__link {
+  color: #d6d6d6 !important;
+}
+
+#ops-more-menu .ops-rail__link:hover,
+#ops-more-menu .ops-rail__link--active,
+#ops-more-menu .ops-rail__heading.is-active,
+#ops-more-menu .ops-rail__solo--active {
+  color: #ffffff !important;
+}
+
+#ops-more-menu .ops-rail__more-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.3) transparent;
+}
+
+#ops-more-menu .ops-rail__more-scroll::-webkit-scrollbar {
+  width: 8px;
+}
+
+#ops-more-menu .ops-rail__more-scroll::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.3);
+  border-radius: 999px;
+}
+
+html[data-theme='light'] .ops-top .ops-menu-trigger {
+  background: #ffffff !important;
+  border-color: rgba(23, 33, 43, 0.14) !important;
+  color: #17212b !important;
+}
+
+html[data-theme='light'] .ops-top .ops-menu-trigger svg {
+  color: #5c6975 !important;
+}
+
+html[data-theme='light'] .ops-top .ops-menu-trigger:hover,
+html[data-theme='light'] .ops-top .ops-menu-trigger.is-open {
+  background: #f3f5f8 !important;
+  border-color: rgba(23, 33, 43, 0.22) !important;
+  color: #17212b !important;
+}
+
+html[data-theme='light'] #ops-more-menu.ops-rail__more {
+  background: #ffffff !important;
+  border-color: rgba(23, 33, 43, 0.14) !important;
+  box-shadow: 0 18px 42px rgba(23, 33, 43, 0.16) !important;
+  color: #17212b !important;
+  color-scheme: light;
+}
+
+html[data-theme='light'] #ops-more-menu .ops-rail__more-head,
+html[data-theme='light'] #ops-more-menu .ops-rail__more-head strong {
+  color: #17212b !important;
+  border-bottom-color: rgba(23, 33, 43, 0.1);
+}
+
+html[data-theme='light'] #ops-more-menu .ops-rail__more-head button {
+  color: #5c6975 !important;
+}
+
+html[data-theme='light'] #ops-more-menu .ops-rail__heading,
+html[data-theme='light'] #ops-more-menu .ops-rail__solo {
+  color: #17212b !important;
+}
+
+html[data-theme='light'] #ops-more-menu .ops-rail__link {
+  color: #3d4a57 !important;
+}
+
+html[data-theme='light'] #ops-more-menu .ops-rail__link:hover,
+html[data-theme='light'] #ops-more-menu .ops-rail__link--active,
+html[data-theme='light'] #ops-more-menu .ops-rail__heading.is-active,
+html[data-theme='light'] #ops-more-menu .ops-rail__solo--active {
+  color: #0f1720 !important;
+  background: rgba(23, 33, 43, 0.08) !important;
+}
+
+html[data-theme='light'] #ops-more-menu .ops-rail__more-scroll {
+  scrollbar-color: rgba(23, 33, 43, 0.28) transparent;
+}
+
+html[data-theme='light'] #ops-more-menu .ops-rail__more-scroll::-webkit-scrollbar-thumb {
+  background: rgba(23, 33, 43, 0.28);
+}
+
+/* Appearance / settings desk nested panels */
+html[data-theme='light'] .ops-stage .settings-desk .settings-inline-field,
+html[data-theme='light'] .ops-stage .settings-desk .settings-escalation-card,
+html[data-theme='light'] .ops-stage .settings-desk .settings-alert-card,
+html[data-theme='light'] .ops-stage .settings-desk .settings-activity-item {
+  background: #f3f5f8 !important;
+  border-color: rgba(23, 33, 43, 0.12) !important;
+  color: #17212b !important;
+}
+
+html[data-theme='light'] .ops-stage .settings-desk .settings-inline-field > span,
+html[data-theme='light'] .ops-stage .settings-desk .settings-time-row label small,
+html[data-theme='light'] .ops-stage .settings-desk .settings-escalation-card > span,
+html[data-theme='light'] .ops-stage .settings-desk .settings-alert-card > span {
+  color: #5c6975 !important;
+}
+
+html[data-theme='light'] .ops-stage .settings-desk .settings-search input,
+html[data-theme='light'] .ops-stage .settings-desk .settings-time-row input,
+html[data-theme='light'] .ops-stage .settings-desk .settings-inline-field input,
+html[data-theme='light'] .ops-stage .settings-desk .settings-inline-field select,
+html[data-theme='light'] .ops-stage .settings-desk .settings-key-row input,
+html[data-theme='light'] .ops-stage .page-content--settings textarea,
+html[data-theme='light'] .ops-stage .page-content--settings select {
+  background: #ffffff !important;
+  border: 1px solid rgba(23, 33, 43, 0.14) !important;
+  color: #17212b !important;
+}
+
+html[data-theme='light'] .ops-stage .settings-desk .settings-inline-field .ui-select .ops-menu__trigger,
+html[data-theme='light'] .ops-stage .page-content--settings .settings-inline-field .ui-select .ops-menu__trigger,
+html[data-theme='light'] .ops-stage .settings-desk .settings-inline-field .ui-select--field .ops-menu__trigger,
+html[data-theme='light'] .ops-stage .settings-desk .ui-select--field .ops-menu__trigger,
+html[data-theme='light'] .ops-stage .settings-desk label .ops-menu__trigger {
+  background: #e8edf2 !important;
+  border: 1px solid rgba(23, 33, 43, 0.14) !important;
+  color: #17212b !important;
+  font-weight: 600 !important;
+}
+
+html[data-theme='light'] .ops-stage .settings-desk .settings-inline-field .ui-select .ops-menu__trigger .ops-menu__label,
+html[data-theme='light'] .ops-stage .settings-desk .ui-select--field .ops-menu__trigger .ops-menu__label,
+html[data-theme='light'] .ops-stage .settings-desk label .ops-menu__trigger span {
+  color: #17212b !important;
+}
+
+html[data-theme='light'] .ops-stage .settings-desk .settings-inline-field .ui-select .ops-menu__trigger svg,
+html[data-theme='light'] .ops-stage .settings-desk .settings-inline-field .ui-select--field .ops-menu__trigger svg,
+html[data-theme='light'] .ops-stage .settings-desk label .ops-menu__trigger svg {
+  color: #5c6975 !important;
+}
+
+html[data-theme='light'] .ops-stage .settings-desk .ops-menu--open .ops-menu__trigger,
+html[data-theme='light'] .ops-stage .settings-desk .ops-menu__trigger:hover {
+  background: #dce3eb !important;
+  border-color: rgba(23, 33, 43, 0.22) !important;
+  color: #0f1720 !important;
+}
+
+html[data-theme='light'] .ops-stage .settings-desk .settings-nav-item {
+  color: #3d4a57 !important;
+  background: #eef1f5 !important;
+  border-color: rgba(23, 33, 43, 0.1) !important;
+}
+
+html[data-theme='light'] .ops-stage .settings-desk .settings-nav-item:hover {
+  color: #17212b !important;
+  background: #e2e7ee !important;
+}
+
+html[data-theme='light'] .ops-stage .settings-desk .settings-nav-item--active,
+html[data-theme='light'] .ops-stage .settings-desk .settings-nav-item--active:hover {
+  color: #ffffff !important;
+  background: #5c6975 !important;
+  border-color: transparent !important;
+}
+
+html[data-theme='light'] .ops-stage .settings-desk .settings-nav-item--active .settings-nav-item__icon {
+  color: #ffffff !important;
+}
+
+html[data-theme='light'] .ops-stage .settings-desk .settings-switch {
+  background: #f3f5f8 !important;
+  border-color: rgba(23, 33, 43, 0.12) !important;
+  color: #17212b !important;
+}
+
+html[data-theme='light'] .ops-stage .settings-desk .settings-switch--on {
+  background: #eef2f6 !important;
+  border-color: rgba(23, 33, 43, 0.18) !important;
+}
+
+html[data-theme='light'] .ops-stage .settings-desk .settings-switch strong {
+  color: #17212b !important;
+}
+
+html[data-theme='light'] .ops-stage .settings-desk .settings-switch small {
+  color: #5c6975 !important;
+}
+
+html[data-theme='light'] .ops-stage .settings-desk .settings-switch__track {
+  background: #d5dbe3 !important;
+  border-color: rgba(23, 33, 43, 0.18) !important;
+  box-shadow: inset 0 1px 2px rgba(23, 33, 43, 0.08) !important;
+}
+
+html[data-theme='light'] .ops-stage .settings-desk .settings-panel,
+html[data-theme='light'] .ops-stage .settings-desk .portal-card.settings-panel {
+  background: #ffffff !important;
+  border-color: rgba(23, 33, 43, 0.12) !important;
+  color: #17212b !important;
+}
+
+html[data-theme='light'] .ops-stage .settings-desk .settings-panel h2,
+html[data-theme='light'] .ops-stage .settings-desk .settings-panel h3 {
+  color: #17212b !important;
+}
+
+html[data-theme='light'] .ops-stage .settings-desk .settings-panel__eyebrow,
+html[data-theme='light'] .ops-stage .settings-desk .settings-panel .text-muted {
+  color: #5c6975 !important;
+}
+
+/* Profile desk — stop flex-collapse clipping hero / cards */
+html[data-theme='light'] .ops-stage .profile-desk .portal-card,
+html[data-theme='light'] .ops-stage .profile-desk .profile-hero,
+.ops-stage .profile-desk .portal-card,
+.ops-stage .profile-desk .profile-hero {
+  min-height: min-content !important;
+  height: auto !important;
+  flex-shrink: 0 !important;
+  overflow: visible !important;
+}
+
+html[data-theme='light'] .ops-stage .profile-desk .profile-hero-meta,
+html[data-theme='light'] .ops-stage .profile-desk .theme-settings__option {
+  background: #f3f5f8 !important;
+  border-color: rgba(23, 33, 43, 0.12) !important;
+  color: #17212b !important;
+}
+
+html[data-theme='light'] .ops-stage .profile-desk .theme-settings__option--active {
+  background: #e8edf2 !important;
+  border-color: rgba(23, 33, 43, 0.28) !important;
+}
+
+html[data-theme='light'] .ops-stage .profile-desk .theme-settings__option-hint,
+html[data-theme='light'] .ops-stage .profile-desk .profile-section__lede,
+html[data-theme='light'] .ops-stage .profile-desk .theme-settings__header p,
+html[data-theme='light'] .ops-stage .profile-desk .theme-settings__status {
+  color: #5c6975 !important;
+}

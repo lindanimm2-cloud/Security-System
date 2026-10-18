@@ -11,6 +11,7 @@ import {
   type LoyaltySummary,
 } from '@/components/loyalty/LoyaltySummaryCard';
 import { ThemeSettings } from '@/components/ThemeSettings';
+import { PasskeysSettingsPanel } from '@/components/auth/PasskeysSettingsPanel';
 import { PortalPermissionsSection } from '@/components/portal/PortalPermissions';
 import { PortalLayout } from '@/components/portal/PortalLayout';
 import { FamilyProfilePopup, type FamilyProfilePerson } from '@/components/portal/FamilyProfilePopup';
@@ -318,6 +319,8 @@ function ProfileContent() {
         </section>
 
         <PortalPermissionsSection />
+
+        <PasskeysSettingsPanel portal="client" />
 
         <section className="portal-card profile-section">
           <ThemeSettings />

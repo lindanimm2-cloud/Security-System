@@ -3,13 +3,21 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { publicApi } from '@/lib/api-client';
+import { getDemoProducts } from '@/lib/demo/catalog';
 import type { StoreProduct } from '@/lib/store-types';
 import { ProductCard } from './ProductCard';
 import { StoreScrollRail } from './StoreScrollRail';
 
+function pickFeatured(list: StoreProduct[], dense: boolean) {
+  const featured = list.filter((p) => p.featured);
+  const pool = featured.length ? featured : list;
+  return pool.slice(0, dense ? 10 : 4);
+}
+
 export function FeaturedProducts({ dense = false }: { dense?: boolean }) {
-  const [products, setProducts] = useState<StoreProduct[]>([]);
-  const [error, setError] = useState('');
+  const [products, setProducts] = useState<StoreProduct[]>(() =>
+    pickFeatured(getDemoProducts(), dense),
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -19,16 +27,12 @@ export function FeaturedProducts({ dense = false }: { dense?: boolean }) {
           success: boolean;
           data: StoreProduct[];
         }>('/store/catalog?tenant=demo');
-        if (!cancelled) {
-          const featured = res.data.filter((p) => p.featured);
-          const pool = featured.length ? featured : res.data;
-          setProducts(pool.slice(0, dense ? 10 : 4));
+        if (!cancelled && Array.isArray(res.data) && res.data.length) {
+          setProducts(pickFeatured(res.data, dense));
         }
-      } catch (e) {
+      } catch {
         if (!cancelled) {
-          setError(
-            e instanceof Error ? e.message : 'Catalog unavailable right now',
-          );
+          setProducts(pickFeatured(getDemoProducts(), dense));
         }
       }
     })();
@@ -40,21 +44,17 @@ export function FeaturedProducts({ dense = false }: { dense?: boolean }) {
   if (dense) {
     return (
       <div>
-        {error ? (
-          <p className="nx-muted">{error} — start the API to load live catalog.</p>
-        ) : (
-          <StoreScrollRail
-            title="Trending right now"
-            subtitle="Featured duty gear from Nexus Supply"
-            href="/store"
-            linkLabel="Full catalog"
-            className="nx-scroll-section--products"
-          >
-            {products.map((p) => (
-              <ProductCard key={p.id} product={p} variant="rail" />
-            ))}
-          </StoreScrollRail>
-        )}
+        <StoreScrollRail
+          title="Trending right now"
+          subtitle="Featured duty gear from Nexus Supply"
+          href="/store"
+          linkLabel="Full catalog"
+          className="nx-scroll-section--products"
+        >
+          {products.map((p) => (
+            <ProductCard key={p.id} product={p} variant="rail" />
+          ))}
+        </StoreScrollRail>
       </div>
     );
   }
@@ -72,15 +72,11 @@ export function FeaturedProducts({ dense = false }: { dense?: boolean }) {
           </p>
         </div>
       </div>
-      {error ? (
-        <p className="nx-muted">{error} — start the API to load live catalog.</p>
-      ) : (
-        <div className="nx-product-grid">
-          {products.map((p) => (
-            <ProductCard key={p.id} product={p} />
-          ))}
-        </div>
-      )}
+      <div className="nx-product-grid">
+        {products.map((p) => (
+          <ProductCard key={p.id} product={p} />
+        ))}
+      </div>
       <div className="nx-section-cta">
         <Link href="/store" className="nx-btn nx-btn--primary">
           Browse full catalog

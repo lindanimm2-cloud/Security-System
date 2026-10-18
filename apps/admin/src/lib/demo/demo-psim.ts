@@ -287,7 +287,7 @@ export const demoSecurityEvents: NormalizedSecurityEvent[] = [
     source: 'APP',
     type: 'PANIC',
     severity: 'CRITICAL',
-    title: 'App panic — Nomsa Client',
+    title: 'App panic — Demo Client',
     site: 'Umhlanga Rocks Dr',
     incidentId: 'demo-inc-1',
     receivedAt: new Date(now - 2 * 60_000).toISOString(),

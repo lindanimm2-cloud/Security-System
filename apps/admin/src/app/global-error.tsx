@@ -10,7 +10,7 @@ export default function GlobalError({
   reset: () => void;
 }) {
   return (
-    <html lang="en" data-theme="dark">
+    <html lang="en" data-theme="dark" data-scroll-behavior="smooth">
       <body style={{ margin: 0, background: '#000' }}>
         <ProfessionalErrorPage error={error} reset={reset} />
       </body>

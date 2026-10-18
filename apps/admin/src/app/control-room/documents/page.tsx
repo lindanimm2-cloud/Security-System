@@ -223,39 +223,56 @@ function DocumentsContent() {
   ];
 
   return (
-    <div className="documents-hub">
-      <header className="documents-hub__header">
-        <div>
-          <h1 className="documents-hub__title">Documents</h1>
-          <p className="documents-hub__lede">
-            Manage evidence, officer reports, policies and operational records.
-          </p>
-          <p className="documents-hub__meta">
-            <strong>{library?.stats.totalDocuments ?? 0}</strong> documents
-            <span aria-hidden>·</span>
-            <strong>{library?.stats.folderCount ?? 0}</strong> folders
-            <span aria-hidden>·</span>
-            <strong>{library?.stats.pinned ?? 0}</strong> pinned
-            {incidentFilter && (
-              <>
-                <span aria-hidden>·</span>
-                <Link href={incidentHref(incidentFilter)} className="interactive-text">
-                  View incident
-                </Link>
-              </>
-            )}
-          </p>
-        </div>
-        <div className="documents-hub__actions">
-          <button type="button" className="btn-secondary" onClick={() => setShowNewFolder(true)}>
-            + New folder
+    <div className="vms-page documents-page documents-hub">
+      <header className="vms-page__head">
+        <nav className="vms-tabs" aria-label="Documents views">
+          <button
+            type="button"
+            className={`vms-tab ${!folderId && !category ? 'is-on' : ''}`}
+            onClick={clearFilters}
+          >
+            Library
           </button>
-          <button type="button" className="btn-action" onClick={() => setShowUpload(true)}>
-            + Add document
+          <button
+            type="button"
+            className={`vms-tab ${category === 'PINNED' ? 'is-on' : ''}`}
+            onClick={() => {
+              setFolderId(null);
+              setCategory('PINNED');
+            }}
+          >
+            Pinned
+          </button>
+          {incidentFilter ? (
+            <Link href={incidentHref(incidentFilter)} className="vms-tab">
+              Incident
+            </Link>
+          ) : (
+            <Link href={incidentHref()} className="vms-tab">
+              Incidents
+            </Link>
+          )}
+        </nav>
+        <div className="vms-page__meta">
+          <span>
+            {library?.stats.totalDocuments ?? 0} docs · {library?.stats.folderCount ?? 0} folders ·{' '}
+            {library?.stats.pinned ?? 0} pinned
+          </span>
+          {incidentFilter ? (
+            <Link href="/control-room/documents" className="vms-pill vms-pill--warn">
+              Clear incident filter
+            </Link>
+          ) : null}
+          <button type="button" className="btn btn-ghost btn-sm" onClick={() => setShowNewFolder(true)}>
+            New folder
+          </button>
+          <button type="button" className="btn btn-ghost btn-sm" onClick={() => setShowUpload(true)}>
+            Add document
           </button>
         </div>
       </header>
 
+      <div className="documents-desk">
       {incidentFilter && (
         <div className="alert alert--info documents-incident-banner">
           Showing documents linked to incident.{' '}
@@ -453,21 +470,31 @@ function DocumentsContent() {
 
         <section className="documents-section">
           <div className="documents-section__head">
-            <h2 className="documents-section__title">
-              {selectedFolder
-                ? selectedFolder.name
-                : category === 'PINNED'
-                  ? 'Pinned documents'
-                  : category
-                    ? DOCUMENT_CATEGORIES[category as DocumentCategoryKey] ?? 'Documents'
-                    : 'Recent documents'}
-            </h2>
-            <div className="documents-section__tools">
+            <div className="documents-section__heading">
               {selectedFolder && (
-                <button type="button" className="btn-ghost" onClick={() => setFolderId(null)}>
-                  All folders
+                <button
+                  type="button"
+                  className="documents-back"
+                  onClick={() => setFolderId(null)}
+                  aria-label="Back to all folders"
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+                    <path d="M15 18l-6-6 6-6" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                  <span>Folders</span>
                 </button>
               )}
+              <h2 className="documents-section__title">
+                {selectedFolder
+                  ? selectedFolder.name
+                  : category === 'PINNED'
+                    ? 'Pinned documents'
+                    : category
+                      ? DOCUMENT_CATEGORIES[category as DocumentCategoryKey] ?? 'Documents'
+                      : 'Recent documents'}
+              </h2>
+            </div>
+            <div className="documents-section__tools">
               <OpsMenuDropdown
                 compact
                 align="right"
@@ -499,104 +526,138 @@ function DocumentsContent() {
               </button>
             </div>
           ) : (
-            <div className="documents-list">
-              {visibleDocs.map((doc) => {
-                const href = resolveMediaUrl(doc.fileUrl) ?? '#';
-                const ext = fileExtLabel(doc.fileType, doc.fileName);
-                const size = formatFileSize(doc.fileSizeKb);
-                const marks = documentClassifications(doc);
-                return (
-                  <article
-                    key={doc.id}
-                    className={`document-card document-card--${CATEGORY_TONE[doc.category]} ${
-                      doc.isPinned ? 'document-card--pinned' : ''
-                    }`}
-                  >
-                    <div className="document-card__icon">
-                      <NavIcon name={fileTypeNavIcon(doc.fileType)} size={18} />
-                    </div>
-                    <div className="document-card__body">
-                      <div className="document-card__top">
-                        <h3>{doc.title}</h3>
-                        <p className="document-card__file">
-                          {ext}
-                          {size ? ` · ${size}` : ''}
-                        </p>
-                      </div>
-                      <p className="document-card__meta">
-                        {DOCUMENT_CATEGORIES[doc.category]}
-                        {doc.folder ? ` / ${doc.folder.name}` : ''}
-                        {doc.uploadedBy ? ` · ${doc.uploadedBy}` : ''}
-                      </p>
-                      {doc.description && <p className="document-card__desc">{doc.description}</p>}
-                      <div className="document-card__marks">
-                        {marks.map((mark) => (
-                          <span key={mark.label} className={`document-mark document-mark--${mark.tone}`}>
-                            {mark.label}
-                          </span>
-                        ))}
-                        {doc.tags.map((t) => (
-                          <span key={t} className="document-tag">
-                            {t}
-                          </span>
-                        ))}
-                        <time className="document-card__added">{formatAdded(doc.createdAt)}</time>
-                      </div>
-                      <div className="document-card__actions">
-                        <a href={href} className="btn-sm" target="_blank" rel="noopener noreferrer">
-                          Preview
-                        </a>
-                        <a href={href} className="btn-sm" download={doc.fileName}>
-                          Download
-                        </a>
-                        <button type="button" className="btn-sm" onClick={() => void copyLink(doc)}>
-                          Share
-                        </button>
-                        <OpsMenuDropdown
-                          compact
-                          align="right"
-                          hideCaret
-                          className="document-card__more"
-                          ariaLabel={`More actions for ${doc.title}`}
-                          label="⋮"
-                          items={[
-                            {
-                              id: 'pin',
-                              label: doc.isPinned ? 'Unpin' : 'Pin',
-                              onClick: () => void togglePin(doc),
-                            },
-                            {
-                              id: 'share',
-                              label: 'Copy link',
-                              onClick: () => void copyLink(doc),
-                            },
-                            doc.incident
-                              ? {
-                                  id: 'incident',
-                                  label: 'View incident',
-                                  href: incidentHref(doc.incident.id),
-                                }
-                              : {
-                                  id: 'link',
-                                  label: 'Link incident',
-                                  onClick: () => setLinkDocId(doc.id),
+            <div className="docs-table-wrap">
+              <table className="docs-table">
+                <thead>
+                  <tr>
+                    <th>Document</th>
+                    <th>Size</th>
+                    <th>Folder</th>
+                    <th>Tags</th>
+                    <th>Status</th>
+                    <th>Updated</th>
+                    <th aria-label="Actions" />
+                  </tr>
+                </thead>
+                <tbody>
+                  {visibleDocs.map((doc) => {
+                    const href = resolveMediaUrl(doc.fileUrl) ?? '#';
+                    const ext = fileExtLabel(doc.fileType, doc.fileName);
+                    const size = formatFileSize(doc.fileSizeKb);
+                    const marks = documentClassifications(doc);
+                    const status = primaryDocStatus(marks);
+                    const tone = CATEGORY_TONE[doc.category];
+                    const tagLabels = [
+                      ...doc.tags,
+                      ...marks
+                        .filter((m) => m !== status && m.tone !== 'case')
+                        .map((m) => m.label)
+                        .slice(0, 3),
+                    ].filter((v, i, arr) => arr.indexOf(v) === i).slice(0, 4);
+                    const caseMark = marks.find((m) => m.tone === 'case');
+                    return (
+                      <tr
+                        key={doc.id}
+                        className={`docs-table__row docs-table__row--${tone}${
+                          doc.isPinned ? ' docs-table__row--pinned' : ''
+                        }`}
+                      >
+                        <td>
+                          <div className="docs-table__identity">
+                            <strong className="docs-table__title">{doc.title}</strong>
+                            <span className="docs-table__sub">
+                              {DOCUMENT_CATEGORIES[doc.category]}
+                              {doc.uploadedBy ? ` · ${doc.uploadedBy}` : ''}
+                            </span>
+                            <span className="docs-table__badge">
+                              {ext}
+                              {caseMark ? ` · ${caseMark.label}` : doc.isPinned ? ' · Pinned' : ''}
+                            </span>
+                          </div>
+                        </td>
+                        <td>
+                          <span className="docs-table__id">{size ?? '—'}</span>
+                        </td>
+                        <td>
+                          <span className="docs-table__plan">{doc.folder?.name ?? DOCUMENT_CATEGORIES[doc.category]}</span>
+                        </td>
+                        <td>
+                          {tagLabels.length > 0 ? (
+                            <div className="docs-table__tags">
+                              {tagLabels.map((tag) => (
+                                <span key={tag} className="docs-table__tag">
+                                  {tag}
+                                </span>
+                              ))}
+                            </div>
+                          ) : (
+                            <span className="docs-table__muted">—</span>
+                          )}
+                        </td>
+                        <td>
+                          {status ? (
+                            <span className={`docs-table__status docs-table__status--${status.tone}`}>
+                              {status.label}
+                            </span>
+                          ) : (
+                            <span className="docs-table__muted">—</span>
+                          )}
+                        </td>
+                        <td>
+                          <span className="docs-table__time">{formatRelativeShort(doc.createdAt)}</span>
+                        </td>
+                        <td>
+                          <div className="docs-table__actions">
+                            <OpsMenuDropdown
+                              compact
+                              align="right"
+                              hideCaret
+                              className="docs-table__more"
+                              ariaLabel={`Actions for ${doc.title}`}
+                              label="⋯"
+                              items={[
+                                { id: 'preview', label: 'Preview', href },
+                                { id: 'download', label: 'Download', href },
+                                {
+                                  id: 'share',
+                                  label: 'Copy link',
+                                  onClick: () => void copyLink(doc),
                                 },
-                            {
-                              id: 'delete',
-                              label: 'Archive / delete',
-                              tone: 'danger',
-                              onClick: () => deleteDocument(doc),
-                            },
-                          ]}
-                        />
-                      </div>
-                    </div>
-                  </article>
-                );
-              })}
+                                {
+                                  id: 'pin',
+                                  label: doc.isPinned ? 'Unpin' : 'Pin',
+                                  onClick: () => void togglePin(doc),
+                                },
+                                doc.incident
+                                  ? {
+                                      id: 'incident',
+                                      label: 'View incident',
+                                      href: incidentHref(doc.incident.id),
+                                    }
+                                  : {
+                                      id: 'link',
+                                      label: 'Link incident',
+                                      onClick: () => setLinkDocId(doc.id),
+                                    },
+                                {
+                                  id: 'delete',
+                                  label: 'Archive / delete',
+                                  tone: 'danger',
+                                  onClick: () => deleteDocument(doc),
+                                },
+                              ]}
+                            />
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
             </div>
           )}
         </section>
+      </div>
       </div>
 
       {linkDocId && (
@@ -627,6 +688,32 @@ function DocumentsContent() {
   );
 }
 
+function formatRelativeShort(iso: string) {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '—';
+  const diff = Date.now() - d.getTime();
+  const mins = Math.max(0, Math.round(diff / 60000));
+  if (mins < 1) return 'Just now';
+  if (mins < 60) return `${mins} min ago`;
+  const hours = Math.round(mins / 60);
+  if (hours < 24) return hours === 1 ? '1 hr ago' : `${hours} hr ago`;
+  const days = Math.round(hours / 24);
+  if (days === 1) return 'Yesterday';
+  if (days < 7) return `${days} days ago`;
+  return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+}
+
+function primaryDocStatus(
+  marks: { label: string; tone: string }[],
+): { label: string; tone: string } | null {
+  const order = ['restricted', 'evidence', 'ok', 'case', 'muted'] as const;
+  for (const tone of order) {
+    const match = marks.find((m) => m.tone === tone);
+    if (match) return match;
+  }
+  return marks[0] ?? null;
+}
+
 function formatRelative(iso: string) {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return 'Recently';
@@ -654,12 +741,6 @@ function formatUpdated(iso?: string) {
   if (days === 1) return 'Updated yesterday';
   if (days < 7) return `Updated ${days} days ago`;
   return `Updated ${d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}`;
-}
-
-function formatAdded(iso: string) {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return '—';
-  return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
 function SearchGlyph() {

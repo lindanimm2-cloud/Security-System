@@ -26,6 +26,10 @@ export type OpsIncident = {
   ackedAt?: string | null;
   /** Mobile queue preview: dash cams vs property CCTV. */
   cctvKind?: 'dash' | 'site' | null;
+  /** Property / surveillance site to open when this incident is selected. */
+  siteId?: string | null;
+  /** Client or fleet vehicle to open on Dash cams when selected. */
+  vehicleId?: string | null;
   previewCameras?: Array<{
     id: string;
     name: string;

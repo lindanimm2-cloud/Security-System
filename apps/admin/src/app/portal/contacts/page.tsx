@@ -12,6 +12,7 @@ import {
   formatZaPhone,
 } from '@/components/portal/EmergencyCallButton';
 import { clientApi, type ApiResponse } from '@/lib/api-client';
+import { OpsDialog } from '@/components/ops/OpsDialog';
 import { OpsMenuDropdown } from '@/components/ops/OpsMenuDropdown';
 import { PhoneWithCountryField } from '@/components/ui/PhoneWithCountryField';
 import {
@@ -166,61 +167,67 @@ function ContactsContent() {
             {String(personal.length).padStart(2, '0')} active · {String(verifiedCount).padStart(2, '0')} verified
           </p>
         </div>
-        <button type="button" className="btn-ghost btn-sm ec-add" onClick={() => setShowForm((open) => !open)}>
-          {showForm ? 'Cancel' : '+ Add'}
+        <button type="button" className="btn-ghost btn-sm ec-add" onClick={() => setShowForm(true)}>
+          + Add
         </button>
       </section>
 
       {showForm ? (
-        <form className="form-card ec-form" onSubmit={handleAdd}>
-          <label>
-            Name
-            <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
-          </label>
-          <PhoneWithCountryField
-            label="Phone"
-            variant="form"
-            countryIso={form.phoneCountry}
-            nationalNumber={form.phoneNational}
-            onCountryChange={(phoneCountry) => setForm({ ...form, phoneCountry })}
-            onNumberChange={(phoneNational) => setForm({ ...form, phoneNational })}
-            required
-          />
-          <label>
-            Relationship
-            <UiSelect
-              value={relationshipSelectValue(form.relationship)}
-              onChange={(value) =>
-                setForm({
-                  ...form,
-                  relationship: value === 'Other' ? '' : value,
-                })
-              }
-              options={[
-                { value: '', label: 'Select relationship' },
-                ...RELATIONSHIP_OPTIONS.map((option) => ({ value: option, label: option })),
-                { value: 'Other', label: 'Other' },
-              ]}
-              ariaLabel="Relationship"
-              compact={false}
-              className="form-field-select"
-            />
-          </label>
-          {relationshipSelectValue(form.relationship) === 'Other' && (
+        <OpsDialog
+          title="Your emergency contacts"
+          subtitle={`${String(personal.length).padStart(2, '0')} active · ${String(verifiedCount).padStart(2, '0')} verified`}
+          onClose={() => setShowForm(false)}
+        >
+          <form className="form-card ec-form" onSubmit={handleAdd}>
             <label>
-              Other relationship
-              <input
-                value={form.relationship}
-                onChange={(e) => setForm({ ...form, relationship: e.target.value })}
-                placeholder="e.g. fiancé, godparent"
-                required
+              Name
+              <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
+            </label>
+            <PhoneWithCountryField
+              label="Phone"
+              variant="form"
+              countryIso={form.phoneCountry}
+              nationalNumber={form.phoneNational}
+              onCountryChange={(phoneCountry) => setForm({ ...form, phoneCountry })}
+              onNumberChange={(phoneNational) => setForm({ ...form, phoneNational })}
+              required
+            />
+            <label>
+              Relationship
+              <UiSelect
+                value={relationshipSelectValue(form.relationship)}
+                onChange={(value) =>
+                  setForm({
+                    ...form,
+                    relationship: value === 'Other' ? '' : value,
+                  })
+                }
+                options={[
+                  { value: '', label: 'Select relationship' },
+                  ...RELATIONSHIP_OPTIONS.map((option) => ({ value: option, label: option })),
+                  { value: 'Other', label: 'Other' },
+                ]}
+                ariaLabel="Relationship"
+                compact={false}
+                className="form-field-select"
               />
             </label>
-          )}
-          <button type="submit" className="btn-secondary" disabled={saving}>
-            {saving ? <LoadingSpinner label="" size="sm" /> : 'Save contact'}
-          </button>
-        </form>
+            {relationshipSelectValue(form.relationship) === 'Other' && (
+              <label>
+                Other relationship
+                <input
+                  value={form.relationship}
+                  onChange={(e) => setForm({ ...form, relationship: e.target.value })}
+                  placeholder="e.g. fiancé, godparent"
+                  required
+                />
+              </label>
+            )}
+            <button type="submit" className="btn-secondary" disabled={saving}>
+              {saving ? <LoadingSpinner label="" size="sm" /> : 'Save contact'}
+            </button>
+          </form>
+        </OpsDialog>
       ) : null}
 
       <div className="ec-cards">

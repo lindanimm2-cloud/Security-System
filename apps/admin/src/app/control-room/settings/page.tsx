@@ -196,7 +196,7 @@ const PREVIEW_ALERTS: {
       kind: 'high',
       category: 'BILLING',
       title: 'Subscription renewed',
-      subtitle: 'Nomsa Client · Premium Protect · notification-bell preview',
+      subtitle: 'Demo Client · Premium Protect · notification-bell preview',
       link: '/control-room/customers',
       createdAt: new Date().toISOString(),
     },
@@ -206,12 +206,11 @@ const PREVIEW_ALERTS: {
 const ROLE_GUIDE: RoleGuideRow[] = [
   { role: 'Owner', portal: 'Control Panel', access: 'Full Access', users: 1, status: 'Operational', count: 64, tone: 'owner', tags: ['Platform', 'Billing', 'Users', 'Security'] },
   { role: 'Developer', portal: 'Control Panel', access: 'Technical', users: 2, status: 'Scoped', count: 31, tone: 'developer', tags: ['Ops', 'Logs', 'Support', 'Deployments'] },
-  { role: 'Manager', portal: 'Control Panel', access: 'Operations', users: 4, status: 'Operational', count: 38, tone: 'manager', tags: ['Operations', 'Sales', 'Customers', 'Fleet'] },
+  { role: 'Manager', portal: 'Control Panel', access: 'Operations', users: 4, status: 'Operational', count: 38, tone: 'manager', tags: ['Operations', 'Customers', 'Fleet', 'Dispatch'] },
   { role: 'Supervisor', portal: 'Control Panel', access: 'Dispatch', users: 8, status: 'Operational', count: 26, tone: 'supervisor', tags: ['Dispatch', 'Map', 'Incidents', 'Escalation'] },
-  { role: 'Sales', portal: 'Control Panel', access: 'Sales', users: 5, status: 'Operational', count: 18, tone: 'sales', tags: ['Leads', 'CRM', 'Quotes', 'Store'] },
   { role: 'Client', portal: 'Client Portal', access: 'Protected User', users: 42, status: 'Operational', count: 12, tone: 'client', tags: ['Panic', 'Tracking', 'Family', 'Subscription'] },
   { role: 'Officer', portal: 'Officer App', access: 'Field', users: 24, status: 'Operational', count: 22, tone: 'officer', tags: ['Assignments', 'Navigation', 'Reports', 'Check-ins'] },
-  { role: 'Technician', portal: 'Technician App', access: 'Installation', users: 7, status: 'Operational', count: 20, tone: 'technician', tags: ['Installs', 'CCTV', 'Alarms', 'Access Control'] },
+  { role: 'Technician', portal: 'Technician App', access: 'Field', users: 7, status: 'Operational', count: 20, tone: 'technician', tags: ['Installs', 'CCTV', 'Alarms', 'Access Control'] },
 ];
 
 const SETTINGS_NAV = [
@@ -221,6 +220,11 @@ const SETTINGS_NAV = [
   { id: 'permissions', label: 'Permissions', keywords: ['permissions', 'matrix', 'access'] },
   { id: 'notifications', label: 'Notifications', keywords: ['notifications', 'bell', 'routine'] },
   { id: 'alerts', label: 'Alerts & Escalation', keywords: ['panic', 'medical', 'silent', 'escalation', 'alerts'] },
+  {
+    id: 'operator-responses',
+    label: 'Operator responses',
+    keywords: ['operator', 'responses', 'acknowledge', 'mandatory', 'wincram', 'close'],
+  },
   { id: 'lens', label: 'Critical Quick Actions Lens', keywords: ['lens', 'eye', 'critical', 'quick actions', 'peek'] },
   { id: 'organisation', label: 'Organisation', keywords: ['organisation', 'tenant', 'company'] },
   { id: 'branches', label: 'Branches', keywords: ['branches', 'zones', 'sites'] },
@@ -240,6 +244,7 @@ const PERMISSION_MATRIX = [
   { module: 'Panic', owner: 'Yes', manager: 'Yes', supervisor: 'Yes', officer: 'Yes', technician: 'No' },
   { module: 'Dispatch', owner: 'Yes', manager: 'Yes', supervisor: 'Yes', officer: 'Yes', technician: 'No' },
   { module: 'Installations', owner: 'Yes', manager: 'Yes', supervisor: 'View', officer: 'No', technician: 'Yes' },
+  { module: 'Subscriptions', owner: 'Yes', manager: 'Yes', supervisor: 'View', officer: 'No', technician: 'No' },
   { module: 'Billing', owner: 'Yes', manager: 'Yes', supervisor: 'No', officer: 'No', technician: 'No' },
   { module: 'Users', owner: 'Yes', manager: 'Yes', supervisor: 'No', officer: 'No', technician: 'No' },
   { module: 'System Settings', owner: 'Yes', manager: 'No', supervisor: 'No', officer: 'No', technician: 'No' },
@@ -315,16 +320,15 @@ export default function ControlRoomSettingsPage() {
 
   return (
     <ControlRoomLayout title="Settings">
-      <div className="page-content page-content--settings">
+      <div className="page-content page-content--settings settings-desk">
         <section className="settings-hero">
-          <div>
-            <p className="ec-kicker">4DS Control Room</p>
+          <div className="settings-hero__intro">
             <h1>Settings &amp; Configuration</h1>
-            <p className="text-muted">
-              Control how your organisation, users, alerts, permissions and security systems operate.
+            <p className="text-muted settings-hero__desc">
+              Organisation, users, alerts, permissions and security
             </p>
           </div>
-          <div className="settings-status-grid">
+          <div className="settings-status-grid" aria-label="Settings overview">
             <div className="settings-status-card">
               <span className="settings-status-card__label">System</span>
               <strong>Operational</strong>
@@ -338,7 +342,7 @@ export default function ControlRoomSettingsPage() {
               <strong>{roles.length}</strong>
             </div>
             <div className="settings-status-card">
-              <span className="settings-status-card__label">Active alerts</span>
+              <span className="settings-status-card__label">Alerts</span>
               <strong>{activeAlerts}</strong>
             </div>
           </div>
@@ -347,15 +351,16 @@ export default function ControlRoomSettingsPage() {
         <section className="settings-workspace">
           <aside className="settings-nav-card">
             <div className="settings-nav-card__head">
-              <h2>Settings</h2>
-              <p className="text-muted">Modules, access and escalations</p>
+              <h2>Modules</h2>
+              <p className="text-muted">Access &amp; escalations</p>
             </div>
             <label className="settings-search">
-              <span>Search settings</span>
+              <span className="sr-only">Search settings</span>
               <input
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="Users, permissions, billing, security..."
+                placeholder="Search settings…"
+                aria-label="Search settings"
               />
             </label>
             <div className="settings-nav-list">
@@ -393,17 +398,20 @@ export default function ControlRoomSettingsPage() {
                 <div className="settings-theme-grid" role="radiogroup" aria-label="Theme preference">
                   {THEME_OPTIONS.map((option) => {
                     const selected = preference === option;
+                    const label = THEME_PREFERENCE_LABELS[option];
                     return (
                       <button
                         key={option}
                         type="button"
                         role="radio"
                         aria-checked={selected}
-                        className={`settings-theme-tile ${selected ? 'settings-theme-tile--active' : ''}`}
+                        aria-label={`${label} theme. ${THEME_PREFERENCE_HINTS[option]}${selected ? ' Selected.' : ''}`}
+                        title={THEME_PREFERENCE_HINTS[option]}
+                        className={`settings-theme-btn ${selected ? 'is-active' : ''}`}
                         onClick={() => setPreference(option)}
                       >
-                        <span className="settings-theme-tile__label">{THEME_PREFERENCE_LABELS[option]}</span>
-                        <span className="settings-theme-tile__hint">{THEME_PREFERENCE_HINTS[option]}</span>
+                        <span className="settings-theme-btn__face">{label}</span>
+                        <span className="settings-theme-btn__lamp" aria-hidden />
                       </button>
                     );
                   })}

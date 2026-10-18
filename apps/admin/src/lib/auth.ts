@@ -1,6 +1,12 @@
-import { DEMO_PASSWORD, demoLogin, demoRegisterSession, getDemoInvite } from './demo/users';
+import { DEMO_PASSWORD, demoLogin, demoLoginWithPasskey, demoRegisterSession, getDemoInvite } from './demo/users';
 import { isDemoMode } from './demo/is-demo-mode';
 import { setActionKind } from './action-status';
+import {
+  assertPasskeyLocal,
+  isPasskeySupported,
+  registerPasskeyLocal,
+  type PasskeyPortal,
+} from './passkeys';
 
 export type AuthUser = {
   id: string;
@@ -199,6 +205,179 @@ export async function login(
   return session;
 }
 
+export function passkeysAvailable(): boolean {
+  return isPasskeySupported();
+}
+
+export async function loginWithPasskey(
+  portal: AuthPortal,
+  tenantSlug: string,
+  options?: {
+    emailHint?: string;
+    authSource?: ClientAuthSource;
+    /** Mobile autofill / conditional UI (Safari, Chrome). */
+    useBrowserAutofill?: boolean;
+  },
+): Promise<LoginResult> {
+  const authSource =
+    portal === 'client' ? (options?.authSource ?? 'portal') : undefined;
+
+  if (isDemoMode()) {
+    const { passkey } = await assertPasskeyLocal({
+      portal: portal as PasskeyPortal,
+      tenantSlug,
+      emailHint: options?.emailHint,
+      mediation: options?.useBrowserAutofill ? 'conditional' : undefined,
+    });
+    const session = {
+      ...demoLoginWithPasskey(portal, passkey.email, tenantSlug),
+      ...(authSource ? { authSource } : {}),
+    } as AuthSession;
+    persistLoginSession(portal, session, authSource);
+    return session;
+  }
+
+  let optionsRes: Response;
+  try {
+    optionsRes = await fetch(`${getApiUrl()}/auth/passkey/login/options`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        portal,
+        tenantSlug,
+        email: options?.emailHint || undefined,
+      }),
+    });
+  } catch {
+    throw new Error('Request failed');
+  }
+  const optionsJson = await optionsRes.json().catch(() => ({}));
+  if (!optionsRes.ok) {
+    const msg = Array.isArray(optionsJson?.message)
+      ? optionsJson.message[0]
+      : optionsJson?.message;
+    throw new Error(msg ?? 'Could not start passkey sign-in');
+  }
+
+  const { startAuthentication } = await import('@simplewebauthn/browser');
+  const assertion = await startAuthentication({
+    optionsJSON: optionsJson.data.options,
+    useBrowserAutofill: Boolean(options?.useBrowserAutofill),
+  });
+
+  let verifyRes: Response;
+  try {
+    verifyRes = await fetch(`${getApiUrl()}/auth/passkey/login/verify`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        portal,
+        tenantSlug,
+        challengeId: optionsJson.data.challengeId,
+        credential: assertion,
+      }),
+    });
+  } catch {
+    throw new Error('Request failed');
+  }
+  const verifyJson = await verifyRes.json().catch(() => ({}));
+  if (!verifyRes.ok) {
+    const msg = Array.isArray(verifyJson?.message)
+      ? verifyJson.message[0]
+      : verifyJson?.message;
+    throw new Error(msg ?? 'Passkey sign-in failed');
+  }
+
+  const data = verifyJson.data ?? {};
+  if (data.mfaSetupRequired && data.mfaToken) {
+    return {
+      kind: 'setup',
+      mfaToken: data.mfaToken as string,
+      user: data.user as AuthUser,
+    };
+  }
+  if (data.mfaRequired && data.mfaToken) {
+    return {
+      kind: 'verify',
+      mfaToken: data.mfaToken as string,
+      user: data.user as AuthUser,
+    };
+  }
+
+  const session: AuthSession = {
+    user: data.user,
+    accessToken: data.tokens.accessToken,
+    ...(authSource ? { authSource } : {}),
+  };
+  persistLoginSession(portal, session, authSource);
+  return session;
+}
+
+export async function registerPasskeyForSession(
+  portal: AuthPortal,
+  session: AuthSession,
+): Promise<{ id: string; createdAt: string }> {
+  const displayName = `${session.user.firstName} ${session.user.lastName}`.trim();
+  const tenantSlug = session.user.tenant?.slug ?? 'demo';
+
+  if (isDemoMode()) {
+    const row = await registerPasskeyLocal({
+      portal: portal as PasskeyPortal,
+      tenantSlug,
+      email: session.user.email,
+      userId: session.user.id,
+      displayName: displayName || session.user.email,
+    });
+    return { id: row.id, createdAt: row.createdAt };
+  }
+
+  let optionsRes: Response;
+  try {
+    optionsRes = await fetch(`${getApiUrl()}/auth/passkey/register/options`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${session.accessToken}`,
+      },
+      body: JSON.stringify({ portal }),
+    });
+  } catch {
+    throw new Error('Request failed');
+  }
+  const optionsJson = await optionsRes.json().catch(() => ({}));
+  if (!optionsRes.ok) {
+    throw new Error(optionsJson?.message ?? 'Could not start passkey registration');
+  }
+
+  const { startRegistration } = await import('@simplewebauthn/browser');
+  const attestation = await startRegistration({
+    optionsJSON: optionsJson.data.options,
+  });
+
+  let verifyRes: Response;
+  try {
+    verifyRes = await fetch(`${getApiUrl()}/auth/passkey/register/verify`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${session.accessToken}`,
+      },
+      body: JSON.stringify({
+        challengeId: optionsJson.data.challengeId,
+        credential: attestation,
+        portal,
+      }),
+    });
+  } catch {
+    throw new Error('Request failed');
+  }
+  const verifyJson = await verifyRes.json().catch(() => ({}));
+  if (!verifyRes.ok) {
+    throw new Error(verifyJson?.message ?? 'Passkey registration failed');
+  }
+  return verifyJson.data as { id: string; createdAt: string };
+}
+
 function persistLoginSession(
   portal: AuthPortal,
   session: AuthSession,
@@ -352,7 +531,7 @@ export type ClientRegisterCompletePayload = {
     medicalAidMemberNumber?: string;
     medicalAidPlan?: string;
   };
-  property?: { name: string; address: string; gateCode?: string };
+  property?: { name: string; address: string; gateCode?: string; accessNotes?: string };
   vehicle?: {
     registration: string;
     make: string;

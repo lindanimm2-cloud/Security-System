@@ -1,13 +1,11 @@
 import type { Metadata } from 'next';
 import { Barlow_Condensed, Source_Sans_3 } from 'next/font/google';
-import { CartDrawer } from '@/components/site/CartDrawer';
-import { CartProvider } from '@/components/site/CartProvider';
 import { SiteClientProvider } from '@/components/site/SiteClientProvider';
 import { SiteFooter } from '@/components/site/SiteFooter';
 import { SiteHeader } from '@/components/site/SiteHeader';
 import { SiteMobileBottomNav } from '@/components/site/SiteMobileBottomNav';
 import { SiteMotion } from '@/components/site/SiteMotion';
-import { StoreHelpDock } from '@/components/site/StoreHelpDock';
+import '../nx-enterprise.css';
 
 const display = Barlow_Condensed({
   subsets: ['latin'],
@@ -29,7 +27,7 @@ export const metadata: Metadata = {
     template: '%s — 4DS Nexus',
   },
   description:
-    '4DS Nexus — mobile protection, rapid response, and professional security supply.',
+    '4DS Nexus — close protection, private escort, mobile protection, and rapid response.',
 };
 
 export default function SiteLayout({
@@ -40,15 +38,11 @@ export default function SiteLayout({
       className={`nx-site nx-site--with-bottom-nav ${display.variable} ${body.variable}`}
     >
       <SiteClientProvider>
-        <CartProvider>
-          <SiteHeader />
-          <SiteMotion />
-          <main className="nx-main">{children}</main>
-          <SiteFooter />
-          <CartDrawer />
-          <StoreHelpDock />
-          <SiteMobileBottomNav />
-        </CartProvider>
+        <SiteHeader />
+        <SiteMotion />
+        <main className="nx-main">{children}</main>
+        <SiteFooter />
+        <SiteMobileBottomNav />
       </SiteClientProvider>
     </div>
   );

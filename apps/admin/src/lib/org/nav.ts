@@ -1,9 +1,12 @@
+import type { NavIconName } from '@/components/nav/NavIcon';
+
 export type OrgNavItem = {
   id: string;
   href: string;
   label: string;
   exact?: boolean;
   prominent?: boolean;
+  icon?: NavIconName;
 };
 
 export type OrgNavSection = {
@@ -33,7 +36,7 @@ export function orgNav(organizationId: string): OrgNavSection[] {
     {
       title: 'Site operations',
       items: [
-        { id: 'gates', href: `${base}/gates`, label: 'Gates' },
+        { id: 'gates', href: `${base}/gates`, label: 'Gates & intercoms' },
         { id: 'officers', href: `${base}/security`, label: 'Officers & posts' },
         { id: 'visitors', href: `${base}/visitors`, label: 'Visitors' },
         { id: 'vehicles', href: `${base}/vehicles`, label: 'Vehicles' },
@@ -66,10 +69,10 @@ export function orgNav(organizationId: string): OrgNavSection[] {
 export function orgMobileNav(organizationId: string): OrgNavItem[] {
   const base = `/org/${organizationId}`;
   return [
-    { id: 'm-home', href: `${base}/dashboard`, label: 'Home', exact: true },
-    { id: 'm-cctv', href: `${base}/cctv`, label: 'CCTV', prominent: true },
-    { id: 'm-incidents', href: `${base}/incidents`, label: 'Incidents' },
-    { id: 'm-map', href: `${base}/map`, label: 'Map' },
-    { id: 'm-more', href: `${base}/settings`, label: 'More' },
+    { id: 'm-home', href: `${base}/dashboard`, label: 'Home', exact: true, icon: 'home' },
+    { id: 'm-cctv', href: `${base}/cctv`, label: 'CCTV', prominent: true, icon: 'surveillance' },
+    { id: 'm-incidents', href: `${base}/incidents`, label: 'Incidents', icon: 'incidents' },
+    { id: 'm-map', href: `${base}/map`, label: 'Map', icon: 'live-map' },
+    { id: 'm-more', href: `${base}/settings`, label: 'More', icon: 'grid' },
   ];
 }

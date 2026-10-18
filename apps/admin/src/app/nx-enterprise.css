@@ -1,0 +1,1024 @@
+/* 4DS Nexus — Hikvision-inspired enterprise marketing surface
+   Scoped to .nx-site / .nx-enterprise so ops/control-room stay untouched. */
+
+.nx-site {
+  --nx-ink: #1a1d23;
+  --nx-paper: #f5f6f8;
+  --nx-paper-2: #ffffff;
+  --nx-signal: #c02a22;
+  --nx-signal-hover: #9e221c;
+  --nx-steel: #5c6570;
+  --nx-line: rgba(26, 29, 35, 0.1);
+  --nx-hero-ink: #1a1d23;
+  --nx-shadow: 0 1px 2px rgba(26, 29, 35, 0.04), 0 12px 32px rgba(26, 29, 35, 0.06);
+  --nx-card: #ffffff;
+  --nx-card-border: rgba(26, 29, 35, 0.1);
+  background: var(--nx-paper-2);
+}
+
+/* Prefer clean light marketing even when app theme is dark */
+[data-theme='dark'] .nx-site {
+  --nx-ink: #1a1d23;
+  --nx-paper: #f5f6f8;
+  --nx-paper-2: #ffffff;
+  --nx-steel: #5c6570;
+  --nx-line: rgba(26, 29, 35, 0.1);
+  --nx-hero-ink: #1a1d23;
+  --nx-shadow: 0 1px 2px rgba(26, 29, 35, 0.04), 0 12px 32px rgba(26, 29, 35, 0.06);
+  --nx-card: #ffffff;
+  --nx-card-border: rgba(26, 29, 35, 0.1);
+  color-scheme: light;
+  color: var(--nx-ink);
+  background: var(--nx-paper-2);
+}
+
+/* —— Utility / announcement —— */
+.nx-site .nx-utility-bar {
+  background: #eceef1;
+  color: #4a5260;
+  border-bottom: 1px solid rgba(26, 29, 35, 0.06);
+  font-size: 0.75rem;
+  letter-spacing: 0.01em;
+}
+
+.nx-site .nx-utility-bar strong {
+  color: var(--nx-ink);
+  font-weight: 600;
+}
+
+.nx-site .nx-utility-links a {
+  color: #4a5260;
+  font-weight: 500;
+  font-size: 0.75rem;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.nx-site .nx-utility-links a:hover {
+  color: var(--nx-signal);
+}
+
+.nx-site .nx-utility-links a.nx-utility-employee {
+  background: var(--nx-signal);
+  color: #fff;
+  border-radius: 2px;
+  padding: 0.22rem 0.65rem;
+  font-size: 0.72rem;
+}
+
+/* —— Header —— */
+html .nx-site .nx-header,
+html[data-theme='dark'] .nx-site .nx-header,
+html[data-theme='light'] .nx-site .nx-header,
+html[data-theme='dark'] .nx-site header.nx-header {
+  background: #ffffff !important;
+  backdrop-filter: none;
+  border-bottom: 1px solid rgba(26, 29, 35, 0.08);
+  box-shadow: none;
+  color: var(--nx-ink);
+}
+
+html .nx-site .nx-header--scrolled,
+html[data-theme='dark'] .nx-site .nx-header--scrolled {
+  background: #ffffff !important;
+  box-shadow: 0 1px 0 rgba(26, 29, 35, 0.06), 0 8px 24px rgba(26, 29, 35, 0.04);
+}
+
+.nx-site .nx-header-inner {
+  max-width: 1280px;
+  padding: 0.65rem 1.5rem;
+  gap: 1.25rem;
+  flex-wrap: wrap;
+}
+
+@media (min-width: 901px) {
+  .nx-site .nx-header-inner {
+    flex-wrap: nowrap;
+  }
+
+  .nx-site .nx-nav {
+    order: 2;
+    flex: 1;
+    justify-content: center;
+    margin-left: 0;
+  }
+
+  .nx-site .nx-header-search {
+    order: 3;
+    flex: 0 1 220px;
+    max-width: 220px;
+    display: block;
+  }
+
+  .nx-site .nx-header-actions {
+    order: 4;
+  }
+
+  .nx-site .nx-logo {
+    order: 1;
+  }
+}
+
+.nx-site .nx-logo-word {
+  font-size: 1.2rem;
+  letter-spacing: 0.04em;
+  color: var(--nx-ink);
+}
+
+.nx-site .nx-logo-word em {
+  color: var(--nx-signal);
+  font-style: italic;
+}
+
+.nx-site .nx-nav {
+  gap: 0.15rem 1.1rem;
+  margin-left: auto;
+  flex-wrap: nowrap;
+}
+
+.nx-site .nx-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+
+.nx-site .nx-header .theme-toggle,
+.nx-site .nx-utility-bar .theme-toggle {
+  flex-shrink: 0;
+}
+
+.nx-site .nx-utility-bar .theme-toggle {
+  min-height: 28px;
+  padding: 0.15rem 0.4rem;
+  font-size: 0.75rem;
+  gap: 0.35rem;
+}
+
+.nx-site .nx-utility-links {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+@media (max-width: 900px) {
+  .nx-site .nx-utility-bar .theme-toggle {
+    display: none;
+  }
+}
+
+@media (min-width: 901px) {
+  .nx-site .nx-header .nx-header-theme {
+    display: none;
+  }
+}
+
+.nx-site .nx-nav-link {
+  font-family: var(--font-nx-body), 'Source Sans 3', sans-serif;
+  font-size: 0.88rem;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  text-transform: none;
+  color: #6b7280;
+  border-bottom: 2px solid transparent;
+  padding: 0.4rem 0;
+}
+
+.nx-site .nx-nav-link:hover,
+.nx-site .nx-nav-link--active {
+  color: var(--nx-ink);
+  border-bottom-color: var(--nx-signal);
+}
+
+.nx-site .nx-nav-link--employee {
+  color: var(--nx-signal) !important;
+  border: 0 !important;
+  border-bottom: 2px solid transparent !important;
+  border-radius: 0;
+  padding: 0.4rem 0 !important;
+  background: transparent !important;
+}
+
+.nx-site .nx-nav-link--employee:hover,
+.nx-site .nx-nav-link--employee.nx-nav-link--active {
+  background: transparent !important;
+  border-bottom-color: var(--nx-signal) !important;
+}
+
+.nx-site .nx-header-search form {
+  border-radius: 2px;
+  background: #f3f4f6;
+  border-color: transparent;
+}
+
+.nx-site .nx-header-search button {
+  background: var(--nx-signal);
+  border-radius: 0;
+}
+
+.nx-site .nx-header-search button:hover {
+  background: var(--nx-signal-hover);
+}
+
+.nx-site .nx-btn {
+  border-radius: 2px;
+  letter-spacing: 0.02em;
+}
+
+.nx-site .nx-btn--primary,
+html[data-theme='dark'] .nx-site .nx-btn--primary {
+  background: #c02a22 !important;
+  color: #fff !important;
+  border-color: #c02a22 !important;
+}
+
+.nx-site .nx-btn--primary:hover,
+html[data-theme='dark'] .nx-site .nx-btn--primary:hover {
+  background: #9e221c !important;
+}
+
+.nx-site .nx-main {
+  padding: 0;
+}
+
+/* —— Hero —— */
+.nx-enterprise {
+  background: var(--nx-paper-2);
+}
+
+.nx-ent-hero {
+  position: relative;
+  min-height: min(78vh, 640px);
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+  color: #111318;
+  background: #f3f4f6;
+}
+
+.nx-ent-hero__media {
+  position: absolute;
+  inset: 0;
+  background:
+    url('/brand/nx-hero-ops.jpg') 72% center / cover no-repeat,
+    linear-gradient(110deg, #f7f8fa 0%, #eef0f3 42%, #e4e7ec 100%);
+  transform: scale(1.02);
+  animation: nx-ent-hero-drift 18s ease-in-out infinite alternate;
+}
+
+.nx-ent-hero__veil {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(
+      95deg,
+      rgba(255, 255, 255, 0.94) 0%,
+      rgba(255, 255, 255, 0.78) 22%,
+      rgba(255, 255, 255, 0.22) 44%,
+      transparent 62%
+    );
+  pointer-events: none;
+}
+
+.nx-ent-hero__inner {
+  position: relative;
+  z-index: 1;
+  max-width: 1280px;
+  width: 100%;
+  margin: 0 auto;
+  padding: 4.5rem 1.5rem 4rem;
+  animation: nx-ent-rise 0.85s ease both;
+}
+
+.nx-ent-hero__brand {
+  font-family: var(--font-nx-display), 'Barlow Condensed', sans-serif;
+  font-size: clamp(3rem, 10vw, 5.75rem);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  line-height: 0.9;
+  margin: 0 0 1.1rem;
+  color: #111318;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.65);
+}
+
+.nx-ent-hero h1 {
+  font-family: var(--font-nx-body), 'Source Sans 3', sans-serif;
+  font-size: clamp(1.15rem, 2.4vw, 1.55rem);
+  font-weight: 500;
+  letter-spacing: 0;
+  line-height: 1.35;
+  max-width: 28rem;
+  margin: 0 0 0.85rem;
+  color: var(--nx-ink);
+  text-transform: none;
+}
+
+.nx-ent-hero__lead {
+  max-width: 28rem;
+  margin: 0 0 1.75rem;
+  font-size: 1rem;
+  line-height: 1.55;
+  color: var(--nx-steel);
+}
+
+.nx-ent-hero__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+@keyframes nx-ent-hero-drift {
+  from {
+    transform: scale(1.02) translate3d(0, 0, 0);
+  }
+  to {
+    transform: scale(1.06) translate3d(-1.2%, 0.6%, 0);
+  }
+}
+
+@keyframes nx-ent-rise {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* —— Solution stories —— */
+.nx-ent-solutions {
+  display: flex;
+  flex-direction: column;
+}
+
+.nx-ent-story {
+  display: grid;
+  grid-template-columns: 1.05fr 1fr;
+  min-height: 420px;
+  border-top: 1px solid var(--nx-line);
+}
+
+.nx-ent-story--flip {
+  direction: rtl;
+}
+
+.nx-ent-story--flip > * {
+  direction: ltr;
+}
+
+.nx-ent-story__visual {
+  position: relative;
+  overflow: hidden;
+  background: #e8ebf0;
+  min-height: 280px;
+}
+
+.nx-ent-story__img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+  display: block;
+  z-index: 0;
+}
+
+.nx-ent-story__glow {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background:
+    linear-gradient(90deg, rgba(0, 0, 0, 0.12), transparent 40%),
+    radial-gradient(ellipse 70% 60% at 60% 40%, rgba(192, 42, 34, 0.12), transparent 58%);
+}
+
+.nx-ent-story--cctv .nx-ent-story__glow {
+  background:
+    linear-gradient(115deg, rgba(8, 10, 14, 0.22) 0%, transparent 55%),
+    radial-gradient(ellipse 55% 50% at 70% 30%, rgba(192, 42, 34, 0.12), transparent 55%);
+}
+
+.nx-ent-story--cctv .nx-ent-story__img {
+  object-position: center 40%;
+}
+
+.nx-ent-story--access .nx-ent-story__glow {
+  background:
+    linear-gradient(145deg, rgba(8, 12, 18, 0.18), transparent 52%),
+    radial-gradient(ellipse 50% 45% at 30% 70%, rgba(70, 95, 130, 0.1), transparent 55%);
+}
+
+.nx-ent-story--access .nx-ent-story__img {
+  object-position: center 40%;
+}
+
+.nx-ent-story--pack .nx-ent-story__glow {
+  background:
+    linear-gradient(135deg, rgba(8, 12, 18, 0.14), transparent 55%),
+    radial-gradient(ellipse 60% 55% at 50% 40%, rgba(192, 42, 34, 0.08), transparent 60%);
+}
+
+.nx-ent-story--pack .nx-ent-story__img {
+  object-position: center 45%;
+}
+
+.nx-ent-story__copy {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0.85rem;
+  padding: 3rem 3.25rem;
+  background: #fff;
+}
+
+.nx-ent-story__copy h2 {
+  font-family: var(--font-nx-display), 'Barlow Condensed', sans-serif;
+  font-size: clamp(1.75rem, 3vw, 2.35rem);
+  letter-spacing: 0.02em;
+  line-height: 1.1;
+  margin: 0;
+  color: var(--nx-ink);
+}
+
+.nx-ent-story__copy p:not(.nx-eyebrow) {
+  margin: 0;
+  color: var(--nx-steel);
+  line-height: 1.55;
+  max-width: 34rem;
+}
+
+.nx-ent-story__copy .nx-btn {
+  align-self: flex-start;
+  margin-top: 0.5rem;
+}
+
+@keyframes nx-ent-glow {
+  from {
+    transform: scale(1);
+    filter: saturate(1);
+  }
+  to {
+    transform: scale(1.05);
+    filter: saturate(1.12);
+  }
+}
+
+/* —— Capabilities —— */
+.nx-ent-capabilities {
+  max-width: 1280px;
+  padding-top: 4.5rem;
+  padding-bottom: 3.5rem;
+}
+
+.nx-ent-cap-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1.5rem;
+}
+
+.nx-ent-cap {
+  padding-top: 0.85rem;
+  border-top: 2px solid var(--nx-signal);
+}
+
+.nx-ent-cap h3 {
+  font-family: var(--font-nx-display), 'Barlow Condensed', sans-serif;
+  font-size: 1.25rem;
+  letter-spacing: 0.03em;
+  margin: 0 0 0.45rem;
+}
+
+.nx-ent-cap p {
+  margin: 0;
+  color: var(--nx-steel);
+  font-size: 0.95rem;
+  line-height: 1.5;
+}
+
+/* —— Catalog —— */
+.nx-ent-catalog {
+  max-width: 1280px;
+  padding-top: 1rem;
+  padding-bottom: 2.5rem;
+}
+
+.nx-ent-cat-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.75rem;
+}
+
+.nx-ent-cat {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding: 1.15rem 1rem;
+  border: 1px solid var(--nx-line);
+  background: #fff;
+  text-decoration: none;
+  color: inherit;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  min-height: 96px;
+}
+
+.nx-ent-cat:hover {
+  border-color: color-mix(in srgb, var(--nx-signal) 45%, var(--nx-line));
+  box-shadow: var(--nx-shadow);
+}
+
+.nx-ent-cat strong {
+  font-family: var(--font-nx-display), 'Barlow Condensed', sans-serif;
+  font-size: 1.05rem;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.nx-ent-cat span {
+  font-size: 0.82rem;
+  color: var(--nx-steel);
+  line-height: 1.35;
+}
+
+.nx-ent-products {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 0 1.5rem 2.5rem;
+}
+
+.nx-ent-dispatch {
+  max-width: 1280px;
+  margin: 0 auto 2rem;
+  padding: 0 1.5rem;
+}
+
+.nx-ent-band {
+  margin: 0;
+  border-radius: 0;
+  background:
+    linear-gradient(180deg, rgba(160, 20, 28, 0.42) 0%, transparent 58%),
+    linear-gradient(135deg, #0b0d11 0%, #12151a 52%, #1a0c0e 100%) !important;
+  color: #f5f6f8 !important;
+  border-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+.nx-site .nx-ent-band h2,
+.nx-site .nx-band.nx-ent-band h2 {
+  color: #ffffff !important;
+}
+
+.nx-site .nx-ent-band p,
+.nx-site .nx-band.nx-ent-band p {
+  color: rgba(245, 246, 248, 0.78) !important;
+}
+
+/* Keep product rail readable even when app theme is dark */
+html[data-theme='dark'] .nx-site .nx-rail-card,
+html[data-theme='dark'] .nx-site .nx-ent-products .nx-rail-card,
+.nx-site .nx-rail-card,
+.nx-site .nx-ent-products .nx-rail-card {
+  background: #ffffff !important;
+  background-image: none !important;
+  color: #1a1d23 !important;
+  border-color: rgba(26, 29, 35, 0.12) !important;
+  box-shadow: 0 6px 18px rgba(20, 23, 29, 0.08) !important;
+}
+
+html[data-theme='dark'] .nx-site .nx-rail-card__name,
+html[data-theme='dark'] .nx-site .nx-rail-card__price,
+.nx-site .nx-rail-card__name,
+.nx-site .nx-rail-card__price {
+  color: #1a1d23 !important;
+}
+
+html[data-theme='dark'] .nx-site .nx-rail-card__meta,
+.nx-site .nx-rail-card__meta {
+  color: #5c6570 !important;
+}
+
+html[data-theme='dark'] .nx-site .nx-rail-card__media,
+.nx-site .nx-rail-card__media {
+  background: linear-gradient(165deg, #f7f8fa, #eef0f3) !important;
+}
+
+html[data-theme='dark'] .nx-site .nx-rail-card__add,
+.nx-site .nx-rail-card__add {
+  background: #14171d !important;
+  color: #fff !important;
+}
+
+/* Control-room CTA — readable on dark dispatch strip */
+.nx-site .nx-dispatch__cta,
+html[data-theme='dark'] .nx-site .nx-dispatch__cta {
+  background: #c02a22 !important;
+  color: #ffffff !important;
+  border: 0 !important;
+  box-shadow: 0 8px 22px rgba(192, 42, 34, 0.35) !important;
+}
+
+.nx-site .nx-dispatch__cta:hover,
+html[data-theme='dark'] .nx-site .nx-dispatch__cta:hover {
+  background: #9e221c !important;
+  filter: none !important;
+}
+
+.nx-site .nx-dispatch__note,
+html[data-theme='dark'] .nx-site .nx-dispatch__note {
+  color: rgba(255, 255, 255, 0.72) !important;
+}
+
+.nx-site .nx-dispatch__note a,
+html[data-theme='dark'] .nx-site .nx-dispatch__note a {
+  color: #ffffff !important;
+}
+
+html[data-theme='dark'] .nx-site .nx-band,
+html[data-theme='dark'] .nx-site .nx-band.nx-ent-band {
+  background:
+    linear-gradient(180deg, rgba(160, 20, 28, 0.42) 0%, transparent 58%),
+    linear-gradient(135deg, #0b0d11 0%, #12151a 52%, #1a0c0e 100%) !important;
+  color: #f5f6f8 !important;
+}
+
+html[data-theme='dark'] .nx-site .nx-band h2,
+html[data-theme='dark'] .nx-site .nx-ent-band h2 {
+  color: #ffffff !important;
+}
+
+html[data-theme='dark'] .nx-site .nx-band p,
+html[data-theme='dark'] .nx-site .nx-ent-band p {
+  color: rgba(245, 246, 248, 0.78) !important;
+}
+
+/* —— Footer polish —— */
+.nx-site .nx-footer {
+  background: #fff;
+  border-top: 1px solid var(--nx-line);
+  box-shadow: none;
+}
+
+/* —— Responsive —— */
+@media (max-width: 980px) {
+  .nx-ent-story {
+    grid-template-columns: 1fr;
+    min-height: 0;
+    width: 100%;
+  }
+
+  .nx-ent-story--flip {
+    direction: ltr;
+  }
+
+  .nx-ent-story__visual {
+    width: 100%;
+    min-height: 0;
+    aspect-ratio: 16 / 10;
+  }
+
+  .nx-ent-story__img {
+    transform: none;
+    animation: none;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .nx-ent-story__copy {
+    padding: 2rem 1.5rem 2.5rem;
+  }
+
+  .nx-ent-cap-grid,
+  .nx-ent-cat-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 600px) {
+  .nx-ent-hero {
+    min-height: min(84vh, 640px);
+    align-items: flex-end;
+  }
+
+  .nx-ent-hero__media {
+    background-position: 68% center;
+  }
+
+  .nx-ent-hero__veil {
+    background:
+      linear-gradient(
+        180deg,
+        rgba(247, 248, 250, 0.55) 0%,
+        rgba(247, 248, 250, 0.82) 42%,
+        rgba(247, 248, 250, 0.96) 100%
+      );
+  }
+
+  .nx-ent-hero__inner {
+    padding: 3.5rem 1.15rem 3rem;
+  }
+
+  .nx-ent-cap-grid,
+  .nx-ent-cat-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .nx-ent-products,
+  .nx-ent-dispatch {
+    padding-left: 1.15rem;
+    padding-right: 1.15rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nx-ent-hero__media,
+  .nx-ent-story__glow,
+  .nx-ent-story__img,
+  .nx-ent-hero__inner {
+    animation: none !important;
+  }
+}
+
+/* —— Marketing site: stay brand-flat (ops neumorphism / dark theme must not leak) —— */
+html .nx-site input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='file']),
+html .nx-site textarea,
+html .nx-site select,
+html .nx-site .ops-menu__trigger,
+html .nx-site .ui-select .ops-menu__trigger,
+html[data-theme='light'] .nx-site input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='file']),
+html[data-theme='light'] .nx-site textarea,
+html[data-theme='light'] .nx-site select,
+html[data-theme='light'] .nx-site .ops-menu__trigger,
+html[data-theme='light'] .nx-site .ui-select .ops-menu__trigger,
+html[data-theme='dark'] .nx-site input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='file']),
+html[data-theme='dark'] .nx-site textarea,
+html[data-theme='dark'] .nx-site select,
+html[data-theme='dark'] .nx-site .ops-menu__trigger,
+html[data-theme='dark'] .nx-site .ui-select .ops-menu__trigger {
+  background: #ffffff !important;
+  border: 1px solid rgba(26, 29, 35, 0.14) !important;
+  box-shadow: none !important;
+  border-radius: 8px !important;
+  color: #1a1d23 !important;
+}
+
+html .nx-site .ops-menu__label,
+html .nx-site .ops-menu__trigger .ops-menu__label,
+html[data-theme='dark'] .nx-site .ops-menu__label,
+html[data-theme='light'] .nx-site .ops-menu__label {
+  color: #1a1d23 !important;
+}
+
+html .nx-site .ops-menu__caret,
+html[data-theme='dark'] .nx-site .ops-menu__caret,
+html[data-theme='light'] .nx-site .ops-menu__caret {
+  opacity: 0.75;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8' fill='none'><path d='M1 1.5 6 6.5 11 1.5' stroke='%235c6570' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'/></svg>") !important;
+}
+
+html .nx-site input:focus,
+html .nx-site textarea:focus,
+html .nx-site select:focus,
+html .nx-site .ops-menu__trigger:focus,
+html[data-theme='light'] .nx-site input:focus,
+html[data-theme='light'] .nx-site textarea:focus,
+html[data-theme='light'] .nx-site select:focus,
+html[data-theme='light'] .nx-site .ops-menu__trigger:focus,
+html[data-theme='dark'] .nx-site input:focus,
+html[data-theme='dark'] .nx-site textarea:focus,
+html[data-theme='dark'] .nx-site select:focus,
+html[data-theme='dark'] .nx-site .ops-menu__trigger:focus {
+  outline: none;
+  border-color: rgba(192, 42, 34, 0.45) !important;
+  box-shadow: 0 0 0 3px rgba(192, 42, 34, 0.12) !important;
+}
+
+html .nx-site ::placeholder,
+html[data-theme='light'] .nx-site ::placeholder,
+html[data-theme='dark'] .nx-site ::placeholder {
+  color: #8b939e !important;
+}
+
+/* Portaled UiSelect panels opened from marketing forms */
+body:has(.nx-site) .ops-menu__scrim:not(.ops-menu__scrim--soft) {
+  background: transparent !important;
+}
+
+body:has(.nx-site) .ops-menu__panel,
+body:has(.nx-site) .ops-menu__panel--site {
+  background: #ffffff !important;
+  color: #1a1d23 !important;
+  border: 1px solid rgba(26, 29, 35, 0.12) !important;
+  box-shadow: 0 12px 32px rgba(20, 23, 29, 0.14) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+body:has(.nx-site) .ops-menu__panel .ops-menu__item,
+body:has(.nx-site) .ops-menu__panel button,
+body:has(.nx-site) .ops-menu__panel [role='menuitem'],
+body:has(.nx-site) .ops-menu__panel [role='option'] {
+  color: #1a1d23 !important;
+}
+
+body:has(.nx-site) .ops-menu__panel .ops-menu__item:hover,
+body:has(.nx-site) .ops-menu__panel button:hover,
+body:has(.nx-site) .ops-menu__panel [role='menuitem']:hover,
+body:has(.nx-site) .ops-menu__panel [role='option']:hover,
+body:has(.nx-site) .ops-menu__panel .ops-menu__item--active,
+body:has(.nx-site) .ops-menu__panel .is-on,
+body:has(.nx-site) .ops-menu__panel [aria-selected='true'] {
+  background: rgba(26, 29, 35, 0.06) !important;
+  color: #1a1d23 !important;
+}
+
+/* Light heroes: outline CTAs stay readable on paper */
+html .nx-site .nx-page-hero .nx-btn--ghost-light,
+html .nx-site .nx-page-hero .nx-btn--outline,
+html[data-theme='dark'] .nx-site .nx-page-hero .nx-btn--ghost-light,
+html[data-theme='dark'] .nx-site .nx-page-hero .nx-btn--outline {
+  background: #ffffff !important;
+  color: #0f1419 !important;
+  border: 1px solid rgba(26, 29, 35, 0.16) !important;
+  box-shadow: none !important;
+}
+
+html .nx-site .nx-page-hero h1,
+html[data-theme='dark'] .nx-site .nx-page-hero h1 {
+  color: #1a1d23 !important;
+}
+
+html .nx-site .nx-page-hero p,
+html[data-theme='dark'] .nx-site .nx-page-hero p {
+  color: #5c6570 !important;
+}
+
+html .nx-site .nx-toc-item,
+html[data-theme='dark'] .nx-site .nx-toc-item {
+  background: #ffffff !important;
+  color: #1a1d23 !important;
+  border-color: rgba(26, 29, 35, 0.1) !important;
+}
+
+html .nx-site .nx-service-block-head h2,
+html[data-theme='dark'] .nx-site .nx-service-block-head h2 {
+  color: #1a1d23 !important;
+}
+
+html .nx-site .nx-service-tagline,
+html[data-theme='dark'] .nx-site .nx-service-tagline {
+  color: #5c6570 !important;
+}
+
+.nx-site .nx-contact-form,
+.nx-site .nx-checkout-form {
+  background: #ffffff;
+  border: 1px solid rgba(26, 29, 35, 0.1);
+  border-radius: 12px;
+  box-shadow: 0 10px 28px rgba(20, 23, 29, 0.05);
+  padding: 1.5rem 1.4rem;
+}
+
+.nx-site .nx-contact-form label,
+.nx-site .nx-checkout-form label {
+  color: #3d4654;
+  font-weight: 600;
+}
+
+/* Dispatch strip must keep light-on-dark contrast in light theme */
+html[data-theme='light'] .nx-site .nx-dispatch,
+html[data-theme='light'] .nx-site .nx-dispatch h2,
+html[data-theme='light'] .nx-site .nx-dispatch strong {
+  color: #f5f6f8 !important;
+}
+
+html[data-theme='light'] .nx-site .nx-dispatch h2 {
+  color: #ffffff !important;
+}
+
+html[data-theme='light'] .nx-site .nx-dispatch__phone,
+html[data-theme='light'] .nx-site .nx-dispatch p {
+  color: rgba(245, 246, 248, 0.82) !important;
+}
+
+html[data-theme='light'] .nx-site .nx-dispatch__kicker {
+  color: rgba(255, 255, 255, 0.55) !important;
+}
+
+html[data-theme='light'] .nx-site .nx-dispatch__note {
+  color: rgba(255, 255, 255, 0.55) !important;
+}
+
+html[data-theme='light'] .nx-site .nx-dispatch__note a,
+html[data-theme='light'] .nx-site .nx-dispatch a:not(.nx-dispatch__cta) {
+  color: #ffffff !important;
+}
+
+/* Access band stays dark CTA surface in light mode */
+html[data-theme='light'] .nx-site .nx-band.nx-ent-band,
+html[data-theme='light'] .nx-site .nx-ent-band {
+  background:
+    linear-gradient(180deg, rgba(160, 20, 28, 0.42) 0%, transparent 58%),
+    linear-gradient(135deg, #0b0d11 0%, #12151a 52%, #1a0c0e 100%) !important;
+  color: #f5f6f8 !important;
+  border-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+html[data-theme='light'] .nx-site .nx-band.nx-ent-band h2,
+html[data-theme='light'] .nx-site .nx-ent-band h2 {
+  color: #ffffff !important;
+}
+
+html[data-theme='light'] .nx-site .nx-band.nx-ent-band p,
+html[data-theme='light'] .nx-site .nx-ent-band p {
+  color: rgba(245, 246, 248, 0.78) !important;
+}
+
+html[data-theme='light'] .nx-site .nx-band.nx-ent-band .nx-btn--ghost-light,
+html[data-theme='light'] .nx-site .nx-ent-band .nx-btn--ghost-light {
+  background: #ffffff !important;
+  color: #0f1419 !important;
+  border-color: rgba(255, 255, 255, 0.35) !important;
+  box-shadow: none !important;
+}
+
+html[data-theme='light'] .nx-site .nx-band.nx-ent-band .nx-btn--ghost-light:hover,
+html[data-theme='light'] .nx-site .nx-ent-band .nx-btn--ghost-light:hover {
+  background: #f3f6fb !important;
+  color: #9e221c !important;
+  border-color: #ffffff !important;
+}
+
+html[data-theme='light'] .nx-site .nx-band.nx-ent-band .nx-btn--primary,
+html[data-theme='light'] .nx-site .nx-ent-band .nx-btn--primary {
+  background: #c02a22 !important;
+  color: #ffffff !important;
+  border-color: transparent !important;
+  box-shadow: 0 8px 22px rgba(192, 42, 34, 0.35) !important;
+}
+
+/* —— Service request form —— */
+.nx-service-request__intro {
+  margin-bottom: 0.35rem;
+}
+
+.nx-service-request__intro h2 {
+  margin: 0 0 0.35rem;
+  font-family: var(--font-nx-display), 'Barlow Condensed', sans-serif;
+  font-size: 1.45rem;
+  letter-spacing: 0.02em;
+  color: var(--nx-ink);
+}
+
+.nx-service-request__intro p {
+  margin: 0 0 0.5rem;
+  font-size: 0.92rem;
+  line-height: 1.45;
+  color: var(--nx-steel);
+}
+
+.nx-service-request__row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.85rem;
+}
+
+.nx-service-request__block {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  padding: 0.95rem 1rem;
+  border: 1px solid var(--nx-line);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--nx-paper-2, #f3f5f8) 70%, #fff);
+}
+
+.nx-service-request__block-title {
+  margin: 0;
+  font-size: 0.72rem;
+  font-weight: 750;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--nx-steel);
+}
+
+.nx-service-request__optional {
+  font-weight: 500;
+  color: var(--nx-steel);
+}
+
+.nx-service-request__fine {
+  margin: 0.15rem 0 0;
+  font-size: 0.78rem;
+  line-height: 1.4;
+  color: var(--nx-steel);
+}
+
+@media (max-width: 640px) {
+  .nx-service-request__row {
+    grid-template-columns: 1fr;
+  }
+}

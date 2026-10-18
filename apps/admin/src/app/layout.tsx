@@ -8,6 +8,8 @@ import './field-ops.css';
 import './portal-ambient.css';
 import './psim-hub.css';
 import './mobile-light-polish.css';
+import './light-neu-ops.css';
+import './control-room-charcoal.css';
 
 export const metadata: Metadata = {
   title: {
@@ -77,7 +79,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" data-theme="dark" suppressHydrationWarning>
+    <html lang="en" data-theme="dark" data-scroll-behavior="smooth" suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
       </head>

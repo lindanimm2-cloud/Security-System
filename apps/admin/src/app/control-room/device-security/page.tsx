@@ -5,22 +5,14 @@ import { useMemo, useState } from 'react';
 import { ControlRoomLayout } from '@/components/control-room/ControlRoomLayout';
 import { ErrorAlert } from '@/components/ErrorAlert';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
-import { useApi } from '@/hooks/useApi';
-import { adminApi, type ApiResponse } from '@/lib/api-client';
+import { OpsMenuDropdown } from '@/components/ops/OpsMenuDropdown';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ListSearch } from '@/components/ui/ListSearch';
-import { MetricStrip } from '@/components/ui/MetricStrip';
-import {
-  bucketByDay,
-  ChartCard,
-  ColumnChart,
-  countBy,
-  DonutChart,
-  GaugeChart,
-  HorizontalBars,
-  type ChartTone,
-} from '@/components/ui/charts';
-import { dispatchHref, incidentHref, mapHref } from '@/lib/control-room-routes';
+import { UiSelect } from '@/components/ui/UiSelect';
+import { ChartCard, DonutChart, countBy } from '@/components/ui/charts';
+import { useApi } from '@/hooks/useApi';
+import { adminApi, type ApiResponse } from '@/lib/api-client';
+import { CONTROL_ROOM_ROUTES, dispatchHref, incidentHref, mapHref } from '@/lib/control-room-routes';
 import { matchesSearch } from '@/lib/list-search';
 
 type PanicRow = {
@@ -62,29 +54,26 @@ type OpsDevice = {
   clientPhone: string;
 };
 
-const WORKFLOW = [
-  'NEW',
-  'ACKNOWLEDGED',
-  'CONTACTING_CLIENT',
-  'DISPATCHED',
-  'RESPONDING',
-  'ON_SCENE',
-  'RESOLVED',
+type TabId = 'overview' | 'panic' | 'devices' | 'events';
+
+const TABS: { id: TabId; label: string }[] = [
+  { id: 'overview', label: 'Overview' },
+  { id: 'panic', label: 'Active Panic' },
+  { id: 'devices', label: 'Devices' },
+  { id: 'events', label: 'Events' },
 ];
 
-const FILTERS = [
-  'ALL',
-  'PANIC',
-  'DEVICE_REGISTERED',
-  'DEVICE_LOST',
-  'DEVICE_STOLEN',
-  'EMERGENCY_SESSION_CREATED',
-  'SECURITY_LOCKDOWN',
-];
+const STEPPER = [
+  { id: 'detected', label: 'Detected', match: ['NEW', 'ACKNOWLEDGED'] },
+  { id: 'contacting', label: 'Contacting', match: ['CONTACTING_CLIENT'] },
+  { id: 'dispatch', label: 'Dispatch', match: ['DISPATCHED', 'RESPONDING', 'ON_SCENE'] },
+  { id: 'resolved', label: 'Resolved', match: ['RESOLVED', 'CLOSED', 'CANCELLED'] },
+] as const;
 
-function eventTone(type: string): 'ok' | 'warn' | 'danger' | 'neutral' {
+function eventTone(type: string): 'ok' | 'warn' | 'danger' | 'neutral' | 'duress' {
   if (type.includes('STOLEN') || type === 'PANIC' || type.includes('LOCKDOWN')) return 'danger';
-  if (type.includes('LOST') || type.includes('DURESS')) return 'warn';
+  if (type.includes('DURESS')) return 'duress';
+  if (type.includes('LOST') || type.includes('TEMPORARY')) return 'warn';
   if (type.includes('REGISTERED') || type.includes('RESOLVED') || type.includes('SESSION')) return 'ok';
   return 'neutral';
 }
@@ -93,7 +82,8 @@ function statusTone(status: string): string {
   const s = status.toUpperCase();
   if (s === 'TRUSTED') return 'ok';
   if (s === 'TEMPORARY') return 'warn';
-  if (s === 'LOST' || s === 'STOLEN' || s === 'BLOCKED' || s === 'REVOKED') return 'danger';
+  if (s === 'STOLEN') return 'duress';
+  if (s === 'LOST' || s === 'BLOCKED' || s === 'REVOKED') return 'danger';
   return 'neutral';
 }
 
@@ -101,13 +91,54 @@ function statusChartTone(status: string): 'success' | 'warning' | 'danger' | 'ne
   const s = status.toUpperCase();
   if (s === 'TRUSTED') return 'success';
   if (s === 'TEMPORARY') return 'warning';
-  if (s === 'LOST' || s === 'STOLEN' || s === 'BLOCKED' || s === 'REVOKED') return 'danger';
+  if (s === 'STOLEN') return 'accent';
+  if (s === 'LOST' || s === 'BLOCKED' || s === 'REVOKED') return 'danger';
   return 'neutral';
+}
+
+function relativeTime(iso: string) {
+  const ms = Date.now() - new Date(iso).getTime();
+  if (!Number.isFinite(ms) || ms < 0) return 'just now';
+  const mins = Math.round(ms / 60_000);
+  if (mins < 1) return 'just now';
+  if (mins < 60) return `${mins} min ago`;
+  const hours = Math.round(mins / 60);
+  if (hours < 48) return `${hours}h ago`;
+  return `${Math.round(hours / 24)}d ago`;
+}
+
+function stepperIndex(status: string) {
+  const idx = STEPPER.findIndex((s) => s.match.includes(status));
+  return idx < 0 ? 0 : idx;
+}
+
+function placeLabel(panic: PanicRow) {
+  if (!panic.location) return 'Location unavailable';
+  const { lat, lng } = panic.location;
+  if (lat < -29.7 && lat > -29.85 && lng > 30.9 && lng < 31.2) return 'Durban, KZN';
+  return `${lat.toFixed(2)}°, ${lng.toFixed(2)}°`;
+}
+
+function initials(name: string) {
+  return name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((p) => p[0]?.toUpperCase() ?? '')
+    .join('');
+}
+
+function deviceIcon(type: string, os: string) {
+  const t = `${type} ${os}`.toLowerCase();
+  if (t.includes('watch')) return '⌚';
+  if (t.includes('tablet') || t.includes('ipad')) return '▦';
+  if (t.includes('laptop') || t.includes('windows') || t.includes('mac')) return '▣';
+  return '▣';
 }
 
 export default function DeviceSecurityOpsPage() {
   return (
-    <ControlRoomLayout title="Device Security">
+    <ControlRoomLayout title="Panic & Devices">
       <OpsContent />
     </ControlRoomLayout>
   );
@@ -126,84 +157,22 @@ function OpsContent() {
     () => adminApi.get<ApiResponse<OpsDevice[]>>('/control-room/security/devices'),
     [],
   );
-  const { data: analytics } = useApi(
-    () =>
-      adminApi.get<
-        ApiResponse<{
-          events90d: number;
-          tests: number;
-          falseAlarms: number;
-          avgAckMs: number | null;
-          lostDeviceReports: number;
-          registeredDevices?: number;
-          activeClients?: number;
-        }>
-      >('/control-room/security/analytics'),
-    [],
-  );
-  const [filter, setFilter] = useState('ALL');
+
+  const [tab, setTab] = useState<TabId>('overview');
   const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState('ALL');
+  const [platformFilter, setPlatformFilter] = useState('ALL');
+  const [eventFilter, setEventFilter] = useState('ALL');
+
   const panics = data?.data ?? [];
   const events = eventsData?.data ?? [];
   const devices = devicesData?.data ?? [];
-  const filteredPanics = useMemo(
-    () =>
-      panics.filter((p) =>
-        matchesSearch(
-          search,
-          p.client,
-          p.phone,
-          p.device?.name,
-          p.device?.status,
-          p.source,
-          p.workflowStatus,
-          p.headline,
-        ),
-      ),
-    [panics, search],
-  );
+
   const activePanics = useMemo(
-    () => filteredPanics.filter((p) => !['RESOLVED', 'CLOSED', 'CANCELLED'].includes(p.workflowStatus)),
-    [filteredPanics],
+    () => panics.filter((p) => !['RESOLVED', 'CLOSED', 'CANCELLED'].includes(p.workflowStatus)),
+    [panics],
   );
-  const filteredDevices = useMemo(
-    () =>
-      devices.filter((d) =>
-        matchesSearch(
-          search,
-          d.name,
-          d.status,
-          d.clientName,
-          d.clientPhone,
-          d.clientEmail,
-          d.deviceType,
-          d.osName,
-        ),
-      ),
-    [devices, search],
-  );
-  const typeFilteredEvents = useMemo(() => {
-    if (filter === 'ALL') return events;
-    if (filter === 'PANIC') {
-      return events.filter((e) => e.type === 'PANIC' || e.type.startsWith('PANIC_'));
-    }
-    return events.filter((e) => e.type === filter);
-  }, [events, filter]);
-  const filteredEvents = useMemo(
-    () =>
-      typeFilteredEvents.filter((e) =>
-        matchesSearch(
-          search,
-          e.type,
-          e.device?.name,
-          e.device?.status,
-          e.device?.clientName,
-          e.payload?.actor,
-          e.payload?.reason,
-        ),
-      ),
-    [typeFilteredEvents, search],
-  );
+
   const deviceStatusSlices = useMemo(
     () =>
       countBy(devices, (d) => d.status).map((slice) => ({
@@ -212,299 +181,460 @@ function OpsContent() {
       })),
     [devices],
   );
-  const platformSlices = useMemo(
-    () =>
-      countBy(devices, (d) => d.osName, (os) => (os === 'Android' ? 'Android' : os === 'iOS' ? 'iOS' : os)).map(
-        (slice, index): { label: string; value: number; tone: ChartTone } => ({
-          ...slice,
-          tone: index === 0 ? 'accent' : 'info',
-        }),
-      ),
-    [devices],
-  );
-  const eventTrend = useMemo(
-    () => bucketByDay(events, (e) => e.createdAt, 7),
-    [events],
-  );
-  const eventTypeBars = useMemo(
-    () =>
-      countBy(events, (e) => e.type, (type) => type.replaceAll('_', ' '))
-        .slice(0, 6)
-        .map((slice, index): { label: string; value: number; tone: ChartTone } => ({
-          label: slice.label,
-          value: slice.value,
-          tone: index === 0 ? 'danger' : index < 3 ? 'warning' : 'accent',
-        })),
-    [events],
-  );
-  const trustedCount = devices.filter((d) => d.status === 'TRUSTED').length;
-  const trustScore = devices.length > 0 ? Math.round((trustedCount / devices.length) * 100) : 0;
+
+  const filteredDevices = useMemo(() => {
+    return devices.filter((d) => {
+      if (statusFilter !== 'ALL' && d.status !== statusFilter) return false;
+      if (platformFilter !== 'ALL' && d.osName !== platformFilter) return false;
+      return matchesSearch(
+        search,
+        d.name,
+        d.status,
+        d.clientName,
+        d.clientPhone,
+        d.clientEmail,
+        d.deviceType,
+        d.osName,
+      );
+    });
+  }, [devices, search, statusFilter, platformFilter]);
+
+  const recentEvents = useMemo(() => {
+    const list =
+      eventFilter === 'ALL'
+        ? events
+        : eventFilter === 'PANIC'
+          ? events.filter((e) => e.type === 'PANIC' || e.type.startsWith('PANIC_'))
+          : events.filter((e) => e.type === eventFilter);
+    return list.slice(0, tab === 'events' ? 40 : 8);
+  }, [events, eventFilter, tab]);
 
   async function transition(id: string, status: string) {
     await adminApi.post(`/control-room/security/panic/${id}/transition`, { status });
     void reload();
   }
 
-  if (loading) return <LoadingSpinner label="Loading device security…" fullScreen />;
+  if (loading) return <LoadingSpinner label="Loading Panic & Devices…" fullScreen />;
   if (error) return <ErrorAlert error={error} onRetry={reload} />;
 
+  const showOverview = tab === 'overview';
+  const showPanic = tab === 'overview' || tab === 'panic';
+  const showMid = tab === 'overview' || tab === 'events';
+  const showDevices = tab === 'overview' || tab === 'devices';
+  const showEventsOnly = tab === 'events';
+
+  const trustedCount = devices.filter((d) => d.status === 'TRUSTED').length;
+  const riskCount = devices.filter((d) => ['LOST', 'STOLEN', 'BLOCKED', 'REVOKED'].includes(d.status)).length;
+
   return (
-    <div className="sec-ops">
-      <MetricStrip
-        items={[
-          {
-            id: 'devices',
-            label: 'Devices',
-            value: analytics?.data.registeredDevices ?? devices.length,
-            tone: 'active',
-          },
-          {
-            id: 'clients',
-            label: 'Clients',
-            value: analytics?.data.activeClients ?? new Set(devices.map((d) => d.clientEmail)).size,
-          },
-          { id: 'events', label: 'Events (90d)', value: analytics?.data.events90d ?? '—' },
-          {
-            id: 'ack',
-            label: 'Avg ack',
-            value: analytics?.data.avgAckMs ? `${Math.round(analytics.data.avgAckMs / 1000)}s` : '—',
-            tone: 'success',
-          },
-          { id: 'tests', label: 'Tests', value: analytics?.data.tests ?? 0 },
-          {
-            id: 'lost',
-            label: 'Lost / stolen',
-            value: analytics?.data.lostDeviceReports ?? 0,
-            tone: 'warning',
-          },
-        ]}
-      />
-
-      <div className="ds-chart-grid">
-        <ChartCard title="Device trust posture" subtitle="Status mix across registered endpoints" className="ds-chart-card--span-4">
-          <DonutChart
-            slices={deviceStatusSlices}
-            centerValue={devices.length}
-            centerLabel="devices"
-          />
-        </ChartCard>
-        <ChartCard title="Platform footprint" subtitle="Operating system distribution" className="ds-chart-card--span-4">
-          <DonutChart slices={platformSlices} centerValue={devices.length} centerLabel="fleet" />
-        </ChartCard>
-        <ChartCard title="Trust score" subtitle="Trusted vs total registered" className="ds-chart-card--span-4">
-          <GaugeChart
-            value={trustScore}
-            label="Trusted devices"
-            hint={`${trustedCount} of ${devices.length} endpoints`}
-            tone={trustScore >= 80 ? 'success' : trustScore >= 60 ? 'warning' : 'danger'}
-          />
-        </ChartCard>
-        <ChartCard title="Security events" subtitle="Last 7 days" className="ds-chart-card--span-7">
-          <ColumnChart
-            items={eventTrend.map((point, index) => ({
-              label: point.label,
-              value: point.value,
-              tone: index === eventTrend.length - 1 ? 'accent' : 'info',
-            }))}
-            height={132}
-            emptyLabel="No events in the last week"
-          />
-        </ChartCard>
-        <ChartCard title="Event categories" subtitle="Top activity types (90d)" className="ds-chart-card--span-5">
-          <HorizontalBars items={eventTypeBars} compact />
-        </ChartCard>
-      </div>
-
-      <div className="list-search-bar">
-        <ListSearch
-          value={search}
-          onChange={setSearch}
-          placeholder="Search client, device, event, workflow…"
-          resultCount={filteredPanics.length + filteredDevices.length + filteredEvents.length}
-          totalCount={panics.length + devices.length + typeFilteredEvents.length}
-        />
-      </div>
-
-      <section className="sec-ops-section">
-        <div className="sec-ops-section__head">
-          <h2>Panic & emergency</h2>
-          <span className="sec-ops-count">{activePanics.length} live</span>
+    <div className="pd-page vms-page">
+      <header className="vms-page__head pd-header">
+        <div>
+          <h1 className="pd-header__title">Panic & Devices</h1>
+          <p className="pd-header__subtitle">
+            Panic buttons, trusted endpoints, and live emergency sessions
+          </p>
         </div>
-        <div className="sec-ops-grid">
-          {filteredPanics.map((panic) => (
-            <article
-              key={panic.id}
-              className={`sec-panic-card ${
-                panic.priority === 'TEST'
-                  ? 'sec-panic-card--test'
-                  : panic.priority === 'SILENT'
-                    ? 'sec-panic-card--silent'
-                    : 'sec-panic-card--p1'
-              }`}
-            >
-              <p className="sec-kicker">{panic.headline}</p>
-              <h3>{panic.client}</h3>
-              <dl>
-                <div>
-                  <dt>Source</dt>
-                  <dd>{panic.source.replaceAll('_', ' ')}</dd>
-                </div>
-                <div>
-                  <dt>Device</dt>
-                  <dd>
-                    {panic.device?.name} · {panic.device?.status}
-                  </dd>
-                </div>
-                <div>
-                  <dt>Location</dt>
-                  <dd>
-                    {panic.location
-                      ? `${panic.location.lat.toFixed(4)}, ${panic.location.lng.toFixed(4)} ±${Math.round(panic.location.accuracy ?? 0)}m`
-                      : 'Unavailable'}
-                  </dd>
-                </div>
-                <div>
-                  <dt>Time</dt>
-                  <dd>{new Date(panic.createdAt).toLocaleTimeString()}</dd>
-                </div>
-                <div>
-                  <dt>Workflow</dt>
-                  <dd>{panic.workflowStatus.replaceAll('_', ' ')}</dd>
-                </div>
-              </dl>
-              {panic.cancelRequestedAt ? (
-                <p className="alert">Client attempting to cancel Panic.</p>
-              ) : null}
-              <div className="sec-device__actions">
-                {WORKFLOW.filter((s) => s !== panic.workflowStatus)
-                  .slice(0, 4)
-                  .map((status) => (
-                    <button
-                      key={status}
-                      type="button"
-                      className="btn-sm btn-secondary"
-                      onClick={() => void transition(panic.id, status)}
-                    >
-                      {status === 'ACKNOWLEDGED' ? 'Acknowledge' : status.replaceAll('_', ' ')}
-                    </button>
-                  ))}
-                {panic.incidentId ? (
-                  <>
-                    <Link className="btn-sm btn-primary" href={incidentHref(panic.incidentId)}>
-                      Open incident
-                    </Link>
-                    <Link className="btn-sm btn-secondary" href={dispatchHref(panic.incidentId)}>
-                      Dispatch
-                    </Link>
-                    <Link className="btn-sm btn-secondary" href={mapHref('incidents')}>
-                      Open map
-                    </Link>
-                  </>
-                ) : null}
-                {panic.phone ? (
-                  <a className="btn-sm btn-secondary" href={`tel:${panic.phone}`}>
-                    Call client
-                  </a>
-                ) : null}
-                <Link className="btn-sm btn-secondary" href="/control-room/surveillance">
-                  View CCTV
-                </Link>
-              </div>
-            </article>
-          ))}
-          {filteredPanics.length === 0 ? (
+        <div className="vms-page__meta pd-header__meta">
+          <nav className="pd-tabs" aria-label="Panic and devices views">
+            {TABS.map((t) => (
+              <button
+                key={t.id}
+                type="button"
+                className={`pd-tabs__btn ${tab === t.id ? 'is-active' : ''}`}
+                aria-pressed={tab === t.id}
+                onClick={() => setTab(t.id)}
+              >
+                {t.label}
+              </button>
+            ))}
+          </nav>
+        </div>
+      </header>
+
+      {showOverview ? (
+        <div className="pd-stats" aria-label="Desk summary">
+          <div className={`pd-stat ${activePanics.length ? 'pd-stat--hot' : ''}`}>
+            <strong>{activePanics.length}</strong>
+            <span>Live panic</span>
+          </div>
+          <div className="pd-stat">
+            <strong>{devices.length}</strong>
+            <span>Devices</span>
+          </div>
+          <div className="pd-stat pd-stat--ok">
+            <strong>{trustedCount}</strong>
+            <span>Trusted</span>
+          </div>
+          <div className={`pd-stat ${riskCount ? 'pd-stat--warn' : ''}`}>
+            <strong>{riskCount}</strong>
+            <span>At risk</span>
+          </div>
+          <div className="pd-stat">
+            <strong>{events.length}</strong>
+            <span>Events</span>
+          </div>
+        </div>
+      ) : null}
+
+      {showPanic ? (
+        <section className="pd-section" aria-label="Active incidents">
+          <div className="pd-section__head">
+            <div className="pd-section__title-row">
+              <h2>Active Incidents</h2>
+              <span className={`pd-live ${activePanics.length ? 'is-hot' : ''}`}>
+                {activePanics.length} LIVE
+              </span>
+            </div>
+            <Link href={CONTROL_ROOM_ROUTES.incidents} className="pd-link">
+              View all incidents
+            </Link>
+          </div>
+
+          {activePanics.length === 0 ? (
             <EmptyState
-              title={search.trim() ? 'No matches' : 'No panic events'}
-              body={
-                search.trim()
-                  ? 'Try another client, device, or workflow term.'
-                  : 'Live Panic, duress and labelled tests from client devices appear here.'
-              }
+              title="No active panic"
+              body="Live Panic, duress and emergency sessions from client devices appear here."
             />
-          ) : null}
-        </div>
-      </section>
+          ) : (
+            <div className="pd-incident-list">
+              {activePanics.map((panic) => {
+                const silent = panic.priority === 'SILENT';
+                const step = stepperIndex(panic.workflowStatus);
+                const tone = silent ? 'duress' : panic.priority === 'TEST' ? 'test' : 'critical';
+                return (
+                  <article key={panic.id} className={`pd-incident pd-incident--${tone}`}>
+                    <div className="pd-incident__rail" aria-hidden />
+                    <div className="pd-incident__body">
+                      <div className="pd-incident__top">
+                        <div className="pd-incident__badges">
+                          <span className={`pd-badge pd-badge--${tone}`}>
+                            {silent ? 'DURESS' : panic.priority === 'TEST' ? 'TEST' : 'CRITICAL'}
+                          </span>
+                          <span className="pd-badge pd-badge--muted">
+                            {silent
+                              ? 'Silent Duress'
+                              : panic.source.includes('TEST')
+                                ? 'Test Alert'
+                                : 'Client Panic'}
+                          </span>
+                        </div>
+                        <span className={`pd-status-pill pd-status-pill--${tone}`}>
+                          {panic.workflowStatus.replaceAll('_', ' ')}
+                        </span>
+                      </div>
 
-      <section className="sec-ops-section">
-        <div className="sec-ops-section__head">
-          <h2>Registered devices</h2>
-          <span className="sec-ops-count">{filteredDevices.length} total</span>
+                      <div className="pd-incident__main">
+                        <div className="pd-incident__person">
+                          <span className={`pd-avatar pd-avatar--${tone}`} aria-hidden>
+                            {initials(panic.client)}
+                          </span>
+                          <div>
+                            <strong>{panic.client}</strong>
+                            <span>
+                              {panic.device?.name ?? 'Unknown device'}
+                              {panic.device?.status ? ` · ${panic.device.status}` : ''}
+                            </span>
+                            <span className="pd-incident__place">{placeLabel(panic)}</span>
+                          </div>
+                        </div>
+
+                        <div className="pd-incident__loc">
+                          <span className="pd-incident__loc-label">Last known location</span>
+                          <strong>
+                            {panic.location
+                              ? `${panic.location.lat.toFixed(4)}, ${panic.location.lng.toFixed(4)}`
+                              : '—'}
+                          </strong>
+                          <span>
+                            {panic.location?.accuracy != null
+                              ? `±${Math.round(panic.location.accuracy)}m`
+                              : 'GPS'}
+                            {' · '}
+                            {relativeTime(panic.createdAt)}
+                          </span>
+                        </div>
+
+                        <ol className={`pd-stepper pd-stepper--${tone}`} aria-label="Response workflow">
+                          {STEPPER.map((s, i) => (
+                            <li
+                              key={s.id}
+                              className={
+                                i < step ? 'is-done' : i === step ? 'is-current' : 'is-todo'
+                              }
+                            >
+                              <span className="pd-stepper__dot" aria-hidden />
+                              <span className="pd-stepper__label">{s.label}</span>
+                            </li>
+                          ))}
+                        </ol>
+                      </div>
+
+                      {panic.cancelRequestedAt ? (
+                        <p className="pd-incident__alert">Client attempting to cancel Panic.</p>
+                      ) : null}
+
+                      <div className="pd-incident__actions">
+                        {panic.incidentId ? (
+                          <Link className="btn-sm btn-secondary" href={incidentHref(panic.incidentId)}>
+                            Open Incident
+                          </Link>
+                        ) : null}
+                        {panic.phone ? (
+                          <a className="btn-sm btn-secondary" href={`tel:${panic.phone}`}>
+                            Call Client
+                          </a>
+                        ) : null}
+                        <Link className="btn-sm btn-secondary" href={CONTROL_ROOM_ROUTES.surveillance}>
+                          View CCTV
+                        </Link>
+                        <OpsMenuDropdown
+                          compact
+                          align="right"
+                          ariaLabel="Incident actions"
+                          label="⋯"
+                          items={[
+                            ...(panic.incidentId
+                              ? [
+                                  {
+                                    id: 'dispatch',
+                                    label: 'Open dispatch',
+                                    onClick: () => {
+                                      window.location.href = dispatchHref(panic.incidentId!);
+                                    },
+                                  },
+                                  {
+                                    id: 'map',
+                                    label: 'Open map',
+                                    onClick: () => {
+                                      window.location.href = mapHref('incidents');
+                                    },
+                                  },
+                                ]
+                              : []),
+                            ...(['ACKNOWLEDGED', 'CONTACTING_CLIENT', 'DISPATCHED', 'RESOLVED'] as const)
+                              .filter((s) => s !== panic.workflowStatus)
+                              .map((status) => ({
+                                id: status,
+                                label:
+                                  status === 'ACKNOWLEDGED'
+                                    ? 'Acknowledge'
+                                    : status.replaceAll('_', ' '),
+                                onClick: () => void transition(panic.id, status),
+                              })),
+                          ]}
+                        />
+                      </div>
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+          )}
+        </section>
+      ) : null}
+
+      {showMid ? (
+        <div className="pd-mid">
+          {showOverview ? (
+            <ChartCard
+              title="Device Status"
+              subtitle="Trust posture across registered endpoints"
+              className="pd-mid__chart"
+            >
+              <DonutChart
+                slices={deviceStatusSlices}
+                centerValue={devices.length}
+                centerLabel="devices"
+              />
+            </ChartCard>
+          ) : null}
+
+          <section className={`pd-activity ${showOverview ? '' : 'pd-activity--wide'}`}>
+            <div className="pd-section__head">
+              <h2>Recent Activity</h2>
+              {showEventsOnly ? (
+                <UiSelect
+                  value={eventFilter}
+                  ariaLabel="Event type filter"
+                  onChange={setEventFilter}
+                  options={[
+                    { value: 'ALL', label: 'All events' },
+                    { value: 'PANIC', label: 'Panic' },
+                    { value: 'DEVICE_REGISTERED', label: 'Registered' },
+                    { value: 'DEVICE_LOST', label: 'Lost' },
+                    { value: 'DEVICE_STOLEN', label: 'Stolen' },
+                    { value: 'SECURITY_LOCKDOWN', label: 'Lockdown' },
+                  ]}
+                />
+              ) : (
+                <button type="button" className="pd-link" onClick={() => setTab('events')}>
+                  View all
+                </button>
+              )}
+            </div>
+            <ul className="pd-activity__list">
+              {recentEvents.map((event) => {
+                const tone = eventTone(event.type);
+                return (
+                  <li key={event.id} className={`pd-activity__item pd-activity__item--${tone}`}>
+                    <span className="pd-activity__dot" aria-hidden />
+                    <div className="pd-activity__copy">
+                      <strong>{event.type.replaceAll('_', ' ')}</strong>
+                      <span>
+                        {event.device?.name ?? '—'}
+                        {event.device?.clientName || event.payload?.actor
+                          ? ` · ${event.device?.clientName ?? event.payload?.actor}`
+                          : ''}
+                      </span>
+                    </div>
+                    <time dateTime={event.createdAt}>{relativeTime(event.createdAt)}</time>
+                  </li>
+                );
+              })}
+              {recentEvents.length === 0 ? (
+                <li className="pd-activity__empty">
+                  <EmptyState title="No recent activity" body="Device and panic events will show here." />
+                </li>
+              ) : null}
+            </ul>
+          </section>
         </div>
-        <div className="sec-ops-devices">
-          {filteredDevices.map((device) => (
-            <article key={device.id} className={`sec-ops-device sec-ops-device--${statusTone(device.status)}`}>
-              <div className="sec-ops-device__top">
-                <strong>{device.name}</strong>
-                <span className={`sec-ops-pill sec-ops-pill--${statusTone(device.status)}`}>
-                  {device.status}
-                </span>
-              </div>
-              <p className="sec-ops-device__client">{device.clientName}</p>
-              <p className="sec-ops-device__meta">
-                {device.osName}
-                {device.osVersion ? ` ${device.osVersion}` : ''} · {device.deviceType}
-                {device.isPrimary ? ' · Primary' : ''}
-                {device.isLocked ? ' · Locked' : ''}
-              </p>
-              <p className="sec-ops-device__active">Active {device.lastActiveLabel.toLowerCase()}</p>
-              <a className="sec-ops-device__phone" href={`tel:${device.clientPhone}`}>
-                {device.clientPhone}
-              </a>
-            </article>
-          ))}
+      ) : null}
+
+      {showDevices ? (
+        <section className="pd-section pd-devices" aria-label="Registered devices">
+          <div className="pd-section__head">
+            <h2>Registered Devices</h2>
+            <span className="pd-section__meta">{filteredDevices.length} devices</span>
+          </div>
+
+          <div className="pd-devices__toolbar">
+            <ListSearch
+              value={search}
+              onChange={setSearch}
+              placeholder="Search devices…"
+              resultCount={filteredDevices.length}
+              totalCount={devices.length}
+            />
+            <UiSelect
+              value={statusFilter}
+              ariaLabel="Filter by status"
+              onChange={setStatusFilter}
+              options={[
+                { value: 'ALL', label: 'All Statuses' },
+                { value: 'TRUSTED', label: 'Trusted' },
+                { value: 'TEMPORARY', label: 'Temporary' },
+                { value: 'BLOCKED', label: 'Blocked' },
+                { value: 'LOST', label: 'Lost' },
+                { value: 'STOLEN', label: 'Stolen' },
+              ]}
+            />
+            <UiSelect
+              value={platformFilter}
+              ariaLabel="Filter by platform"
+              onChange={setPlatformFilter}
+              options={[
+                { value: 'ALL', label: 'All Platforms' },
+                ...Array.from(new Set(devices.map((d) => d.osName))).map((os) => ({
+                  value: os,
+                  label: os,
+                })),
+              ]}
+            />
+          </div>
+
           {filteredDevices.length === 0 ? (
             <EmptyState
               title={search.trim() ? 'No matches' : 'No devices'}
               body={search.trim() ? 'Try another client or device name.' : 'Registered client devices appear here.'}
             />
-          ) : null}
-        </div>
-      </section>
+          ) : (
+            <div className="pd-table-wrap">
+              <table className="pd-table">
+                <thead>
+                  <tr>
+                    <th>Device</th>
+                    <th>Client</th>
+                    <th>Status</th>
+                    <th>Platform</th>
+                    <th>Last Active</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredDevices.map((device) => {
+                    const tone = statusTone(device.status);
+                    return (
+                      <tr key={device.id}>
+                        <td>
+                          <div className="pd-table__device">
+                            <span className="pd-table__device-icon" aria-hidden>
+                              {deviceIcon(device.deviceType, device.osName)}
+                            </span>
+                            <div>
+                              <strong>{device.name}</strong>
+                              <span className="text-muted">
+                                {device.deviceType}
+                                {device.isPrimary ? ' · Primary' : ''}
+                                {device.isLocked ? ' · Locked' : ''}
+                              </span>
+                            </div>
+                          </div>
+                        </td>
+                        <td>
+                          <strong>{device.clientName}</strong>
+                          <span className="text-muted pd-table__sub">{device.clientEmail}</span>
+                        </td>
+                        <td>
+                          <span className={`pd-pill pd-pill--${tone}`}>
+                            {device.status.charAt(0) + device.status.slice(1).toLowerCase()}
+                          </span>
+                        </td>
+                        <td>
+                          {device.osName}
+                          {device.osVersion ? ` ${device.osVersion}` : ''}
+                        </td>
+                        <td>{device.lastActiveLabel}</td>
+                        <td>
+                          <div className="pd-table__actions">
+                            <a className="btn-sm btn-secondary" href={`tel:${device.clientPhone}`}>
+                              View
+                            </a>
+                            <OpsMenuDropdown
+                              compact
+                              align="right"
+                              ariaLabel={`${device.name} actions`}
+                              label="⋯"
+                              items={[
+                                {
+                                  id: 'call',
+                                  label: 'Call client',
+                                  onClick: () => {
+                                    window.location.href = `tel:${device.clientPhone}`;
+                                  },
+                                },
+                                {
+                                  id: 'mail',
+                                  label: 'Email client',
+                                  onClick: () => {
+                                    window.location.href = `mailto:${device.clientEmail}`;
+                                  },
+                                },
+                              ]}
+                            />
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+      ) : null}
 
-      <section className="sec-ops-section">
-        <div className="sec-ops-section__head">
-          <h2>Device events</h2>
-          <span className="sec-ops-count">{filteredEvents.length} shown</span>
-        </div>
-        <div className="sec-ops-filters">
-          {FILTERS.map((f) => (
-            <button
-              key={f}
-              type="button"
-              className={filter === f ? 'btn-sm btn-primary' : 'btn-sm btn-secondary'}
-              onClick={() => setFilter(f)}
-            >
-              {f.replaceAll('_', ' ')}
-            </button>
-          ))}
-        </div>
-        <ul className="sec-activity">
-          {filteredEvents.map((event) => {
-            const tone = eventTone(event.type);
-            return (
-              <li key={event.id} className={`sec-activity__item sec-activity__item--${tone}`}>
-                <strong>{event.type.replaceAll('_', ' ')}</strong>
-                <span>
-                  {event.device?.name ?? '—'}
-                  {event.device?.clientName || event.payload?.actor
-                    ? ` · ${event.device?.clientName ?? event.payload?.actor}`
-                    : ''}
-                </span>
-                {event.payload?.reason ? <span className="sec-activity__reason">{event.payload.reason}</span> : null}
-                <time>{new Date(event.createdAt).toLocaleString()}</time>
-              </li>
-            );
-          })}
-          {filteredEvents.length === 0 ? (
-            <li className="sec-activity__empty">
-              <EmptyState
-                title="No matching events"
-                body={search.trim() ? 'Try another search term.' : 'Try another filter or wait for new device activity.'}
-              />
-            </li>
-          ) : null}
-        </ul>
-      </section>
     </div>
   );
 }

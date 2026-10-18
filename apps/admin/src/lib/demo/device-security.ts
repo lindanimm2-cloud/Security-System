@@ -136,7 +136,7 @@ const devices: DemoDevice[] = [
     lastFailedAuthAt: null,
     registeredAt: '2026-08-18T08:00:00.000Z',
     lastActiveLabel: 'Just now',
-    clientName: 'Nomsa Client',
+    clientName: 'Demo Client',
     clientEmail: 'client@demo.local',
     clientPhone: '+27821234567',
   }),
@@ -158,7 +158,7 @@ const devices: DemoDevice[] = [
     lastFailedAuthAt: null,
     registeredAt: '2026-07-02T10:00:00.000Z',
     lastActiveLabel: '50 minutes ago',
-    clientName: 'Nomsa Client',
+    clientName: 'Demo Client',
     clientEmail: 'client@demo.local',
     clientPhone: '+27821234567',
   }),
@@ -178,7 +178,7 @@ const devices: DemoDevice[] = [
     lastFailedAuthAt: null,
     registeredAt: '2026-08-17T18:20:00.000Z',
     lastActiveLabel: '2 hours ago',
-    clientName: 'Nomsa Client',
+    clientName: 'Demo Client',
     clientEmail: 'client@demo.local',
     clientPhone: '+27821234567',
   }),
@@ -199,7 +199,7 @@ const devices: DemoDevice[] = [
     lastFailedAuthAt: hoursAgo(26),
     registeredAt: '2026-06-01T09:00:00.000Z',
     lastActiveLabel: 'Yesterday',
-    clientName: 'Nomsa Client',
+    clientName: 'Demo Client',
     clientEmail: 'client@demo.local',
     clientPhone: '+27821234567',
   }),
@@ -370,7 +370,7 @@ const audits: DemoAudit[] = [
     id: 'demo-aud-1',
     action: 'DEVICE_REGISTERED',
     createdAt: '2026-08-18T18:20:00.000Z',
-    actor: 'Nomsa Client',
+    actor: 'Demo Client',
     result: 'SUCCESS',
     deviceId: 'demo-dev-s24',
   },
@@ -378,7 +378,7 @@ const audits: DemoAudit[] = [
     id: 'demo-aud-2',
     action: 'EMERGENCY_SESSION_CREATED',
     createdAt: minutesAgo(12),
-    actor: 'Nomsa Client',
+    actor: 'Demo Client',
     result: 'SUCCESS',
     deviceId: 'demo-dev-s24',
   },
@@ -576,7 +576,7 @@ function clientDevicesForSession(session?: AuthSession | null) {
 }
 
 function clientName(session?: AuthSession | null) {
-  if (!session?.user) return 'Nomsa Client';
+  if (!session?.user) return 'Demo Client';
   return `${session.user.firstName ?? ''} ${session.user.lastName ?? ''}`.trim() || session.user.email;
 }
 

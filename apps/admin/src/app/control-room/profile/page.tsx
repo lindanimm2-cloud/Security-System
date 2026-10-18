@@ -13,8 +13,10 @@ import { useApi } from '@/hooks/useApi';
 import { useActionHandoff } from '@/hooks/useActionHandoff';
 import { adminApi, type ApiResponse } from '@/lib/api-client';
 import { clearSession, getSession, updateSessionUser, type AuthSession } from '@/lib/auth';
+import { isDemoMode } from '@/lib/demo/is-demo-mode';
 import { roleDisplayLabel } from '@/lib/role-labels';
 import { DEMO_PASSWORD } from '@/lib/demo/users';
+import { PasskeysSettingsPanel } from '@/components/auth/PasskeysSettingsPanel';
 
 type StaffProfile = {
   id: string;
@@ -46,15 +48,13 @@ const DEVELOPER_LINKS = [
   { label: 'Live map', href: '/control-room/map', desc: 'Fleet & incident positions' },
   { label: 'Incidents', href: '/control-room/incidents', desc: 'Panic, medical, and dispatch queue' },
   { label: 'Customers', href: '/control-room/customers', desc: 'CRM, subscriptions, billing checks' },
-  { label: 'Gear store', href: '/control-room/store', desc: 'Inventory & POS (revenue may be hidden)' },
   { label: 'Internal chat', href: '/control-room/chat', desc: 'Staff channels incl. dev-support' },
   { label: 'Settings', href: '/control-room/my-settings', desc: 'Personal preferences' },
 ];
 
 const DEVELOPER_ACCESS = [
   { area: 'Operations', access: 'Full — map, dispatch, incidents, surveillance' },
-  { area: 'Store & inventory', access: 'Full — catalog, stock, install jobs' },
-  { area: 'Revenue & pipeline', access: 'Hidden until owner unlocks in Settings' },
+  { area: 'Clients & billing', access: 'View customers; revenue hidden until owner unlocks' },
   { area: 'Error desk', access: 'Receive & resolve staff error reports' },
   { area: 'Support chat', access: 'dev-support channel with owner & ops' },
   { area: 'User management', access: 'View teams; owner manages roles' },
@@ -239,17 +239,18 @@ function ProfileContent() {
   }
 
   return (
-    <div className="page-content page-content--profile">
+    <div className="page-content page-content--profile profile-desk">
       {handoff.overlay}
       <div className="page-header">
         <div>
+          <h1>My profile</h1>
           <p className="text-muted">
             {isDeveloper
-              ? 'Your developer account, toolkit, and sign-in details.'
-              : 'Your control panel account and preferences.'}
+              ? 'Developer account, toolkit, and sign-in details'
+              : 'Control panel account and preferences'}
           </p>
         </div>
-        <button type="button" className="btn-secondary" onClick={() => setEditing(true)}>
+        <button type="button" className="btn-secondary btn-sm" onClick={() => setEditing(true)}>
           Edit profile
         </button>
       </div>
@@ -295,6 +296,7 @@ function ProfileContent() {
         )}
       </section>
 
+      <div className="profile-desk__grid">
       <section className="portal-card profile-section">
         <h2>Account details</h2>
         <dl className="profile-summary-grid">
@@ -323,9 +325,14 @@ function ProfileContent() {
         </dl>
       </section>
 
-      <section className="portal-card profile-section">
+      <section className="portal-card profile-section profile-section--security">
         <div className="card-header-row">
-          <h2>Authenticator MFA</h2>
+          <div className="profile-section__title">
+            <h2>Authenticator MFA</h2>
+            <p className="profile-section__lede">
+              Control-room roles use an authenticator app at sign-in. Backup codes appear once after enrolment.
+            </p>
+          </div>
           {mfaStatus.data?.data?.mfaEnabled ? (
             <span className="status-pill status-pill--ok">Enabled</span>
           ) : mfaStatus.data?.data?.required ? (
@@ -334,10 +341,6 @@ function ProfileContent() {
             <span className="status-pill">Optional</span>
           )}
         </div>
-        <p className="text-muted" style={{ marginBottom: '0.75rem' }}>
-          Privileged control-room roles must use an authenticator app at sign-in. Backup codes are
-          shown once after enrolment.
-        </p>
         {mfaError && (
           <div className="alert alert--error" role="alert">
             {mfaError}
@@ -415,6 +418,9 @@ function ProfileContent() {
           </form>
         )}
       </section>
+
+      <PasskeysSettingsPanel portal="admin" className="portal-card profile-section" />
+      </div>
 
       {isDeveloper && (
         <>
@@ -511,17 +517,18 @@ function ProfileContent() {
         </>
       )}
 
+      <div className="profile-desk__grid">
       <section className="portal-card profile-section">
         <ThemeSettings />
       </section>
 
       <section className="portal-card profile-section">
         <h2>Session</h2>
-        <p className="text-muted" style={{ marginBottom: '0.75rem' }}>
+        <p className="profile-section__lede">
           Sign out of the control panel on this device.
         </p>
-        <div className="entity-card-actions">
-          <button type="button" className="btn-secondary" onClick={logout}>
+        <div className="entity-card-actions profile-session-actions">
+          <button type="button" className="btn-secondary btn-sm" onClick={logout}>
             Sign out
           </button>
           <Link href="/control-room/settings" className="btn-ghost btn-sm">
@@ -529,6 +536,7 @@ function ProfileContent() {
           </Link>
         </div>
       </section>
+      </div>
       {editing && (
         <OpsDialog
           title="Edit profile"

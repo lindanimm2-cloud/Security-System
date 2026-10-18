@@ -1,23 +1,14 @@
 'use client';
 
 import { MobileBottomNav, type MobileBottomNavItem } from '@/components/nav/MobileBottomNav';
-import { useCart } from './CartProvider';
 
 export function SiteMobileBottomNav() {
-  const { cartCount, drawerOpen, setDrawerOpen } = useCart();
-
   const items: MobileBottomNavItem[] = [
     { href: '/', label: 'Home', icon: 'home', exact: true },
-    { href: '/store', label: 'Shop', icon: 'grid' },
-    {
-      label: 'Cart',
-      icon: 'bag',
-      onClick: () => setDrawerOpen(true),
-      badge: cartCount > 0 ? cartCount : undefined,
-      active: drawerOpen,
-    },
     { href: '/services', label: 'Services', icon: 'services' },
-    { href: '/account', label: 'Account', icon: 'account' },
+    { href: '/contact', label: 'Contact', icon: 'contacts' },
+    { href: '/about', label: 'About', icon: 'overview' },
+    { href: '/portal/login', label: 'Portal', icon: 'account' },
   ];
 
   return (

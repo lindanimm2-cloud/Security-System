@@ -3,11 +3,13 @@
 import { useState } from 'react';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { OpsMenuDropdown } from '@/components/ops/OpsMenuDropdown';
+import { OpsMarqueeText } from '@/components/ui/OpsMarquee';
 import { adminApi } from '@/lib/api-client';
 import { friendlyErrorMessage } from '@/lib/friendly-error';
 import {
   OFFICER_STATUSES,
   isSameOfficerStatus,
+  nextOfficerStatus,
   officerStatusLabel,
   officerStatusSlug,
 } from '@/lib/officer-status';
@@ -46,13 +48,13 @@ export function OfficerStatusControl({
     return (
       <div className="officer-status-select-wrap">
         <OpsMenuDropdown
-          className={`officer-status-menu officer-status-menu--${officerStatusSlug(status)}`}
+          className={`officer-status-menu officer-status-menu--ops officer-status-menu--${officerStatusSlug(status)}`}
           triggerClassName={`officer-status-menu__trigger officer-status-menu__trigger--${officerStatusSlug(status)}`}
           compact
           align="right"
           ariaLabel="Officer status"
           disabled={updating}
-          label={officerStatusLabel(status)}
+          label={<OpsMarqueeText>{officerStatusLabel(status)}</OpsMarqueeText>}
           leading={<OfficerStatusDot status={status} />}
           items={OFFICER_STATUSES.map((s) => ({
             id: s.value,
@@ -71,25 +73,22 @@ export function OfficerStatusControl({
     );
   }
 
+  const slug = officerStatusSlug(status);
+  const next = nextOfficerStatus(status);
+  const nextLabel = officerStatusLabel(next);
+
   return (
     <div className="officer-status-control">
-      <div className="officer-status-buttons" role="group" aria-label="Set officer status">
-        {OFFICER_STATUSES.map((s) => (
-          <button
-            key={s.value}
-            type="button"
-            className={`officer-status-btn officer-status-btn--${officerStatusSlug(s.value)} ${
-              isSameOfficerStatus(status, s.value) ? 'officer-status-btn--active' : ''
-            }`}
-            title={s.hint}
-            disabled={updating}
-            onClick={() => void setStatus(s.value)}
-          >
-            {s.label}
-          </button>
-        ))}
-      </div>
-      {updating && <span className="officer-status-saving">Updating…</span>}
+      <button
+        type="button"
+        className={`officer-status-btn officer-status-btn--cycle officer-status-btn--${slug} officer-status-btn--active`}
+        title={`Tap to set ${nextLabel}`}
+        aria-label={`Status ${officerStatusLabel(status)}. Tap to change to ${nextLabel}`}
+        disabled={updating}
+        onClick={() => void setStatus(next)}
+      >
+        {updating ? 'Updating…' : officerStatusLabel(status)}
+      </button>
       {error && <span className="officer-status-error">{error}</span>}
     </div>
   );

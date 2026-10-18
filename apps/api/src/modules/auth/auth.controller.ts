@@ -19,6 +19,7 @@ import {
   ClientRegisterDto,
 } from './dto/client-register.dto';
 import { LoginDto } from './dto/login.dto';
+import { PasskeyService } from './passkey.service';
 
 function clientIp(req: Request): string | null {
   const forwarded = req.headers['x-forwarded-for'];
@@ -36,7 +37,10 @@ const AUTH_THROTTLE = {
 
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(
+    private readonly authService: AuthService,
+    private readonly passkeys: PasskeyService,
+  ) {}
 
   @Post('client/login')
   @Throttle(AUTH_THROTTLE)
@@ -147,5 +151,70 @@ export class AuthController {
     },
   ) {
     return this.authService.updateProfile(user.id, body);
+  }
+
+  @Post('passkey/login/options')
+  @Throttle(AUTH_THROTTLE)
+  passkeyLoginOptions(
+    @Body()
+    body: { portal: 'client' | 'admin' | 'officer' | 'technician'; tenantSlug: string; email?: string },
+  ) {
+    return this.passkeys.loginOptions(body);
+  }
+
+  @Post('passkey/login/verify')
+  @Throttle(AUTH_THROTTLE)
+  passkeyLoginVerify(
+    @Body()
+    body: {
+      portal: 'client' | 'admin' | 'officer' | 'technician';
+      tenantSlug: string;
+      challengeId: string;
+      credential: { id?: string; rawId?: string; response?: unknown; type?: string };
+    },
+    @Req() req: Request,
+  ) {
+    return this.passkeys.loginVerify(body, clientIp(req));
+  }
+
+  @Post('passkey/register/options')
+  @UseGuards(JwtAuthGuard)
+  @Throttle(AUTH_THROTTLE)
+  passkeyRegisterOptions(
+    @CurrentUser() user: { id: string },
+    @Body() body: { portal: 'client' | 'admin' | 'officer' | 'technician' },
+  ) {
+    return this.passkeys.registrationOptions(user.id, body.portal);
+  }
+
+  @Post('passkey/register/verify')
+  @UseGuards(JwtAuthGuard)
+  @Throttle(AUTH_THROTTLE)
+  passkeyRegisterVerify(
+    @CurrentUser() user: { id: string },
+    @Body()
+    body: {
+      challengeId: string;
+      credential: unknown;
+      portal: 'client' | 'admin' | 'officer' | 'technician';
+      label?: string;
+    },
+  ) {
+    return this.passkeys.registrationVerify(user.id, body);
+  }
+
+  @Get('passkey')
+  @UseGuards(JwtAuthGuard)
+  listPasskeys(@CurrentUser() user: { id: string }) {
+    return this.passkeys.listForUser(user.id);
+  }
+
+  @Post('passkey/:id/delete')
+  @UseGuards(JwtAuthGuard)
+  removePasskey(
+    @CurrentUser() user: { id: string },
+    @Param('id') id: string,
+  ) {
+    return this.passkeys.remove(user.id, id);
   }
 }

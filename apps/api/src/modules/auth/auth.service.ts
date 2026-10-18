@@ -230,6 +230,110 @@ export class AuthService {
     return this.login(dto, TECHNICIAN_ROLES, { ...meta, portal: 'technician' });
   }
 
+  /**
+   * Finish sign-in after a verified WebAuthn assertion (passkey / biometric).
+   * Applies the same MFA gates as password login.
+   */
+  async completePasskeyLogin(
+    user: {
+      id: string;
+      email: string;
+      firstName: string;
+      lastName: string;
+      role: UserRole;
+      status: UserStatus;
+      tenantId: string;
+      jobTitle?: string | null;
+      phone?: string | null;
+      mfaEnabled?: boolean;
+      mfaSecretEnc?: string | null;
+      tenant?: {
+        id: string;
+        name: string;
+        slug: string;
+        primaryColor: string | null;
+        settings?: Prisma.JsonValue | null;
+      } | null;
+    },
+    meta?: { ipAddress?: string | null; portal?: string },
+  ) {
+    const tenant =
+      user.tenant ??
+      (await this.prisma.tenant.findUnique({ where: { id: user.tenantId } }));
+    if (!tenant) throw new UnauthorizedException('Invalid credentials');
+
+    const tenantSettings =
+      tenant.settings ??
+      (
+        await this.prisma.tenant.findUnique({
+          where: { id: user.tenantId },
+          select: { settings: true },
+        })
+      )?.settings ??
+      null;
+    const mfaRequired = this.roleRequiresMfa(user.role, tenantSettings);
+    if (mfaRequired) {
+      if (!user.mfaEnabled || !user.mfaSecretEnc) {
+        const mfaToken = this.signMfaChallenge(user.id, user.tenantId, user.role, 'mfa_setup');
+        return {
+          success: true,
+          data: {
+            mfaSetupRequired: true,
+            mfaToken,
+            user: this.sanitizeUser({ ...user, tenant }),
+            tenant: {
+              id: tenant.id,
+              name: tenant.name,
+              slug: tenant.slug,
+              primaryColor: tenant.primaryColor,
+            },
+          },
+        };
+      }
+      const mfaToken = this.signMfaChallenge(user.id, user.tenantId, user.role, 'mfa_verify');
+      return {
+        success: true,
+        data: {
+          mfaRequired: true,
+          mfaToken,
+          user: this.sanitizeUser({ ...user, tenant }),
+          tenant: {
+            id: tenant.id,
+            name: tenant.name,
+            slug: tenant.slug,
+            primaryColor: tenant.primaryColor,
+          },
+        },
+      };
+    }
+
+    const tokens = await this.issueTokens(user.id, user.tenantId, user.role);
+    await this.audit.write({
+      tenantId: tenant.id,
+      action: 'AUTH_PASSKEY_LOGIN_SUCCESS',
+      result: 'SUCCESS',
+      actorUserId: user.id,
+      actorRole: user.role,
+      accountUserId: user.id,
+      ipAddress: meta?.ipAddress,
+      source: meta?.portal ?? 'auth',
+    });
+
+    return {
+      success: true,
+      data: {
+        user: this.sanitizeUser({ ...user, tenant }),
+        tenant: {
+          id: tenant.id,
+          name: tenant.name,
+          slug: tenant.slug,
+          primaryColor: tenant.primaryColor,
+        },
+        tokens,
+      },
+    };
+  }
+
   async startMfaSetup(mfaToken: string, ipAddress?: string | null) {
     const challenge = this.verifyMfaChallenge(mfaToken, ['mfa_setup', 'mfa_manage']);
     const user = await this.prisma.user.findFirst({

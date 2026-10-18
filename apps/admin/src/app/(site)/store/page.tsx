@@ -1,17 +1,5 @@
-import { Suspense } from 'react';
-import { LoadingSpinner } from '@/components/LoadingSpinner';
-import StoreClient from './StoreClient';
+import { redirect } from 'next/navigation';
 
 export default function StorePage() {
-  return (
-    <Suspense
-      fallback={
-        <section className="nx-section">
-          <LoadingSpinner label="Loading shop…" />
-        </section>
-      }
-    >
-      <StoreClient />
-    </Suspense>
-  );
+  redirect('/services');
 }

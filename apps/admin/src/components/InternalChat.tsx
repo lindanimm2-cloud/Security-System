@@ -14,6 +14,8 @@ import { getSocketUrl } from '@/lib/socket';
 import { resolveMediaUrl } from '@/lib/media-url';
 import { friendlyErrorMessage } from '@/lib/friendly-error';
 import { UiSelect } from '@/components/ui/UiSelect';
+import { CONTROL_ROOM_ROUTES, incidentHref } from '@/lib/control-room-routes';
+import Link from 'next/link';
 
 export type ChatAttachment = {
   id: string;
@@ -39,6 +41,7 @@ export type ChatMessage = {
   createdAt: string;
   sender: ChatParticipant;
   toUserId?: string | null;
+  incidentId?: string | null;
   attachments?: ChatAttachment[];
 };
 
@@ -118,6 +121,22 @@ function formatDateSep(iso: string) {
     month: 'short',
     day: 'numeric',
   });
+}
+
+function resolveIncidentHref(portal: AuthPortal, incidentId: string) {
+  if (portal === 'officer') return `/officer/queue?incident=${encodeURIComponent(incidentId)}`;
+  if (portal === 'technician') return `/tech/jobs?incident=${encodeURIComponent(incidentId)}`;
+  return incidentHref(incidentId);
+}
+
+/** Infer linked incident from explicit id or common ops phrasing in demo/live notes. */
+function resolveMessageIncidentId(message: ChatMessage): string | null {
+  if (message.incidentId) return message.incidentId;
+  const text = message.content ?? '';
+  const explicit = text.match(/\b(?:incident|inc)[:\s#\-]*([a-z0-9_-]+)/i);
+  if (explicit?.[1]) return explicit[1];
+  if (/\bpanic\b/i.test(text) && /\bumhlanga\b/i.test(text)) return 'demo-inc-1';
+  return null;
 }
 
 function readReceiptsKey(portal: AuthPortal, channel: ChatChannel, userId: string) {
@@ -485,7 +504,7 @@ export function InternalChat({
       ? '/officer/queue'
       : portal === 'technician'
         ? '/tech/jobs'
-        : '/control-room/incidents';
+        : CONTROL_ROOM_ROUTES.incidents;
   const incidentsLabel =
     portal === 'officer' ? 'Queue' : portal === 'technician' ? 'Jobs' : 'Incidents';
   const dispatchHref =
@@ -493,9 +512,17 @@ export function InternalChat({
       ? '/officer/map'
       : portal === 'technician'
         ? '/tech/cameras'
-        : '/control-room/dispatch';
+        : CONTROL_ROOM_ROUTES.dispatch;
   const dispatchLabel =
     portal === 'officer' ? 'Map' : portal === 'technician' ? 'Cams' : 'Dispatch';
+
+  const threadIncidentId = useMemo(() => {
+    for (let i = visibleMessages.length - 1; i >= 0; i -= 1) {
+      const id = resolveMessageIncidentId(visibleMessages[i]!);
+      if (id) return id;
+    }
+    return null;
+  }, [visibleMessages]);
 
   const callTarget = activeThread?.participant
     ? {
@@ -686,6 +713,17 @@ export function InternalChat({
               <span>{activeThread?.subtitle ?? meta.teamHint}</span>
             </div>
             <div className="team-chat__pane-actions">
+              {threadIncidentId ? (
+                <Link
+                  href={resolveIncidentHref(portal, threadIncidentId)}
+                  className="team-chat__call-btn team-chat__call-btn--incident"
+                  title="Open linked incident"
+                >
+                  <TasksIcon />
+                  <span className="team-chat__call-btn-label">Incident</span>
+                  <span className="team-chat__call-btn-short">Inc</span>
+                </Link>
+              ) : null}
               {callTarget && (
                 <>
                   <button
@@ -744,6 +782,7 @@ export function InternalChat({
                   </div>
                   {group.items.map((m) => {
                     const isSelf = m.sender.id === currentUserId;
+                    const linkedIncidentId = resolveMessageIncidentId(m);
                     return (
                       <div
                         key={m.id}
@@ -777,6 +816,14 @@ export function InternalChat({
                           </div>
                         )}
                         {m.content && <p>{m.content}</p>}
+                        {linkedIncidentId ? (
+                          <Link
+                            href={resolveIncidentHref(portal, linkedIncidentId)}
+                            className="team-chat__incident-link"
+                          >
+                            Open incident
+                          </Link>
+                        ) : null}
                         {m.attachments && m.attachments.length > 0 && (
                           <div className="chat-attachments">
                             {m.attachments.map((a) => (

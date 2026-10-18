@@ -448,6 +448,9 @@ enum AlarmEventType {
   SMOKE
   WATER
   GAS_LEAK
+  FAILED_CHECK_IN
+  OUT_OF_HOURS
+  INFORMATIVE
 }
 
 enum AlarmEventStatus {
@@ -461,6 +464,7 @@ enum AlarmEventStatus {
 enum CompanyVehicleType {
   PATROL
   ARMED_RESPONSE
+  VIP_TRANSPORT
   MOTORCYCLE
   MEDICAL
   FIRE_TRUCK
@@ -559,6 +563,8 @@ model Tenant {
   offlineSyncCursors OfflineSyncCursor[]
   accessPoints       AccessPoint[]
   accessCommands     AccessCommand[]
+  webAuthnCredentials WebAuthnCredential[]
+  operatorResponseTemplates OperatorResponseTemplate[]
 
   @@map("tenants")
 }
@@ -626,10 +632,36 @@ model User {
   securityConsents   SecurityConsent[]
   securitySettings   ClientSecuritySettings?
   deviceSessions     DeviceSession[]
+  webAuthnCredentials WebAuthnCredential[]
+  claimedAlarmEvents  AlarmEvent[] @relation("AlarmEventClaimedBy")
+  alarmEventResponses AlarmEventResponse[]
 
   @@unique([tenantId, email])
   @@index([tenantId, status])
   @@map("users")
+}
+
+model WebAuthnCredential {
+  id           String    @id @default(uuid()) @db.Uuid
+  userId       String    @map("user_id") @db.Uuid
+  tenantId     String    @map("tenant_id") @db.Uuid
+  credentialId String    @unique @map("credential_id")
+  publicKey    Bytes     @map("public_key")
+  counter      BigInt    @default(0)
+  deviceType   String?   @map("device_type")
+  backedUp     Boolean   @default(false) @map("backed_up")
+  transports   Json      @default("[]")
+  label        String?
+  lastUsedAt   DateTime? @map("last_used_at")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([tenantId])
+  @@map("webauthn_credentials")
 }
 
 model Officer {
@@ -957,6 +989,11 @@ model Property {
   communicatorType   String?      @map("communicator_type")
   monitoringAccount  String?      @map("monitoring_account")
   partitionLabel     String?      @default("Partition 1") @map("partition_label")
+  /** Hours between expected communicator check-ins; 0/null disables failed-check-in */
+  checkInHours       Float?       @map("check_in_hours")
+  lastCheckInAt      DateTime?    @map("last_check_in_at")
+  /** Open/close (arm/disarm) windows + tolerance minutes for out-of-hours signals */
+  monitoringSchedule Json         @default("{}") @map("monitoring_schedule")
   lat                Decimal?     @db.Decimal(10, 8)
   lng                Decimal?     @db.Decimal(11, 8)
   createdAt          DateTime     @default(now()) @map("created_at")
@@ -1107,6 +1144,10 @@ model Sensor {
   bypassed        Boolean      @default(false)
   cidCode         String?      @map("cid_code")
   vendor          String?
+  /** WinCRAM-style zone type reporting: FIRE, MEDICAL, INTRUSION, INFORMATIVE, … */
+  reportAsType    String?      @map("report_as_type")
+  requiredAction  String?      @map("required_action")
+  requiresAck     Boolean      @default(true) @map("requires_ack")
   lastTriggeredAt DateTime?    @map("last_triggered_at")
   createdAt       DateTime     @default(now()) @map("created_at")
   updatedAt       DateTime     @updatedAt @map("updated_at")
@@ -1122,36 +1163,85 @@ model Sensor {
 }
 
 model AlarmEvent {
-  id             String           @id @default(uuid()) @db.Uuid
-  tenantId       String           @map("tenant_id") @db.Uuid
-  propertyId     String           @map("property_id") @db.Uuid
-  cameraId       String?          @map("camera_id") @db.Uuid
-  sensorId       String?          @map("sensor_id") @db.Uuid
-  type           AlarmEventType
-  severity       IncidentPriority @default(MEDIUM)
-  status         AlarmEventStatus @default(NEW)
-  title          String
-  description    String?
-  cidCode        String?          @map("cid_code")
-  snapshotUrl    String?          @map("snapshot_url")
-  incidentId     String?          @map("incident_id") @db.Uuid
-  acknowledgedBy String?          @map("acknowledged_by") @db.Uuid
-  acknowledgedAt DateTime?        @map("acknowledged_at")
-  triggeredAt    DateTime         @default(now()) @map("triggered_at")
-  resolvedAt     DateTime?        @map("resolved_at")
-  createdAt      DateTime         @default(now()) @map("created_at")
-  updatedAt      DateTime         @updatedAt @map("updated_at")
+  id               String           @id @default(uuid()) @db.Uuid
+  tenantId         String           @map("tenant_id") @db.Uuid
+  propertyId       String           @map("property_id") @db.Uuid
+  cameraId         String?          @map("camera_id") @db.Uuid
+  sensorId         String?          @map("sensor_id") @db.Uuid
+  type             AlarmEventType
+  severity         IncidentPriority @default(MEDIUM)
+  status           AlarmEventStatus @default(NEW)
+  title            String
+  description      String?
+  cidCode          String?          @map("cid_code")
+  snapshotUrl      String?          @map("snapshot_url")
+  incidentId       String?          @map("incident_id") @db.Uuid
+  requiresAck      Boolean          @default(true) @map("requires_ack")
+  claimedByUserId  String?          @map("claimed_by_user_id") @db.Uuid
+  claimedAt        DateTime?        @map("claimed_at")
+  acknowledgedBy   String?          @map("acknowledged_by") @db.Uuid
+  acknowledgedAt   DateTime?        @map("acknowledged_at")
+  triggeredAt      DateTime         @default(now()) @map("triggered_at")
+  resolvedAt       DateTime?        @map("resolved_at")
+  closedAt         DateTime?        @map("closed_at")
+  closeMeta        Json             @default("{}") @map("close_meta")
+  createdAt        DateTime         @default(now()) @map("created_at")
+  updatedAt        DateTime         @updatedAt @map("updated_at")
 
-  tenant   Tenant    @relation(fields: [tenantId], references: [id])
-  property Property  @relation(fields: [propertyId], references: [id], onDelete: Cascade)
-  camera   Camera?   @relation(fields: [cameraId], references: [id], onDelete: SetNull)
-  sensor   Sensor?   @relation(fields: [sensorId], references: [id], onDelete: SetNull)
-  incident Incident? @relation(fields: [incidentId], references: [id], onDelete: SetNull)
+  tenant    Tenant               @relation(fields: [tenantId], references: [id])
+  property  Property             @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  camera    Camera?              @relation(fields: [cameraId], references: [id], onDelete: SetNull)
+  sensor    Sensor?              @relation(fields: [sensorId], references: [id], onDelete: SetNull)
+  incident  Incident?            @relation(fields: [incidentId], references: [id], onDelete: SetNull)
+  claimedBy User?                @relation("AlarmEventClaimedBy", fields: [claimedByUserId], references: [id], onDelete: SetNull)
+  responses AlarmEventResponse[]
 
   @@index([propertyId, triggeredAt])
   @@index([tenantId, status])
   @@index([incidentId])
+  @@index([claimedByUserId])
   @@map("alarm_events")
+}
+
+/** Tenant-configurable operator action codes (WinCRAM-style 1–9 / A / B). */
+model OperatorResponseTemplate {
+  id          String   @id @default(uuid()) @db.Uuid
+  tenantId    String   @map("tenant_id") @db.Uuid
+  code        String
+  label       String
+  mandatory   Boolean  @default(false)
+  sortOrder   Int      @default(0) @map("sort_order")
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  tenant    Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  responses AlarmEventResponse[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId, sortOrder])
+  @@map("operator_response_templates")
+}
+
+model AlarmEventResponse {
+  id         String   @id @default(uuid()) @db.Uuid
+  tenantId   String   @map("tenant_id") @db.Uuid
+  eventId    String   @map("event_id") @db.Uuid
+  templateId String?  @map("template_id") @db.Uuid
+  code       String
+  label      String
+  answer     String
+  note       String?
+  actorUserId String  @map("actor_user_id") @db.Uuid
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  event    AlarmEvent                @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  template OperatorResponseTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
+  actor    User                      @relation(fields: [actorUserId], references: [id], onDelete: Cascade)
+
+  @@unique([eventId, code])
+  @@index([tenantId, eventId])
+  @@map("alarm_event_responses")
 }
 
 model Subscription {
@@ -2076,3 +2166,117 @@ model AccessCommand {
   @@map("access_commands")
 }
 
+
+// --- Control-panel VMS (camera config, schedules, e-map, alarm-video rules, exports, ops audit) ---
+
+model VmsCameraConfig {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  cameraId  String   @map("camera_id")
+  image     Json     @default("{}")
+  encoding  Json     @default("{}")
+  osd       Json     @default("{}")
+  stagedBy  String?  @map("staged_by")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([tenantId, cameraId])
+  @@map("vms_camera_configs")
+}
+
+model VmsRecordSchedule {
+  id            String   @id @default(uuid()) @db.Uuid
+  tenantId      String   @map("tenant_id") @db.Uuid
+  cameraId      String   @map("camera_id")
+  days          Json     @default("[]")
+  retentionDays Int      @default(30) @map("retention_days")
+  preRecordSec  Int      @default(5) @map("pre_record_sec")
+  postRecordSec Int      @default(30) @map("post_record_sec")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  @@unique([tenantId, cameraId])
+  @@map("vms_record_schedules")
+}
+
+model VmsFloorplan {
+  id         String   @id @default(uuid()) @db.Uuid
+  tenantId   String   @map("tenant_id") @db.Uuid
+  propertyId String   @map("property_id")
+  name       String
+  imageUrl   String   @map("image_url")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  placements VmsCameraPlacement[]
+
+  @@index([tenantId, propertyId])
+  @@map("vms_floorplans")
+}
+
+model VmsCameraPlacement {
+  id          String @id @default(uuid()) @db.Uuid
+  floorplanId String @map("floorplan_id") @db.Uuid
+  cameraId    String @map("camera_id")
+  x           Float
+  y           Float
+
+  floorplan VmsFloorplan @relation(fields: [floorplanId], references: [id], onDelete: Cascade)
+
+  @@unique([floorplanId, cameraId])
+  @@map("vms_camera_placements")
+}
+
+model VmsAlarmVideoRule {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  cameraId  String   @map("camera_id")
+  alarmType String   @map("alarm_type")
+  enabled   Boolean  @default(true)
+  level     Int      @default(3)
+  actions   Json     @default("{}")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([tenantId, cameraId, alarmType])
+  @@index([tenantId, enabled])
+  @@map("vms_alarm_video_rules")
+}
+
+model VmsVideoExportJob {
+  id          String   @id @default(uuid()) @db.Uuid
+  tenantId    String   @map("tenant_id") @db.Uuid
+  cameraId    String   @map("camera_id")
+  cameraName  String   @map("camera_name")
+  siteName    String   @map("site_name")
+  startAt     DateTime @map("start_at")
+  endAt       DateTime @map("end_at")
+  format      String   @default("MP4")
+  incidentRef String?  @map("incident_ref")
+  status      String   @default("QUEUED")
+  progress    Int      @default(0)
+  sizeMb      Int      @default(0) @map("size_mb")
+  path        String   @default("")
+  createdBy   String   @map("created_by")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@index([tenantId, createdAt])
+  @@map("vms_video_export_jobs")
+}
+
+model OpsAuditEntry {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  actorId   String?  @map("actor_id") @db.Uuid
+  actor     String
+  category  String
+  action    String
+  target    String
+  detail    String?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([tenantId, createdAt])
+  @@index([tenantId, category])
+  @@map("ops_audit_entries")
+}

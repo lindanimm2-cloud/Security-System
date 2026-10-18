@@ -135,6 +135,7 @@ type FormState = {
   propertyCity: string;
   propertyPostalCode: string;
   propertyGateCode: string;
+  dogOnPremises: boolean;
   requestAlarmServices: boolean;
   alarmServiceInterests: string[];
   alarmRequestConfirmed: boolean;
@@ -185,6 +186,7 @@ const INITIAL: FormState = {
   propertyCity: '',
   propertyPostalCode: '',
   propertyGateCode: '',
+  dogOnPremises: false,
   requestAlarmServices: false,
   alarmServiceInterests: [],
   alarmRequestConfirmed: false,
@@ -467,6 +469,7 @@ function RegisterWizard() {
               name: form.propertyName.trim(),
               address: propertyAddress,
               gateCode: form.propertyGateCode.trim() || undefined,
+              ...(form.dogOnPremises ? { accessNotes: 'Dog on premises.' } : {}),
             }
           : undefined;
 
@@ -1177,6 +1180,7 @@ function RegisterWizard() {
                           ...(!form.includeProperty
                             ? {}
                             : {
+                                dogOnPremises: false,
                                 requestAlarmServices: false,
                                 alarmServiceInterests: [],
                                 alarmRequestConfirmed: false,
@@ -1275,6 +1279,18 @@ function RegisterWizard() {
                               </span>
                             </label>
                           </div>
+
+                          <label className="register-service-panel__toggle register-dog-check">
+                            <input
+                              type="checkbox"
+                              checked={form.dogOnPremises}
+                              onChange={(e) => patch({ dogOnPremises: e.target.checked })}
+                            />
+                            <span>
+                              <strong>Dog on the premises</strong>
+                              <em>Shown to responders before entry</em>
+                            </span>
+                          </label>
                         </div>
 
                         <div className="register-service-panel">
@@ -1849,6 +1865,12 @@ function RegisterWizard() {
                             : 'Skipped'}
                         </dd>
                       </div>
+                      {form.includeProperty && form.dogOnPremises ? (
+                        <div className="register-review__row register-review__row--full">
+                          <dt>Access note</dt>
+                          <dd>Dog on the premises</dd>
+                        </div>
+                      ) : null}
                       {form.includeProperty && form.alarmRequestConfirmed ? (
                         <div className="register-review__row register-review__row--full">
                           <dt>Alarm enquiry</dt>

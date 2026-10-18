@@ -99,7 +99,6 @@ const ROLES = [
   'TENANT_ADMIN',
   'OWNER',
   'SUPER_ADMIN',
-  'SALES',
   'TECHNICIAN',
   'DEVELOPER',
 ] as const;
@@ -114,7 +113,6 @@ const ROLE_LABELS: Record<(typeof ROLES)[number], string> = {
   TENANT_ADMIN: 'Tenant Admin',
   OWNER: 'Owner',
   SUPER_ADMIN: 'Super Admin',
-  SALES: 'Sales',
   TECHNICIAN: 'Technician',
   DEVELOPER: 'Developer',
 };
@@ -135,7 +133,6 @@ const POSITIONS = [
   'Team Lead',
   'Tenant Administrator',
   'Security Consultant',
-  'Sales Consultant',
   'CCTV Install Technician',
   'Alarm Systems Technician',
   'Access Control Technician',

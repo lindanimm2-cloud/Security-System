@@ -3,8 +3,8 @@
 import { ErrorAlert } from '@/components/ErrorAlert';
 
 import Link from 'next/link';
-import { useSearchParams } from 'next/navigation';
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { useEffect, useMemo, useState } from 'react';
 import { ControlRoomLayout } from '@/components/control-room/ControlRoomLayout';
 import { IncidentReportForm, IncidentReportPanel } from '@/components/control-room/IncidentReportForm';
 import { OpsDialog } from '@/components/ops/OpsDialog';
@@ -12,7 +12,6 @@ import { IncidentMediaGallery } from '@/components/IncidentMediaGallery';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { useApi } from '@/hooks/useApi';
 import { adminApi, type ApiResponse } from '@/lib/api-client';
-import { AvailableOfficersButton } from '@/components/control-room/AvailableOfficersButton';
 import { QuickDispatchPanel } from '@/components/control-room/QuickDispatchPanel';
 import { IncidentKernelPanels } from '@/components/incident/IncidentKernelPanels';
 import { setActiveIncidentId } from '@/lib/dispatch-context';
@@ -21,8 +20,9 @@ import { exportCsv } from '@/lib/export-csv';
 import { openBrandedTableReport } from '@/lib/branded-document';
 import { isAwaitingDispatch } from '@/lib/incident-status';
 import { ListSearch } from '@/components/ui/ListSearch';
+import { OpsMarqueeText } from '@/components/ui/OpsMarquee';
+import { OpsMonActionsMenu, type OpsMonAction } from '@/components/ops/OpsMonActionsMenu';
 import { matchesSearch } from '@/lib/list-search';
-import { ChartCard, countBy, DonutChart, HorizontalBars, type ChartTone } from '@/components/ui/charts';
 
 type Incident = {
   id: string;
@@ -73,9 +73,17 @@ export default function IncidentsPage() {
 }
 
 function IncidentsContent() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const selectedId = searchParams.get('id');
   const priorityFilter = searchParams.get('priority');
+
+  function closeIncidentFile() {
+    const next = new URLSearchParams(searchParams.toString());
+    next.delete('id');
+    const qs = next.toString();
+    router.replace(qs ? `${CONTROL_ROOM_ROUTES.incidents}?${qs}` : CONTROL_ROOM_ROUTES.incidents);
+  }
 
   const { data, loading, error, reload } = useApi(
     () => adminApi.get<ApiResponse<Incident[]>>('/control-room/incidents'),
@@ -149,48 +157,40 @@ function IncidentsContent() {
   });
   const resolvedIncidents = searchedIncidents.filter((i) => !isActiveIncident(i.status));
 
-  const criticalCount = activeIncidents.filter((i) => (i.priority ?? '').toUpperCase() === 'CRITICAL').length;
-  const highCount = activeIncidents.filter((i) => (i.priority ?? '').toUpperCase() === 'HIGH').length;
-  const dispatchedCount = activeIncidents.filter((i) =>
-    ['DISPATCHED', 'EN_ROUTE', 'ON_SCENE'].includes(i.status),
-  ).length;
-  const prioritySlices = countBy(activeIncidents, (i) => i.priority || 'MEDIUM').map(
-    (slice, index): { label: string; value: number; tone: ChartTone } => ({
-      ...slice,
-      tone:
-        slice.label.toUpperCase() === 'CRITICAL'
-          ? 'danger'
-          : slice.label.toUpperCase() === 'HIGH'
-            ? 'warning'
-            : index === 0
-              ? 'accent'
-              : 'neutral',
-    }),
-  );
-  const statusBars = countBy(activeIncidents, (i) => i.status).map(
-    (slice, index): { label: string; value: number; tone: ChartTone } => ({
-      label: slice.label.replaceAll('_', ' '),
-      value: slice.value,
-      tone: index === 0 ? 'accent' : index === 1 ? 'warning' : 'success',
-    }),
-  );
-
   return (
-    <div className="page-content">
-      <div className="page-header">
-        <div>
-          <p className="text-muted" style={{ fontSize: '0.82rem' }}>
-            <Link href={CONTROL_ROOM_ROUTES.overview} className="interactive-text">Overview</Link>
-            {' · '}
-            <Link href={CONTROL_ROOM_ROUTES.dispatch} className="interactive-text">Dispatch</Link>
-            {' · '}
-            <Link href={mapHref('incidents')} className="interactive-text">Live map</Link>
+    <div className="page-content inc-hud-page inc-hud-page--compact">
+      <header className="inc-board-bar" aria-label="Live board">
+        <div className="inc-board-bar__lead">
+          <h1 className="inc-board-bar__title">
+            <span className={`inc-hud-live ${activeIncidents.length > 0 ? 'is-hot' : ''}`} aria-hidden>
+              <i />
+            </span>
+            Live board
+          </h1>
+          <p className="inc-board-bar__count" aria-live="polite">
+            {activeIncidents.length} active · {resolvedIncidents.length} resolved
           </p>
+          <nav className="inc-board-bar__tabs" aria-label="Incidents shortcuts">
+            <Link href={CONTROL_ROOM_ROUTES.incidents} aria-current="page">
+              Overview
+            </Link>
+            <Link href={CONTROL_ROOM_ROUTES.dispatch}>Dispatch</Link>
+            <Link href={mapHref('incidents')}>Live map</Link>
+          </nav>
         </div>
-        <div className="page-header__actions">
+        <div className="inc-board-bar__tools">
+          <div className="inc-board-bar__search">
+            <ListSearch
+              value={search}
+              onChange={setSearch}
+              placeholder="Search incidents, client, location, officer…"
+              resultCount={searchedIncidents.length}
+              totalCount={incidents.length}
+            />
+          </div>
           <button
             type="button"
-            className="btn-secondary"
+            className="btn-sm"
             onClick={() =>
               openBrandedTableReport({
                 title: 'Incidents register',
@@ -209,11 +209,11 @@ function IncidentsContent() {
               })
             }
           >
-            Print report
+            Print
           </button>
           <button
             type="button"
-            className="btn-ghost"
+            className="btn-sm"
             onClick={() =>
               exportCsv(
                 'incidents.csv',
@@ -231,64 +231,13 @@ function IncidentsContent() {
               )
             }
           >
-            Export CSV
+            CSV
           </button>
-          <button type="button" className="btn-primary" onClick={() => setShowReport(true)}>
-            + Report incident
+          <button type="button" className="btn-sm btn-primary" onClick={() => setShowReport(true)}>
+            Report
           </button>
         </div>
-      </div>
-
-      <div className="list-search-bar">
-        <ListSearch
-          value={search}
-          onChange={setSearch}
-          placeholder="Search incidents, client, location, officer…"
-          resultCount={searchedIncidents.length}
-          totalCount={incidents.length}
-        />
-      </div>
-
-      {/* Stats bar */}
-      <div className="inc-stats-bar">
-        <div className="inc-stat inc-stat--critical">
-          <span className="inc-stat__value">{criticalCount}</span>
-          <span className="inc-stat__label">Critical</span>
-        </div>
-        <div className="inc-stat inc-stat--high">
-          <span className="inc-stat__value">{highCount}</span>
-          <span className="inc-stat__label">High</span>
-        </div>
-        <div className="inc-stat inc-stat--dispatched">
-          <span className="inc-stat__value">{dispatchedCount}</span>
-          <span className="inc-stat__label">Dispatched</span>
-        </div>
-        <div className="inc-stat inc-stat--total">
-          <span className="inc-stat__value">{activeIncidents.length}</span>
-          <span className="inc-stat__label">Active total</span>
-        </div>
-        <div className="inc-stat inc-stat--resolved">
-          <span className="inc-stat__value">{resolvedIncidents.length}</span>
-          <span className="inc-stat__label">Resolved</span>
-        </div>
-      </div>
-
-      <div className="ds-chart-grid">
-        <ChartCard title="Active priority mix" subtitle="Open incidents by severity" className="ds-chart-card--span-6">
-          <DonutChart
-            slices={prioritySlices}
-            centerValue={activeIncidents.length}
-            centerLabel="active"
-            emptyLabel="No active incidents"
-          />
-        </ChartCard>
-        <ChartCard title="Workflow status" subtitle="Where active files sit" className="ds-chart-card--span-6">
-          <HorizontalBars
-            items={statusBars.length > 0 ? statusBars : [{ label: 'No active incidents', value: 0, tone: 'neutral' }]}
-            compact
-          />
-        </ChartCard>
-      </div>
+      </header>
 
       {showReport && (
         <OpsDialog
@@ -307,121 +256,108 @@ function IncidentsContent() {
         </OpsDialog>
       )}
 
-      {selectedId && detail && (
-        <section id="incident-detail" className="portal-card incident-detail-card">
-          <div className="card-header-row">
-            <h2>
-              {detail.type} — {detail.user}
-            </h2>
-          <span className={`incident-type incident-type--${(detail.priority ?? 'medium').toLowerCase()}`}>
-              {detail.status}
-            </span>
+      {selectedId && detail ? (
+        <OpsDialog
+          title={`${detail.type} — ${detail.user}`}
+          subtitle={`${detail.location} · ${detail.status.replace(/_/g, ' ')}`}
+          onClose={closeIncidentFile}
+          wide
+        >
+          <div id="incident-detail" className="incident-detail-card incident-detail-card--dialog">
+            {detail.description ? <p>{detail.description}</p> : null}
+            {detail.dispatches?.length ? (
+              <p className="text-muted">
+                Dispatched: {detail.dispatches.map((d) => `${d.officer} (${d.status})`).join(', ')}
+              </p>
+            ) : null}
+
+            <IncidentKernelPanels incidentId={detail.id} portal="admin" compact />
+
+            <h3>Incident reports</h3>
+            {detail.notes.length === 0 ? (
+              <p className="text-muted">No reports logged yet.</p>
+            ) : (
+              <ul className="incident-notes-list">
+                {detail.notes.map((n) => (
+                  <li key={n.id} className="incident-note">
+                    <div className="incident-note__meta">
+                      <strong>{n.authorName}</strong>
+                      <span>{n.authorRole}</span>
+                      <time>{new Date(n.createdAt).toLocaleString('en-ZA')}</time>
+                    </div>
+                    <p>{n.content}</p>
+                  </li>
+                ))}
+              </ul>
+            )}
+
+            <IncidentReportPanel
+              incidentId={detail.id}
+              onSuccess={() => {
+                reload();
+                reloadDetail();
+              }}
+            />
+
+            {detail.media && detail.media.length > 0 ? (
+              <>
+                <h3>Evidence & attachments</h3>
+                <p className="text-muted">Photos, videos, and documents submitted by officers.</p>
+                <IncidentMediaGallery media={detail.media} />
+              </>
+            ) : null}
+
+            <div className="inc-detail-rail">
+              <div className="inc-detail-rail__copy">
+                <h3>Linked files</h3>
+                <p className="text-muted">Evidence, reports, and documents for this case.</p>
+              </div>
+              <div className="inc-detail-rail__actions">
+                <Link href={dispatchHref(detail.id)} className="btn-sm">
+                  Dispatch
+                </Link>
+                <Link href={`/control-room/map?incident=${detail.id}`} className="btn-sm">
+                  Map
+                </Link>
+                <Link href={documentsHref({ incidentId: detail.id })} className="btn-sm btn-primary">
+                  Documents
+                </Link>
+              </div>
+            </div>
           </div>
-          <p className="text-muted">{detail.location}</p>
-          {detail.description && <p>{detail.description}</p>}
-          {detail.dispatches?.length ? (
-            <p className="text-muted">
-              Dispatched: {detail.dispatches.map((d) => `${d.officer} (${d.status})`).join(', ')}
-            </p>
-          ) : null}
+        </OpsDialog>
+      ) : null}
 
-          <IncidentKernelPanels incidentId={detail.id} portal="admin" />
-
-          <h3>Incident reports</h3>
-          {detail.notes.length === 0 ? (
-            <p className="text-muted">No reports logged yet.</p>
-          ) : (
-            <ul className="incident-notes-list">
-              {detail.notes.map((n) => (
-                <li key={n.id} className="incident-note">
-                  <div className="incident-note__meta">
-                    <strong>{n.authorName}</strong>
-                    <span>{n.authorRole}</span>
-                    <time>{new Date(n.createdAt).toLocaleString('en-ZA')}</time>
-                  </div>
-                  <p>{n.content}</p>
-                </li>
-              ))}
-            </ul>
-          )}
-
-          <IncidentReportPanel
-            incidentId={detail.id}
-            onSuccess={() => {
-              reload();
-              reloadDetail();
-            }}
-          />
-
-          {detail.media && detail.media.length > 0 && (
-            <>
-              <h3>Evidence & attachments</h3>
-              <p className="text-muted">Photos, videos, and documents submitted by officers.</p>
-              <IncidentMediaGallery media={detail.media} />
-            </>
-          )}
-
-          <h3>Documents</h3>
-          <p className="text-muted">Evidence, reports, and files linked to this incident.</p>
-          <Link href={documentsHref({ incidentId: detail.id })} className="btn-secondary btn-inline mb-1">
-            View linked documents
-          </Link>
-
-          <div className="entity-card-actions mt-1">
-            <Link href={dispatchHref(detail.id)} className="btn-sm btn-sm--link">Dispatch</Link>
-            <Link href={`/control-room/map?incident=${detail.id}`} className="btn-sm btn-sm--link">Map</Link>
-            <Link href={documentsHref({ incidentId: detail.id })} className="btn-sm btn-sm--link">Documents</Link>
-          </div>
-        </section>
-      )}
-
-      <IncidentSection
-        title="Active"
-        count={activeIncidents.length}
-        variant="active"
+      <IncidentMonitorBoard
+        title="Active incidents"
+        rows={activeIncidents}
         emptyMessage={search.trim() ? 'No matching active incidents.' : 'No active incidents — all clear.'}
-      >
-        {activeIncidents.map((i) => (
-          <IncidentRow
-            key={i.id}
-            incident={i}
-            selected={selectedId === i.id}
-            resolved={false}
-            dispatchOpen={dispatchIncidentId === i.id}
-            updating={updating === i.id}
-            onToggleDispatch={() => {
-              setDispatchIncidentId((prev) => (prev === i.id ? null : i.id));
-              setActiveIncidentId(i.id);
-            }}
-            onResolve={() => resolve(i.id)}
-            onAssigned={() => {
-              reload();
-              setDispatchIncidentId(null);
-            }}
-          />
-        ))}
-      </IncidentSection>
+        selectedId={selectedId}
+        dispatchIncidentId={dispatchIncidentId}
+        updatingId={updating}
+        onToggleDispatch={(id) => {
+          setDispatchIncidentId((prev) => (prev === id ? null : id));
+          setActiveIncidentId(id);
+        }}
+        onResolve={(id) => void resolve(id)}
+        onAssigned={() => {
+          reload();
+          setDispatchIncidentId(null);
+        }}
+      />
 
-      <IncidentSection
+      <IncidentMonitorBoard
         title="Resolved"
-        count={resolvedIncidents.length}
-        variant="resolved"
+        rows={resolvedIncidents}
         emptyMessage={search.trim() ? 'No matching resolved incidents.' : 'No resolved incidents yet.'}
-      >
-        {resolvedIncidents.map((i) => (
-          <IncidentRow
-            key={i.id}
-            incident={i}
-            selected={selectedId === i.id}
-            resolved
-            dispatchOpen={false}
-            updating={false}
-            onToggleDispatch={() => {}}
-            onResolve={() => {}}
-            onAssigned={() => {}}
-          />
-        ))}
-      </IncidentSection>
+        selectedId={selectedId}
+        resolved
+        dispatchIncidentId={null}
+        updatingId={null}
+        onToggleDispatch={() => {}}
+        onResolve={() => {}}
+        onAssigned={() => {}}
+      />
     </div>
   );
 }
@@ -430,144 +366,360 @@ function isActiveIncident(status: string) {
   return !['RESOLVED', 'CLOSED', 'CANCELLED'].includes(status);
 }
 
-function statusBadgeClass(status: string) {
-  if (status === 'ACTIVE' || status === 'OPEN' || status === 'PENDING' || status === 'NEW') {
-    return 'incident-status-badge incident-status-badge--active';
-  }
-  if (['DISPATCHED', 'EN_ROUTE', 'ON_SCENE'].includes(status)) {
-    return 'incident-status-badge incident-status-badge--dispatched';
-  }
-  if (status === 'RESOLVED') return 'incident-status-badge incident-status-badge--resolved';
-  return 'incident-status-badge incident-status-badge--closed';
+type StatusTone = 'ok' | 'alert' | 'fault' | 'offline' | 'muted';
+
+function incidentStatusLabel(status: string) {
+  const s = status.toUpperCase();
+  if (s === 'NEW' || s === 'OPEN') return 'Needs response';
+  if (s === 'ACKNOWLEDGED') return 'Acknowledged';
+  if (s === 'DISPATCHED' || s === 'EN_ROUTE') return 'Dispatched';
+  if (s === 'IN_PROGRESS' || s === 'RESPONDING' || s === 'ON_SCENE') return 'In progress';
+  if (s === 'RESOLVED') return 'Resolved';
+  if (s === 'CLOSED' || s === 'CANCELLED') return 'Closed';
+  return status.replace(/_/g, ' ');
 }
 
-function IncidentSection({
-  title,
-  count,
-  variant,
-  emptyMessage,
-  children,
-}: {
-  title: string;
-  count: number;
-  variant: 'active' | 'resolved';
-  emptyMessage: string;
-  children: ReactNode;
-}) {
-  const hasItems = count > 0;
+function incidentStatusTone(status: string): StatusTone {
+  const s = status.toUpperCase();
+  if (s === 'RESOLVED' || s === 'CLOSED' || s === 'CANCELLED') return 'ok';
+  if (s === 'IN_PROGRESS' || s === 'RESPONDING' || s === 'ON_SCENE') return 'alert';
+  if (s === 'DISPATCHED' || s === 'EN_ROUTE' || s === 'ACKNOWLEDGED') return 'fault';
+  if (s === 'NEW' || s === 'OPEN') return 'offline';
+  return 'muted';
+}
 
+function toneFill(tone: StatusTone) {
+  switch (tone) {
+    case 'ok':
+      return 100;
+    case 'alert':
+      return 75;
+    case 'fault':
+      return 48;
+    case 'offline':
+      return 22;
+    default:
+      return 35;
+  }
+}
+
+function IncidentTypeIcon({ type }: { type: string }) {
+  const t = type.toLowerCase();
+  if (t.includes('panic') || t.includes('sos')) {
+    return (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden>
+        <path d="M12 3.2 21 19.5H3L12 3.2z" />
+        <path d="M12 9.2v4.6M12 16.6h.01" />
+      </svg>
+    );
+  }
+  if (t.includes('medical')) {
+    return (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden>
+        <circle cx="12" cy="8" r="3.2" />
+        <path d="M5.5 20.2c1.2-3.2 3.5-4.8 6.5-4.8s5.3 1.6 6.5 4.8" />
+      </svg>
+    );
+  }
+  if (t.includes('fire')) {
+    return (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden>
+        <path d="M12 21c3.6 0 6-2.4 6-5.6 0-3.2-2.2-5.2-4.2-7.2-.4 2.2-1.6 3.2-1.6 3.2S10.4 8 10.2 5.4C8 7.4 6 10 6 15.4 6 18.6 8.4 21 12 21z" />
+      </svg>
+    );
+  }
+  if (t.includes('camera') || t.includes('cctv')) {
+    return (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden>
+        <rect x="3.5" y="7" width="12.5" height="10" rx="1.5" />
+        <path d="m16 10.5 4.5-2.5v8L16 13.5" />
+      </svg>
+    );
+  }
   return (
-    <section className={`incidents-section incidents-section--${variant}`}>
-      <div className="incidents-section__header">
-        <h2 className="incidents-section__title">{title}</h2>
-        <span className={`incidents-section__count incidents-section__count--${variant}`}>{count}</span>
-      </div>
-      {hasItems ? (
-        <div className="incident-list">{children}</div>
-      ) : (
-        <div className="incidents-section__empty">{emptyMessage}</div>
-      )}
-    </section>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden>
+      <path d="M12 3.2c-2.8 1-5.2 1.3-7.4 1.5v6.4c0 4.2 3 7.6 7.4 9.2 4.4-1.6 7.4-5 7.4-9.2V4.7c-2.2-.2-4.6-.5-7.4-1.5z" />
+    </svg>
   );
 }
 
-function IncidentRow({
+function OpsSignal({ fill }: { fill: number }) {
+  const level = Math.max(1, Math.min(4, Math.ceil((fill / 100) * 4)));
+  return (
+    <span className="ops-mon__signal" title={`${fill}%`}>
+      {[1, 2, 3, 4].map((n) => (
+        <i key={n} className={n <= level ? 'is-on' : undefined} />
+      ))}
+      <em>{fill}%</em>
+    </span>
+  );
+}
+
+function OpsStatusPill({ tone, label }: { tone: StatusTone; label: string }) {
+  return (
+    <span className={`ops-mon__status ops-mon__status--${tone}`}>
+      <em aria-hidden />
+      <OpsMarqueeText>{label}</OpsMarqueeText>
+    </span>
+  );
+}
+
+function controlRoomIncidentActions({
   incident: i,
-  selected,
+  code,
   resolved,
-  dispatchOpen,
   updating,
+  onToggleDispatch,
+  onResolve,
+}: {
+  incident: Incident;
+  code: string;
+  resolved: boolean;
+  updating: boolean;
+  onToggleDispatch: () => void;
+  onResolve: () => void;
+}): OpsMonAction[] {
+  const items: OpsMonAction[] = [
+    {
+      id: 'open',
+      label: 'Open incident file',
+      description: `${i.type} · ${i.user}`,
+      href: `/control-room/incidents?id=${i.id}`,
+    },
+    {
+      id: 'map',
+      label: 'Open live map',
+      description: i.location,
+      href: `/control-room/map?incident=${i.id}`,
+    },
+    {
+      id: 'docs',
+      label: 'Documents',
+      href: documentsHref({ incidentId: i.id }),
+    },
+  ];
+
+  if (!resolved && isAwaitingDispatch(i.status, i.officer)) {
+    items.push({
+      id: 'dispatch',
+      label: 'Dispatch officers',
+      description: 'Assign available units',
+      onClick: onToggleDispatch,
+    });
+  }
+
+  if (!resolved) {
+    items.push({
+      id: 'resolve',
+      label: updating ? 'Resolving…' : 'Resolve incident',
+      tone: 'ok',
+      disabled: updating,
+      onClick: onResolve,
+    });
+  }
+
+  items.push({
+    id: 'copy',
+    label: 'Copy reference',
+    description: code,
+    onClick: () => {
+      void navigator.clipboard?.writeText(i.id);
+    },
+  });
+
+  return items;
+}
+
+function IncidentMonitorBoard({
+  title,
+  rows,
+  emptyMessage,
+  selectedId,
+  resolved = false,
+  dispatchIncidentId,
+  updatingId,
   onToggleDispatch,
   onResolve,
   onAssigned,
 }: {
-  incident: Incident;
-  selected: boolean;
-  resolved: boolean;
-  dispatchOpen: boolean;
-  updating: boolean;
-  onToggleDispatch: () => void;
-  onResolve: () => void;
+  title: string;
+  rows: Incident[];
+  emptyMessage: string;
+  selectedId: string | null;
+  resolved?: boolean;
+  dispatchIncidentId: string | null;
+  updatingId: string | null;
+  onToggleDispatch: (id: string) => void;
+  onResolve: (id: string) => void;
   onAssigned: () => void;
 }) {
-  const priorityCls = i.priority.toLowerCase();
-
   return (
-    <article
-      className={`incident-card incident-card--v2 ${resolved ? 'incident-card--resolved' : `incident-card--active incident-card--pri-${priorityCls}`} ${
-        selected ? 'incident-card--selected' : ''
-      }`}
-    >
-      {/* Priority stripe */}
-      <div className={`incident-card__stripe incident-card__stripe--${priorityCls}`} aria-hidden="true" />
-
-      <div className="incident-card__body">
-        <Link href={`/control-room/incidents?id=${i.id}`} className="incident-card__main">
-          <div className="incident-card__top">
-            <span className={`incident-type incident-type--${priorityCls}`}>{i.type}</span>
-            <span className={statusBadgeClass(i.status)}>{i.status.replace(/_/g, ' ')}</span>
-            {!resolved && i.priority.toUpperCase() === 'CRITICAL' && (
-              <span className="inc-critical-pill">CRITICAL</span>
-            )}
-          </div>
-          <strong className="incident-card__title">{i.user}</strong>
-          <div className="incident-card__detail-row">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
-            <span className="incident-card__location">{i.location}</span>
-          </div>
-          <div className="incident-card__meta">
-            <span>🕐 {i.time}</span>
-            {i.officer && (
-              <span className="inc-officer-pill">
-                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-                {i.officer}
-              </span>
-            )}
-            {(i.reportCount ?? 0) > 0 && (
-              <span className="inc-reports-pill">{i.reportCount} report{i.reportCount === 1 ? '' : 's'}</span>
-            )}
-          </div>
-          {i.latestReport && (
-            <p className="incident-card__preview">"{i.latestReport.slice(0, 120)}{i.latestReport.length > 120 ? '…' : ''}"</p>
-          )}
-        </Link>
-
-        <div className="incident-card__actions">
-          {!resolved && isAwaitingDispatch(i.status, i.officer) && (
-            <AvailableOfficersButton
-              incidentId={i.id}
-              active={dispatchOpen}
-              onClick={onToggleDispatch}
-            />
-          )}
-          <Link href={`/control-room/map?incident=${i.id}`} className="btn-sm btn-sm--link">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg>
-            Map
-          </Link>
-          <Link href={`/control-room/incidents?id=${i.id}`} className="btn-sm btn-sm--link">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-            Reports
-          </Link>
-          <Link href={documentsHref({ incidentId: i.id })} className="btn-sm btn-sm--link">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
-            Docs
-          </Link>
-          {!resolved && (
-            <button type="button" className="btn-sm btn-sm--resolve" onClick={onResolve} disabled={updating}>
-              {updating ? <LoadingSpinner label="" size="sm" /> : '✓ Resolve'}
-            </button>
-          )}
+    <section className="soc-history inc-monitor" aria-label={title}>
+      <header className="soc-history__head">
+        <div>
+          <h2>{title}</h2>
+          <p>{resolved ? 'Closed and cleared files.' : 'Open files needing desk or field response.'}</p>
         </div>
+        <div className="soc-history__stats">
+          <span>
+            <strong>{rows.length}</strong> {resolved ? 'resolved' : 'open'}
+          </span>
+        </div>
+      </header>
+
+      <div className="soc-history__board ops-mon">
+        <table className="ops-mon__table">
+          <thead>
+            <tr>
+              <th>Incident</th>
+              <th>Type</th>
+              <th>Location</th>
+              <th>Status</th>
+              <th>Last seen</th>
+              <th>Signal</th>
+              <th className="ops-mon__actions-h">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.length === 0 ? (
+              <tr>
+                <td colSpan={7} className="ops-mon__empty">
+                  {emptyMessage}
+                </td>
+              </tr>
+            ) : (
+              rows.map((i, index) => {
+                const tone = incidentStatusTone(i.status);
+                const fill = toneFill(tone);
+                const code = `IN${String(index + 1).padStart(4, '0')}`;
+                const selected = selectedId === i.id;
+                const dispatchOpen = dispatchIncidentId === i.id;
+                return (
+                  <tr
+                    key={i.id}
+                    className={[
+                      resolved ? 'is-void' : '',
+                      selected || dispatchOpen ? 'is-selected' : '',
+                      !resolved && (i.priority ?? '').toUpperCase() === 'CRITICAL' ? 'is-critical' : '',
+                    ]
+                      .filter(Boolean)
+                      .join(' ')}
+                  >
+                    <td>
+                      <div className="ops-mon__device">
+                        <span className="ops-mon__icon" aria-hidden>
+                          <IncidentTypeIcon type={i.type} />
+                        </span>
+                        <span className="ops-mon__device-copy">
+                          <strong>
+                            <OpsMarqueeText>
+                              {i.type} — {i.user}
+                            </OpsMarqueeText>
+                          </strong>
+                          <em>
+                            {code}
+                            {i.officer ? ` · ${i.officer}` : ''}
+                          </em>
+                        </span>
+                      </div>
+                    </td>
+                    <td className="ops-mon__muted">{i.type}</td>
+                    <td className="ops-mon__muted">{i.location}</td>
+                    <td>
+                      <OpsStatusPill tone={tone} label={incidentStatusLabel(i.status)} />
+                    </td>
+                    <td className="ops-mon__muted">{i.time}</td>
+                    <td>
+                      <OpsSignal fill={fill} />
+                    </td>
+                    <td className="ops-mon__actions">
+                      <div className="inc-monitor__actions">
+                        <OpsMonActionsMenu
+                          label={`Actions for ${i.type} — ${i.user}`}
+                          items={controlRoomIncidentActions({
+                            incident: i,
+                            code,
+                            resolved,
+                            updating: updatingId === i.id,
+                            onToggleDispatch: () => onToggleDispatch(i.id),
+                            onResolve: () => onResolve(i.id),
+                          })}
+                        />
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })
+            )}
+          </tbody>
+        </table>
+
+        <ul className="ops-mon__cards">
+          {rows.length === 0 ? (
+            <li className="ops-mon__empty">{emptyMessage}</li>
+          ) : (
+            rows.map((i, index) => {
+              const tone = incidentStatusTone(i.status);
+              const fill = toneFill(tone);
+              const code = `IN${String(index + 1).padStart(4, '0')}`;
+              const dispatchOpen = dispatchIncidentId === i.id;
+              return (
+                <li key={`card-${i.id}`} className={resolved ? 'is-void' : undefined}>
+                  <div className="ops-mon__device">
+                    <span className="ops-mon__icon" aria-hidden>
+                      <IncidentTypeIcon type={i.type} />
+                    </span>
+                    <span className="ops-mon__device-copy">
+                      <strong>
+                        <OpsMarqueeText>
+                          {i.type} — {i.user}
+                        </OpsMarqueeText>
+                      </strong>
+                      <em>
+                        {code}
+                        {i.officer ? ` · ${i.officer}` : ''}
+                      </em>
+                    </span>
+                    <OpsMonActionsMenu
+                      label={`Actions for ${i.type} — ${i.user}`}
+                      items={controlRoomIncidentActions({
+                        incident: i,
+                        code,
+                        resolved,
+                        updating: updatingId === i.id,
+                        onToggleDispatch: () => onToggleDispatch(i.id),
+                        onResolve: () => onResolve(i.id),
+                      })}
+                    />
+                  </div>
+                  <div className="ops-mon__card-meta">
+                    <span>{i.type}</span>
+                    <span>{i.location}</span>
+                    <span>{i.time}</span>
+                  </div>
+                  <div className="ops-mon__card-foot">
+                    <OpsStatusPill tone={tone} label={incidentStatusLabel(i.status)} />
+                    <OpsSignal fill={fill} />
+                  </div>
+                </li>
+              );
+            })
+          )}
+        </ul>
       </div>
 
-      {dispatchOpen && (
-        <QuickDispatchPanel
-          incidentId={i.id}
-          incidentLabel={`${i.type} · ${i.user}`}
-          defaultExpanded
-          onAssigned={onAssigned}
-        />
+      {rows.map((i) =>
+        dispatchIncidentId === i.id && !resolved ? (
+          <div key={`dispatch-${i.id}`} className="inc-monitor__dispatch-desk">
+            <QuickDispatchPanel
+              incidentId={i.id}
+              incidentLabel={`${i.type} · ${i.user}`}
+              defaultExpanded
+              onAssigned={onAssigned}
+            />
+          </div>
+        ) : null,
       )}
-    </article>
+    </section>
   );
 }

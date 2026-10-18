@@ -614,7 +614,7 @@ function MapContent() {
       </div>
 
       <p className="command-centre__hint text-muted">
-        Durban metro operations view · Dark mode optimised for 24/7 control room use ·
+        Durban metro operations view · Control room live map ·
         {' '}
         <Link href={CONTROL_ROOM_ROUTES.analytics} className="interactive-text">Analytics</Link>
       </p>

@@ -6,6 +6,7 @@ import { TechLayout } from '@/components/tech/TechLayout';
 import { ErrorAlert } from '@/components/ErrorAlert';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { ThemeSettings } from '@/components/ThemeSettings';
+import { PasskeysSettingsPanel } from '@/components/auth/PasskeysSettingsPanel';
 import { OpsDialog } from '@/components/ops/OpsDialog';
 import { useApi } from '@/hooks/useApi';
 import { techApi, type ApiResponse } from '@/lib/api-client';
@@ -139,6 +140,8 @@ function TechProfileContent() {
           </a>
         </div>
       </section>
+
+      <PasskeysSettingsPanel portal="technician" />
 
       <section className="portal-card profile-section">
         <ThemeSettings />

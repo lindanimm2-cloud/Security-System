@@ -8,12 +8,19 @@ import {
   confirmMfaSetup,
   isMfaChallenge,
   login,
+  loginWithPasskey,
   oauthClientSignIn,
+  passkeysAvailable,
   startMfaSetup,
   verifyMfaLogin,
   type AuthSession,
   type MfaChallenge,
 } from '@/lib/auth';
+import {
+  isConditionalMediationAvailable,
+  loginPasskeyButtonLabel,
+  mobileBiometricHint,
+} from '@/lib/passkeys';
 import { applyTabTitle, bootTabSession } from '@/lib/tab-session';
 import { clearActionKind, getActionKind, setActionKind } from '@/lib/action-status';
 import { friendlyErrorMessage } from '@/lib/friendly-error';
@@ -120,6 +127,12 @@ function LoginFormInner({
   const [backupCodes, setBackupCodes] = useState<string[] | null>(null);
   const [pendingSessionRole, setPendingSessionRole] = useState<string | null>(null);
   const [pendingPortal, setPendingPortal] = useState<string | null>(null);
+  const [passkeyReady, setPasskeyReady] = useState(false);
+  const [passkeyBusy, setPasskeyBusy] = useState(false);
+  const [passkeyLabel, setPasskeyLabel] = useState('Sign in with passkey / biometrics');
+  const [passkeyHint, setPasskeyHint] = useState(
+    'Uses Windows Hello, Face ID, Touch ID, or a security key on this device.',
+  );
 
   useEffect(() => {
     const pending = getActionKind();
@@ -145,6 +158,75 @@ function LoginFormInner({
   useEffect(() => {
     setPendingPortal(null);
   }, [pathname]);
+
+  useEffect(() => {
+    setPasskeyReady(passkeysAvailable());
+    setPasskeyLabel(loginPasskeyButtonLabel());
+    setPasskeyHint(mobileBiometricHint());
+  }, []);
+
+  useEffect(() => {
+    if (!passkeyReady || mfaChallenge) return;
+    let cancelled = false;
+    void (async () => {
+      const ok = await isConditionalMediationAvailable();
+      if (!ok || cancelled) return;
+      try {
+        const result = await loginWithPasskey(portal, tenantSlug, {
+          emailHint: email.trim() || undefined,
+          authSource: portal === 'client' ? 'portal' : undefined,
+          useBrowserAutofill: true,
+        });
+        if (cancelled) return;
+        if (isMfaChallenge(result)) {
+          if (result.kind === 'setup') {
+            await beginMfaSetup(result);
+          } else {
+            setMfaChallenge(result);
+            setMfaCode('');
+            setBackupCodes(null);
+          }
+          return;
+        }
+        finishSignIn(result);
+      } catch {
+        /* User ignored autofill — password form remains available. */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // Autofill once per portal mount; email/tenant updates still work via the button.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [passkeyReady, portal, mfaChallenge]);
+
+  async function handlePasskeyLogin() {
+    setError('');
+    setPasskeyBusy(true);
+    setLoading(true);
+    try {
+      const result = await loginWithPasskey(portal, tenantSlug, {
+        emailHint: email.trim() || undefined,
+        authSource: portal === 'client' ? 'portal' : undefined,
+      });
+      if (isMfaChallenge(result)) {
+        if (result.kind === 'setup') {
+          await beginMfaSetup(result);
+        } else {
+          setMfaChallenge(result);
+          setMfaCode('');
+        }
+        setLoading(false);
+        setPasskeyBusy(false);
+        return;
+      }
+      finishSignIn(result);
+    } catch (err) {
+      setError(friendlyErrorMessage(err, 'login'));
+      setLoading(false);
+      setPasskeyBusy(false);
+    }
+  }
 
   function finishSignIn(session: AuthSession) {
     applyTabTitle(session, portal);
@@ -269,7 +351,7 @@ function LoginFormInner({
 
   if (backupCodes) {
     return (
-      <div className="login-page login-page--v2">
+      <div className={`login-page login-page--v2${portal === 'admin' ? ' login-page--control-only' : ''}`}>
         <LoginPageChrome />
         <div className="login-page__inner">
           <div className="login-card login-card--v2">
@@ -311,17 +393,19 @@ function LoginFormInner({
   if (mfaChallenge) {
     const isSetup = mfaChallenge.kind === 'setup';
     return (
-      <div className="login-page login-page--v2">
+      <div className={`login-page login-page--v2${portal === 'admin' ? ' login-page--control-only' : ''}`}>
         <LoginPageChrome />
         <div className="login-page__inner">
-          <div className="login-page__logo">
-            <BrandMark
-              variant={portal === 'admin' ? 'control' : portal === 'officer' ? 'officer' : 'portal'}
-              href={false}
-              showProduct={false}
-            />
-          </div>
-          <div className="login-card login-card--v2">
+          {portal !== 'admin' ? (
+            <div className="login-page__logo">
+              <BrandMark
+                variant={portal === 'officer' ? 'officer' : 'portal'}
+                href={false}
+                showProduct={false}
+              />
+            </div>
+          ) : null}
+          <div className={`login-card login-card--v2${portal === 'admin' ? ' login-card--control' : ''}`}>
             <div className="login-brand login-brand--v2">
               <h1>{isSetup ? 'Set up authenticator' : 'Two-step verification'}</h1>
               <p>
@@ -390,20 +474,24 @@ function LoginFormInner({
     );
   }
 
+  const isControlPanel = portal === 'admin';
+
   return (
-    <div className="login-page login-page--v2">
+    <div className={`login-page login-page--v2${isControlPanel ? ' login-page--control-only' : ''}`}>
       <LoginPageChrome />
 
       <div className="login-page__inner">
-        <div className="login-page__logo">
-          <BrandMark
-            variant={portal === 'admin' ? 'control' : portal === 'officer' ? 'officer' : 'portal'}
-            href={false}
-            showProduct={false}
-          />
-        </div>
+        {!isControlPanel ? (
+          <div className="login-page__logo">
+            <BrandMark
+              variant={portal === 'officer' ? 'officer' : 'portal'}
+              href={false}
+              showProduct={false}
+            />
+          </div>
+        ) : null}
 
-        <div className="login-card login-card--v2">
+        <div className={`login-card login-card--v2${isControlPanel ? ' login-card--control' : ''}`}>
           <div className="login-card__icon" aria-hidden>
             <SketchIcon name="shield" size={28} />
           </div>
@@ -501,6 +589,32 @@ function LoginFormInner({
 
           {!(portal === 'client' && oauthProvider) && (
           <form onSubmit={handleSubmit} className="login-form login-form--v2">
+            {passkeyReady && !mfaChallenge ? (
+              <div className="login-passkey">
+                <button
+                  type="button"
+                  className="login-passkey-btn"
+                  disabled={loading || passkeyBusy}
+                  onClick={() => void handlePasskeyLogin()}
+                >
+                  {passkeyBusy ? (
+                    <span className="btn-loading">
+                      <ButtonSpinner />
+                      Waiting for Face ID / fingerprint…
+                    </span>
+                  ) : (
+                    <>
+                      <SketchIcon name="secure" size={18} />
+                      {passkeyLabel}
+                    </>
+                  )}
+                </button>
+                <p className="login-passkey__hint">{passkeyHint}</p>
+                <div className="login-divider">
+                  <span>or use password</span>
+                </div>
+              </div>
+            ) : null}
             {portal !== 'client' && (
               <label className="login-field">
                 <span>Organization</span>
@@ -531,7 +645,7 @@ function LoginFormInner({
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="you@example.com"
                   required
-                  autoComplete="email"
+                  autoComplete="username webauthn"
                 />
               </span>
             </label>
@@ -615,76 +729,61 @@ function LoginFormInner({
             </div>
           )}
 
-          {portal === 'client' && oauthProvider ? null : (
-          <>
-          <div className="login-divider">
-            <span>or continue as</span>
-          </div>
+          {/* Control panel /login is card-only — never show other portal links */}
+          {!isControlPanel && !(portal === 'client' && oauthProvider) ? (
+            <>
+              <div className="login-divider">
+                <span>or continue as</span>
+              </div>
 
-          <div className="login-portal-switch">
-            {otherPortals.map((p) => {
-              const waiting = pendingPortal === p.href;
-              return (
-                <Link
-                  key={p.href}
-                  href={p.href}
-                  className={`login-portal-btn${waiting ? ' login-portal-btn--busy' : ''}`}
-                  aria-busy={waiting || undefined}
-                  aria-label={waiting ? `Loading ${p.label}` : p.label}
-                  onClick={(e) => {
-                    if (pendingPortal) {
-                      e.preventDefault();
-                      return;
-                    }
-                    setPendingPortal(p.href);
-                  }}
-                >
-                  {waiting ? (
-                    <ButtonSpinner />
-                  ) : (
-                    <>
-                      <SketchIcon name={p.icon} size={17} />
-                      {p.label}
-                    </>
-                  )}
-                </Link>
-              );
-            })}
-          </div>
+              <div className="login-portal-switch">
+                {otherPortals.map((p) => {
+                  const waiting = pendingPortal === p.href;
+                  return (
+                    <Link
+                      key={p.href}
+                      href={p.href}
+                      className={`login-portal-btn${waiting ? ' login-portal-btn--busy' : ''}`}
+                      aria-busy={waiting || undefined}
+                      aria-label={waiting ? `Loading ${p.label}` : p.label}
+                      onClick={(e) => {
+                        if (pendingPortal) {
+                          e.preventDefault();
+                          return;
+                        }
+                        setPendingPortal(p.href);
+                      }}
+                    >
+                      {waiting ? (
+                        <ButtonSpinner />
+                      ) : (
+                        <>
+                          <SketchIcon name={p.icon} size={17} />
+                          {p.label}
+                        </>
+                      )}
+                    </Link>
+                  );
+                })}
+              </div>
 
-          <div className="login-demo-hint login-demo-hint--v2">
-            Demo:{' '}
-            <code>
-              {demoEmail ??
-                (asDeveloper
-                  ? 'developer@4ds.local'
-                  : portal === 'admin'
-                    ? 'admin@demo.local'
-                    : portal === 'officer'
-                      ? 'ndlovu@4ds.local'
-                      : 'client@demo.local')}
-            </code>
-            {' / '}<code>{DEMO_PASSWORD}</code>
-            {portal !== 'client' && (
-              <>
-                {' · '}org <code>demo</code>
-              </>
-            )}
-            {asDeveloper && (
-              <>
-                {' · '}
-                <Link href="/control-room/profile">Developer profile</Link>
-              </>
-            )}
-          </div>
-          </>
-          )}
+              <div className="login-demo-hint login-demo-hint--v2">
+                Demo:{' '}
+                <code>
+                  {demoEmail ??
+                    (portal === 'officer' ? 'ndlovu@4ds.local' : 'client@demo.local')}
+                </code>
+                {' / '}
+                <code>{DEMO_PASSWORD}</code>
+                {portal !== 'client' && (
+                  <>
+                    {' · '}org <code>demo</code>
+                  </>
+                )}
+              </div>
+            </>
+          ) : null}
         </div>
-
-        <p className="login-footer-note">
-          <SketchIcon name="secure" size={15} className="login-footer-note__icon" />
-          Secure access · Trusted by 4DS Solutions
-        </p>
       </div>
 
       {forgotOpen && (

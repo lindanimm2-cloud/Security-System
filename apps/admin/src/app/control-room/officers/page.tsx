@@ -4,7 +4,7 @@ import { ErrorAlert } from '@/components/ErrorAlert';
 import Link from 'next/link';
 import { useMemo, useRef, useState, type ChangeEvent } from 'react';
 import { ControlRoomLayout } from '@/components/control-room/ControlRoomLayout';
-import { OfficerStatusControl, OfficerStatusDot } from '@/components/control-room/OfficerStatusControl';
+import { OfficerStatusControl } from '@/components/control-room/OfficerStatusControl';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { useApi } from '@/hooks/useApi';
 import { adminApi, type ApiResponse } from '@/lib/api-client';
@@ -16,6 +16,7 @@ import { OpsMenuDropdown } from '@/components/ops/OpsMenuDropdown';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ListSearch } from '@/components/ui/ListSearch';
 import { LayoutViewToggle } from '@/components/ui/LayoutViewToggle';
+import { OpsMarqueeText } from '@/components/ui/OpsMarquee';
 import { UiSelect } from '@/components/ui/UiSelect';
 import { UserAvatar } from '@/components/ui/UserAvatar';
 import { friendlyErrorMessage } from '@/lib/friendly-error';
@@ -47,6 +48,12 @@ type Officer = {
   phone?: string | null;
   email?: string | null;
   rank?: string | null;
+  employmentType?: 'FULL_TIME' | 'PART_TIME' | 'CONTRACT' | null;
+  idNumber?: string | null;
+  psiraNumber?: string | null;
+  psiraGrade?: string | null;
+  certifications?: string | null;
+  certificationExpiry?: string | null;
   dutyModeActive?: boolean;
   dutyStartedAt?: string | null;
   lastHeartbeatAt?: string | null;
@@ -65,6 +72,8 @@ type Officer = {
   assignedFleet?: AssignedFleet | null;
 };
 
+type EmploymentType = 'FULL_TIME' | 'PART_TIME' | 'CONTRACT';
+
 type OfficerDraft = {
   id?: string;
   firstName: string;
@@ -73,8 +82,42 @@ type OfficerDraft = {
   phone: string;
   email: string;
   rank: string;
+  employmentType: EmploymentType;
+  idNumber: string;
+  psiraNumber: string;
+  psiraGrade: string;
+  certifications: string;
+  certificationExpiry: string;
   avatarUrl: string | null;
 };
+
+const EMPLOYMENT_OPTIONS: { value: EmploymentType; label: string }[] = [
+  { value: 'FULL_TIME', label: 'Full-time' },
+  { value: 'PART_TIME', label: 'Part-time' },
+  { value: 'CONTRACT', label: 'Contract' },
+];
+
+const PSIRA_GRADES = ['A', 'B', 'C', 'D', 'E'];
+
+function employmentLabel(value?: string | null) {
+  return EMPLOYMENT_OPTIONS.find((option) => option.value === value)?.label ?? 'Full-time';
+}
+
+function employmentTypeOf(value?: string | null): EmploymentType {
+  if (value === 'PART_TIME' || value === 'CONTRACT' || value === 'FULL_TIME') return value;
+  return 'FULL_TIME';
+}
+
+function emptyCompliance() {
+  return {
+    employmentType: 'FULL_TIME' as EmploymentType,
+    idNumber: '',
+    psiraNumber: '',
+    psiraGrade: '',
+    certifications: '',
+    certificationExpiry: '',
+  };
+}
 
 function formatAvgResponse(sec: number) {
   const avgMin = Math.floor(sec / 60);
@@ -142,6 +185,11 @@ function OfficersContent() {
           o.zone,
           o.rank,
           o.status,
+          o.idNumber,
+          o.psiraNumber,
+          o.psiraGrade,
+          o.certifications,
+          employmentLabel(o.employmentType),
           o.vehicle?.callSign,
           o.vehicle?.registration,
           o.assignedFleet?.callSign,
@@ -168,6 +216,7 @@ function OfficersContent() {
       phone: '',
       email: '',
       rank: 'Officer',
+      ...emptyCompliance(),
       avatarUrl: null,
     });
   }
@@ -182,6 +231,12 @@ function OfficersContent() {
       phone: officer.phone ?? '',
       email: officer.email ?? '',
       rank: officer.rank ?? 'Officer',
+      employmentType: employmentTypeOf(officer.employmentType),
+      idNumber: officer.idNumber ?? '',
+      psiraNumber: officer.psiraNumber ?? '',
+      psiraGrade: officer.psiraGrade ?? '',
+      certifications: officer.certifications ?? '',
+      certificationExpiry: officer.certificationExpiry ?? '',
       avatarUrl: officer.avatarUrl ?? null,
     });
   }
@@ -202,6 +257,12 @@ function OfficersContent() {
       phone: draft.phone.trim() || null,
       email: draft.email.trim() || null,
       rank: draft.rank.trim() || 'Officer',
+      employmentType: draft.employmentType,
+      idNumber: draft.idNumber.trim() || null,
+      psiraNumber: draft.psiraNumber.trim() || null,
+      psiraGrade: draft.psiraGrade.trim() || null,
+      certifications: draft.certifications.trim() || null,
+      certificationExpiry: draft.certificationExpiry.trim() || null,
       avatarUrl: draft.avatarUrl,
     };
     try {
@@ -230,14 +291,14 @@ function OfficersContent() {
   if (error) return <ErrorAlert error={error} onRetry={reload} />;
 
   return (
-    <div className="page-content ops-page">
-      <header className="ops-page-header">
+    <div className="page-content ops-page officers-page">
+      <header className="ops-page-header ops-page-header--compact">
         <div>
           <h1 className="ops-page-header__title">Officers</h1>
           <p className="ops-page-header__subtitle">Personnel, vehicles &amp; field status</p>
         </div>
         <div className="ops-page-header__actions">
-          <button type="button" className="btn-primary" onClick={openAdd}>
+          <button type="button" className="btn-primary btn-sm" onClick={openAdd}>
             + Add Officer
           </button>
         </div>
@@ -261,16 +322,16 @@ function OfficersContent() {
         />
       )}
 
-      <div className="ops-metrics" aria-label="Officer summary">
+      <div className="ops-metrics ops-metrics--compact" aria-label="Officer summary">
         <article className="ops-metric">
           <strong className="ops-metric__value">{metrics.total}</strong>
-          <span className="ops-metric__label">Total Officers</span>
+          <span className="ops-metric__label">Total</span>
         </article>
         <article className="ops-metric ops-status--ok">
           <strong className="ops-metric__value">{metrics.onDuty}</strong>
           <span className="ops-metric__label">
             <span className="ops-status__dot" aria-hidden />
-            On Duty
+            On duty
           </span>
         </article>
         <article className="ops-metric ops-status--ok">
@@ -284,17 +345,17 @@ function OfficersContent() {
           <strong className="ops-metric__value">{metrics.offDuty}</strong>
           <span className="ops-metric__label">
             <span className="ops-status__dot" aria-hidden />
-            Off Duty
+            Off duty
           </span>
         </article>
       </div>
 
-      <div className="ops-toolbar">
+      <div className="ops-toolbar ops-toolbar--compact">
         <div className="list-search-bar">
           <ListSearch
             value={search}
             onChange={setSearch}
-            placeholder="Search officers by name, unit, or phone…"
+            placeholder="Search officers…"
             resultCount={filteredOfficers.length}
             totalCount={officers.length}
           />
@@ -348,92 +409,129 @@ function OfficersContent() {
           }
         />
       ) : layoutView === 'list' ? (
-        <div className="table-wrap">
-          <table className="ops-officer-table">
-            <thead>
-              <tr>
-                <th>Officer</th>
-                <th>Role</th>
-                <th>Zone</th>
-                <th>Unit</th>
-                <th>Status</th>
-                <th>Device</th>
-                <th>Response</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredOfficers.map((o) => (
-                <tr key={o.id}>
-                  <td>
-                    <div className="ops-officer-table__name">
-                      <OfficerStatusDot status={o.status} />
-                      <span>
-                        {o.firstName} {o.lastName}
-                      </span>
-                    </div>
-                  </td>
-                  <td>{o.rank ?? 'Officer'}</td>
-                  <td>{o.zone ?? '—'}</td>
-                  <td>{o.assignedFleet?.callSign ?? '—'}</td>
-                  <td>
-                    <OfficerStatusControl
-                      officerId={o.id}
-                      status={o.status}
-                      variant="select"
-                      onUpdated={reload}
-                    />
-                  </td>
-                  <td>
-                    {o.deviceLink === 'OFFLINE' || o.deviceLink === 'NO_SIGNAL' ? (
-                      <span className="ops-status ops-status--warn">
-                        <span className="ops-status__dot" aria-hidden />
-                        Offline
-                      </span>
-                    ) : o.dutyModeActive ? (
-                      <span className="ops-status ops-status--ok">
-                        <span className="ops-status__dot" aria-hidden />
-                        Duty · {deviceLinkLabel(o.deviceLink ?? 'ONLINE')}
-                      </span>
-                    ) : (
-                      <span className="text-muted">Standby</span>
-                    )}
-                  </td>
-                  <td>{formatAvgResponse(o.avgResponseSec)}</td>
-                  <td>
-                    <div className="officer-table__actions">
-                      <Link href={mapHref('officers')} className="btn-sm btn-secondary">
-                        Map
-                      </Link>
-                      <Link href={CONTROL_ROOM_ROUTES.dispatch} className="btn-sm btn-secondary">
-                        Dispatch
-                      </Link>
-                      {o.phone ? (
-                        <a href={`tel:${o.phone}`} className="btn-sm btn-ghost">
-                          Call
-                        </a>
-                      ) : null}
-                      <button type="button" className="btn-sm btn-ghost" onClick={() => openEdit(o)}>
-                        Edit
-                      </button>
-                    </div>
-                  </td>
+        <div className="ops-officer-panel">
+          <div className="table-wrap ops-officer-panel__scroll">
+            <table className="ops-officer-table">
+              <thead>
+                <tr>
+                  <th>Officer</th>
+                  <th>Role</th>
+                  <th>Zone</th>
+                  <th>Unit</th>
+                  <th>Status</th>
+                  <th>Device</th>
+                  <th>Response</th>
+                  <th aria-label="Actions" />
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {filteredOfficers.map((o) => (
+                  <tr key={o.id}>
+                    <td>
+                      <div className="ops-officer-table__name">
+                        <strong>
+                          <OpsMarqueeText>
+                            {o.firstName} {o.lastName}
+                          </OpsMarqueeText>
+                        </strong>
+                      </div>
+                    </td>
+                    <td>
+                      <div className="ops-officer-table__role">
+                        <span>{o.rank ?? 'Officer'}</span>
+                        <span>{employmentLabel(o.employmentType)}</span>
+                        {o.psiraNumber ? <span>PSIRA {o.psiraNumber}</span> : null}
+                      </div>
+                    </td>
+                    <td>
+                      <span className="ops-officer-table__muted">{o.zone ?? '—'}</span>
+                    </td>
+                    <td>
+                      <span className="ops-officer-table__unit">
+                        {o.assignedFleet?.callSign ?? '—'}
+                      </span>
+                    </td>
+                    <td>
+                      <OfficerStatusControl
+                        officerId={o.id}
+                        status={o.status}
+                        variant="select"
+                        onUpdated={reload}
+                      />
+                    </td>
+                    <td>
+                      {o.deviceLink === 'OFFLINE' || o.deviceLink === 'NO_SIGNAL' ? (
+                        <span className="ops-status ops-status--warn ops-status--sm">
+                          <span className="ops-status__dot" aria-hidden />
+                          Offline
+                        </span>
+                      ) : o.dutyModeActive ? (
+                        <span className="ops-status ops-status--ok ops-status--sm">
+                          <span className="ops-status__dot" aria-hidden />
+                          Duty
+                        </span>
+                      ) : (
+                        <span className="ops-officer-table__standby">Standby</span>
+                      )}
+                    </td>
+                    <td>
+                      <span className="ops-officer-table__response">
+                        {formatAvgResponse(o.avgResponseSec)}
+                      </span>
+                    </td>
+                    <td>
+                      <div className="officer-table__actions">
+                        <Link href={mapHref('officers')} className="btn-sm btn-secondary">
+                          Map
+                        </Link>
+                        <OpsMenuDropdown
+                          className="ops-officer-more"
+                          compact
+                          align="right"
+                          hideCaret
+                          ariaLabel={`Actions for ${o.firstName} ${o.lastName}`}
+                          label={
+                            <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden>
+                              <circle cx="3.2" cy="8" r="1.15" fill="currentColor" />
+                              <circle cx="8" cy="8" r="1.15" fill="currentColor" />
+                              <circle cx="12.8" cy="8" r="1.15" fill="currentColor" />
+                            </svg>
+                          }
+                          items={[
+                            {
+                              id: 'dispatch',
+                              label: 'Dispatch',
+                              href: CONTROL_ROOM_ROUTES.dispatch,
+                            },
+                            ...(o.phone
+                              ? ([{ id: 'call', label: 'Call', href: `tel:${o.phone}` }] as const)
+                              : []),
+                            { id: 'edit', label: 'Edit', onClick: () => openEdit(o) },
+                          ]}
+                        />
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <p className="ops-officer-panel__meta">
+            Showing {filteredOfficers.length} of {officers.length} officers
+          </p>
         </div>
       ) : (
-        <div className="ops-officer-grid">
-          {filteredOfficers.map((o) => (
-            <OfficerCard key={o.id} officer={o} onEdit={() => openEdit(o)} onUpdated={reload} />
-          ))}
+        <div className="ops-officer-panel ops-officer-panel--grid">
+          <div className="ops-officer-grid">
+            {filteredOfficers.map((o) => (
+              <OfficerCard key={o.id} officer={o} onEdit={() => openEdit(o)} onUpdated={reload} />
+            ))}
+          </div>
+          <p className="ops-officer-panel__meta">
+            Showing {filteredOfficers.length} of {officers.length} officers
+          </p>
         </div>
       )}
-
-      <p className="text-muted" style={{ margin: 0, fontSize: '0.8rem' }}>
-        Showing {filteredOfficers.length} of {officers.length} officers
-      </p>
     </div>
   );
 }
@@ -448,7 +546,7 @@ function OfficerCard({
   onUpdated: () => void;
 }) {
   const fleet = o.assignedFleet;
-  const onDuty = isOnDuty(o.status);
+  const deviceOffline = o.deviceLink === 'OFFLINE' || o.deviceLink === 'NO_SIGNAL';
 
   return (
     <article className="ops-officer-card">
@@ -463,15 +561,28 @@ function OfficerCard({
             firstName={o.firstName}
             lastName={o.lastName}
             avatarUrl={o.avatarUrl}
-            size="md"
+            size="sm"
           />
         </button>
         <div className="ops-officer-card__identity">
           <strong className="ops-officer-card__name">
             {o.firstName} {o.lastName}
           </strong>
-          <span className="ops-officer-card__role">{o.rank ?? 'Officer'}</span>
-          {o.zone ? <span className="ops-officer-card__zone">{o.zone}</span> : null}
+          <span className="ops-officer-card__meta">
+            {o.rank ?? 'Officer'}
+            {` · ${employmentLabel(o.employmentType)}`}
+            {o.zone ? ` · ${o.zone}` : ''}
+            {fleet?.callSign ? ` · ${fleet.callSign}` : ''}
+          </span>
+          {o.psiraNumber || o.idNumber ? (
+            <span className="ops-officer-card__meta">
+              {o.psiraNumber
+                ? `PSIRA ${o.psiraNumber}${o.psiraGrade ? ` · Grade ${o.psiraGrade}` : ''}`
+                : ''}
+              {o.psiraNumber && o.idNumber ? ' · ' : ''}
+              {o.idNumber ? `ID ${o.idNumber}` : ''}
+            </span>
+          ) : null}
         </div>
         <OfficerStatusControl
           officerId={o.id}
@@ -481,95 +592,54 @@ function OfficerCard({
         />
       </div>
 
-      <div className="ops-officer-card__rows">
-        {o.phone ? (
-          <a href={`tel:${o.phone}`} className="ops-officer-card__row">
-            <span aria-hidden>☎</span>
-            <span>{o.phone}</span>
-          </a>
-        ) : (
-          <span className="ops-officer-card__row text-muted">No phone on file</span>
-        )}
-        <span className="ops-officer-card__row">
-          <span aria-hidden>◷</span>
-          <span>Avg. response {formatAvgResponse(o.avgResponseSec)}</span>
-        </span>
-        {fleet ? (
-          <span className="ops-officer-card__row">
-            <span aria-hidden>🚙</span>
-            <span>
-              {fleet.callSign} · {fleet.registration}
-              {fleet.teamName ? ` · ${fleet.teamName}` : ''}
-            </span>
+      <div className="ops-officer-card__footer">
+        <div className="ops-officer-card__facts">
+          <span className="ops-officer-card__fact">
+            <span className="ops-officer-card__fact-label">Response</span>
+            <strong>{formatAvgResponse(o.avgResponseSec)}</strong>
           </span>
-        ) : (
-          <span className="ops-officer-card__row text-muted">
-            <span aria-hidden>🚙</span>
-            <span>No vehicle assigned</span>
+          <span className="ops-officer-card__fact">
+            <span className="ops-officer-card__fact-label">Device</span>
+            {deviceOffline ? (
+              <span className="ops-status ops-status--warn ops-status--sm">
+                <span className="ops-status__dot" aria-hidden />
+                Offline
+              </span>
+            ) : o.dutyModeActive ? (
+              <span className="ops-status ops-status--ok ops-status--sm">
+                <span className="ops-status__dot" aria-hidden />
+                Duty
+              </span>
+            ) : (
+              <span className="ops-officer-table__standby">Standby</span>
+            )}
           </span>
-        )}
-      </div>
-
-      <div className="ops-officer-card__duty">
-        <span className={onDuty ? 'ops-status ops-status--ok' : 'ops-status ops-status--muted'}>
-          <span className="ops-status__dot" aria-hidden />
-          {o.dutyModeActive ? 'DUTY ACTIVE' : onDuty ? 'ON DUTY' : 'OFF DUTY'}
-          {fleet?.seatRole ? ` · ${fleet.seatRole}` : ''}
-        </span>
-        {o.dutyModeActive || o.deviceLink === 'OFFLINE' || o.deviceLink === 'NO_SIGNAL' ? (
-          <span
-            className={
-              o.deviceLink === 'ONLINE'
-                ? 'ops-status ops-status--ok'
-                : o.deviceLink === 'OFFLINE' || o.deviceLink === 'NO_SIGNAL'
-                  ? 'ops-status ops-status--warn'
-                  : 'ops-status ops-status--muted'
+        </div>
+        <div className="ops-officer-card__actions">
+          <Link href={mapHref('officers')} className="btn-sm btn-secondary">
+            Map
+          </Link>
+          <OpsMenuDropdown
+            className="ops-officer-more"
+            compact
+            align="right"
+            hideCaret
+            ariaLabel={`More actions for ${o.firstName} ${o.lastName}`}
+            label={
+              <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden>
+                <circle cx="3.2" cy="8" r="1.15" fill="currentColor" />
+                <circle cx="8" cy="8" r="1.15" fill="currentColor" />
+                <circle cx="12.8" cy="8" r="1.15" fill="currentColor" />
+              </svg>
             }
-            title={
-              o.lastHeartbeatAt
-                ? `Last heartbeat ${new Date(o.lastHeartbeatAt).toLocaleString()}`
-                : 'No heartbeat yet'
-            }
-          >
-            <span className="ops-status__dot" aria-hidden />
-            {o.deviceLink === 'OFFLINE' || o.deviceLink === 'NO_SIGNAL'
-              ? 'OFFICER DEVICE OFFLINE'
-              : deviceLinkLabel(o.deviceLink ?? 'STANDBY')}
-            {o.batteryPct != null ? ` · ${o.batteryPct}%` : ''}
-          </span>
-        ) : null}
-      </div>
-
-      <div className="ops-officer-card__actions">
-        <Link href={mapHref('officers')} className="btn-sm btn-secondary">
-          Map
-        </Link>
-        <Link href={CONTROL_ROOM_ROUTES.dispatch} className="btn-sm btn-secondary">
-          Dispatch
-        </Link>
-        {o.phone ? (
-          <a href={`tel:${o.phone}`} className="btn-sm btn-ghost">
-            Call
-          </a>
-        ) : (
-          <button type="button" className="btn-sm btn-ghost" disabled>
-            Call
-          </button>
-        )}
-        <OpsMenuDropdown
-          className="ops-officer-more"
-          compact
-          align="right"
-          hideCaret
-          ariaLabel="More officer actions"
-          label="⋯"
-          items={[
-            { id: 'edit', label: 'Edit Officer', onClick: onEdit },
-            { id: 'fleet', label: 'View Fleet', href: CONTROL_ROOM_ROUTES.fleet },
-            { id: 'map', label: 'Open Live Map', href: mapHref('officers') },
-            { id: 'dispatch', label: 'Open Dispatch', href: CONTROL_ROOM_ROUTES.dispatch },
-          ]}
-        />
+            items={[
+              { id: 'dispatch', label: 'Dispatch', href: CONTROL_ROOM_ROUTES.dispatch },
+              ...(o.phone ? ([{ id: 'call', label: 'Call', href: `tel:${o.phone}` }] as const) : []),
+              { id: 'edit', label: 'Edit Officer', onClick: onEdit },
+              { id: 'fleet', label: 'View Fleet', href: CONTROL_ROOM_ROUTES.fleet },
+            ]}
+          />
+        </div>
       </div>
     </article>
   );
@@ -619,7 +689,7 @@ function OfficerDialog({
       title={editing ? `Edit ${draft.firstName} ${draft.lastName}`.trim() : 'Add officer'}
       subtitle={
         editing
-          ? 'Update profile, contact details, zone, and rank.'
+          ? 'Update profile, employment, ID, PSIRA, and certifications.'
           : "Fill in the officer's details to add them to the roster."
       }
       onClose={onClose}
@@ -715,6 +785,70 @@ function OfficerDialog({
               value={draft.email}
               onChange={(e) => onChange({ ...draft, email: e.target.value })}
               placeholder="officer@4ds.local"
+            />
+          </label>
+          <label>
+            Employment
+            <select
+              value={draft.employmentType}
+              onChange={(e) =>
+                onChange({ ...draft, employmentType: employmentTypeOf(e.target.value) })
+              }
+            >
+              {EMPLOYMENT_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            ID number
+            <input
+              value={draft.idNumber}
+              onChange={(e) => onChange({ ...draft, idNumber: e.target.value })}
+              placeholder="South African ID number"
+              inputMode="numeric"
+              autoComplete="off"
+            />
+          </label>
+          <label>
+            PSIRA number
+            <input
+              value={draft.psiraNumber}
+              onChange={(e) => onChange({ ...draft, psiraNumber: e.target.value })}
+              placeholder="e.g. 3018824"
+              autoComplete="off"
+            />
+          </label>
+          <label>
+            PSIRA grade
+            <select
+              value={draft.psiraGrade}
+              onChange={(e) => onChange({ ...draft, psiraGrade: e.target.value })}
+            >
+              <option value="">Not set</option>
+              {PSIRA_GRADES.map((grade) => (
+                <option key={grade} value={grade}>
+                  Grade {grade}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="officer-form-grid__span">
+            Certifications
+            <input
+              value={draft.certifications}
+              onChange={(e) => onChange({ ...draft, certifications: e.target.value })}
+              placeholder="First aid, firearm competency, HPCSA"
+            />
+          </label>
+          <label>
+            Certification expiry
+            <input
+              type="date"
+              value={draft.certificationExpiry}
+              onChange={(e) => onChange({ ...draft, certificationExpiry: e.target.value })}
             />
           </label>
         </div>

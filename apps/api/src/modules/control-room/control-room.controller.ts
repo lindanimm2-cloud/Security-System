@@ -96,6 +96,119 @@ export class ControlRoomController {
     return this.surveillanceService.dispatchFromEvent(user.tenantId, id, user.id);
   }
 
+  @Post('surveillance/events/:id/claim')
+  @Roles(...OPS_ROLES)
+  claimSurveillanceEvent(@CurrentUser() user: AuthUser, @Param('id') id: string) {
+    return this.surveillanceService.claimEvent(user.tenantId, id, user.id);
+  }
+
+  @Post('surveillance/events/:id/release')
+  @Roles(...OPS_ROLES)
+  releaseSurveillanceEvent(@CurrentUser() user: AuthUser, @Param('id') id: string) {
+    return this.surveillanceService.releaseEvent(user.tenantId, id, user.id);
+  }
+
+  @Post('surveillance/events/:id/responses')
+  @Roles(...OPS_ROLES)
+  respondSurveillanceEvent(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Body() body: { code?: string; answer?: string; note?: string },
+  ) {
+    return this.surveillanceService.recordEventResponse(user.tenantId, id, user.id, {
+      code: body?.code ?? '',
+      answer: body?.answer ?? '',
+      note: body?.note,
+    });
+  }
+
+  @Post('surveillance/events/:id/close')
+  @Roles(...OPS_ROLES)
+  closeSurveillanceEvent(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Body() body: { falseAlarm?: boolean; note?: string },
+  ) {
+    return this.surveillanceService.closeEvent(user.tenantId, id, user.id, body);
+  }
+
+  @Get('operator-responses')
+  @Roles(...OPS_ROLES)
+  listOperatorResponses(@CurrentUser() user: AuthUser) {
+    return this.surveillanceService.listOperatorResponses(user.tenantId);
+  }
+
+  @Patch('operator-responses')
+  putOperatorResponses(
+    @CurrentUser() user: AuthUser,
+    @Body()
+    body: {
+      responses?: Array<{
+        code: string;
+        label: string;
+        mandatory?: boolean;
+        sortOrder?: number;
+        isActive?: boolean;
+      }>;
+    },
+  ) {
+    return this.surveillanceService.putOperatorResponses(user.tenantId, body?.responses ?? []);
+  }
+
+  @Get('sites/:id/monitoring-file')
+  @Roles(...OPS_ROLES)
+  monitoringFile(@CurrentUser() user: AuthUser, @Param('id') id: string) {
+    return this.surveillanceService.getMonitoringFile(user.tenantId, id);
+  }
+
+  @Patch('surveillance/sensors/:id')
+  @Roles(...OPS_ROLES)
+  patchSensorZone(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Body()
+    body: {
+      name?: string;
+      reportAsType?: string | null;
+      requiredAction?: string | null;
+      requiresAck?: boolean;
+      locationLabel?: string;
+    },
+  ) {
+    return this.surveillanceService.updateSensorZone(user.tenantId, id, body ?? {});
+  }
+
+  @Patch('surveillance/sites/:id/monitoring')
+  @Roles(...OPS_ROLES)
+  patchSiteMonitoring(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Body()
+    body: {
+      checkInHours?: number | null;
+      monitoringSchedule?: Record<string, unknown>;
+      lastCheckInAt?: string | null;
+    },
+  ) {
+    return this.surveillanceService.updateSiteMonitoring(user.tenantId, id, body ?? {});
+  }
+
+  @Post('sites/:id/notify-keyholder')
+  @Roles(...OPS_ROLES)
+  notifyKeyholder(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Body() body: { phone?: string; message?: string },
+  ) {
+    return this.surveillanceService.notifyKeyholder(user.tenantId, id, user.id, body);
+  }
+
+  @Post('surveillance/check-in-scan')
+  @Roles(...OPS_ROLES)
+  failedCheckInScan(@CurrentUser() user: AuthUser) {
+    return this.surveillanceService.runFailedCheckInScan(user.tenantId);
+  }
+
   @Post('surveillance/sensors/:id/trigger')
   @Roles(...OPS_ROLES)
   triggerSensor(
@@ -432,7 +545,22 @@ export class ControlRoomController {
   @Post('officers')
   createOfficer(
     @CurrentUser() user: AuthUser,
-    @Body() body: { firstName?: string; lastName?: string; zone?: string; avatarUrl?: string | null },
+    @Body()
+    body: {
+      firstName?: string;
+      lastName?: string;
+      zone?: string;
+      avatarUrl?: string | null;
+      phone?: string | null;
+      email?: string | null;
+      rank?: string | null;
+      employmentType?: string;
+      idNumber?: string | null;
+      psiraNumber?: string | null;
+      psiraGrade?: string | null;
+      certifications?: string | null;
+      certificationExpiry?: string | null;
+    },
   ) {
     return this.controlRoomService.createOfficer(user.tenantId, body);
   }
@@ -441,7 +569,22 @@ export class ControlRoomController {
   updateOfficerProfile(
     @CurrentUser() user: AuthUser,
     @Param('id') id: string,
-    @Body() body: { firstName?: string; lastName?: string; zone?: string; avatarUrl?: string | null },
+    @Body()
+    body: {
+      firstName?: string;
+      lastName?: string;
+      zone?: string;
+      avatarUrl?: string | null;
+      phone?: string | null;
+      email?: string | null;
+      rank?: string | null;
+      employmentType?: string;
+      idNumber?: string | null;
+      psiraNumber?: string | null;
+      psiraGrade?: string | null;
+      certifications?: string | null;
+      certificationExpiry?: string | null;
+    },
   ) {
     return this.controlRoomService.updateOfficerProfile(user.tenantId, id, body);
   }

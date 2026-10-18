@@ -36,6 +36,76 @@ export function generateClientInviteCode(): string {
   return `NX-${body}`;
 }
 
+export type OfficerEmploymentType = 'FULL_TIME' | 'PART_TIME' | 'CONTRACT';
+
+export type OfficerCompliance = {
+  phone: string | null;
+  email: string | null;
+  rank: string | null;
+  employmentType: OfficerEmploymentType;
+  idNumber: string | null;
+  psiraNumber: string | null;
+  psiraGrade: string | null;
+  certifications: string | null;
+  certificationExpiry: string | null;
+};
+
+const EMPLOYMENT_TYPES = new Set<OfficerEmploymentType>(['FULL_TIME', 'PART_TIME', 'CONTRACT']);
+
+function textOrNull(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  return trimmed || null;
+}
+
+export function readOfficerCompliance(checks: unknown): Partial<OfficerCompliance> {
+  if (!checks || typeof checks !== 'object' || Array.isArray(checks)) return {};
+  const profile = (checks as { profile?: unknown }).profile;
+  if (!profile || typeof profile !== 'object' || Array.isArray(profile)) return {};
+  const row = profile as Record<string, unknown>;
+  const employment = String(row.employmentType ?? '');
+  return {
+    phone: textOrNull(row.phone),
+    email: textOrNull(row.email),
+    rank: textOrNull(row.rank),
+    employmentType: EMPLOYMENT_TYPES.has(employment as OfficerEmploymentType)
+      ? (employment as OfficerEmploymentType)
+      : undefined,
+    idNumber: textOrNull(row.idNumber),
+    psiraNumber: textOrNull(row.psiraNumber),
+    psiraGrade: textOrNull(row.psiraGrade),
+    certifications: textOrNull(row.certifications),
+    certificationExpiry: textOrNull(row.certificationExpiry),
+  };
+}
+
+export function mergeOfficerCompliance(checks: unknown, body: Record<string, unknown>): Prisma.InputJsonValue {
+  const base =
+    checks && typeof checks === 'object' && !Array.isArray(checks)
+      ? { ...(checks as Record<string, unknown>) }
+      : {};
+  const current = readOfficerCompliance(checks);
+  const employment = String(body.employmentType ?? '');
+  const next: OfficerCompliance = {
+    phone: body.phone !== undefined ? textOrNull(body.phone) : (current.phone ?? null),
+    email: body.email !== undefined ? textOrNull(body.email) : (current.email ?? null),
+    rank: body.rank !== undefined ? (textOrNull(body.rank) ?? 'Officer') : (current.rank ?? 'Officer'),
+    employmentType: EMPLOYMENT_TYPES.has(employment as OfficerEmploymentType)
+      ? (employment as OfficerEmploymentType)
+      : (current.employmentType ?? 'FULL_TIME'),
+    idNumber: body.idNumber !== undefined ? textOrNull(body.idNumber) : (current.idNumber ?? null),
+    psiraNumber: body.psiraNumber !== undefined ? textOrNull(body.psiraNumber) : (current.psiraNumber ?? null),
+    psiraGrade: body.psiraGrade !== undefined ? textOrNull(body.psiraGrade) : (current.psiraGrade ?? null),
+    certifications:
+      body.certifications !== undefined ? textOrNull(body.certifications) : (current.certifications ?? null),
+    certificationExpiry:
+      body.certificationExpiry !== undefined
+        ? textOrNull(body.certificationExpiry)
+        : (current.certificationExpiry ?? null),
+  };
+  return { ...base, profile: next } as Prisma.InputJsonValue;
+}
+
 type ManagedUserInclude = {
   branch: { id: string; name: string; code: string } | null;
   teamMemberships: {
@@ -901,11 +971,12 @@ export class ControlRoomService {
             : deviceOnline
               ? 'ONLINE'
               : 'OFFLINE';
+        const profile = readOfficerCompliance(o.operationalChecks);
         return {
           id: o.id,
           firstName: o.firstName,
           lastName: o.lastName,
-          email: o.email,
+          email: profile.email ?? o.email,
           status: o.status,
           zone: o.zone,
           avgResponseSec: o.avgResponseSec,
@@ -920,6 +991,14 @@ export class ControlRoomService {
           appVersion: o.appVersion,
           deviceLink,
           avatarUrl: avatarByEmail.get(o.email) ?? null,
+          phone: profile.phone ?? null,
+          rank: profile.rank ?? null,
+          employmentType: profile.employmentType ?? 'FULL_TIME',
+          idNumber: profile.idNumber ?? null,
+          psiraNumber: profile.psiraNumber ?? null,
+          psiraGrade: profile.psiraGrade ?? null,
+          certifications: profile.certifications ?? null,
+          certificationExpiry: profile.certificationExpiry ?? null,
           vehicle: vehicle
             ? {
                 id: vehicle.vehicleId,
@@ -936,7 +1015,12 @@ export class ControlRoomService {
 
   async createOfficer(
     tenantId: string,
-    body: { firstName?: string; lastName?: string; zone?: string; avatarUrl?: string | null },
+    body: {
+      firstName?: string;
+      lastName?: string;
+      zone?: string;
+      avatarUrl?: string | null;
+    } & Record<string, unknown>,
   ) {
     const firstName = String(body.firstName ?? '').trim();
     const lastName = String(body.lastName ?? '').trim();
@@ -954,6 +1038,7 @@ export class ControlRoomService {
         lastName,
         zone: String(body.zone ?? '').trim() || null,
         status: 'AVAILABLE',
+        operationalChecks: mergeOfficerCompliance(null, body),
       },
     });
     const passwordHash = await bcrypt.hash(randomBytes(18).toString('hex'), 10);
@@ -979,7 +1064,12 @@ export class ControlRoomService {
   async updateOfficerProfile(
     tenantId: string,
     id: string,
-    body: { firstName?: string; lastName?: string; zone?: string; avatarUrl?: string | null },
+    body: {
+      firstName?: string;
+      lastName?: string;
+      zone?: string;
+      avatarUrl?: string | null;
+    } & Record<string, unknown>,
   ) {
     const officer = await this.prisma.officer.findFirst({ where: { id, tenantId } });
     if (!officer) throw new NotFoundException('Officer not found');
@@ -990,7 +1080,12 @@ export class ControlRoomService {
     const zone = typeof body.zone === 'string' ? body.zone.trim() || null : officer.zone;
     const updated = await this.prisma.officer.update({
       where: { id },
-      data: { firstName, lastName, zone },
+      data: {
+        firstName,
+        lastName,
+        zone,
+        operationalChecks: mergeOfficerCompliance(officer.operationalChecks, body),
+      },
     });
     const user = await this.prisma.user.findFirst({ where: { tenantId, email: officer.email } });
     let avatarUrl = user?.avatarUrl ?? null;
@@ -2190,6 +2285,8 @@ export class ControlRoomService {
     lng?: unknown;
     isSilent?: boolean;
     ackedAt?: Date | null;
+    propertyId?: string | null;
+    vehicleId?: string | null;
     user: { firstName: string; lastName: string; phone?: string | null };
     dispatches?: {
       status?: string;
@@ -2209,6 +2306,9 @@ export class ControlRoomService {
       incident.lng != null &&
       Number.isFinite(Number(incident.lat)) &&
       Number.isFinite(Number(incident.lng));
+    const siteId = incident.propertyId ?? null;
+    const vehicleId = incident.vehicleId ?? null;
+    const cctvKind = vehicleId ? ('dash' as const) : siteId ? ('site' as const) : null;
     return {
       id: incident.id,
       type: incident.type,
@@ -2227,6 +2327,9 @@ export class ControlRoomService {
       slaBreached: elapsedSec > slaTargetSec,
       isSilent: Boolean(incident.isSilent),
       ackedAt: incident.ackedAt?.toISOString() ?? null,
+      siteId,
+      vehicleId,
+      cctvKind,
     };
   }
 

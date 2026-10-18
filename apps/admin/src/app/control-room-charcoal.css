@@ -1,0 +1,1201 @@
+/* ============================================================
+   Control panel — charcoal Live Ops palette (all pages)
+   Deep charcoal canvas, grey modules, soft borders, pill controls.
+   Scoped to .shell--admin so portal/marketing stay untouched.
+   Light theme remains neumorphic via light-neu-ops.css.
+   ============================================================ */
+
+html:not([data-theme='light']) .shell--admin,
+html:not([data-theme='light']) .shell--admin {
+  color-scheme: dark;
+  --bg: #0a0a0a;
+  --surface: #161616;
+  --surface-2: #121212;
+  --surface-elevated: #1a1a1a;
+  --border: #2a2a2a;
+  --text: #ffffff;
+  --muted: #a0a0a0;
+  --text-muted: #a0a0a0;
+  --loader-color: #c8c8c8;
+  --text-disabled: #666666;
+  --accent: #e8e8e8;
+  --accent-hover: #ffffff;
+  --accent-soft: rgba(255, 255, 255, 0.08);
+  --accent-muted: rgba(255, 255, 255, 0.14);
+  --accent-text: #f2f2f2;
+  --on-accent: #0a0a0a;
+  --btn-charcoal: #1a1a1a;
+  --btn-charcoal-hover: #222222;
+  --success: #44b37f;
+  --success-soft: rgba(68, 179, 127, 0.14);
+  --status-live: #44b37f;
+  --danger: #d63434;
+  --danger-soft: rgba(214, 52, 52, 0.14);
+  --input-bg: #1a1a1a;
+  --field-bg: #1a1a1a;
+  --field-bg-focus: #222222;
+  --field-border: #333333;
+  --field-border-focus: #4a4a4a;
+  --topbar-bg: rgba(10, 10, 10, 0.96);
+  --glass: rgba(22, 22, 22, 0.88);
+  --glass-border: #2a2a2a;
+  --menu-bg: #161616;
+  --monitor: #0a0a0a;
+  --cr-panel: #161616;
+  --cr-surface: #1a1a1a;
+  --cr-surface-hover: #222222;
+  --cr-surface-active: #2b2b2b;
+  --cr-edge: #2a2a2a;
+  --cr-edge-strong: #333333;
+  --cr-blur: none;
+  --panel-radius: 16px;
+}
+
+html:not([data-theme='light']) .shell--admin,
+html:not([data-theme='light']) .shell--admin .shell-main,
+html:not([data-theme='light']) .shell--admin .shell-content,
+html:not([data-theme='light']) .shell--admin,
+html:not([data-theme='light']) .shell--admin .shell-main,
+html:not([data-theme='light']) .shell--admin .shell-content {
+  background: #0a0a0a !important;
+  color: #ffffff;
+}
+
+html:not([data-theme='light']) .shell--admin .sidebar,
+html:not([data-theme='light']) .shell--admin .mobile-shell-header {
+  background: #0a0a0a !important;
+  border-color: #2a2a2a !important;
+  color: #ffffff;
+}
+
+html:not([data-theme='light']) .shell--admin .sidebar-link {
+  color: #a0a0a0;
+}
+
+html:not([data-theme='light']) .shell--admin .sidebar-link:hover {
+  background: #1a1a1a;
+  color: #ffffff;
+}
+
+html:not([data-theme='light']) .shell--admin .sidebar-link--active {
+  background: #2b2b2b !important;
+  color: #ffffff !important;
+}
+
+html:not([data-theme='light']) .shell--admin .page-header h1,
+html:not([data-theme='light']) .shell--admin .page-header h2,
+html:not([data-theme='light']) .shell--admin .page-content h1,
+html:not([data-theme='light']) .shell--admin .page-content h2 {
+  color: #ffffff;
+}
+
+html:not([data-theme='light']) .shell--admin .text-muted {
+  color: #a0a0a0 !important;
+}
+
+html:not([data-theme='light']) .shell--admin .panel,
+html:not([data-theme='light']) .shell--admin .card,
+html:not([data-theme='light']) .shell--admin .card-panel,
+html:not([data-theme='light']) .shell--admin .portal-card,
+html:not([data-theme='light']) .shell--admin .empty-state,
+html:not([data-theme='light']) .shell--admin .ops-dialog,
+html:not([data-theme='light']) .shell--admin .chart-card,
+html:not([data-theme='light']) .shell--admin .soc-history,
+html:not([data-theme='light']) .shell--admin .soc-history__board,
+html:not([data-theme='light']) .shell--admin .dispatch-card,
+html:not([data-theme='light']) .shell--admin .officer-roster-card,
+html:not([data-theme='light']) .shell--admin .incident-detail-card,
+html:not([data-theme='light']) .shell--admin .customers-toolbar,
+html:not([data-theme='light']) .shell--admin .list-panel {
+  background: #161616 !important;
+  border: 1px solid #2a2a2a !important;
+  border-radius: 16px !important;
+  box-shadow: none !important;
+  color: #ffffff;
+}
+
+html:not([data-theme='light']) .shell--admin .list-search,
+html:not([data-theme='light']) .shell--admin .list-search-bar input,
+html:not([data-theme='light']) .shell--admin input:not([type='checkbox']):not([type='radio']):not([type='range']),
+html:not([data-theme='light']) .shell--admin select,
+html:not([data-theme='light']) .shell--admin textarea {
+  background: #1a1a1a !important;
+  border-color: #333333 !important;
+  color: #ffffff !important;
+}
+
+html:not([data-theme='light']) .shell--admin .btn-sm,
+html:not([data-theme='light']) .shell--admin .btn-secondary,
+html:not([data-theme='light']) .shell--admin .btn-ghost {
+  background: transparent;
+  border: 1px solid #333333;
+  color: #ffffff;
+  border-radius: 999px;
+}
+
+html:not([data-theme='light']) .shell--admin .btn-sm:hover,
+html:not([data-theme='light']) .shell--admin .btn-secondary:hover,
+html:not([data-theme='light']) .shell--admin .btn-ghost:hover {
+  background: #2b2b2b;
+  border-color: #444444;
+  color: #ffffff;
+}
+
+html:not([data-theme='light']) .shell--admin .btn-primary {
+  background: #2b2b2b;
+  border: 1px solid #3a3a3a;
+  color: #ffffff;
+  border-radius: 999px;
+}
+
+html:not([data-theme='light']) .shell--admin .btn-primary:hover {
+  background: #333333;
+  border-color: #4a4a4a;
+}
+
+html:not([data-theme='light']) .shell--admin .ops-mon__table th,
+html:not([data-theme='light']) .shell--admin thead th {
+  color: #a0a0a0;
+  border-color: #2a2a2a;
+}
+
+html:not([data-theme='light']) .shell--admin .ops-mon__table td,
+html:not([data-theme='light']) .shell--admin tbody td {
+  border-color: #2a2a2a;
+  color: #e8e8e8;
+}
+
+html:not([data-theme='light']) .shell--admin .ops-mon__table tbody tr:hover td {
+  background: color-mix(in srgb, #2b2b2b 55%, transparent);
+}
+
+html:not([data-theme='light']) .shell--admin .mobile-bottom-nav__pill {
+  background: #161616;
+  border-color: #2a2a2a;
+}
+
+html:not([data-theme='light']) .shell--admin .mobile-bottom-nav__item--active {
+  background: #2b2b2b;
+  color: #ffffff;
+}
+
+html:not([data-theme='light']) .shell--admin .layout-view-toggle {
+  background: #1a1a1a;
+  border-color: #2a2a2a;
+}
+
+html:not([data-theme='light']) .shell--admin .layout-view-toggle__btn--on {
+  background: #2a2a2c;
+  color: #f4f4f5;
+}
+
+html:not([data-theme='light']) .shell--admin .inc-hud {
+  background: #161616;
+  border-color: #2a2a2a;
+}
+
+html:not([data-theme='light']) .shell--admin .inc-hud__btn {
+  border-color: #333333;
+  color: #ffffff;
+}
+
+html:not([data-theme='light']) .shell--admin .inc-hud__btn--primary {
+  border-color: #d63434;
+  color: #f0a0a0;
+}
+
+html:not([data-theme='light']) .shell--admin .ops-menu__trigger,
+html:not([data-theme='light']) .shell--admin .ui-select__trigger {
+  background: #1a1a1a;
+  border-color: #333333;
+  color: #ffffff;
+  border-radius: 999px;
+}
+
+html:not([data-theme='light']) .shell--admin .ops-status-pill,
+html:not([data-theme='light']) .shell--admin .ops-mon__status {
+  background: #1a1a1a;
+  border-color: #2a2a2a;
+}
+
+html:not([data-theme='light']) .shell--admin .page-header.page-section,
+html:not([data-theme='light']) .shell--admin .list-search-bar {
+  color: #ffffff;
+}
+
+/* ── Dispatch + officer soft rows ─────────────────────────── */
+
+html:not([data-theme='light']) .shell--admin .dispatch-card,
+html:not([data-theme='light']) .shell--admin .dispatch-card--en-route,
+html:not([data-theme='light']) .shell--admin .dispatch-card--on-scene,
+html:not([data-theme='light']) .shell--admin .dispatch-card--assigned,
+html:not([data-theme='light']) .shell--admin .officer-roster-card {
+  background: #1a1a1a !important;
+  border: 1px solid #2a2a2a !important;
+  border-radius: 16px !important;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.03), 0 8px 24px rgba(0, 0, 0, 0.28) !important;
+}
+
+html:not([data-theme='light']) .shell--admin .dispatch-card:hover,
+html:not([data-theme='light']) .shell--admin .officer-roster-card:hover {
+  border-color: #333333 !important;
+  transform: none;
+}
+
+html:not([data-theme='light']) .shell--admin .dispatch-grid--list {
+  gap: 0.55rem;
+}
+
+html:not([data-theme='light']) .shell--admin .dispatch-grid--list .dispatch-card {
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 0.85rem 1rem;
+  padding: 0.8rem 1rem;
+  min-height: 0;
+}
+
+html:not([data-theme='light']) .shell--admin .dispatch-grid--list .dispatch-card__badges {
+  flex: 0 0 auto;
+  max-width: 9.5rem;
+}
+
+html:not([data-theme='light']) .shell--admin .dispatch-grid--list .dispatch-card__body {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+html:not([data-theme='light']) .shell--admin .dispatch-grid--list .dispatch-card__actions {
+  flex: 0 0 auto;
+  margin-left: auto;
+  margin-top: 0;
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 0.4rem;
+  grid-template-columns: none;
+}
+
+html:not([data-theme='light']) .shell--admin .dispatch-grid--list .dispatch-card__actions .ops-menu,
+html:not([data-theme='light']) .shell--admin .dispatch-grid--list .dispatch-card__actions .ui-select,
+html:not([data-theme='light']) .shell--admin .dispatch-grid--list .dispatch-card__actions .officer-status-select-wrap {
+  width: auto;
+  min-width: 7.25rem;
+  max-width: 8.5rem;
+}
+
+html:not([data-theme='light']) .shell--admin .dispatch-grid--list .dispatch-card__actions .btn-sm {
+  width: auto;
+  min-width: 4.25rem;
+  min-height: 2rem;
+  height: 2rem;
+  padding-inline: 0.85rem;
+  background: #161616 !important;
+  border: 1px solid #333333 !important;
+  color: #ffffff !important;
+  border-radius: 999px !important;
+}
+
+html:not([data-theme='light']) .shell--admin .dispatch-card__status {
+  background: #161616;
+  border-color: #333333;
+  color: #c8c8c8;
+}
+
+html:not([data-theme='light']) .shell--admin .dispatch-card__status--en-route {
+  color: #7eb8d8;
+  border-color: rgba(86, 156, 196, 0.35);
+  background: rgba(86, 156, 196, 0.1);
+}
+
+html:not([data-theme='light']) .shell--admin .dispatch-card__status--on-scene {
+  color: #6fbf94;
+  border-color: rgba(68, 179, 127, 0.35);
+  background: rgba(68, 179, 127, 0.1);
+}
+
+html:not([data-theme='light']) .shell--admin .dispatch-card__status--assigned {
+  color: #b0b0b0;
+  border-color: #3a3a3a;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+html:not([data-theme='light']) .shell--admin .incident-type--critical {
+  background: rgba(214, 52, 52, 0.16) !important;
+  color: #e88a8a !important;
+  border: 1px solid rgba(214, 52, 52, 0.35);
+}
+
+html:not([data-theme='light']) .shell--admin .incident-type--high {
+  background: rgba(212, 160, 23, 0.14) !important;
+  color: #e0b84a !important;
+  border: 1px solid rgba(212, 160, 23, 0.32);
+}
+
+html:not([data-theme='light']) .shell--admin .layout-view-toggle {
+  background: #161616 !important;
+  border: 1px solid #2a2a2a !important;
+  border-radius: 999px;
+  padding: 0.2rem;
+}
+
+html:not([data-theme='light']) .shell--admin .layout-view-toggle__btn {
+  color: #7a7a7a;
+  border-radius: 10px;
+}
+
+html:not([data-theme='light']) .shell--admin .layout-view-toggle__btn--on {
+  background: #2b2b2b !important;
+  color: #ffffff !important;
+}
+
+html:not([data-theme='light']) .shell--admin .officer-roster--list {
+  gap: 0.45rem;
+}
+
+html:not([data-theme='light']) .shell--admin .officer-roster--list .officer-roster-card {
+  flex-direction: row;
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem 1rem;
+  padding: 0.7rem 0.95rem;
+}
+
+html:not([data-theme='light']) .shell--admin .officer-roster--list .officer-roster-card__header {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+html:not([data-theme='light']) .shell--admin .officer-roster--list .officer-status-control {
+  flex: 0 0 auto;
+  margin-left: auto;
+}
+
+html:not([data-theme='light']) .shell--admin .officer-status-btn--cycle {
+  min-width: 6.75rem;
+  min-height: 2.05rem;
+  border-radius: 999px;
+  font-weight: 650;
+  box-shadow: none;
+}
+
+html:not([data-theme='light']) .shell--admin .officer-status-btn--available.officer-status-btn--active {
+  background: rgba(68, 179, 127, 0.14) !important;
+  border-color: rgba(68, 179, 127, 0.4) !important;
+  color: #6fbf94 !important;
+}
+
+html:not([data-theme='light']) .shell--admin .officer-status-btn--en-route.officer-status-btn--active {
+  background: rgba(214, 52, 52, 0.14) !important;
+  border-color: rgba(214, 52, 52, 0.4) !important;
+  color: #e88a8a !important;
+}
+
+html:not([data-theme='light']) .shell--admin .officer-status-btn--on-scene.officer-status-btn--active,
+html:not([data-theme='light']) .shell--admin .officer-status-btn--busy.officer-status-btn--active {
+  background: rgba(212, 160, 23, 0.14) !important;
+  border-color: rgba(212, 160, 23, 0.4) !important;
+  color: #e0b84a !important;
+}
+
+html:not([data-theme='light']) .shell--admin .officer-status-btn--returning.officer-status-btn--active {
+  background: rgba(139, 92, 246, 0.14) !important;
+  border-color: rgba(139, 92, 246, 0.35) !important;
+  color: #b39cf0 !important;
+}
+
+html:not([data-theme='light']) .shell--admin .officer-status-btn--off-duty.officer-status-btn--active {
+  background: #161616 !important;
+  border-color: #333333 !important;
+  color: #a0a0a0 !important;
+}
+
+html:not([data-theme='light']) .shell--admin .officer-status-menu--ops .ops-menu__trigger {
+  background: #161616 !important;
+  border-color: #333333 !important;
+}
+
+@media (max-width: 720px) {
+  html:not([data-theme='light']) .shell--admin .dispatch-grid--list .dispatch-card {
+    flex-wrap: wrap;
+  }
+
+  html:not([data-theme='light']) .shell--admin .dispatch-grid--list .dispatch-card__actions {
+    width: 100%;
+    margin-left: 0;
+    justify-content: flex-start;
+  }
+
+  html:not([data-theme='light']) .shell--admin .officer-roster--list .officer-roster-card {
+    flex-wrap: wrap;
+  }
+}
+
+/* ── Alarm panel cards ────────────────────────────────────── */
+
+html:not([data-theme='light']) .shell--admin .alarm-panel-card {
+  background: #1a1a1a !important;
+  border: 1px solid #2a2a2a !important;
+  border-radius: 18px !important;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.03), 0 10px 28px rgba(0, 0, 0, 0.28) !important;
+}
+
+html:not([data-theme='light']) .shell--admin .cctv-kit-card__cams {
+  background: #141414;
+  border-color: #2a2a2a;
+}
+
+html:not([data-theme='light']) .shell--admin .cctv-kit-card__cams li {
+  background: #121212;
+}
+
+html:not([data-theme='light']) .shell--admin .alarm-panel-card__site {
+  background: #121212;
+  border-color: #2a2a2a;
+}
+
+html:not([data-theme='light']) .shell--admin .alarm-panel-card__notes {
+  background: #141414;
+  border-color: #2a2a2a;
+}
+
+html:not([data-theme='light']) .shell--admin .alarm-panel-card .cctv-system-card__facts dt {
+  color: #8a8a8a;
+}
+
+html:not([data-theme='light']) .shell--admin .alarm-panel-card .cctv-system-card__facts dd {
+  color: #f0f0f0;
+  font-weight: 600;
+}
+
+html:not([data-theme='light']) .shell--admin .alarm-panel-card__actions .btn-ghost,
+html:not([data-theme='light']) .shell--admin .alarm-panel-card__actions .btn-secondary {
+  background: #161616;
+  border: 1px solid #333333;
+  color: #ffffff;
+}
+
+html:not([data-theme='light']) .shell--admin .alarm-panel-card__actions .btn-secondary:hover,
+html:not([data-theme='light']) .shell--admin .alarm-panel-card__actions .btn-ghost:hover {
+  background: #2b2b2b;
+  border-color: #444444;
+}
+
+@media print {
+  .shell--admin .sidebar,
+  .shell--admin .mobile-shell-header,
+  .shell--admin .mobile-bottom-nav,
+  .shell--admin .ops-page-header__actions,
+  .shell--admin .ops-toolbar,
+  .shell--admin .cctv-reg-form,
+  .shell--admin .alarm-panel-card__actions,
+  .shell--admin .command-dock {
+    display: none !important;
+  }
+
+  .shell--admin,
+  .shell--admin .shell-main,
+  .shell--admin .shell-content,
+  .shell--admin .ops-page {
+    background: #ffffff !important;
+    color: #111827 !important;
+  }
+
+  .shell--admin .alarm-panel-grid {
+    display: block !important;
+  }
+
+  .shell--admin .alarm-panel-card,
+  .shell--admin .cctv-kit-card {
+    break-inside: avoid;
+    page-break-inside: avoid;
+    background: #ffffff !important;
+    border: 1px solid #d1d5db !important;
+    box-shadow: none !important;
+    color: #111827 !important;
+    margin-bottom: 1rem;
+  }
+
+  .shell--admin .alarm-panel-card__site,
+  .shell--admin .alarm-panel-card__notes,
+  .shell--admin .cctv-kit-card__cams {
+    background: #f8fafc !important;
+    border-color: #e5e7eb !important;
+  }
+
+  .shell--admin .cctv-kit-card__cams li {
+    background: #ffffff !important;
+    border-color: #e5e7eb !important;
+  }
+
+  .shell--admin .alarm-panel-card .text-muted,
+  .shell--admin .alarm-panel-card__eyebrow,
+  .shell--admin .alarm-panel-card__site-label,
+  .shell--admin .alarm-panel-card .cctv-system-card__facts dt {
+    color: #6b7280 !important;
+  }
+
+  .shell--admin .alarm-panel-card h3,
+  .shell--admin .alarm-panel-card strong,
+  .shell--admin .alarm-panel-card .cctv-system-card__facts dd {
+    color: #111827 !important;
+  }
+}
+
+/* ── Panic & Devices charcoal polish ─────────────────────── */
+
+html[data-theme='dark'] .shell--admin .stats-grid,
+html[data-theme='dark'] .shell--admin .ds-metric-strip {
+  display: flex !important;
+  flex-wrap: nowrap !important;
+  align-items: center !important;
+  gap: 0.2rem !important;
+  background: #121212 !important;
+  border: 1px solid #2a2a2a !important;
+  border-radius: 999px !important;
+  padding: 0.26rem 0.3rem !important;
+  overflow-x: auto !important;
+  scrollbar-width: none !important;
+}
+
+html[data-theme='dark'] .shell--admin .stats-grid::-webkit-scrollbar,
+html[data-theme='dark'] .shell--admin .ds-metric-strip::-webkit-scrollbar {
+  display: none !important;
+}
+
+html[data-theme='dark'] .shell--admin .stat-card,
+html[data-theme='dark'] .shell--admin .ds-metric {
+  flex: 0 0 auto !important;
+  background: transparent !important;
+  border: 0 !important;
+  border-radius: 999px !important;
+  box-shadow: none !important;
+  padding: 0.26rem 0.52rem !important;
+  min-height: 0 !important;
+  gap: 0.32rem !important;
+}
+
+html[data-theme='dark'] .shell--admin .stat-card--highlight,
+html[data-theme='dark'] .shell--admin .ds-metric--primary {
+  background: #2b2b2b !important;
+}
+
+html:not([data-theme='light']) .shell--admin .stat-label,
+html:not([data-theme='light']) .shell--admin .ds-metric__label {
+  color: #8a8a8a !important;
+  font-size: 0.56rem !important;
+  letter-spacing: 0.05em !important;
+  line-height: 1 !important;
+}
+
+html:not([data-theme='light']) .shell--admin .stat-value,
+html:not([data-theme='light']) .shell--admin .ds-metric__value {
+  color: #f2f2f2 !important;
+  font-size: 0.8rem !important;
+  line-height: 1 !important;
+}
+
+html:not([data-theme='light']) .shell--admin .customers-stats {
+  margin-bottom: 0.7rem !important;
+}
+
+html:not([data-theme='light']) .shell--admin .customers-stats .stat-value {
+  color: #34d399 !important;
+  font-weight: 750 !important;
+}
+
+html:not([data-theme='light']) .shell--admin .customers-stats .stat-card--warn .stat-value {
+  color: #fbbf24 !important;
+}
+
+html:not([data-theme='light']) .shell--admin .customers-stats .stat-card--danger .stat-value {
+  color: #f87171 !important;
+}
+
+html:not([data-theme='light']) .shell--admin .pd-page .ds-metric {
+  background: transparent !important;
+  border: 0 !important;
+  border-radius: 999px !important;
+  box-shadow: none !important;
+}
+
+html:not([data-theme='light']) .shell--admin .ops-stage .pd-page .pd-tabs {
+  background: #111;
+  border-color: var(--vms-line, #2a2a2a);
+}
+
+html:not([data-theme='light']) .shell--admin .ops-stage .pd-page .pd-tabs__btn.is-active {
+  background: var(--vms-accent, #f1f1f1);
+  color: #111;
+}
+
+html:not([data-theme='light']) .shell--admin .ops-stage .pd-page .pd-incident,
+html:not([data-theme='light']) .shell--admin .ops-stage .pd-page .pd-activity,
+html:not([data-theme='light']) .shell--admin .ops-stage .pd-page .pd-devices,
+html:not([data-theme='light']) .shell--admin .ops-stage .pd-page .ds-chart-card {
+  background: var(--vms-panel, #161616) !important;
+  border-color: var(--vms-line, #2a2a2a) !important;
+  box-shadow: none !important;
+}
+
+html:not([data-theme='light']) .shell--admin .ops-metrics--compact {
+  display: flex !important;
+  flex-wrap: nowrap !important;
+  align-items: center !important;
+  grid-template-columns: none !important;
+  gap: 0.2rem !important;
+  padding: 0.26rem 0.3rem !important;
+  border-radius: 999px !important;
+  border: 1px solid #2a2a2a !important;
+  background: #121212 !important;
+  overflow-x: auto !important;
+  scrollbar-width: none !important;
+}
+
+/* Compact metrics = pill chip track (same language as customers stats) */
+html:not([data-theme='light']) .shell--admin .ops-metrics--compact .ops-metric {
+  display: inline-flex !important;
+  flex: 0 0 auto !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  gap: 0.32rem !important;
+  padding: 0.26rem 0.52rem !important;
+  min-height: 0 !important;
+  background: transparent !important;
+  border: 0 !important;
+  border-radius: 999px !important;
+  box-shadow: none !important;
+  white-space: nowrap !important;
+}
+
+html:not([data-theme='light']) .shell--admin .ops-metrics--compact .ops-metric:first-child,
+html:not([data-theme='light']) .shell--admin .ops-metrics--compact .ops-metric--active {
+  background: #2b2b2b !important;
+}
+
+html:not([data-theme='light']) .shell--admin .ops-metrics--compact .ops-metric__value {
+  font-size: 0.86rem !important;
+  line-height: 1 !important;
+  order: 2 !important;
+}
+
+html:not([data-theme='light']) .shell--admin .ops-metrics--compact .ops-metric__label {
+  font-size: 0.58rem !important;
+  letter-spacing: 0.04em !important;
+  order: 1 !important;
+  white-space: nowrap !important;
+}
+
+html:not([data-theme='light']) .shell--admin .ops-toolbar--compact {
+  display: flex !important;
+  flex-wrap: nowrap !important;
+  align-items: center !important;
+  background: #161616 !important;
+  border-color: #2a2a2a !important;
+  box-shadow: none !important;
+  padding: 0.35rem 0.45rem !important;
+  gap: 0.4rem !important;
+}
+
+html:not([data-theme='light']) .shell--admin .ops-toolbar--compact .list-search-bar {
+  flex: 1 1 auto !important;
+  min-width: 0 !important;
+  margin: 0 !important;
+}
+
+html:not([data-theme='light']) .shell--admin .ops-toolbar--compact .ops-toolbar__filters {
+  display: flex !important;
+  flex-direction: row !important;
+  flex-wrap: nowrap !important;
+  flex: 0 0 auto !important;
+  align-items: center !important;
+  gap: 0.3rem !important;
+  min-width: 0 !important;
+}
+
+html:not([data-theme='light']) .shell--admin .ops-toolbar--compact .ops-toolbar__filters .ui-select,
+html:not([data-theme='light']) .shell--admin .ops-toolbar--compact .ops-toolbar__filters .ops-menu {
+  flex: 0 0 auto !important;
+  min-width: 6.25rem !important;
+  max-width: 8rem !important;
+  width: auto !important;
+}
+
+html:not([data-theme='light']) .shell--admin .ops-toolbar--compact .ops-menu__trigger,
+html:not([data-theme='light']) .shell--admin .ops-toolbar--compact .ui-select__trigger {
+  min-height: 1.85rem !important;
+  height: 1.85rem !important;
+  padding-inline: 0.5rem !important;
+  font-size: 0.72rem !important;
+}
+
+html:not([data-theme='light']) .shell--admin .ops-toolbar--compact .list-search-bar input,
+html:not([data-theme='light']) .shell--admin .ops-toolbar--compact .list-search input {
+  min-height: 1.85rem !important;
+  height: 1.85rem !important;
+  padding-block: 0.2rem !important;
+  font-size: 0.8rem !important;
+}
+
+html:not([data-theme='light']) .shell--admin .ops-toolbar--compact .layout-view-toggle {
+  flex: 0 0 auto !important;
+  margin-left: 0 !important;
+}
+
+html:not([data-theme='light']) .shell--admin .officers-page .ops-page-header--compact {
+  margin-bottom: 0 !important;
+  gap: 0.45rem !important;
+}
+
+html:not([data-theme='light']) .shell--admin .officers-page {
+  gap: 0.5rem !important;
+}
+
+html:not([data-theme='light']) .shell--admin .officers-page .ops-page-header__title {
+  font-size: 1.05rem !important;
+}
+
+html:not([data-theme='light']) .shell--admin .officers-page .ops-page-header__subtitle {
+  margin-top: 0.05rem !important;
+  font-size: 0.72rem !important;
+}
+
+html:not([data-theme='light']) .shell--admin .officers-page .ops-officer-table th,
+html:not([data-theme='light']) .shell--admin .officers-page .ops-officer-table td {
+  padding: 0.34rem 0.65rem !important;
+  border-color: #222 !important;
+}
+
+html:not([data-theme='light']) .shell--admin .officers-page .ops-officer-panel {
+  background: #1a1a1a !important;
+  border-color: #2a2a2a !important;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.03), 0 10px 28px rgba(0, 0, 0, 0.28) !important;
+  padding: 0.28rem !important;
+}
+
+html:not([data-theme='light']) .shell--admin .officers-page .ops-officer-panel--grid {
+  padding: 0.35rem !important;
+}
+
+html:not([data-theme='light']) .shell--admin .officers-page .ops-officer-table th {
+  background: #141414 !important;
+  color: #8a8a8a !important;
+  font-size: 0.6rem !important;
+  letter-spacing: 0.07em !important;
+}
+
+html:not([data-theme='light']) .shell--admin .officers-page .ops-officer-table tbody tr:nth-child(even) td {
+  background: rgba(255, 255, 255, 0.015) !important;
+}
+
+html:not([data-theme='light']) .shell--admin .officers-page .ops-officer-table tbody tr:hover td {
+  background: rgba(255, 255, 255, 0.03) !important;
+}
+
+html:not([data-theme='light']) .shell--admin .officers-page .ops-officer-table__name strong {
+  font-size: 0.84rem !important;
+  font-weight: 650 !important;
+  color: #f2f2f2 !important;
+}
+
+html:not([data-theme='light']) .shell--admin .officers-page .ops-officer-table__muted,
+html:not([data-theme='light']) .shell--admin .officers-page .ops-officer-table__standby {
+  color: #8a8a8a !important;
+}
+
+html:not([data-theme='light']) .shell--admin .officers-page .ops-officer-table__unit,
+html:not([data-theme='light']) .shell--admin .officers-page .ops-officer-table__response {
+  color: #d8d8d8 !important;
+}
+
+html:not([data-theme='light']) .shell--admin .officers-page .ops-officer-table__role {
+  color: #8a8a8a !important;
+}
+
+html:not([data-theme='light']) .shell--admin .officers-page .ops-officer-table__role span:first-child {
+  color: #f2f2f2 !important;
+}
+
+html:not([data-theme='light']) .shell--admin .officers-page .ops-officer-table th:last-child,
+html:not([data-theme='light']) .shell--admin .officers-page .ops-officer-table td:last-child {
+  background: #1a1a1a !important;
+}
+
+html:not([data-theme='light']) .shell--admin .officers-page .ops-officer-table tbody tr:nth-child(even) td:last-child {
+  background: #1c1c1c !important;
+}
+
+html:not([data-theme='light']) .shell--admin .officers-page .ops-officer-table tbody tr:hover td:last-child {
+  background: #222 !important;
+}
+
+html:not([data-theme='light']) .shell--admin .officers-page .officer-table__actions {
+  flex-wrap: nowrap !important;
+  gap: 0.25rem !important;
+  white-space: nowrap !important;
+}
+
+html:not([data-theme='light']) .shell--admin .officers-page .officer-table__actions .btn-sm {
+  min-height: 1.55rem !important;
+  height: 1.55rem !important;
+  padding-inline: 0.5rem !important;
+  font-size: 0.7rem !important;
+  border-color: #2a2a2a !important;
+  background: #121212 !important;
+  border-radius: 8px !important;
+}
+
+html:not([data-theme='light']) .shell--admin .officers-page .officer-table__actions .ops-menu__trigger {
+  min-width: 1.55rem !important;
+  width: 1.55rem !important;
+  min-height: 1.55rem !important;
+  height: 1.55rem !important;
+  border-color: #2a2a2a !important;
+  background: #121212 !important;
+  border-radius: 8px !important;
+}
+
+/* Grid cards — dense charcoal tiles matching list language */
+html:not([data-theme='light']) .shell--admin .officers-page .ops-officer-grid {
+  gap: 0.5rem !important;
+  padding: 0.1rem !important;
+}
+
+html:not([data-theme='light']) .shell--admin .officers-page .ops-officer-card {
+  gap: 0.5rem !important;
+  padding: 0.65rem 0.7rem !important;
+  border-radius: 12px !important;
+  border: 1px solid #2a2a2a !important;
+  background: #161616 !important;
+  box-shadow: none !important;
+}
+
+html:not([data-theme='light']) .shell--admin .officers-page .ops-officer-card:hover {
+  border-color: #3a3a3a !important;
+  background: #1a1a1a !important;
+}
+
+html:not([data-theme='light']) .shell--admin .officers-page .ops-officer-card__name {
+  font-size: 0.86rem !important;
+  font-weight: 650 !important;
+  color: #f2f2f2 !important;
+}
+
+html:not([data-theme='light']) .shell--admin .officers-page .ops-officer-card__meta {
+  font-size: 0.7rem !important;
+  color: #8a8a8a !important;
+}
+
+html:not([data-theme='light']) .shell--admin .officers-page .ops-officer-card__facts {
+  gap: 0.35rem !important;
+  padding-top: 0 !important;
+  border-top: 0 !important;
+}
+
+html:not([data-theme='light']) .shell--admin .officers-page .ops-officer-card__footer {
+  padding-top: 0.4rem !important;
+  border-top-color: #222 !important;
+}
+
+html:not([data-theme='light']) .shell--admin .officers-page .ops-officer-card__fact-label {
+  font-size: 0.56rem !important;
+  color: #6e6e6e !important;
+}
+
+html:not([data-theme='light']) .shell--admin .officers-page .ops-officer-card__fact strong {
+  font-size: 0.8rem !important;
+  color: #d8d8d8 !important;
+}
+
+html:not([data-theme='light']) .shell--admin .officers-page .ops-officer-card__actions {
+  gap: 0.25rem !important;
+  padding-top: 0 !important;
+}
+
+html:not([data-theme='light']) .shell--admin .officers-page .ops-officer-card__actions .btn-sm {
+  min-height: 1.55rem !important;
+  height: 1.55rem !important;
+  padding-inline: 0.5rem !important;
+  font-size: 0.7rem !important;
+  border-color: #2a2a2a !important;
+  background: #121212 !important;
+  border-radius: 8px !important;
+  color: #e8e8e8 !important;
+}
+
+html:not([data-theme='light']) .shell--admin .officers-page .ops-officer-card__actions .ops-menu__trigger {
+  min-width: 1.55rem !important;
+  width: 1.55rem !important;
+  min-height: 1.55rem !important;
+  height: 1.55rem !important;
+  border-color: #2a2a2a !important;
+  background: #121212 !important;
+  border-radius: 8px !important;
+}
+
+html:not([data-theme='light']) .shell--admin .officers-page .ops-officer-panel__meta {
+  color: #6e6e6e !important;
+  font-size: 0.68rem !important;
+}
+
+html:not([data-theme='light']) .shell--admin .officers-page .officer-status-menu .ops-menu__trigger {
+  min-height: 1.5rem !important;
+  height: 1.5rem !important;
+  padding: 0 0.45rem !important;
+  font-size: 0.68rem !important;
+  border-radius: 999px !important;
+}
+
+@media (max-width: 900px) {
+  html:not([data-theme='light']) .shell--admin .ops-toolbar--compact {
+    flex-wrap: wrap !important;
+  }
+
+  html:not([data-theme='light']) .shell--admin .ops-toolbar--compact .list-search-bar {
+    flex: 1 1 100% !important;
+  }
+
+  /* Keep filters + view toggle on one row under the search */
+  html:not([data-theme='light']) .shell--admin .ops-toolbar--compact .ops-toolbar__filters {
+    flex: 1 1 0 !important;
+    min-width: 0 !important;
+  }
+
+  html:not([data-theme='light']) .shell--admin .ops-toolbar--compact .ops-toolbar__filters .ui-select,
+  html:not([data-theme='light']) .shell--admin .ops-toolbar--compact .ops-toolbar__filters .ops-menu {
+    flex: 1 1 0 !important;
+    min-width: 0 !important;
+    max-width: none !important;
+  }
+
+  html:not([data-theme='light']) .shell--admin .ops-toolbar--compact .layout-view-toggle {
+    flex: 0 0 auto !important;
+  }
+}
+
+@media (max-width: 520px) {
+  html:not([data-theme='light']) .shell--admin .ops-metrics--compact {
+    flex-wrap: nowrap !important;
+  }
+
+  html:not([data-theme='light']) .shell--admin .ops-toolbar--compact .ops-toolbar__filters {
+    flex-wrap: wrap !important;
+    width: 100% !important;
+  }
+
+  html:not([data-theme='light']) .shell--admin .ops-toolbar--compact .ops-toolbar__filters .ui-select,
+  html:not([data-theme='light']) .shell--admin .ops-toolbar--compact .ops-toolbar__filters .ops-menu {
+    flex: 1 1 auto !important;
+    min-width: 0 !important;
+    max-width: none !important;
+  }
+}
+
+html:not([data-theme='light']) .shell--admin .ops-vehicle-picker .ops-menu__trigger {
+  background: #1a1a1a !important;
+  border-color: #2a2a2a !important;
+  box-shadow: none !important;
+}
+
+html:not([data-theme='light']) .shell--admin .ops-vehicle-picker.ops-menu--open .ops-menu__trigger,
+html:not([data-theme='light']) .shell--admin .ops-vehicle-picker .ops-menu__trigger:hover {
+  border-color: #3b82f6 !important;
+  background: #161616 !important;
+}
+
+html:not([data-theme='light']) .shell--admin .ops-vehicle-picker .ops-menu__summary {
+  color: #8a8a8a !important;
+}
+
+html:not([data-theme='light']) .shell--admin .ic-card,
+html:not([data-theme='light']) .shell--admin .ic-panel__call,
+html:not([data-theme='light']) .shell--admin .ticket-assist {
+  background: #1a1a1a !important;
+  border-color: #2a2a2a !important;
+}
+
+html:not([data-theme='light']) .shell--admin .gates-comms-tabs__btn.is-active {
+  background: #2b2b2b !important;
+  border-color: #3a3a3a !important;
+}
+
+html:not([data-theme='light']) .shell--admin .ticket-assist__field input {
+  background: #121212 !important;
+  border-color: #2a2a2a !important;
+  color: #f0f0f0 !important;
+}
+
+/* Documents dense table */
+html:not([data-theme='light']) .shell--admin .docs-table-wrap {
+  background: #1a1a1a !important;
+  border-color: #2a2a2a !important;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.03), 0 10px 28px rgba(0, 0, 0, 0.28) !important;
+}
+
+html:not([data-theme='light']) .shell--admin .docs-table th {
+  background: #141414 !important;
+  color: #8a8a8a !important;
+  border-color: #222 !important;
+  font-size: 0.6rem !important;
+  padding: 0.5rem 0.85rem !important;
+}
+
+html:not([data-theme='light']) .shell--admin .docs-table td {
+  border-color: #222 !important;
+  padding: 0.7rem 0.85rem !important;
+}
+
+html:not([data-theme='light']) .shell--admin .docs-table tbody tr:hover td {
+  background: rgba(255, 255, 255, 0.025) !important;
+}
+
+html:not([data-theme='light']) .shell--admin .docs-table__title {
+  color: #f2f2f2 !important;
+  font-size: 0.9rem !important;
+}
+
+html:not([data-theme='light']) .shell--admin .docs-table__sub,
+html:not([data-theme='light']) .shell--admin .docs-table__id,
+html:not([data-theme='light']) .shell--admin .docs-table__muted,
+html:not([data-theme='light']) .shell--admin .docs-table__time {
+  color: #8a8a8a !important;
+}
+
+html:not([data-theme='light']) .shell--admin .docs-table__badge {
+  background: #121212 !important;
+  border-color: #2a2a2a !important;
+  color: #9a9a9a !important;
+}
+
+html:not([data-theme='light']) .shell--admin .docs-table__plan {
+  background: rgba(37, 99, 235, 0.18) !important;
+  color: #93c5fd !important;
+}
+
+html:not([data-theme='light']) .shell--admin .docs-table__tag {
+  background: rgba(16, 185, 129, 0.14) !important;
+  color: #6ee7b7 !important;
+}
+
+html:not([data-theme='light']) .shell--admin .docs-table__status--ok {
+  background: rgba(16, 185, 129, 0.16) !important;
+  border-color: rgba(16, 185, 129, 0.28) !important;
+  color: #34d399 !important;
+}
+
+html:not([data-theme='light']) .shell--admin .docs-table__status--restricted {
+  background: #1c1c1c !important;
+  border-color: #2a2a2a !important;
+  color: #e8e8e8 !important;
+}
+
+html:not([data-theme='light']) .shell--admin .docs-table__more .ops-menu__trigger {
+  background: #121212 !important;
+  border-color: #2a2a2a !important;
+  border-radius: 999px !important;
+  color: #e8e8e8 !important;
+}
+
+/* Camera wall beats the featured-feed grid */
+.shell--admin .dash-ops--wall .ops-board.ops-board--console .ops-cctv.ops-cctv--wall {
+  display: grid !important;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  grid-template-rows: repeat(3, minmax(0, 1fr)) !important;
+  gap: 2px !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+  background: #050505 !important;
+  min-height: 0 !important;
+}
+
+.shell--admin .dash-ops--wall .ops-cctv--wall > .cctv-feed-link,
+.shell--admin .dash-ops--wall .ops-cctv--wall > .cctv-feed-link:first-child {
+  grid-column: auto !important;
+  grid-row: auto !important;
+  display: flex !important;
+  min-height: 0 !important;
+  height: 100% !important;
+}
+
+.shell--admin .dash-ops--wall .ops-cctv--wall .cctv-feed {
+  display: block !important;
+  flex: none;
+  width: 100%;
+  height: 100% !important;
+  min-height: 0 !important;
+  max-height: none !important;
+  overflow: hidden !important;
+  background: #050505 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  transform: none !important;
+  box-shadow: none !important;
+  gap: 0 !important;
+}
+
+.shell--admin .dash-ops--wall .ops-cctv--wall .cctv-feed__stage {
+  position: absolute !important;
+  inset: 0 !important;
+  min-height: 0 !important;
+  height: auto !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+}
+
+.shell--admin .dash-ops--wall .ops-cctv--wall .cctv-feed__footer {
+  position: absolute !important;
+  inset: auto 0 0 0 !important;
+  padding: 1.1rem 0.45rem 0.35rem !important;
+  background: linear-gradient(0deg, rgba(0, 0, 0, 0.82), transparent) !important;
+}
+
+@media (max-width: 900px) {
+  .shell--admin .dash-ops--wall .ops-board__stage > .ops-board__cctv {
+    height: calc(100dvh - 16.5rem) !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+  }
+
+  .shell--admin .dash-ops--wall .ops-cctv--wall {
+    height: 100% !important;
+  }
+}
+
+@media (max-width: 520px) {
+  .shell--admin .dash-ops--wall .ops-board.ops-board--console .ops-cctv.ops-cctv--wall {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+}
+
+@media (min-width: 901px) {
+  .shell--admin .dash-ops--wall .ops-board.ops-board--console {
+    grid-template-rows: minmax(0, 1fr) !important;
+    height: calc(100dvh - 13rem) !important;
+    overflow: hidden !important;
+  }
+
+  .shell--admin .dash-ops--wall .ops-board__center {
+    display: flex !important;
+    flex-direction: column !important;
+    height: 100% !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    overflow: hidden !important;
+  }
+
+  .shell--admin .dash-ops--wall .ops-board__stage,
+  .shell--admin .dash-ops--wall .ops-board__stage > .ops-board__cctv {
+    display: flex !important;
+    flex: 1 1 auto !important;
+    flex-direction: column !important;
+    height: 100% !important;
+    min-height: 0 !important;
+  }
+
+  .shell--admin .dash-ops--wall .ops-cctv--wall {
+    flex: 1 1 auto !important;
+    height: 100% !important;
+    min-height: 0 !important;
+  }
+}

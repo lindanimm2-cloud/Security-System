@@ -92,7 +92,11 @@ export function OrgCctvWorkspace({ organizationId }: { organizationId: string })
         <section className="cctv__stage">
           {active ? (
             <>
-              <CameraFeed camera={active} large />
+              <CameraFeed
+                camera={active}
+                large
+                href={`/org/${organizationId}/cctv?camera=${active.id}`}
+              />
               <div className="cctv__tools">
                 <span>
                   {active.status} · {active.quality} link

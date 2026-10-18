@@ -1,0 +1,2 @@
+-- AlterEnum
+ALTER TYPE "CompanyVehicleType" ADD VALUE IF NOT EXISTS 'VIP_TRANSPORT';

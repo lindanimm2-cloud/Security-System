@@ -39,6 +39,9 @@ export type DemoSensor = {
   bypassed: boolean;
   cidCode: string;
   vendor: string;
+  reportAsType?: string | null;
+  requiredAction?: string | null;
+  requiresAck?: boolean;
 };
 
 export type DemoSurveillanceSite = {
@@ -171,7 +174,7 @@ function sensor(
 export const demoClients: DemoClientRecord[] = [
   {
     id: 'demo-user-client-demo-local',
-    firstName: 'Nomsa',
+    firstName: 'Demo',
     lastName: 'Client',
     email: 'client@demo.local',
     phone: '+27821234567',
@@ -327,7 +330,7 @@ export const demoSurveillanceSites: DemoSurveillanceSite[] = [
     },
     cameraCount: 4,
     onlineCameras: 4,
-    openEvents: 2,
+    openEvents: 4,
     cameras: [
       cam('demo-cam-1', 'Front gate', 'Driveway', 1),
       cam('demo-cam-2', 'Garage', 'Side entrance', 2),
@@ -337,10 +340,23 @@ export const demoSurveillanceSites: DemoSurveillanceSite[] = [
     sensors: [
       sensor('demo-sens-1', 'Front door', 1, 'DOOR', 'Main entrance'),
       sensor('demo-sens-2', 'Lounge window', 2, 'WINDOW', 'Living room'),
-      sensor('demo-sens-3', 'Back gate PIR', 3, 'PIR', 'Rear garden', { status: 'ALERT' }),
-      sensor('demo-sens-4', 'Garage side door', 4, 'DOOR', 'Side garage'),
+      sensor('demo-sens-3', 'Back gate PIR', 3, 'PIR', 'Rear garden', {
+        status: 'ALERT',
+        reportAsType: 'INTRUSION',
+        requiredAction: 'Verify on CCTV then contact subscriber',
+      }),
+      sensor('demo-sens-4', 'Garage medical', 4, 'MEDICAL_BUTTON', 'Side garage', {
+        reportAsType: 'MEDICAL',
+        requiredAction: 'Call subscriber / medical contact immediately',
+        is24Hour: true,
+      }),
       sensor('demo-sens-5', 'Passage PIR', 5, 'PIR', 'Hallway', { isPerimeter: false }),
-      sensor('demo-sens-6', 'Kitchen smoke', 6, 'SMOKE', 'Kitchen', { is24Hour: true, status: 'FAULT' }),
+      sensor('demo-sens-6', 'Kitchen smoke', 6, 'SMOKE', 'Kitchen', {
+        is24Hour: true,
+        status: 'ALERT',
+        reportAsType: 'FIRE',
+        requiredAction: 'Confirm fire signal; evacuate guidance if verified',
+      }),
       sensor('demo-sens-7', 'Yard beam', 7, 'OUTDOOR_BEAM', 'Side yard', { status: 'OFFLINE' }),
       sensor('demo-sens-8', 'Study window', 8, 'WINDOW', 'Study', { bypassed: true, status: 'BYPASSED' }),
     ],
@@ -348,10 +364,10 @@ export const demoSurveillanceSites: DemoSurveillanceSite[] = [
     alertSensors: 3,
     gateCode: '4411',
     accessNotes: 'Contact client before entry. Dog on premises.',
-    keyHolder: 'Nomsa Client · +27 82 123 4567',
+    keyHolder: 'Demo Client · +27 82 123 4567',
     owner: {
       id: 'demo-user-client-demo-local',
-      name: 'Nomsa Client',
+      name: 'Demo Client',
       email: 'client@demo.local',
       phone: '+27821234567',
       membershipNumber: 'NX-MEM-1001',
@@ -634,7 +650,7 @@ export const demoSurveillanceSites: DemoSurveillanceSite[] = [
     onlineCameras: 5,
     sensorCount: 9,
     alertSensors: 2,
-    openEvents: 1,
+    openEvents: 2,
     cameras: [
       cam('demo-cam-41', 'Mall entrance', 'Shopfront', 1, { status: 'RECORDING' }),
       cam('demo-cam-42', 'Till line', 'POS', 2, { isInterior: true, placement: 'INTERIOR' }),
@@ -1080,7 +1096,7 @@ export const demoClientVehicles: DemoClientVehicle[] = [
     emergencyStatus: 'STOLEN',
     immobiliserOn: false,
     insuranceInfo: 'Santam comprehensive',
-    ownerName: 'Nomsa Client',
+    ownerName: 'Demo Client',
     ownerId: 'demo-user-client-demo-local',
     lat: -29.81,
     lng: 31.04,
@@ -1203,41 +1219,7 @@ export const demoClientVehicles: DemoClientVehicle[] = [
   },
 ];
 
-export function demoSiteOpenEvents(siteId: string) {
-  if (siteId === 'demo-prop-1') {
-    return [
-      {
-        id: 'demo-ev-1',
-        title: 'Motion detected — front gate',
-        type: 'MOTION',
-        severity: 'HIGH',
-        status: 'OPEN',
-        triggeredAt: minsAgo(8),
-      },
-      {
-        id: 'demo-ev-2',
-        title: 'PIR alert — back gate',
-        type: 'INTRUSION',
-        severity: 'CRITICAL',
-        status: 'OPEN',
-        triggeredAt: minsAgo(3),
-      },
-    ];
-  }
-  if (siteId === 'demo-prop-4') {
-    return [
-      {
-        id: 'demo-ev-41',
-        title: 'Break-glass — shopfront',
-        type: 'INTRUSION',
-        severity: 'CRITICAL',
-        status: 'OPEN',
-        triggeredAt: minsAgo(6),
-      },
-    ];
-  }
-  return [];
-}
+export { demoSiteOpenEvents } from './demo-arc';
 
 export function syncDemoPropertyAlarm(id: string, status: string) {
   const prop = demoProperties.find((p) => p.id === id);

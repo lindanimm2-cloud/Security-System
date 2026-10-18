@@ -2,7 +2,8 @@
 
 import { useEffect } from 'react';
 import type { LatLngTuple } from 'leaflet';
-import { MapContainer, Marker, Polyline, Popup, TileLayer, useMap } from 'react-leaflet';
+import { MapContainer, Marker, Polyline, Popup, useMap } from 'react-leaflet';
+import { MapBasemap } from '@/components/maps/MapBasemap';
 import { vehicleIcon } from '@/components/maps/map-icons';
 
 type Props = {
@@ -39,10 +40,7 @@ export default function PortalVehicleMapCanvas({
       scrollWheelZoom
       className="vehicle-map leaflet-map"
     >
-      <TileLayer
-        attribution='&copy; OpenStreetMap · CARTO'
-        url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
-      />
+      <MapBasemap />
       <FollowVehicle position={position} />
       {trailPoints.length > 1 && (
         <Polyline

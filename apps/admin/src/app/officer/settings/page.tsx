@@ -31,6 +31,13 @@ function OfficerSettingsContent() {
           { id: 'profile', label: 'Profile & shift', icon: 'profile', href: '/officer/profile' },
           { id: 'duty', label: 'Duty Mode', icon: 'emergency', href: '/officer/duty', hint: 'Operational readiness & device security' },
           { id: 'password', label: 'Password', icon: 'key', onClick: () => setPasswordOpen(true) },
+          {
+            id: 'passkeys',
+            label: 'Face ID / fingerprint',
+            icon: 'lock',
+            href: '/officer/profile',
+            hint: 'Passkey unlock on this phone',
+          },
           { id: 'appearance', label: 'Appearance', icon: 'personal', hint: 'Dark (default), light, or system', onClick: () => setAppearanceOpen(true) },
           { id: 'calls', label: 'Call settings', icon: 'calls', href: '/officer/calls' },
           { id: 'dispatch', label: 'Dispatch chat', icon: 'dispatch-chat', href: '/officer/messages' },

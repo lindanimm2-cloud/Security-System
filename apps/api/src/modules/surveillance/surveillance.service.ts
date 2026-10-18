@@ -206,6 +206,9 @@ export class SurveillanceService {
     cidCode: string | null;
     vendor: string | null;
     lastTriggeredAt: Date | null;
+    reportAsType?: string | null;
+    requiredAction?: string | null;
+    requiresAck?: boolean;
   }) {
     return {
       id: s.id,
@@ -222,6 +225,9 @@ export class SurveillanceService {
       cidCode: s.cidCode,
       vendor: s.vendor,
       lastTriggeredAt: s.lastTriggeredAt,
+      reportAsType: s.reportAsType ?? null,
+      requiredAction: s.requiredAction ?? null,
+      requiresAck: s.requiresAck !== false,
     };
   }
 
@@ -235,9 +241,13 @@ export class SurveillanceService {
     cidCode?: string | null;
     snapshotUrl: string | null;
     incidentId: string | null;
+    requiresAck?: boolean;
+    claimedByUserId?: string | null;
+    claimedAt?: Date | null;
     triggeredAt: Date;
     acknowledgedAt: Date | null;
     resolvedAt: Date | null;
+    closedAt?: Date | null;
     propertyId: string;
     cameraId: string | null;
     sensorId?: string | null;
@@ -248,9 +258,21 @@ export class SurveillanceService {
       zoneNumber: number;
       sensorType: SensorType;
       locationLabel: string;
+      reportAsType?: string | null;
+      requiredAction?: string | null;
+      requiresAck?: boolean;
     } | null;
     property?: { id: string; name: string; address: string } | null;
+    claimedBy?: { id: string; firstName: string; lastName: string } | null;
+    responses?: Array<{
+      code: string;
+      label: string;
+      answer: string;
+      note: string | null;
+      createdAt: Date;
+    }>;
   }) {
+    const requiresAck = e.requiresAck !== false && e.type !== AlarmEventType.INFORMATIVE;
     return {
       id: e.id,
       propertyId: e.propertyId,
@@ -264,9 +286,23 @@ export class SurveillanceService {
       cidCode: e.cidCode ?? null,
       snapshotUrl: e.snapshotUrl,
       incidentId: e.incidentId,
+      requiresAck,
+      claimedByUserId: e.claimedByUserId ?? null,
+      claimedAt: e.claimedAt ?? null,
+      claimedByName: e.claimedBy
+        ? `${e.claimedBy.firstName} ${e.claimedBy.lastName}`.trim()
+        : null,
       triggeredAt: e.triggeredAt,
       acknowledgedAt: e.acknowledgedAt,
       resolvedAt: e.resolvedAt,
+      closedAt: e.closedAt ?? null,
+      responses: (e.responses ?? []).map((r) => ({
+        code: r.code,
+        label: r.label,
+        answer: r.answer,
+        note: r.note,
+        createdAt: r.createdAt,
+      })),
       camera: e.camera
         ? {
             id: e.camera.id,
@@ -282,6 +318,9 @@ export class SurveillanceService {
             zoneLabel: `Zone ${e.sensor.zoneNumber}`,
             sensorType: e.sensor.sensorType,
             locationLabel: e.sensor.locationLabel,
+            reportAsType: e.sensor.reportAsType ?? null,
+            requiredAction: e.sensor.requiredAction ?? null,
+            requiresAck: e.sensor.requiresAck !== false,
           }
         : null,
       property: e.property
@@ -292,6 +331,42 @@ export class SurveillanceService {
           }
         : null,
     };
+  }
+
+  private eventInclude() {
+    return {
+      camera: { select: { id: true, name: true, locationLabel: true } },
+      sensor: {
+        select: {
+          id: true,
+          name: true,
+          zoneNumber: true,
+          sensorType: true,
+          locationLabel: true,
+          reportAsType: true,
+          requiredAction: true,
+          requiresAck: true,
+        },
+      },
+      property: { select: { id: true, name: true, address: true } },
+      claimedBy: { select: { id: true, firstName: true, lastName: true } },
+      responses: {
+        select: { code: true, label: true, answer: true, note: true, createdAt: true },
+        orderBy: { createdAt: 'asc' as const },
+      },
+    };
+  }
+
+  private defaultOperatorResponses() {
+    return [
+      { code: '1', label: 'Contacted customer', mandatory: true, sortOrder: 1 },
+      { code: '2', label: 'Verified on CCTV', mandatory: false, sortOrder: 2 },
+      { code: '3', label: 'Dispatched response', mandatory: false, sortOrder: 3 },
+      { code: '4', label: 'False alarm', mandatory: false, sortOrder: 4 },
+      { code: '5', label: 'Keyholder notified', mandatory: false, sortOrder: 5 },
+      { code: 'A', label: 'Police / emergency services', mandatory: false, sortOrder: 10 },
+      { code: 'B', label: 'Technical follow-up', mandatory: false, sortOrder: 11 },
+    ];
   }
 
   private panelMeta(p: {
@@ -859,31 +934,29 @@ export class SurveillanceService {
       }
     }
 
+    const reported = (sensor.reportAsType ?? '').toUpperCase();
+    const mappedType =
+      reported && (Object.values(AlarmEventType) as string[]).includes(reported)
+        ? (reported as AlarmEventType)
+        : mapping.event;
+    const requiresAck = sensor.requiresAck !== false && mappedType !== AlarmEventType.INFORMATIVE;
+
     const event = await this.prisma.alarmEvent.create({
       data: {
         tenantId,
         propertyId: property.id,
         sensorId: sensor.id,
-        type: mapping.event,
+        type: mappedType,
         severity: mapping.severity,
         status: AlarmEventStatus.NEW,
         title: `Z${sensor.zoneNumber} ${sensor.name}`,
-        description: `${sensor.sensorType.replace(/_/g, ' ')} · ${sensor.locationLabel} · CID ${sensor.cidCode ?? mapping.code}`,
+        description:
+          sensor.requiredAction ||
+          `${sensor.sensorType.replace(/_/g, ' ')} · ${sensor.locationLabel} · CID ${sensor.cidCode ?? mapping.code}`,
         cidCode: sensor.cidCode ?? mapping.code,
+        requiresAck,
       },
-      include: {
-        sensor: {
-          select: {
-            id: true,
-            name: true,
-            zoneNumber: true,
-            sensorType: true,
-            locationLabel: true,
-          },
-        },
-        property: { select: { id: true, name: true, address: true } },
-        camera: { select: { id: true, name: true, locationLabel: true } },
-      },
+      include: this.eventInclude(),
     });
 
     const updatedSensor = await this.prisma.sensor.update({
@@ -917,32 +990,28 @@ export class SurveillanceService {
         alarmEvents: {
           where: { status: { in: ['NEW', 'ACKNOWLEDGED', 'DISPATCHED'] } },
           orderBy: { triggeredAt: 'desc' },
-          take: 5,
-          include: {
-            camera: { select: { id: true, name: true, locationLabel: true } },
-            sensor: {
-              select: {
-                id: true,
-                name: true,
-                zoneNumber: true,
-                sensorType: true,
-                locationLabel: true,
-              },
-            },
-          },
+          take: 8,
+          include: this.eventInclude(),
         },
       },
       orderBy: { name: 'asc' },
     });
 
     const openEvents = await this.prisma.alarmEvent.count({
-      where: { tenantId, status: { in: ['NEW', 'ACKNOWLEDGED'] } },
+      where: { tenantId, status: { in: ['NEW', 'ACKNOWLEDGED', 'DISPATCHED'] } },
     });
     const triggered = properties.filter((p) => p.alarmStatus === AlarmStatus.TRIGGERED).length;
     const offlineCams = properties.reduce(
       (n, p) => n + p.cameras.filter((c) => c.status === CameraStatus.OFFLINE || c.status === CameraStatus.FAULT).length,
       0,
     );
+    const deskEvents = await this.prisma.alarmEvent.findMany({
+      where: { tenantId, status: { in: ['NEW', 'ACKNOWLEDGED', 'DISPATCHED'] } },
+      orderBy: { triggeredAt: 'desc' },
+      take: 40,
+      include: this.eventInclude(),
+    });
+    const responses = await this.listOperatorResponses(tenantId);
 
     return {
       success: true,
@@ -964,6 +1033,9 @@ export class SurveillanceService {
           monitoringEnabled: p.monitoringEnabled,
           camerasLinked: p.camerasLinked,
           alarmLinked: p.alarmLinked,
+          checkInHours: p.checkInHours,
+          lastCheckInAt: p.lastCheckInAt,
+          monitoringSchedule: p.monitoringSchedule ?? {},
           panel: this.panelMeta(p),
           cameraCount: p.cameras.length,
           onlineCameras: p.cameras.filter((c) => c.status === 'ONLINE' || c.status === 'RECORDING').length,
@@ -977,8 +1049,11 @@ export class SurveillanceService {
           cameras: p.cameras.slice(0, 6).map((c) =>
             this.formatCamera(c, { viewer: 'STAFF', interiorUnlocked: p.alarmStatus === AlarmStatus.TRIGGERED }),
           ),
+          sensors: p.sensors.map((s) => this.formatSensor(s)),
           openEvents: p.alarmEvents.map((e) => this.formatEvent(e)),
         })),
+        deskEvents: deskEvents.map((e) => this.formatEvent(e)),
+        operatorResponses: responses.data,
       },
     };
   }
@@ -993,19 +1068,7 @@ export class SurveillanceService {
         alarmEvents: {
           orderBy: { triggeredAt: 'desc' },
           take: 50,
-          include: {
-            camera: { select: { id: true, name: true, locationLabel: true } },
-            sensor: {
-              select: {
-                id: true,
-                name: true,
-                zoneNumber: true,
-                sensorType: true,
-                locationLabel: true,
-              },
-            },
-            property: { select: { id: true, name: true, address: true } },
-          },
+          include: this.eventInclude(),
         },
       },
     });
@@ -1030,6 +1093,9 @@ export class SurveillanceService {
         camerasLinked: property.camerasLinked,
         monitoringEnabled: property.monitoringEnabled,
         shareInteriorCameras: property.shareInteriorCameras,
+        checkInHours: property.checkInHours,
+        lastCheckInAt: property.lastCheckInAt,
+        monitoringSchedule: property.monitoringSchedule ?? {},
         privacy,
         panel: this.panelMeta(property),
         client: {
@@ -2283,6 +2349,510 @@ export class SurveillanceService {
     });
 
     return { success: true, data: this.formatAlarmSystem(updated) };
+  }
+
+  async claimEvent(tenantId: string, eventId: string, actorUserId: string) {
+    const event = await this.prisma.alarmEvent.findFirst({ where: { id: eventId, tenantId } });
+    if (!event) throw new NotFoundException('Alarm event not found');
+    if (event.status === AlarmEventStatus.RESOLVED || event.status === AlarmEventStatus.FALSE_ALARM) {
+      throw new BadRequestException('Event already closed');
+    }
+    if (event.claimedByUserId && event.claimedByUserId !== actorUserId) {
+      throw new BadRequestException('Event already claimed by another operator');
+    }
+    const updated = await this.prisma.alarmEvent.update({
+      where: { id: eventId },
+      data: {
+        claimedByUserId: actorUserId,
+        claimedAt: event.claimedAt ?? new Date(),
+        status: event.status === AlarmEventStatus.NEW ? AlarmEventStatus.ACKNOWLEDGED : event.status,
+        acknowledgedBy: event.acknowledgedBy ?? actorUserId,
+        acknowledgedAt: event.acknowledgedAt ?? new Date(),
+      },
+      include: this.eventInclude(),
+    });
+    return { success: true, data: this.formatEvent(updated) };
+  }
+
+  async releaseEvent(tenantId: string, eventId: string, actorUserId: string) {
+    const event = await this.prisma.alarmEvent.findFirst({ where: { id: eventId, tenantId } });
+    if (!event) throw new NotFoundException('Alarm event not found');
+    if (event.claimedByUserId && event.claimedByUserId !== actorUserId) {
+      throw new BadRequestException('Only the claiming operator can release this event');
+    }
+    const updated = await this.prisma.alarmEvent.update({
+      where: { id: eventId },
+      data: { claimedByUserId: null, claimedAt: null },
+      include: this.eventInclude(),
+    });
+    return { success: true, data: this.formatEvent(updated) };
+  }
+
+  async recordEventResponse(
+    tenantId: string,
+    eventId: string,
+    actorUserId: string,
+    body: { code: string; answer: string; note?: string },
+  ) {
+    const event = await this.prisma.alarmEvent.findFirst({ where: { id: eventId, tenantId } });
+    if (!event) throw new NotFoundException('Alarm event not found');
+    if (event.status === AlarmEventStatus.RESOLVED || event.status === AlarmEventStatus.FALSE_ALARM) {
+      throw new BadRequestException('Event already closed');
+    }
+    const code = (body.code ?? '').trim().toUpperCase();
+    if (!code) throw new BadRequestException('Response code required');
+    const answer = (body.answer ?? '').trim();
+    if (!answer) throw new BadRequestException('Answer required');
+
+    await this.ensureOperatorResponses(tenantId);
+    const template = await this.prisma.operatorResponseTemplate.findFirst({
+      where: { tenantId, code, isActive: true },
+    });
+
+    await this.prisma.alarmEventResponse.upsert({
+      where: { eventId_code: { eventId, code } },
+      create: {
+        tenantId,
+        eventId,
+        templateId: template?.id,
+        code,
+        label: template?.label ?? code,
+        answer,
+        note: body.note?.trim() || null,
+        actorUserId,
+      },
+      update: {
+        answer,
+        note: body.note?.trim() || null,
+        actorUserId,
+        label: template?.label ?? code,
+        templateId: template?.id,
+      },
+    });
+
+    const updated = await this.prisma.alarmEvent.findFirstOrThrow({
+      where: { id: eventId },
+      include: this.eventInclude(),
+    });
+    return { success: true, data: this.formatEvent(updated) };
+  }
+
+  async closeEvent(
+    tenantId: string,
+    eventId: string,
+    actorUserId: string,
+    body?: { falseAlarm?: boolean; note?: string },
+  ) {
+    const event = await this.prisma.alarmEvent.findFirst({
+      where: { id: eventId, tenantId },
+      include: { responses: true },
+    });
+    if (!event) throw new NotFoundException('Alarm event not found');
+    if (event.status === AlarmEventStatus.RESOLVED || event.status === AlarmEventStatus.FALSE_ALARM) {
+      throw new BadRequestException('Event already closed');
+    }
+
+    if (event.requiresAck !== false && event.type !== AlarmEventType.INFORMATIVE) {
+      const templates = await this.listOperatorResponses(tenantId);
+      const mandatory = templates.data.filter((t) => t.mandatory);
+      const done = new Set(event.responses.map((r) => r.code));
+      const missing = mandatory.filter((t) => !done.has(t.code));
+      if (missing.length) {
+        throw new BadRequestException(
+          `Complete mandatory responses first: ${missing.map((m) => m.label).join(', ')}`,
+        );
+      }
+    }
+
+    const asFalse = Boolean(body?.falseAlarm);
+    const updated = await this.prisma.alarmEvent.update({
+      where: { id: eventId },
+      data: {
+        status: asFalse ? AlarmEventStatus.FALSE_ALARM : AlarmEventStatus.RESOLVED,
+        resolvedAt: new Date(),
+        closedAt: new Date(),
+        closeMeta: {
+          closedBy: actorUserId,
+          note: body?.note ?? null,
+          falseAlarm: asFalse,
+        },
+        claimedByUserId: event.claimedByUserId ?? actorUserId,
+        claimedAt: event.claimedAt ?? new Date(),
+        acknowledgedBy: event.acknowledgedBy ?? actorUserId,
+        acknowledgedAt: event.acknowledgedAt ?? new Date(),
+      },
+      include: this.eventInclude(),
+    });
+
+    if (event.sensorId) {
+      await this.prisma.sensor.updateMany({
+        where: { id: event.sensorId, status: SensorStatus.ALARM },
+        data: { status: SensorStatus.NORMAL },
+      });
+    }
+    if (!asFalse) {
+      await this.prisma.property.updateMany({
+        where: { id: event.propertyId, alarmStatus: AlarmStatus.TRIGGERED },
+        data: { alarmStatus: AlarmStatus.ARMED },
+      });
+    }
+
+    return { success: true, data: this.formatEvent(updated) };
+  }
+
+  async ensureOperatorResponses(tenantId: string) {
+    const count = await this.prisma.operatorResponseTemplate.count({ where: { tenantId } });
+    if (count > 0) return;
+    await this.prisma.operatorResponseTemplate.createMany({
+      data: this.defaultOperatorResponses().map((row) => ({
+        tenantId,
+        code: row.code,
+        label: row.label,
+        mandatory: row.mandatory,
+        sortOrder: row.sortOrder,
+      })),
+    });
+  }
+
+  async listOperatorResponses(tenantId: string) {
+    await this.ensureOperatorResponses(tenantId);
+    const rows = await this.prisma.operatorResponseTemplate.findMany({
+      where: { tenantId },
+      orderBy: [{ sortOrder: 'asc' }, { code: 'asc' }],
+    });
+    return {
+      success: true,
+      data: rows.map((r) => ({
+        id: r.id,
+        code: r.code,
+        label: r.label,
+        mandatory: r.mandatory,
+        sortOrder: r.sortOrder,
+        isActive: r.isActive,
+      })),
+    };
+  }
+
+  async putOperatorResponses(
+    tenantId: string,
+    rows: Array<{ code: string; label: string; mandatory?: boolean; sortOrder?: number; isActive?: boolean }>,
+  ) {
+    if (!Array.isArray(rows) || !rows.length) {
+      throw new BadRequestException('Provide at least one response template');
+    }
+    await this.prisma.$transaction(async (tx) => {
+      for (const [index, row] of rows.entries()) {
+        const code = (row.code ?? '').trim().toUpperCase();
+        const label = (row.label ?? '').trim();
+        if (!code || !label) continue;
+        await tx.operatorResponseTemplate.upsert({
+          where: { tenantId_code: { tenantId, code } },
+          create: {
+            tenantId,
+            code,
+            label,
+            mandatory: Boolean(row.mandatory),
+            sortOrder: row.sortOrder ?? index + 1,
+            isActive: row.isActive !== false,
+          },
+          update: {
+            label,
+            mandatory: Boolean(row.mandatory),
+            sortOrder: row.sortOrder ?? index + 1,
+            isActive: row.isActive !== false,
+          },
+        });
+      }
+    });
+    return this.listOperatorResponses(tenantId);
+  }
+
+  async getMonitoringFile(tenantId: string, propertyId: string) {
+    const property = await this.prisma.property.findFirst({
+      where: { id: propertyId, tenantId },
+      include: {
+        user: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+            phone: true,
+            emergencyContacts: {
+              orderBy: { priority: 'asc' },
+              take: 6,
+              select: {
+                id: true,
+                name: true,
+                phone: true,
+                relationship: true,
+                priority: true,
+              },
+            },
+          },
+        },
+        sensors: { orderBy: { zoneNumber: 'asc' } },
+        alarmEvents: {
+          orderBy: { triggeredAt: 'desc' },
+          take: 20,
+          include: this.eventInclude(),
+        },
+        incidents: {
+          orderBy: { createdAt: 'desc' },
+          take: 10,
+          select: {
+            id: true,
+            type: true,
+            title: true,
+            status: true,
+            priority: true,
+            createdAt: true,
+          },
+        },
+      },
+    });
+    if (!property) throw new NotFoundException('Site not found');
+
+    return {
+      success: true,
+      data: {
+        id: property.id,
+        name: property.name,
+        address: property.address,
+        alarmStatus: property.alarmStatus,
+        keyHolder: property.keyHolder,
+        gateCode: property.gateCode,
+        accessNotes: property.accessNotes,
+        checkInHours: property.checkInHours,
+        lastCheckInAt: property.lastCheckInAt,
+        monitoringSchedule: property.monitoringSchedule ?? {},
+        owner: {
+          id: property.user.id,
+          name: `${property.user.firstName} ${property.user.lastName}`.trim(),
+          email: property.user.email,
+          phone: property.user.phone,
+        },
+        contacts: [
+          {
+            name: `${property.user.firstName} ${property.user.lastName}`.trim(),
+            phone: property.user.phone,
+            relationship: 'Primary subscriber',
+            priority: 0,
+          },
+          ...(property.keyHolder
+            ? [
+                {
+                  name: property.keyHolder,
+                  phone: property.user.phone,
+                  relationship: 'Keyholder',
+                  priority: 1,
+                },
+              ]
+            : []),
+          ...property.user.emergencyContacts.map((c) => ({
+            name: c.name,
+            phone: c.phone,
+            relationship: c.relationship,
+            priority: c.priority,
+          })),
+        ],
+        sensors: property.sensors.map((s) => ({
+          id: s.id,
+          name: s.name,
+          zoneNumber: s.zoneNumber,
+          sensorType: s.sensorType,
+          status: s.status,
+          locationLabel: s.locationLabel,
+          reportAsType: s.reportAsType,
+          requiredAction: s.requiredAction,
+          requiresAck: s.requiresAck,
+          bypassed: s.bypassed,
+        })),
+        history: {
+          events: property.alarmEvents.map((e) => this.formatEvent(e)),
+          incidents: property.incidents.map((i) => ({
+            id: i.id,
+            type: i.type,
+            title: i.title,
+            status: i.status,
+            priority: i.priority,
+            createdAt: i.createdAt,
+          })),
+        },
+      },
+    };
+  }
+
+  async updateSensorZone(
+    tenantId: string,
+    sensorId: string,
+    body: {
+      name?: string;
+      reportAsType?: string | null;
+      requiredAction?: string | null;
+      requiresAck?: boolean;
+      locationLabel?: string;
+    },
+  ) {
+    const sensor = await this.prisma.sensor.findFirst({ where: { id: sensorId, tenantId } });
+    if (!sensor) throw new NotFoundException('Zone not found');
+    const updated = await this.prisma.sensor.update({
+      where: { id: sensorId },
+      data: {
+        name: body.name?.trim() || undefined,
+        reportAsType:
+          body.reportAsType === null
+            ? null
+            : body.reportAsType !== undefined
+              ? body.reportAsType.trim().toUpperCase() || null
+              : undefined,
+        requiredAction:
+          body.requiredAction === null
+            ? null
+            : body.requiredAction !== undefined
+              ? body.requiredAction.trim() || null
+              : undefined,
+        requiresAck: body.requiresAck !== undefined ? Boolean(body.requiresAck) : undefined,
+        locationLabel: body.locationLabel?.trim() || undefined,
+      },
+    });
+    return {
+      success: true,
+      data: {
+        id: updated.id,
+        name: updated.name,
+        zoneNumber: updated.zoneNumber,
+        reportAsType: updated.reportAsType,
+        requiredAction: updated.requiredAction,
+        requiresAck: updated.requiresAck,
+        locationLabel: updated.locationLabel,
+      },
+    };
+  }
+
+  async updateSiteMonitoring(
+    tenantId: string,
+    propertyId: string,
+    body: {
+      checkInHours?: number | null;
+      monitoringSchedule?: Record<string, unknown>;
+      lastCheckInAt?: string | null;
+    },
+  ) {
+    const property = await this.prisma.property.findFirst({ where: { id: propertyId, tenantId } });
+    if (!property) throw new NotFoundException('Site not found');
+    const updated = await this.prisma.property.update({
+      where: { id: propertyId },
+      data: {
+        checkInHours:
+          body.checkInHours === null
+            ? null
+            : body.checkInHours !== undefined
+              ? Math.max(0, Number(body.checkInHours) || 0)
+              : undefined,
+        monitoringSchedule:
+          body.monitoringSchedule !== undefined ? body.monitoringSchedule : undefined,
+        lastCheckInAt:
+          body.lastCheckInAt === null
+            ? null
+            : body.lastCheckInAt
+              ? new Date(body.lastCheckInAt)
+              : undefined,
+      },
+    });
+    return {
+      success: true,
+      data: {
+        id: updated.id,
+        checkInHours: updated.checkInHours,
+        lastCheckInAt: updated.lastCheckInAt,
+        monitoringSchedule: updated.monitoringSchedule ?? {},
+      },
+    };
+  }
+
+  async notifyKeyholder(
+    tenantId: string,
+    propertyId: string,
+    actorUserId: string,
+    body?: { phone?: string; message?: string },
+  ) {
+    const property = await this.prisma.property.findFirst({
+      where: { id: propertyId, tenantId },
+      include: { user: { select: { id: true, phone: true, firstName: true, lastName: true } } },
+    });
+    if (!property) throw new NotFoundException('Site not found');
+    const phone = (body?.phone || property.user.phone || '').trim();
+    if (!phone) throw new BadRequestException('No keyholder phone on file');
+    const message =
+      (body?.message ?? '').trim() ||
+      `4DS Security: update regarding ${property.name}. Please contact the control room.`;
+
+    // SMS gateway is stubbed; audit via notification for operators.
+    await this.prisma.notification.create({
+      data: {
+        tenantId,
+        userId: actorUserId,
+        type: NotificationType.SYSTEM,
+        priority: NotificationPriority.P2,
+        title: 'Keyholder SMS queued',
+        body: `To ${phone} (${propertyId}): ${message}`,
+        deepLink: `/control-room/surveillance/${propertyId}`,
+      },
+    });
+
+    return {
+      success: true,
+      data: { queued: true, phone, message, channel: 'sms:stub' },
+    };
+  }
+
+  async runFailedCheckInScan(tenantId: string) {
+    const now = Date.now();
+    const sites = await this.prisma.property.findMany({
+      where: {
+        tenantId,
+        monitoringEnabled: true,
+        checkInHours: { gt: 0 },
+      },
+      select: {
+        id: true,
+        name: true,
+        checkInHours: true,
+        lastCheckInAt: true,
+        userId: true,
+      },
+    });
+    const created: string[] = [];
+    for (const site of sites) {
+      const hours = site.checkInHours ?? 0;
+      if (hours <= 0) continue;
+      const last = site.lastCheckInAt?.getTime() ?? site.lastCheckInAt;
+      const baseline = typeof last === 'number' ? last : now - hours * 3_600_000;
+      if (now - baseline < hours * 3_600_000) continue;
+      const open = await this.prisma.alarmEvent.findFirst({
+        where: {
+          tenantId,
+          propertyId: site.id,
+          type: AlarmEventType.FAILED_CHECK_IN,
+          status: { in: [AlarmEventStatus.NEW, AlarmEventStatus.ACKNOWLEDGED, AlarmEventStatus.DISPATCHED] },
+        },
+      });
+      if (open) continue;
+      const event = await this.prisma.alarmEvent.create({
+        data: {
+          tenantId,
+          propertyId: site.id,
+          type: AlarmEventType.FAILED_CHECK_IN,
+          severity: IncidentPriority.HIGH,
+          title: `Failed to check-in — ${site.name}`,
+          description: `No communicator check-in within ${hours} hour(s).`,
+          requiresAck: true,
+        },
+      });
+      created.push(event.id);
+    }
+    return { success: true, data: { created: created.length, eventIds: created } };
   }
 }
 

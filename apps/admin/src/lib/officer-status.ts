@@ -45,3 +45,11 @@ export function officerStatusLabel(status: string): string {
 export function isSameOfficerStatus(current: string, next: string): boolean {
   return normalizeOfficerStatus(current) === normalizeOfficerStatus(next);
 }
+
+/** Cycle Available → En route → On scene → Returning → Off duty → … */
+export function nextOfficerStatus(current: string): OfficerStatusValue {
+  const normalized = normalizeOfficerStatus(current);
+  const idx = OFFICER_STATUSES.findIndex((s) => s.value === normalized);
+  const nextIdx = idx < 0 ? 0 : (idx + 1) % OFFICER_STATUSES.length;
+  return OFFICER_STATUSES[nextIdx]!.value;
+}

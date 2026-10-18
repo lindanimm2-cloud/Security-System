@@ -54,6 +54,14 @@ export function ProfessionalErrorPage({
   const [copied, setCopied] = useState(false);
   const allowReport = !onLogin && !authBlocked;
 
+  function goBack() {
+    if (typeof window !== 'undefined' && window.history.length > 1) {
+      window.history.back();
+      return;
+    }
+    window.location.assign(home);
+  }
+
   async function sendToDeveloper() {
     setSending(true);
     setSendError('');
@@ -92,6 +100,11 @@ export function ProfessionalErrorPage({
         </p>
 
         <div className="pro-error-page__actions">
+          {!onLogin ? (
+            <button type="button" className="btn-secondary" onClick={goBack}>
+              Back
+            </button>
+          ) : null}
           {reset ? (
             <button type="button" className="btn-primary" onClick={() => reset()}>
               Try again

@@ -28,7 +28,7 @@ function assert(cond: unknown, msg: string) {
 const panic = inc({
   id: 'p1',
   type: 'PANIC',
-  user: 'Nomsa Client',
+  user: 'Demo Client',
   priority: 'CRITICAL',
   location: 'Umhlanga Rocks Dr',
   source: 'APP PANIC',
@@ -39,7 +39,7 @@ const intrusion = inc({
   user: 'James Demo',
   slaBreached: true,
 });
-const theft = inc({ id: 't1', type: 'THEFT', user: 'Nomsa Client' });
+const theft = inc({ id: 't1', type: 'THEFT', user: 'Demo Client' });
 const alarm = inc({ id: 'a1', type: 'ALARM', user: 'Sarah Client', priority: 'MEDIUM' });
 const resolved = inc({ id: 'r1', type: 'PANIC', user: 'Old', status: 'RESOLVED', priority: 'CRITICAL' });
 

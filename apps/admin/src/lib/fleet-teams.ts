@@ -1,5 +1,6 @@
 export const FLEET_TEAMS = [
   { value: 'ARMED_RESPONSE', label: 'Armed response', duty: 'Tactical armed reaction' },
+  { value: 'VIP_TRANSPORT', label: 'VIP transport', duty: 'Executive / VIP secure transport' },
   { value: 'MEDICAL', label: 'Medical', duty: 'Ambulance and medic support' },
   { value: 'PATROL', label: 'Patrol', duty: 'Visible patrol and deterrence' },
   { value: 'FIRE_TRUCK', label: 'Fire', duty: 'Fire and rescue support' },

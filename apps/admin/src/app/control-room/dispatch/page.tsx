@@ -129,6 +129,7 @@ function DispatchContent() {
   const [showReport, setShowReport] = useState(false);
   const [search, setSearch] = useState('');
   const [officerLayout, setOfficerLayout] = useLayoutView('control-room-dispatch-officers');
+  const [dispatchLayout, setDispatchLayout] = useLayoutView('control-room-dispatch-active', 'list');
 
   const allUnassigned = useMemo(
     () => (data?.data.incidents ?? []).filter((i) => isAwaitingDispatch(i.status, i.officer)),
@@ -219,33 +220,39 @@ function DispatchContent() {
   if (error) return <ErrorAlert error={error} onRetry={reload} />;
 
   return (
-    <div className="page-content">
-      <div className="page-header">
-        <div>
-          <p className="text-muted">
-            <Link href={CONTROL_ROOM_ROUTES.incidents} className="interactive-text">Incidents</Link>
-            {' · '}
-            <Link href={officerHref()} className="interactive-text">Officers</Link>
-            {' · '}
-            <Link href={mapHref('incidents')} className="interactive-text">Live map</Link>
-            {' · '}
-            <Link href={CONTROL_ROOM_ROUTES.customers} className="interactive-text">Customers</Link>
-          </p>
+    <div className="page-content dispatch-page">
+      <header className="dispatch-page__bar" aria-label="Dispatch desk">
+        <nav className="dispatch-page__nav" aria-label="Dispatch shortcuts">
+          <Link href={CONTROL_ROOM_ROUTES.incidents}>Incidents</Link>
+          <Link href={officerHref()}>Officers</Link>
+          <Link href={mapHref('incidents')}>Live map</Link>
+          <Link href={CONTROL_ROOM_ROUTES.customers}>Customers</Link>
+        </nav>
+        <div className="dispatch-page__search">
+          <ListSearch
+            value={search}
+            onChange={setSearch}
+            placeholder="Search client, location, officer, status…"
+            resultCount={unassigned.length + dispatches.length + officers.length}
+            totalCount={allUnassigned.length + allDispatches.length + allOfficers.length}
+          />
         </div>
-        <button type="button" className="btn-primary" onClick={() => setShowReport(true)}>
+        <button type="button" className="btn-primary btn-sm" onClick={() => setShowReport(true)}>
           Report incident
         </button>
-      </div>
+      </header>
 
-      <div className="ds-chart-grid">
-        <ChartCard title="Officer availability" subtitle="Live roster status" className="ds-chart-card--span-4">
+      <div className="ds-chart-grid ds-chart-grid--compact">
+        <ChartCard title="Officer availability" subtitle="Live roster" className="ds-chart-card--span-4">
           <DonutChart
             slices={officerStatusSlices}
+            size={96}
+            thickness={12}
             centerValue={allOfficers.length}
             centerLabel="officers"
           />
         </ChartCard>
-        <ChartCard title="Field coverage" subtitle="Units ready to dispatch" className="ds-chart-card--span-4">
+        <ChartCard title="Field coverage" subtitle="Ready to dispatch" className="ds-chart-card--span-4">
           <GaugeChart
             value={coverageScore}
             label="Available capacity"
@@ -253,7 +260,7 @@ function DispatchContent() {
             tone={coverageScore >= 50 ? 'success' : coverageScore >= 30 ? 'warning' : 'danger'}
           />
         </ChartCard>
-        <ChartCard title="Dispatch pipeline" subtitle="Active assignment states" className="ds-chart-card--span-4">
+        <ChartCard title="Dispatch pipeline" subtitle="Assignment states" className="ds-chart-card--span-4">
           <HorizontalBars
             items={
               dispatchStatusBars.length > 0
@@ -263,16 +270,6 @@ function DispatchContent() {
             compact
           />
         </ChartCard>
-      </div>
-
-      <div className="list-search-bar">
-        <ListSearch
-          value={search}
-          onChange={setSearch}
-          placeholder="Search client, location, officer, status…"
-          resultCount={unassigned.length + dispatches.length + officers.length}
-          totalCount={allUnassigned.length + allDispatches.length + allOfficers.length}
-        />
       </div>
 
       {showReport && (
@@ -292,9 +289,9 @@ function DispatchContent() {
         </OpsDialog>
       )}
 
-      <div className="page-header">
+      <div className="dispatch-page__section">
         <h2>Assign officers</h2>
-        <span className="text-muted">{unassigned.length} awaiting dispatch</span>
+        <span className="text-muted">{unassigned.length} awaiting</span>
       </div>
       <div className="list-card">
         {unassigned.length === 0 ? (
@@ -357,13 +354,18 @@ function DispatchContent() {
         )}
       </div>
 
-      <div className="page-header page-section">
+      <div className="dispatch-page__section">
         <h2>Active dispatches</h2>
         <div className="dispatch-grid__meta">
           <span className="text-muted">{dispatches.length} active</span>
           <Link href={officerHref()} className="link-sm">
             Officer roster
           </Link>
+          <LayoutViewToggle
+            value={dispatchLayout}
+            onChange={setDispatchLayout}
+            label="Dispatch layout"
+          />
         </div>
       </div>
       {dispatches.length === 0 ? (
@@ -371,7 +373,9 @@ function DispatchContent() {
           {search.trim() ? 'No matching dispatches.' : 'No active dispatches.'}
         </div>
       ) : (
-        <div className="dispatch-grid">
+        <div
+          className={`dispatch-grid ${dispatchLayout === 'list' ? 'dispatch-grid--list' : ''}`}
+        >
           {dispatches.map((d) => (
             <article
               key={d.id}
@@ -421,10 +425,10 @@ function DispatchContent() {
         </div>
       )}
 
-      <div className="page-header page-section">
+      <div className="dispatch-page__section">
         <div>
           <h2>Officer availability</h2>
-          <span className="text-muted">Override status if an officer is too busy or returning</span>
+          <span className="text-muted">Override status when needed</span>
         </div>
         <LayoutViewToggle value={officerLayout} onChange={setOfficerLayout} label="Officer layout" />
       </div>

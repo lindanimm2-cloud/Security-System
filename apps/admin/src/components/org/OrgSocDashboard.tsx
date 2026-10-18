@@ -1,5 +1,6 @@
 'use client';
 
+import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { OrgCamera, OrgDashboardKpis, OrgIncident } from '@/lib/org';
@@ -7,35 +8,194 @@ import {
   listOrgActivity,
   listOrgAttention,
   listOrgCameras,
-  listOrgMapMarkers,
 } from '@/lib/org';
 import { CameraFeed } from './CameraFeed';
+import { OpsMarqueeText, OpsTicker } from '@/components/ui/OpsMarquee';
+import { OpsMonActionsMenu, type OpsMonAction } from '@/components/ops/OpsMonActionsMenu';
 
-const PIN_CODE: Record<string, string> = {
-  camera: 'CAM',
-  gate: 'GT',
-  officer: 'OFF',
-  building: 'BLD',
-  vehicle: 'VEH',
-  incident: 'INC',
-  fire: 'FIR',
-  assembly: 'ASM',
-  hose: 'HSE',
-  wiring: 'WIR',
-  sensor: 'SNS',
-  zone: 'ZN',
-  entrance: 'ENT',
+const PlainLiveMap = dynamic(() => import('@/components/maps/LiveMap'), {
+  ssr: false,
+  loading: () => <div className="soc-map__loading">Loading map…</div>,
+});
+
+const MAP_CENTER = { lat: -29.8587, lng: 31.0218 };
+const HISTORY_PAGE = 10;
+
+type HistoryRow = {
+  id: string;
+  code: string;
+  type: string;
+  title: string;
+  location: string;
+  status: string;
+  statusTone: 'ok' | 'alert' | 'fault' | 'offline' | 'muted';
+  openedAt: string;
+  duration: string;
+  voided: boolean;
+  href: string;
+  meta: string;
+  cameraId?: string;
+  kind: 'incident' | 'attention';
 };
 
-const SYSTEMS = [
-  { kind: 'fire', label: 'Fire panels' },
-  { kind: 'assembly', label: 'Assembly points' },
-  { kind: 'hose', label: 'Hose reels' },
-  { kind: 'wiring', label: 'Wiring / fence' },
-  { kind: 'sensor', label: 'Sensors' },
-  { kind: 'zone', label: 'Zones' },
-  { kind: 'entrance', label: 'Entrances' },
-] as const;
+function incidentStatusLabel(status: string) {
+  switch (status) {
+    case 'NEW':
+      return 'New';
+    case 'ACKNOWLEDGED':
+      return 'Acknowledged';
+    case 'DISPATCHED':
+      return 'Dispatched';
+    case 'RESPONDING':
+      return 'Response underway';
+    case 'ON_SCENE':
+      return 'On scene';
+    case 'RESOLVED':
+      return 'Resolved';
+    case 'CLOSED':
+      return 'Closed';
+    default:
+      return status.replace(/_/g, ' ');
+  }
+}
+
+function incidentTone(status: string): HistoryRow['statusTone'] {
+  if (status === 'RESOLVED' || status === 'CLOSED') return 'ok';
+  if (status === 'RESPONDING' || status === 'ON_SCENE') return 'alert';
+  if (status === 'DISPATCHED' || status === 'ACKNOWLEDGED') return 'fault';
+  if (status === 'NEW') return 'offline';
+  return 'muted';
+}
+
+function formatClock(iso: string) {
+  try {
+    return new Date(iso).toLocaleTimeString('en-ZA', {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    });
+  } catch {
+    return '—';
+  }
+}
+
+function durationLabel(iso: string) {
+  const ms = Date.now() - new Date(iso).getTime();
+  const mins = Math.max(1, Math.round(ms / 60_000));
+  if (mins < 60) return `${mins}m`;
+  const hrs = Math.floor(mins / 60);
+  const rem = mins % 60;
+  return rem ? `${hrs}h ${rem}m` : `${hrs}h`;
+}
+
+function toneFill(tone: HistoryRow['statusTone']) {
+  switch (tone) {
+    case 'ok':
+      return 100;
+    case 'alert':
+      return 75;
+    case 'fault':
+      return 48;
+    case 'offline':
+      return 22;
+    default:
+      return 35;
+  }
+}
+
+function historyActions(row: HistoryRow, base: string): OpsMonAction[] {
+  const items: OpsMonAction[] = [
+    {
+      id: 'open',
+      label: row.kind === 'incident' ? 'Open incident' : 'Open alert',
+      description: row.code,
+      href: row.href,
+    },
+  ];
+
+  if (row.cameraId) {
+    items.push({
+      id: 'camera',
+      label: 'View camera',
+      description: 'Open live CCTV for this alert',
+      href: `${base}/cctv?camera=${row.cameraId}`,
+    });
+  } else if (/camera|cctv|cam /i.test(row.type) || /camera|cctv|cam /i.test(row.title)) {
+    items.push({
+      id: 'cctv',
+      label: 'Open CCTV',
+      href: `${base}/cctv`,
+    });
+  }
+
+  items.push(
+    {
+      id: 'map',
+      label: 'Open live map',
+      description: row.location,
+      href: `${base}/map`,
+    },
+    {
+      id: 'incidents',
+      label: 'Incident center',
+      href: `${base}/incidents`,
+    },
+    {
+      id: 'dispatch',
+      label: 'Dispatch officer',
+      description: 'Send site security response',
+      href: `${base}/security`,
+    },
+    {
+      id: 'copy',
+      label: 'Copy reference',
+      description: row.code,
+      onClick: () => {
+        void navigator.clipboard?.writeText(row.code);
+      },
+    },
+  );
+
+  return items;
+}
+
+function rowIcon(type: string): string {
+  const t = type.toLowerCase();
+  if (t.includes('panic')) return 'alert';
+  if (t.includes('medical')) return 'officer';
+  if (t.includes('camera') || t.includes('cam ')) return 'camera';
+  if (t.includes('gate') || t.includes('security')) return 'gate';
+  if (t.includes('fire')) return 'fire';
+  if (t.includes('sensor')) return 'sensor';
+  return 'flag';
+}
+
+function OpsSignal({ fill }: { fill: number }) {
+  const level = Math.max(1, Math.min(4, Math.ceil((fill / 100) * 4)));
+  return (
+    <span className="ops-mon__signal" title={`${fill}%`}>
+      {[1, 2, 3, 4].map((n) => (
+        <i key={n} className={n <= level ? 'is-on' : undefined} />
+      ))}
+      <em>{fill}%</em>
+    </span>
+  );
+}
+
+function OpsStatusPill({
+  tone,
+  label,
+}: {
+  tone: HistoryRow['statusTone'];
+  label: string;
+}) {
+  return (
+    <span className={`ops-mon__status ops-mon__status--${tone}`}>
+      <em aria-hidden />
+      {label}
+    </span>
+  );
+}
 
 export function OrgSocDashboard({
   organizationId,
@@ -50,12 +210,97 @@ export function OrgSocDashboard({
 }) {
   const base = `/org/${organizationId}`;
   const cameras = useMemo(() => listOrgCameras(organizationId, siteId), [organizationId, siteId]);
-  const attention = useMemo(() => listOrgAttention(organizationId, siteId).slice(0, 5), [organizationId, siteId]);
-  const activity = useMemo(() => listOrgActivity(organizationId, siteId).slice(0, 6), [organizationId, siteId]);
-  const markers = useMemo(() => listOrgMapMarkers(organizationId, siteId), [organizationId, siteId]);
+  const attention = useMemo(() => listOrgAttention(organizationId, siteId), [organizationId, siteId]);
+  const activity = useMemo(() => listOrgActivity(organizationId, siteId).slice(0, 8), [organizationId, siteId]);
   const [selected, setSelected] = useState<OrgCamera | null>(null);
+  const [query, setQuery] = useState('');
+  const [page, setPage] = useState(0);
   const lead = incidents.find((i) => i.severity === 'critical' || i.severity === 'high');
-  const camerasOffline = Math.max(0, kpis.camerasTotal - kpis.camerasOnline);
+
+  const history = useMemo<HistoryRow[]>(() => {
+    const fromIncidents: HistoryRow[] = incidents.map((incident, index) => {
+      const voided = incident.status === 'RESOLVED' || incident.status === 'CLOSED';
+      return {
+        id: incident.id,
+        code: `RH${String(index + 1).padStart(4, '0')}`,
+        type: incident.type.replace(/_/g, ' '),
+        title: `${incident.type.replace(/_/g, ' ')} — ${incident.subject}`,
+        location: incident.siteName,
+        status: incidentStatusLabel(incident.status),
+        statusTone: incidentTone(incident.status),
+        openedAt: incident.createdAt,
+        duration: durationLabel(incident.createdAt),
+        voided,
+        href: `${base}/incidents`,
+        meta: `${new Date(incident.createdAt).toLocaleString()} · ${incident.location}`,
+        kind: 'incident' as const,
+      };
+    });
+
+    const fromAttention: HistoryRow[] = attention
+      .filter((item) => !incidents.some((i) => i.id === item.id))
+      .map((item, index) => ({
+        id: item.id,
+        code: `AL${String(index + 1).padStart(4, '0')}`,
+        type: item.kind.replace(/_/g, ' '),
+        title: item.title,
+        location: item.location.split('·')[0]?.trim() || item.location,
+        status: item.severity === 'critical' || item.severity === 'high' ? 'Needs response' : 'Monitoring',
+        statusTone:
+          item.severity === 'critical' || item.severity === 'high'
+            ? 'offline'
+            : item.severity === 'medium'
+              ? 'fault'
+              : 'muted',
+        openedAt: new Date(Date.now() - (index + 3) * 60_000).toISOString(),
+        duration: `${index + 3}m`,
+        voided: false,
+        href: item.cameraId ? `${base}/cctv?camera=${item.cameraId}` : `${base}/incidents`,
+        meta: `${item.location} · ${item.detail}`,
+        cameraId: item.cameraId,
+        kind: 'attention' as const,
+      }));
+
+    return [...fromIncidents, ...fromAttention];
+  }, [attention, base, incidents]);
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return history;
+    return history.filter((row) =>
+      [row.code, row.type, row.title, row.location, row.status, row.meta]
+        .join(' ')
+        .toLowerCase()
+        .includes(q),
+    );
+  }, [history, query]);
+
+  const pageCount = Math.max(1, Math.ceil(filtered.length / HISTORY_PAGE));
+  const safePage = Math.min(page, pageCount - 1);
+  const pageRows = filtered.slice(safePage * HISTORY_PAGE, safePage * HISTORY_PAGE + HISTORY_PAGE);
+  const viewFrom = filtered.length === 0 ? 0 : safePage * HISTORY_PAGE + 1;
+  const viewTo = Math.min(filtered.length, (safePage + 1) * HISTORY_PAGE);
+
+  const tickerItems = useMemo(
+    () =>
+      history
+        .filter((row) => !row.voided)
+        .slice(0, 12)
+        .map((row) => ({
+          id: row.id,
+          label: (
+            <>
+              <span className={`ops-mon__status ops-mon__status--${row.statusTone} ops-ticker__status`}>
+                <em aria-hidden />
+                {row.status}
+              </span>
+              <strong>{row.title}</strong>
+              <span>{row.location}</span>
+            </>
+          ),
+        })),
+    [history],
+  );
 
   return (
     <div className="soc">
@@ -64,10 +309,14 @@ export function OrgSocDashboard({
           <div>
             <p className="soc-kicker">Active incident</p>
             <h2>
-              {lead.type} · {lead.subject}
+              <OpsMarqueeText>
+                {lead.type} · {lead.subject}
+              </OpsMarqueeText>
             </h2>
             <p>
-              {lead.siteName} · {lead.location} · {lead.ageLabel}
+              <OpsMarqueeText>
+                {lead.siteName} · {lead.location} · {lead.ageLabel}
+              </OpsMarqueeText>
             </p>
           </div>
           <div className="soc-banner__actions">
@@ -83,6 +332,8 @@ export function OrgSocDashboard({
           </div>
         </section>
       ) : null}
+
+      <OpsTicker items={tickerItems} label="Live ops" durationSec={32} />
 
       <div className="soc-hero">
         <section className="soc-cctv">
@@ -111,155 +362,184 @@ export function OrgSocDashboard({
             </div>
             <Link href={`${base}/map`}>Open</Link>
           </header>
-          <div className="soc-map__canvas" aria-label="Live security map">
-            <span className="soc-plan soc-plan--bldg" aria-hidden />
-            <span className="soc-plan soc-plan--zone" aria-hidden />
-            <span className="soc-plan soc-plan--fence" aria-hidden />
-            {markers.map((marker) => (
-              <button
-                key={marker.id}
-                type="button"
-                className={`soc-pin soc-pin--${marker.tone} soc-pin--${marker.kind}`}
-                style={{ left: `${marker.x}%`, top: `${marker.y}%` }}
-                title={`${PIN_CODE[marker.kind] ?? marker.kind} · ${marker.label}`}
-                onClick={() => {
-                  if (!marker.cameraId) return;
-                  const camera = listOrgCameras(organizationId, siteId).find((c) => c.id === marker.cameraId);
-                  if (camera) setSelected(camera);
-                }}
-              >
-                <em>{PIN_CODE[marker.kind] ?? '•'}</em>
-                <span>{marker.label}</span>
-              </button>
-            ))}
+          <div className="soc-map__canvas" aria-label="Live map">
+            <PlainLiveMap
+              center={MAP_CENTER}
+              users={[]}
+              officers={[]}
+              incidents={[]}
+              scrollWheelZoom={false}
+            />
           </div>
-          <p className="soc-map__legend">
-            Cameras, gates, officers, fire, assembly, hose, wiring, sensors, zones, entrances
-          </p>
         </section>
       </div>
 
-      <nav className="soc-commands" aria-label="Quick response">
-        <Link href={`${base}/incidents`}>
-          <SocIcon name="flag" /> Report incident
-        </Link>
-        <Link href={`${base}/emergencies`} className="soc-commands__alert">
-          <SocIcon name="alert" /> Panic / SOS
-        </Link>
-        <Link href={`${base}/cctv`}>
-          <SocIcon name="camera" /> View all cameras
-        </Link>
-        <Link href={`${base}/security`}>
-          <SocIcon name="officer" /> Dispatch officer
-        </Link>
-        <Link href={`${base}/gates`}>
-          <SocIcon name="gate" /> Gate control
-        </Link>
-        <Link href={`${base}/map`}>
-          <SocIcon name="map" /> Open live map
-        </Link>
-      </nav>
-
-      <section className="soc-systems" aria-label="Connected site systems">
-        {SYSTEMS.map((system) => {
-          const rows = markers.filter((marker) => marker.kind === system.kind);
-          const tone = rows.some((row) => row.tone === 'danger')
-            ? 'danger'
-            : rows.some((row) => row.tone === 'warn')
-              ? 'warn'
-              : 'ok';
-          return (
-            <article key={system.kind} className={`soc-systems__item is-${tone}`}>
-              <SocIcon name={system.kind} />
-              <span>{system.label}</span>
-              <strong>{rows.length}</strong>
-            </article>
-          );
-        })}
-      </section>
-
-      <section className="soc-status" aria-label="Security status">
-        <Status icon="flag" label="Incidents" value={String(kpis.activeIncidents)} tone={kpis.activeIncidents ? 'danger' : 'ok'} />
-        <Status icon="alert" label="Alerts" value={String(kpis.activeAlerts)} tone={kpis.activeAlerts ? 'warn' : 'ok'} />
-        <Status
-          icon="camera"
-          label="Cameras"
-          value={`${kpis.camerasOnline}/${kpis.camerasTotal}`}
-          tone={camerasOffline ? 'warn' : 'ok'}
-        />
-        <Status icon="officer" label="People" value={String(kpis.peopleOnSite)} tone="info" />
-        <Status icon="vehicle" label="Vehicles" value={String(kpis.vehiclesOnSite)} tone="info" />
-        <Status icon="gate" label="Open gates" value={String(kpis.openGates)} tone={kpis.openGates ? 'warn' : 'ok'} />
-      </section>
-
-      <div className="soc-lower">
-        <section className="soc-panel">
-          <header className="soc-head">
-            <h2>Attention required</h2>
-            <Link href={`${base}/incidents`}>View all</Link>
-          </header>
-          {attention.length === 0 ? (
-            <p className="soc-clear">
-              All systems operating normally. No incidents or device faults need attention.
-            </p>
-          ) : (
-            <ul className="soc-attention">
-              {attention.map((item) => (
-                <li key={item.id} className={`soc-attention__item is-${item.severity}`}>
-                  <strong>{item.title}</strong>
-                  <span>
-                    {item.location} · {item.detail}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
-
-        <section className="soc-panel">
-          <header className="soc-head">
-            <h2>Today&apos;s operations</h2>
-          </header>
-          <div className="soc-ops">
-            <article>
-              <SocIcon name="officer" />
-              <p>Officers</p>
+      <section className="soc-history" aria-label="Response history">
+        <header className="soc-history__head">
+          <div>
+            <h2>Response history</h2>
+            <p>Alerts, who responded, and how it ended.</p>
+          </div>
+          <div className="soc-history__stats" aria-label="Quick counts">
+            <span>
+              <strong>{kpis.activeIncidents}</strong> open
+            </span>
+            <span>
+              <strong>{kpis.activeAlerts}</strong> alerts
+            </span>
+            <span>
               <strong>
-                {kpis.officersOnDuty}/{kpis.officersRostered}
-              </strong>
-              <span>On duty</span>
-            </article>
-            <article>
-              <SocIcon name="vehicle" />
-              <p>Vehicles</p>
-              <strong>{kpis.vehiclesOnSite}</strong>
-              <span>On site</span>
-            </article>
-            <article>
-              <SocIcon name="entrance" />
-              <p>Visitors</p>
-              <strong>{kpis.visitors}</strong>
-              <span>Today</span>
-            </article>
+                {kpis.camerasOnline}/{kpis.camerasTotal}
+              </strong>{' '}
+              cams
+            </span>
           </div>
-          <h3 className="soc-subhead">Recent activity</h3>
-          {activity.length === 0 ? (
-            <p className="org-empty">No activity in this view.</p>
-          ) : (
-            <ul className="soc-activity">
-              {activity.map((event) => (
-                <li key={event.id}>
-                  <time>{event.time}</time>
-                  <span>
-                    {event.text}
-                    <em>{event.location}</em>
-                  </span>
+        </header>
+
+        <label className="soc-history__search">
+          <span className="sr-only">Search response history</span>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden>
+            <circle cx="11" cy="11" r="7" />
+            <path d="m20 20-3.5-3.5" />
+          </svg>
+          <input
+            value={query}
+            onChange={(e) => {
+              setQuery(e.target.value);
+              setPage(0);
+            }}
+            placeholder="Search alerts, location, status…"
+          />
+        </label>
+
+        <div className="soc-history__board ops-mon">
+          <table className="ops-mon__table">
+            <thead>
+              <tr>
+                <th>Alert</th>
+                <th>Type</th>
+                <th>Location</th>
+                <th>Status</th>
+                <th>Last seen</th>
+                <th>Signal</th>
+                <th className="ops-mon__actions-h">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {pageRows.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="ops-mon__empty">
+                    No matching responses.
+                  </td>
+                </tr>
+              ) : (
+                pageRows.map((row) => {
+                  const fill = toneFill(row.statusTone);
+                  return (
+                    <tr key={row.id} className={row.voided ? 'is-void' : undefined}>
+                      <td>
+                        <div className="ops-mon__device">
+                          <span className="ops-mon__icon" aria-hidden>
+                            <SocIcon name={rowIcon(row.type)} />
+                          </span>
+                          <span className="ops-mon__device-copy">
+                            <strong>
+                              <OpsMarqueeText>{row.title}</OpsMarqueeText>
+                            </strong>
+                            <em>{row.code}</em>
+                          </span>
+                        </div>
+                      </td>
+                      <td className="ops-mon__muted">{row.type}</td>
+                      <td className="ops-mon__muted">{row.location}</td>
+                      <td>
+                        <OpsStatusPill tone={row.statusTone} label={row.status} />
+                      </td>
+                      <td className="ops-mon__muted">
+                        {formatClock(row.openedAt)} · {row.duration}
+                      </td>
+                      <td>
+                        <OpsSignal fill={fill} />
+                      </td>
+                      <td className="ops-mon__actions">
+                        <OpsMonActionsMenu
+                          label={`Actions for ${row.title}`}
+                          items={historyActions(row, base)}
+                        />
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+
+          <ul className="ops-mon__cards">
+            {pageRows.map((row) => {
+              const fill = toneFill(row.statusTone);
+              return (
+                <li key={`card-${row.id}`} className={row.voided ? 'is-void' : undefined}>
+                  <div className="ops-mon__device">
+                    <span className="ops-mon__icon" aria-hidden>
+                      <SocIcon name={rowIcon(row.type)} />
+                    </span>
+                    <span className="ops-mon__device-copy">
+                      <strong>
+                        <OpsMarqueeText>{row.title}</OpsMarqueeText>
+                      </strong>
+                      <em>{row.code}</em>
+                    </span>
+                    <OpsMonActionsMenu
+                      label={`Actions for ${row.title}`}
+                      items={historyActions(row, base)}
+                    />
+                  </div>
+                  <div className="ops-mon__card-meta">
+                    <span>{row.type}</span>
+                    <span>{row.location}</span>
+                    <span>
+                      {formatClock(row.openedAt)} · {row.duration}
+                    </span>
+                  </div>
+                  <div className="ops-mon__card-foot">
+                    <OpsStatusPill tone={row.statusTone} label={row.status} />
+                    <OpsSignal fill={fill} />
+                  </div>
                 </li>
-              ))}
-            </ul>
-          )}
-        </section>
-      </div>
+              );
+            })}
+          </ul>
+
+          <div className="ops-mon__pager">
+            <p>
+              Viewing{' '}
+              <span className="ops-mon__range">
+                {viewFrom}-{viewTo}
+              </span>{' '}
+              of {filtered.length} results
+            </p>
+            <div>
+              <button type="button" disabled={safePage <= 0} onClick={() => setPage((p) => Math.max(0, p - 1))}>
+                Previous
+              </button>
+              <button
+                type="button"
+                className="is-next"
+                disabled={safePage >= pageCount - 1}
+                onClick={() => setPage((p) => Math.min(pageCount - 1, p + 1))}
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {activity.length > 0 ? (
+          <p className="soc-history__footnote">
+            Latest site note: {activity[0]?.text} · {activity[0]?.location}
+          </p>
+        ) : null}
+      </section>
 
       {selected ? (
         <div className="soc-modal" role="presentation" onClick={() => setSelected(null)}>
@@ -279,7 +559,7 @@ export function OrgSocDashboard({
                 Close
               </button>
             </header>
-            <CameraFeed camera={selected} large />
+            <CameraFeed camera={selected} large href={`${base}/cctv?camera=${selected.id}`} />
             <p className="soc-demo-note">
               {selected.location} · {selected.status} · PTZ {selected.ptz ? 'capable' : 'not fitted'} · audio{' '}
               {selected.audio ? 'capable' : 'not fitted'}. Controls are not sent to a device.
@@ -358,7 +638,7 @@ function CctvSlider({
                 className="soc-cam"
                 onClick={() => onSelect(camera)}
               >
-                <CameraFeed camera={camera} />
+                <CameraFeed camera={camera} href={`${base}/cctv?camera=${camera.id}`} />
               </button>
             ))}
           </div>
@@ -402,26 +682,6 @@ function CctvSlider({
           </button>
         </div>
       ) : null}
-    </div>
-  );
-}
-
-function Status({
-  icon,
-  label,
-  value,
-  tone,
-}: {
-  icon: string;
-  label: string;
-  value: string;
-  tone: 'ok' | 'warn' | 'danger' | 'info';
-}) {
-  return (
-    <div className={`soc-status__item is-${tone}`}>
-      <SocIcon name={icon} />
-      <span>{label}</span>
-      <strong>{value}</strong>
     </div>
   );
 }

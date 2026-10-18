@@ -23,6 +23,7 @@ export function PropertyRegisterForm({ onRegistered, compact }: Props) {
   const [name, setName] = useState('');
   const [addressParts, setAddressParts] = useState<SplitAddressValue>(EMPTY_ADDRESS);
   const [gateCode, setGateCode] = useState('');
+  const [dogOnPremises, setDogOnPremises] = useState(false);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState('');
   const [error, setError] = useState('');
@@ -36,7 +37,12 @@ export function PropertyRegisterForm({ onRegistered, compact }: Props) {
       const address = formatSplitAddress(addressParts);
       const res = await clientApi.post<
         ApiResponse<{ id: string; status: string; message?: string }>
-      >('/client/properties/register', { name, address, gateCode: gateCode || undefined });
+      >('/client/properties/register', {
+        name,
+        address,
+        gateCode: gateCode || undefined,
+        ...(dogOnPremises ? { accessNotes: 'Dog on premises.' } : {}),
+      });
       setMsg(
         res.data?.message ??
           'Property submitted. Our control room will verify and link your alarm & cameras.',
@@ -44,6 +50,7 @@ export function PropertyRegisterForm({ onRegistered, compact }: Props) {
       setName('');
       setAddressParts(EMPTY_ADDRESS);
       setGateCode('');
+      setDogOnPremises(false);
       onRegistered?.();
     } catch (err) {
       setError(friendlyErrorMessage(err, 'action'));
@@ -77,6 +84,17 @@ export function PropertyRegisterForm({ onRegistered, compact }: Props) {
         onGateCodeChange={setGateCode}
         gateLabel="Gate / access notes (optional)"
       />
+      <label className="register-service-panel__toggle register-dog-check">
+        <input
+          type="checkbox"
+          checked={dogOnPremises}
+          onChange={(e) => setDogOnPremises(e.target.checked)}
+        />
+        <span>
+          <strong>Dog on the premises</strong>
+          <em>Shown to responders before entry</em>
+        </span>
+      </label>
       {error ? <div className="alert alert--error">{error}</div> : null}
       {msg ? <div className="alert alert--success">{msg}</div> : null}
       <button type="submit" className="btn-primary" disabled={busy}>

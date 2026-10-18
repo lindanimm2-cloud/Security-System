@@ -1,39 +1,19 @@
 'use client';
 
-import { FormEvent, useState } from 'react';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
+import { Suspense } from 'react';
 import { SiteDispatchStrip } from '@/components/site/SiteDispatchStrip';
-import { UiSelect } from '@/components/ui/UiSelect';
+import { ServiceRequestForm } from '@/components/site/ServiceRequestForm';
+
+function ContactFormPanel() {
+  const searchParams = useSearchParams();
+  const service = searchParams.get('service');
+
+  return <ServiceRequestForm initialInterest={service} />;
+}
 
 export default function ContactPage() {
-  const [sent, setSent] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
-  const [form, setForm] = useState({
-    name: '',
-    email: '',
-    phone: '',
-    company: '',
-    interest: 'protection',
-    message: '',
-  });
-
-  async function onSubmit(e: FormEvent) {
-    e.preventDefault();
-    setSubmitting(true);
-    try {
-      await fetch('/api/contact', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(form),
-      });
-    } catch {
-      // Silently proceed even if endpoint doesn't exist in demo
-    } finally {
-      setSubmitting(false);
-      setSent(true);
-    }
-  }
-
   return (
     <>
       <section className="nx-page-hero nx-page-hero--rich">
@@ -41,8 +21,9 @@ export default function ContactPage() {
           <p className="nx-eyebrow">Contact</p>
           <h1>Tell us what you need protected</h1>
           <p>
-            Protection plans, fleet recovery, site installs, or corporate supply
-            — send a brief and a Nexus advisor will map the right stack.
+            Book private escort, close protection, installs, or monitoring —
+            include dates, people, and locations so we can respond with a clear
+            plan.
           </p>
         </div>
       </section>
@@ -82,77 +63,15 @@ export default function ContactPage() {
           </Link>
         </div>
 
-        <form className="nx-contact-form" onSubmit={(e) => void onSubmit(e)}>
-          {sent ? (
-            <div className="nx-success">
-              Thanks — we have your inquiry and a Nexus advisor will get back to you.
+        <Suspense
+          fallback={
+            <div className="nx-contact-form">
+              <p className="nx-service-request__fine">Loading request form…</p>
             </div>
-          ) : (
-            <>
-              <label>
-                Full name
-                <input
-                  required
-                  value={form.name}
-                  onChange={(e) => setForm({ ...form, name: e.target.value })}
-                />
-              </label>
-              <label>
-                Work email
-                <input
-                  type="email"
-                  required
-                  value={form.email}
-                  onChange={(e) => setForm({ ...form, email: e.target.value })}
-                />
-              </label>
-              <label>
-                Phone
-                <input
-                  value={form.phone}
-                  onChange={(e) => setForm({ ...form, phone: e.target.value })}
-                />
-              </label>
-              <label>
-                Company
-                <input
-                  value={form.company}
-                  onChange={(e) => setForm({ ...form, company: e.target.value })}
-                />
-              </label>
-              <label>
-                I am interested in
-                <UiSelect
-                  compact={false}
-                  ariaLabel="I am interested in"
-                  value={form.interest}
-                  onChange={(interest) => setForm({ ...form, interest })}
-                  options={[
-                    { value: 'protection', label: 'Personal / family protection' },
-                    { value: 'fleet', label: 'Fleet & recovery' },
-                    { value: 'install', label: 'CCTV / alarm install' },
-                    { value: 'supply', label: 'Corporate gear supply' },
-                    { value: 'other', label: 'Something else' },
-                  ]}
-                />
-              </label>
-              <label>
-                Message
-                <textarea
-                  required
-                  rows={5}
-                  value={form.message}
-                  onChange={(e) =>
-                    setForm({ ...form, message: e.target.value })
-                  }
-                />
-              </label>
-              <button type="submit" className="nx-btn nx-btn--primary" disabled={submitting}>
-                {submitting ? 'Sending…' : 'Send inquiry'}
-              </button>
-            </>
-          )}
-        </form>
+          }
+        >
+          <ContactFormPanel />
+        </Suspense>
       </section>
     </>
   );

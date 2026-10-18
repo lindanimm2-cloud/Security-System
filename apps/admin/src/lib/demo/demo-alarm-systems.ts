@@ -128,7 +128,7 @@ export const demoAlarmSystems: DemoAlarmSystem[] = [
     zoneCount: 8,
     firmware: 'V2.1.0',
     techNotes:
-      'WiFi+4G dual path. Touch keypad + RFID tags programmed for Nomsa & James. Siren on AUX <650mA.',
+      'WiFi+4G dual path. Touch keypad + RFID tags programmed for Demo & James. Siren on AUX <650mA.',
     status: 'ONLINE',
     installedAt: now,
     createdAt: now,
@@ -140,7 +140,7 @@ export const demoAlarmSystems: DemoAlarmSystem[] = [
       propertyType: 'HOUSE',
       client: {
         id: 'demo-user-client-demo-local',
-        name: 'Nomsa Client',
+        name: 'Demo Client',
         email: 'client@demo.local',
       },
     },
@@ -184,7 +184,7 @@ export const demoAlarmSystems: DemoAlarmSystem[] = [
       propertyType: 'STORE',
       client: {
         id: 'demo-user-client-demo-local',
-        name: 'Nomsa Client',
+        name: 'Demo Client',
         email: 'client@demo.local',
       },
     },

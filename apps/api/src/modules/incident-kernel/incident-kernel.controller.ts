@@ -1,4 +1,14 @@
-import { Body, Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Post,
+  UploadedFiles,
+  UseGuards,
+  UseInterceptors,
+} from '@nestjs/common';
+import { FilesInterceptor } from '@nestjs/platform-express';
 import { ResponseAgency, UserRole } from '@prisma/client';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
@@ -45,12 +55,25 @@ export class IncidentKernelController {
 
   @Post(':id/chat')
   @RequirePermission('comms.incident')
+  @UseInterceptors(
+    FilesInterceptor('files', 5, {
+      limits: { fileSize: 25 * 1024 * 1024 },
+    }),
+  )
   sendChat(
     @CurrentUser() user: AuthUser,
     @Param('id') id: string,
-    @Body() body: { content: string },
+    @Body('content') content: string,
+    @Body('to') to: string | undefined,
+    @Body('saveTo') saveTo: string | undefined,
+    @UploadedFiles()
+    files?: { originalname: string; mimetype: string; size: number; buffer: Buffer }[],
   ) {
-    return this.kernel.sendIncidentMessage(user.tenantId, id, user, body.content ?? '');
+    return this.kernel.sendIncidentMessage(user.tenantId, id, user, content ?? '', {
+      to: to ?? 'room',
+      saveTo: saveTo ?? 'chat',
+      files: files ?? [],
+    });
   }
 
   @Post(':id/agencies')

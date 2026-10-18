@@ -15,6 +15,15 @@ import { CONTROL_ROOM_ROUTES } from '@/lib/control-room-routes';
 import { matchesSearch } from '@/lib/list-search';
 import { formatSplitAddress } from '@/lib/phone-countries';
 import { SplitAddressFields, type SplitAddressValue } from '@/components/ui/SplitAddressFields';
+import { openBrandedSpecSheet, openBrandedTableReport } from '@/lib/branded-document';
+import { CameraConfigDrawer, type ConfigTarget } from '@/components/vms/CameraConfigDrawer';
+import {
+  DeviceEditModal,
+  DeviceHealthActions,
+  DiscoveryPanel,
+  ManualAddModal,
+} from '@/components/vms/DeviceTools';
+import { playbackHref } from '@/lib/vms/types';
 
 type SiteType = { value: string; label: string };
 
@@ -146,9 +155,69 @@ function clientLabel(c: ClientRow) {
   return c.name || `${c.firstName ?? ''} ${c.lastName ?? ''}`.trim() || c.email;
 }
 
+function kitCameraSummary(s: CctvSystemRow) {
+  if (!s.cameras.length) return 'No cameras logged';
+  return s.cameras
+    .map((c) => `Ch${c.channel} ${c.name}${c.serialNumber ? ` (${c.serialNumber})` : ''}`)
+    .join('; ');
+}
+
+function kitSheetMeta(s: CctvSystemRow) {
+  return [
+    { label: 'Site', value: `${s.property?.name ?? '—'} · ${s.property?.propertyType ?? '—'}` },
+    { label: 'Address', value: s.property?.address ?? '—' },
+    { label: 'Customer', value: s.property?.client?.name ?? '—' },
+    { label: 'Brand / model', value: [s.brand, s.model].filter(Boolean).join(' · ') || '—' },
+    { label: 'Kit SKU', value: s.kitSku || '—' },
+    {
+      label: 'Recorder',
+      value: `${s.recorderType} · ${s.channelCount}ch · ${s.connectivity}`,
+    },
+    { label: 'DVR/NVR serial', value: s.recorderSerial || '—' },
+    { label: 'Cloud / IP', value: [s.cloudId, s.recorderIp].filter(Boolean).join(' · ') || '—' },
+    {
+      label: 'Storage',
+      value: s.hddInstalled
+        ? `${s.hddCapacityGb ?? '?'} GB${s.hddSerial ? ` · ${s.hddSerial}` : ''}`
+        : 'No HDD logged',
+    },
+    { label: 'Cameras', value: kitCameraSummary(s) },
+    { label: 'Status', value: s.status },
+  ];
+}
+
+function openKitSheet(s: CctvSystemRow) {
+  openBrandedSpecSheet({
+    title: s.name,
+    referenceStem: s.recorderSerial || s.kitSku || s.id.slice(0, 8),
+    status: s.status,
+    preparedFor: s.property?.client
+      ? {
+          name: s.property.client.name,
+          email: s.property.client.email || undefined,
+          address: s.property.address || undefined,
+        }
+      : s.property
+        ? { name: s.property.name, address: s.property.address || undefined }
+        : undefined,
+    meta: kitSheetMeta(s),
+    notes: [
+      ...(s.techNotes ? [`Tech notes: ${s.techNotes}`] : []),
+      'Share this sheet with the client or install team via Print → Save as PDF.',
+    ],
+  });
+}
+
+function statusTone(status: string) {
+  if (status === 'ONLINE') return 'ok';
+  if (status === 'FAULT') return 'danger';
+  if (status === 'OFFLINE') return 'warn';
+  return 'info';
+}
+
 export default function CctvSystemsPage() {
   return (
-    <ControlRoomLayout title="CCTV systems">
+    <ControlRoomLayout title="Devices">
       <CctvSystemsContent />
     </ControlRoomLayout>
   );
@@ -178,6 +247,14 @@ function CctvSystemsContent() {
   const sites = surveillanceData?.data?.sites ?? [];
 
   const [search, setSearch] = useState('');
+  const [deviceTab, setDeviceTab] = useState<'managed' | 'online'>(() =>
+    typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('tab') === 'online'
+      ? 'online'
+      : 'managed',
+  );
+  const [manualOpen, setManualOpen] = useState(false);
+  const [editing, setEditing] = useState<CctvSystemRow | null>(null);
+  const [configTarget, setConfigTarget] = useState<ConfigTarget | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [busy, setBusy] = useState(false);
   const [formError, setFormError] = useState('');
@@ -405,21 +482,59 @@ function CctvSystemsContent() {
 
   return (
     <div className="ops-page cctv-systems-page">
-      <header className="ops-page-header">
+      <header className="ops-page-header ops-page-header--compact">
         <div>
-          <h1 className="ops-page-header__title">CCTV systems</h1>
+          <h1 className="ops-page-header__title">Devices</h1>
           <p className="ops-page-header__subtitle">
-            Register HiLook, Dahua, AHD and other kits against a house, store, mall, branch or
-            warehouse — including DVR/NVR and camera serials for the tech team.
+            Recorders &amp; cameras — discover, add by IP, sync &amp; tune
           </p>
         </div>
         <div className="ops-page-header__actions">
-          <Link href={CONTROL_ROOM_ROUTES.alarmSystems} className="btn btn-ghost btn-sm">
-            Alarm panels
-          </Link>
           <Link href={CONTROL_ROOM_ROUTES.surveillance} className="btn btn-ghost btn-sm">
-            Live CCTV
+            Live view
           </Link>
+          <button type="button" className="btn btn-ghost btn-sm" onClick={() => setManualOpen(true)}>
+            Add manually
+          </button>
+          <button
+            type="button"
+            className="btn btn-ghost btn-sm"
+            disabled={!filtered.length}
+            onClick={() =>
+              openBrandedTableReport({
+                title: 'CCTV kit register',
+                filenameStem: 'cctv-kits',
+                headers: [
+                  'Kit',
+                  'Status',
+                  'Site',
+                  'Customer',
+                  'Address',
+                  'Recorder',
+                  'Serial',
+                  'Channels',
+                  'Storage',
+                ],
+                rows: filtered.map((s) => [
+                  s.name,
+                  s.status,
+                  s.property?.name ?? '',
+                  s.property?.client?.name ?? '',
+                  s.property?.address ?? '',
+                  `${s.recorderType} · ${s.connectivity}`,
+                  s.recorderSerial ?? '',
+                  String(s.channelCount),
+                  s.hddInstalled ? `${s.hddCapacityGb ?? '?'} GB` : 'No HDD',
+                ]),
+                notes: [
+                  'Filtered CCTV kit register for install / client packs.',
+                  'Use Print / Save as PDF for a letterheaded archive copy.',
+                ],
+              })
+            }
+          >
+            Print register
+          </button>
           <button
             type="button"
             className="btn btn-primary btn-sm"
@@ -433,10 +548,48 @@ function CctvSystemsContent() {
         </div>
       </header>
 
+      <div className="vms-tabs" role="tablist" aria-label="Device lists" style={{ alignSelf: 'flex-start' }}>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={deviceTab === 'managed'}
+          className={`vms-tab ${deviceTab === 'managed' ? 'is-on' : ''}`}
+          onClick={() => setDeviceTab('managed')}
+        >
+          Managed devices ({systems.length})
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={deviceTab === 'online'}
+          className={`vms-tab ${deviceTab === 'online' ? 'is-on' : ''}`}
+          onClick={() => setDeviceTab('online')}
+        >
+          Online devices
+        </button>
+      </div>
+
       {error ? <ErrorAlert message={error} onRetry={() => void reload()} /> : null}
       {formMsg ? <p className="text-muted" style={{ color: 'var(--success)' }}>{formMsg}</p> : null}
 
-      {showForm ? (
+      {deviceTab === 'online' ? (
+        <DiscoveryPanel
+          sites={sites}
+          onAdded={() => {
+            void reload();
+          }}
+        />
+      ) : null}
+
+      {manualOpen ? (
+        <ManualAddModal sites={sites} onClose={() => setManualOpen(false)} onAdded={() => void reload()} />
+      ) : null}
+      {editing ? (
+        <DeviceEditModal device={editing} onClose={() => setEditing(null)} onSaved={() => void reload()} />
+      ) : null}
+      {configTarget ? <CameraConfigDrawer camera={configTarget} onClose={() => setConfigTarget(null)} /> : null}
+
+      {deviceTab === 'managed' && showForm ? (
         <form className="ops-panel cctv-reg-form" onSubmit={(e) => void onSubmit(e)}>
           <h2 className="ops-panel__title">Register CCTV kit</h2>
           {formError ? <ErrorAlert message={formError} /> : null}
@@ -783,6 +936,8 @@ function CctvSystemsContent() {
         </form>
       ) : null}
 
+      {deviceTab === 'managed' ? (
+      <>
       <div className="ops-toolbar">
         <ListSearch
           value={search}
@@ -797,11 +952,12 @@ function CctvSystemsContent() {
           body="Register a HiLook, Dahua or AHD kit against a house, store, mall or branch."
         />
       ) : (
-        <div className="cctv-system-grid">
+        <div className="cctv-system-grid alarm-panel-grid">
           {filtered.map((s) => (
-            <article key={s.id} className="ops-panel cctv-system-card">
+            <article key={s.id} className="ops-panel cctv-system-card alarm-panel-card cctv-kit-card">
               <header className="cctv-system-card__head">
                 <div>
+                  <p className="alarm-panel-card__eyebrow">CCTV kit</p>
                   <h3>{s.name}</h3>
                   <p className="text-muted">
                     {[s.brand, s.model].filter(Boolean).join(' · ') || 'Custom kit'}
@@ -812,25 +968,23 @@ function CctvSystemsContent() {
                   {s.status}
                 </span>
               </header>
+
+              <div className="alarm-panel-card__site">
+                <div>
+                  <span className="alarm-panel-card__site-label">Site</span>
+                  <strong>{s.property?.name ?? 'Unlinked site'}</strong>
+                  <span className="text-muted">
+                    {s.property?.propertyType ? s.property.propertyType.replace(/_/g, ' ') : '—'}
+                  </span>
+                </div>
+                <div>
+                  <span className="alarm-panel-card__site-label">Customer</span>
+                  <strong>{s.property?.client?.name ?? '—'}</strong>
+                  <span className="text-muted">{s.property?.address ?? 'No address on file'}</span>
+                </div>
+              </div>
+
               <dl className="cctv-system-card__facts">
-                <div>
-                  <dt>Site</dt>
-                  <dd>
-                    {s.property?.name ?? '—'}
-                    <span className="text-muted">
-                      {' '}
-                      · {s.property?.propertyType ?? '—'}
-                    </span>
-                  </dd>
-                </div>
-                <div>
-                  <dt>Address</dt>
-                  <dd>{s.property?.address ?? '—'}</dd>
-                </div>
-                <div>
-                  <dt>Customer</dt>
-                  <dd>{s.property?.client?.name ?? '—'}</dd>
-                </div>
                 <div>
                   <dt>Recorder</dt>
                   <dd>
@@ -854,44 +1008,81 @@ function CctvSystemsContent() {
                   </dd>
                 </div>
               </dl>
-              <div className="cctv-system-card__cams">
-                <strong>Cameras</strong>
-                <ul>
-                  {s.cameras.map((c) => (
-                    <li key={c.id}>
-                      <span>
-                        Ch{c.channel} · {c.name}
-                      </span>
-                      <span className="text-muted">{c.serialNumber || 'No serial'}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
+
+              {s.cameras.length ? (
+                <div className="cctv-system-card__cams cctv-kit-card__cams">
+                  <strong>Cameras</strong>
+                  <ul>
+                    {s.cameras.map((c) => (
+                      <li key={c.id} title={c.serialNumber || undefined}>
+                        <span>
+                          Ch{c.channel} · {c.name}
+                          {c.serialNumber ? (
+                            <em className="cctv-kit-card__cam-serial"> · {c.serialNumber}</em>
+                          ) : null}
+                        </span>
+                        <span className="cctv-kit-card__cam-actions">
+                          <button
+                            type="button"
+                            className="vms-link"
+                            onClick={() => setConfigTarget({ id: c.id, name: c.name, deviceName: s.name })}
+                          >
+                            Settings
+                          </button>
+                          <Link href={playbackHref({ cameraIds: [c.id], siteId: s.property?.id })} className="vms-link">
+                            Playback
+                          </Link>
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
+
               {s.techNotes ? (
-                <p className="ops-safety-note">
+                <div className="alarm-panel-card__notes">
                   <strong>Tech notes</strong>
-                  {s.techNotes}
-                </p>
+                  <p>{s.techNotes}</p>
+                </div>
               ) : null}
-              {s.property?.id ? (
-                <Link
-                  href={`${CONTROL_ROOM_ROUTES.surveillance}/${s.property.id}`}
+
+              <div className="alarm-panel-card__actions">
+                {s.property?.id ? (
+                  <Link
+                    href={`${CONTROL_ROOM_ROUTES.surveillance}/${s.property.id}`}
+                    className="btn btn-ghost btn-sm"
+                  >
+                    Open live site
+                  </Link>
+                ) : (
+                  <span className="text-muted alarm-panel-card__actions-spacer">No live site</span>
+                )}
+                <button
+                  type="button"
                   className="btn btn-ghost btn-sm"
+                  onClick={() => openKitSheet(s)}
+                  title="Open letterheaded kit sheet — Print → Save as PDF"
                 >
-                  Open live site
-                </Link>
-              ) : null}
+                  Download
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-sm"
+                  onClick={() => openKitSheet(s)}
+                >
+                  Print / PDF
+                </button>
+                <button type="button" className="btn btn-ghost btn-sm" onClick={() => setEditing(s)}>
+                  Edit
+                </button>
+              </div>
+              <DeviceHealthActions deviceId={s.id} />
             </article>
           ))}
         </div>
       )}
+      </>
+      ) : null}
     </div>
   );
-}
-
-function statusTone(status: string) {
-  if (status === 'ONLINE') return 'ok';
-  if (status === 'FAULT') return 'danger';
-  if (status === 'OFFLINE') return 'warn';
-  return 'info';
 }

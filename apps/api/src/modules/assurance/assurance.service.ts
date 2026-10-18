@@ -51,8 +51,9 @@ export class AssuranceService {
         metrics: { openVulns, auditCount, evidenceHashed, mfaUsers },
         checklist,
         passkeys: {
-          status: 'planned',
-          message: 'WebAuthn/passkeys are on the Phase 3 roadmap; TOTP MFA is the current control.',
+          status: 'available',
+          message:
+            'WebAuthn passkeys and platform biometrics (Windows Hello / Face ID / Touch ID) are supported for sign-in.',
         },
       },
     };

@@ -19,6 +19,7 @@ export async function bootstrapRegistrationAssets(
         name: payload.property.name.trim(),
         address: payload.property.address.trim(),
         gateCode: payload.property.gateCode?.trim() || undefined,
+        accessNotes: payload.property.accessNotes?.trim() || undefined,
       }),
     );
   }

@@ -21,6 +21,7 @@ import {
   slaSnapshot,
   type OpsIncident,
 } from '@/lib/ops-incident';
+import { OpsMarqueeText } from '@/components/ui/OpsMarquee';
 
 const DashboardLiveMap = dynamic(
   () =>
@@ -187,28 +188,42 @@ export function OpsIncidentCard({
           </span>
         </header>
 
-        <strong className="ops-inc__who">{incident.user}</strong>
-        {panic ? <p className="ops-inc__device">Primary device panic</p> : null}
+        <strong className="ops-inc__who">
+          <OpsMarqueeText>{incident.user}</OpsMarqueeText>
+        </strong>
+        {panic ? (
+          <p className="ops-inc__device">
+            <OpsMarqueeText>Primary device panic</OpsMarqueeText>
+          </p>
+        ) : null}
 
         <p className="ops-inc__where">
-          {incident.location}
-          <span>
-            ACTIVE · {sla.elapsed}
+          <OpsMarqueeText>{incident.location}</OpsMarqueeText>
+          <span className="ops-inc__where-active">
+            <OpsMarqueeText>ACTIVE · {sla.elapsed}</OpsMarqueeText>
           </span>
         </p>
 
         {sla.overdue ? (
-          <p className="ops-inc__sla">SLA {sla.clock} OVERDUE</p>
+          <p className="ops-inc__sla">
+            <OpsMarqueeText>SLA {sla.clock} OVERDUE</OpsMarqueeText>
+          </p>
         ) : compact ? null : (
-          <p className="ops-inc__sla ops-inc__sla--ok">SLA {sla.clock}</p>
+          <p className="ops-inc__sla ops-inc__sla--ok">
+            <OpsMarqueeText>SLA {sla.clock}</OpsMarqueeText>
+          </p>
         )}
 
         {dispatched && !compact ? (
           <div className="ops-inc__unit">
-            <span className="ops-inc__unit-kicker">{incident.unit ?? 'Unit'} dispatched</span>
-            <span>
-              {incident.officer ?? 'Officer assigned'}
-              {eta ? ` · ETA ${eta.overdue ? 'DUE' : eta.clock}` : ''}
+            <span className="ops-inc__unit-kicker">
+              <OpsMarqueeText>{incident.unit ?? 'Unit'} dispatched</OpsMarqueeText>
+            </span>
+            <span className="ops-inc__unit-detail">
+              <OpsMarqueeText>
+                {incident.officer ?? 'Officer assigned'}
+                {eta ? ` · ETA ${eta.overdue ? 'DUE' : eta.clock}` : ''}
+              </OpsMarqueeText>
             </span>
           </div>
         ) : null}
@@ -415,6 +430,7 @@ export function OpsIncidentCard({
                       id: 'client',
                       label: incident.user,
                       hint: 'Client',
+                      phone: clientPhone,
                     },
                     ...(dispatched && incident.officer
                       ? [
@@ -422,6 +438,7 @@ export function OpsIncidentCard({
                             id: 'officer',
                             label: incident.officer,
                             hint: incident.unit ? `Unit · ${incident.unit}` : 'Responding unit',
+                            phone: officerPhone ?? '+27820000000',
                           },
                         ]
                       : []),
@@ -429,6 +446,7 @@ export function OpsIncidentCard({
                       id: 'room',
                       label: 'Incident room',
                       hint: 'Everyone on this job',
+                      phone: clientPhone,
                     },
                   ]}
                 />

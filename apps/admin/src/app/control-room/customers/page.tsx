@@ -134,7 +134,7 @@ type DiscountCodeRow = {
 
 export default function CustomersPage() {
   return (
-    <ControlRoomLayout title="Customers & Subscriptions">
+    <ControlRoomLayout title="Subscriptions">
       <CustomersContent />
     </ControlRoomLayout>
   );
@@ -332,10 +332,10 @@ function CustomersContent() {
   return (
     <div className="page-content">
       <PendingVerificationsPanel />
-      <div className="page-header">
+      <div className="page-header page-header--compact">
         <div>
           <p className="text-muted">
-            Manage client plans, coverage, and billing status from dispatch — synced with the client portal.
+            Plans, coverage, and billing — synced with the client portal.
           </p>
         </div>
         <div className="btn-row">
@@ -369,7 +369,7 @@ function CustomersContent() {
       {showInviteDialog && (
         <OpsDialog
           title="Invite premium / panic-app client"
-          subtitle="Generate an invite code for homes, stores, and work sites. The customer enters this code on the portal to activate the panic app."
+          subtitle="Generate an invite code for homes and work sites. The customer enters this code on the portal to activate panic, medical, and subscription coverage."
           onClose={() => setShowInviteDialog(false)}
         >
           {inviteError && <ErrorAlert error={inviteError} />}
@@ -519,9 +519,8 @@ function CustomersContent() {
                   value={newCode.appliesTo}
                   onChange={(appliesTo) => setNewCode({ ...newCode, appliesTo })}
                   options={[
-                    { value: 'BOTH', label: 'Subscription & store' },
-                    { value: 'SUBSCRIPTION', label: 'Subscription only' },
-                    { value: 'STORE', label: 'Store only' },
+                    { value: 'SUBSCRIPTION', label: 'Subscription' },
+                    { value: 'BOTH', label: 'All billing' },
                   ]}
                 />
               </label>
@@ -546,69 +545,36 @@ function CustomersContent() {
         </OpsDialog>
       )}
 
-      <section className="card">
-        <div className="card-header-row">
-          <div>
-            <h2 style={{ margin: 0 }}>Discount codes</h2>
-            <p className="text-muted" style={{ margin: '0.35rem 0 0' }}>
-              Promo codes stack on top of loyalty/CRM discounts (capped at 30%). Demo: NEXUS10 (both), GEAR15 (store).
-            </p>
-          </div>
-          <button type="button" className="btn-secondary btn-sm" onClick={() => setShowDiscountDialog(true)}>
-            + Create code
-          </button>
-        </div>
-        {codeError && <ErrorAlert error={codeError} />}
-        {codeMsg && <div className="alert alert--success">{codeMsg}</div>}
-        {discountCodes.length > 0 && (
-          <ul className="status-list">
-            {discountCodes.map((c) => (
-              <li key={c.id} className="status-list-item">
-                <span className="status-list-link">
-                  <strong>{c.code}</strong> · {c.percentOff}% · {c.appliesTo}
-                  {!c.isActive ? ' · inactive' : ''}
-                </span>
-                <span className="text-muted">
-                  used {c.usedCount}
-                  {c.maxUses != null ? `/${c.maxUses}` : ''}
-                  {c.description ? ` · ${c.description}` : ''}
-                </span>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
-
       {(stats || billing) && (
-        <div className="stats-grid customers-stats">
-          <div className="stat-card">
-            <div className="stat-label">Total customers</div>
+        <div className="stats-grid customers-stats" role="list">
+          <div className="stat-card stat-card--highlight" role="listitem">
+            <div className="stat-label">Customers</div>
             <div className="stat-value">{stats?.total ?? billing?.totalSubscriptions ?? 0}</div>
           </div>
-          <div className="stat-card stat-card--highlight">
+          <div className="stat-card" role="listitem">
             <div className="stat-label">Premium</div>
             <div className="stat-value">{stats?.premium ?? 0}</div>
           </div>
-          <div className="stat-card">
-            <div className="stat-label">Active plans</div>
+          <div className="stat-card" role="listitem">
+            <div className="stat-label">Active</div>
             <div className="stat-value">{stats?.active ?? billing?.active ?? 0}</div>
           </div>
-          <div className="stat-card">
-            <div className="stat-label">Past due</div>
+          <div className="stat-card stat-card--warn" role="listitem">
+            <div className="stat-label">Due</div>
             <div className="stat-value">{billing?.pastDueCount ?? stats?.pastDue ?? 0}</div>
           </div>
-          {billing && (
-            <div className="stat-card">
-              <div className="stat-label">Revenue at risk</div>
+          {billing ? (
+            <div className="stat-card stat-card--warn" role="listitem" title={`At risk: ${billing.revenueAtRiskFormatted}`}>
+              <div className="stat-label">Risk</div>
               <div className="stat-value">{billing.revenueAtRiskFormatted}</div>
             </div>
-          )}
-          {billing && (
-            <div className="stat-card">
-              <div className="stat-label">MRR (active/trial)</div>
+          ) : null}
+          {billing ? (
+            <div className="stat-card" role="listitem" title={`MRR: ${billing.mrrFormatted}`}>
+              <div className="stat-label">MRR</div>
               <div className="stat-value">{billing.mrrFormatted}</div>
             </div>
-          )}
+          ) : null}
         </div>
       )}
 
@@ -765,6 +731,39 @@ function CustomersContent() {
           )}
         </section>
       )}
+
+      <section className="card customers-codes">
+        <div className="card-header-row">
+          <div>
+            <h2 style={{ margin: 0 }}>Discount codes</h2>
+            <p className="text-muted" style={{ margin: '0.2rem 0 0' }}>
+              Stacks on loyalty discounts, capped at 30%.
+            </p>
+          </div>
+          <button type="button" className="btn-secondary btn-sm" onClick={() => setShowDiscountDialog(true)}>
+            Create code
+          </button>
+        </div>
+        {codeError && <ErrorAlert error={codeError} />}
+        {codeMsg && <div className="alert alert--success">{codeMsg}</div>}
+        {discountCodes.length > 0 && (
+          <ul className="status-list">
+            {discountCodes.map((c) => (
+              <li key={c.id} className="status-list-item">
+                <span className="status-list-link">
+                  <strong>{c.code}</strong> · {c.percentOff}% · {c.appliesTo}
+                  {!c.isActive ? ' · inactive' : ''}
+                </span>
+                <span className="text-muted">
+                  used {c.usedCount}
+                  {c.maxUses != null ? `/${c.maxUses}` : ''}
+                  {c.description ? ` · ${c.description}` : ''}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
 
       {selectedId && !catalog && (
         <OpsDialog

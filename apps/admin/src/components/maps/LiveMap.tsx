@@ -3,7 +3,8 @@
 import 'leaflet/dist/leaflet.css';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { MapContainer, Marker, Popup, TileLayer, useMap } from 'react-leaflet';
+import { MapContainer, Marker, Popup, useMap } from 'react-leaflet';
+import { MapBasemap } from './MapBasemap';
 import { DispatchMenuButton } from '@/components/control-room/DispatchMenuButton';
 import { IncidentDetailsMenu } from '@/components/control-room/IncidentDetailsMenu';
 import { legacyIncidentIcon, officerIcon, userIcon } from './map-icons';
@@ -170,14 +171,7 @@ export default function LiveMap({
         scrollWheelZoom={scrollWheelZoom}
         className="leaflet-map"
       >
-        <TileLayer
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> · <a href="https://carto.com/">CARTO</a>'
-          url={
-            lightTiles
-              ? 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png'
-              : 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
-          }
-        />
+        <MapBasemap light={lightTiles} />
 
         <InvalidateMapSize />
         <FitBoundsOnLoad users={safeUsers} officers={safeOfficers} incidents={safeIncidents} />

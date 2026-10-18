@@ -21,6 +21,7 @@ import { friendlyErrorMessage } from '@/lib/friendly-error';
 import { exportCsv } from '@/lib/export-csv';
 import { getCompanyProfile } from '@/lib/company-profile';
 import { openBrandedDocument } from '@/lib/branded-document';
+import { OperatorResponsesAdmin } from '@/components/control-room/OperatorResponsesAdmin';
 
 type Branch = {
   id: string;
@@ -601,6 +602,10 @@ export function SettingsCategoryPanels({
     return <BranchesPanel actor={actor} onLogged={(next) => { setSettings(next); saveCrSettings(next); }} settings={settings} />;
   }
 
+  if (section === 'operator-responses') {
+    return <OperatorResponsesAdmin />;
+  }
+
   if (section === 'security') {
     const s = settings.security;
     return (
@@ -733,7 +738,7 @@ export function SettingsCategoryPanels({
                 <p className="settings-panel__eyebrow">Revenue scope</p>
                 <h2>Developer revenue access</h2>
                 <p className="text-muted">
-                  By default the developer sees ops and inventory but not money generated. Unlock only after commercial approval.
+                  By default the developer sees ops but not billing figures. Unlock only after commercial approval.
                 </p>
               </div>
             </div>

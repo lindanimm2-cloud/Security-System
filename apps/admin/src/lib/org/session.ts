@@ -66,17 +66,19 @@ export function activateDemoOrgSession(overrides?: {
   firstName?: string;
   lastName?: string;
   role?: OrgMemberRole;
+  organizationId?: string;
 }): OrgSession {
   ensureDemoOrgDirectory();
-  const email = (overrides?.email ?? 'org.admin@nomsagroup.demo').trim().toLowerCase();
+  const email = (overrides?.email ?? 'org.admin@demo.local').trim().toLowerCase();
   const firstName = overrides?.firstName ?? 'Org';
   const lastName = overrides?.lastName ?? 'Admin';
   const role = overrides?.role ?? 'admin';
-  const userId = `org-user-${email.replace(/[^a-z0-9]/gi, '-')}`;
+  const organizationId = overrides?.organizationId ?? DEMO_ORG_ID;
+  const userId = `org-user-${email.replace(/[^a-z0-9]+/gi, '-')}`;
 
   const membership: OrgMember = {
     userId,
-    organizationId: DEMO_ORG_ID,
+    organizationId,
     role,
     email,
     firstName,
@@ -87,20 +89,23 @@ export function activateDemoOrgSession(overrides?: {
   const memberships = existing?.memberships?.length
     ? [
         membership,
-        ...existing.memberships.filter((m) => m.organizationId !== DEMO_ORG_ID),
+        ...existing.memberships.filter((m) => m.organizationId !== organizationId),
       ]
     : [membership];
 
-  // Ensure user also has membership on any locally created orgs
-  for (const org of listOrganizations()) {
-    if (memberships.some((m) => m.organizationId === org.id)) continue;
-    if (org.id === DEMO_ORG_ID) continue;
+  if (organizationId !== DEMO_ORG_ID && getOrganization(DEMO_ORG_ID)) {
+    if (!memberships.some((m) => m.organizationId === DEMO_ORG_ID)) {
+      memberships.push({
+        ...membership,
+        organizationId: DEMO_ORG_ID,
+      });
+    }
   }
 
   const session: OrgSession = {
     user: { id: userId, email, firstName, lastName },
     memberships,
-    activeOrganizationId: DEMO_ORG_ID,
+    activeOrganizationId: organizationId,
     activeSiteId: 'all',
     accessToken: `demo-org-token-${userId}`,
   };

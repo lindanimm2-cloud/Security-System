@@ -14,6 +14,7 @@ export const CONTROL_ROOM_ROUTES = {
   analytics: '/control-room/analytics',
   surveillance: '/control-room/surveillance',
   cctvSystems: '/control-room/cctv-systems',
+  emap: '/control-room/emap',
   alarmSystems: '/control-room/alarm-systems',
   alertHistory: '/control-room/alert-history',
   settings: '/control-room/settings',

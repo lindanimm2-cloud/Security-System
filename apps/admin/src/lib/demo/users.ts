@@ -130,7 +130,7 @@ const ACCOUNTS: DemoAccount[] = [
     email: 'client@demo.local',
     portal: 'client',
     role: 'CLIENT',
-    firstName: 'Nomsa',
+    firstName: 'Demo',
     lastName: 'Client',
     phone: '+27821234567',
   },
@@ -437,6 +437,48 @@ export function demoLogin(
   return {
     user: toUser(account),
     accessToken: `demo-token-${portal}-${account.email}`,
+  };
+}
+
+/** Passwordless demo session after a verified WebAuthn / passkey assertion. */
+export function demoLoginWithPasskey(
+  portal: DemoPortal,
+  email: string,
+  tenantSlug: string,
+): DemoSession {
+  if (tenantSlug.trim().toLowerCase() !== 'demo') {
+    throw new Error('Unknown organisation. Use tenant slug: demo');
+  }
+  const normalized = email.trim().toLowerCase();
+  const storedAccount =
+    portal === 'client'
+      ? readStoredDemoClients().find((a) => a.email === normalized && a.portal === 'client')
+      : undefined;
+  if (storedAccount) {
+    return {
+      user: toUser(storedAccount),
+      accessToken: `demo-passkey-${portal}-${storedAccount.email}`,
+    };
+  }
+  const account = ACCOUNTS.find((a) => a.email === normalized && a.portal === portal);
+  if (account) {
+    return {
+      user: toUser(account),
+      accessToken: `demo-passkey-${portal}-${account.email}`,
+    };
+  }
+  const fallback = ACCOUNTS.find((a) => a.portal === portal);
+  if (!fallback || !normalized.includes('@')) {
+    throw new Error('No account is linked to this passkey.');
+  }
+  const user = toUser({
+    ...fallback,
+    email: normalized,
+    firstName: normalized.split('@')[0] || fallback.firstName,
+  });
+  return {
+    user,
+    accessToken: `demo-passkey-${portal}-${user.id}`,
   };
 }
 

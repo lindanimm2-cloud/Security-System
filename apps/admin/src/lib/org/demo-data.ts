@@ -27,12 +27,12 @@ function seedOrganizations(): Organization[] {
   return [
     {
       id: DEMO_ORG_ID,
-      name: 'Nomsa Group',
+      name: 'Corporate Demo',
       type: 'company',
       typeLabel: 'Corporate Security',
-      logoInitials: 'NG',
-      primaryContactName: 'Nomsa Dlamini',
-      primaryContactEmail: 'security@nomsagroup.demo',
+      logoInitials: 'CD',
+      primaryContactName: 'Org Admin',
+      primaryContactEmail: 'security@demo.local',
       primaryContactPhone: '+27 31 555 0100',
       createdAt: new Date(Date.now() - 86400000 * 120).toISOString(),
     },
@@ -442,5 +442,22 @@ export function createOrganization(input: CreateOrganizationInput): Organization
 }
 
 export function ensureDemoOrgDirectory() {
-  readDirectory();
+  const dir = readDirectory();
+  let changed = false;
+  const organizations = dir.organizations.map((org) => {
+    if (org.id !== DEMO_ORG_ID) return org;
+    if (org.name === 'Corporate Demo' && org.logoInitials === 'CD') return org;
+    changed = true;
+    return {
+      ...org,
+      name: 'Corporate Demo',
+      typeLabel: 'Corporate Security',
+      logoInitials: 'CD',
+      primaryContactName: 'Org Admin',
+      primaryContactEmail: 'security@demo.local',
+    };
+  });
+  if (changed) {
+    writeDirectory({ ...dir, organizations });
+  }
 }

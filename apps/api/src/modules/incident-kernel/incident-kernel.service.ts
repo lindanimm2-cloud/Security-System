@@ -1,12 +1,14 @@
-import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import {
   CompanyVehicleStatus,
   CompanyVehicleType,
   ConversationType,
+  DocumentCategory,
   IncidentClassification,
   IncidentPriority,
   IncidentStatus,
   IncidentType,
+  MessageAttachmentKind,
   NotificationPriority,
   NotificationType,
   OfficerStatus,
@@ -14,6 +16,8 @@ import {
   ResponseAgency,
   UserRole,
 } from '@prisma/client';
+import { mkdir, writeFile } from 'fs/promises';
+import { extname, join } from 'path';
 import { PrismaService } from '../../database/prisma.service';
 import { AlertEscalationService } from '../alerts/alert-escalation.service';
 import { RealtimeGateway } from '../realtime/realtime.gateway';
@@ -24,6 +28,16 @@ import {
   type PlatformEventType,
 } from './incident-events';
 import { PermissionsService } from './permissions.service';
+
+type IncidentChatUploadedFile = {
+  originalname: string;
+  mimetype: string;
+  size: number;
+  buffer: Buffer;
+};
+
+const INCIDENT_CHAT_UPLOAD_ROOT = join(process.cwd(), 'uploads', 'chat');
+const MAX_INCIDENT_CHAT_FILE_BYTES = 25 * 1024 * 1024;
 
 export type EmergencyKind =
   | 'panic'
@@ -628,21 +642,119 @@ export class IncidentKernelService {
     };
   }
 
+  private resolveChatAttachmentKind(mime: string): MessageAttachmentKind {
+    if (mime.startsWith('image/')) return MessageAttachmentKind.IMAGE;
+    if (mime.startsWith('video/')) return MessageAttachmentKind.VIDEO;
+    return MessageAttachmentKind.FILE;
+  }
+
   async sendIncidentMessage(
     tenantId: string,
     incidentId: string,
     actor: { id: string; role: UserRole; firstName: string; lastName: string },
     content: string,
+    opts: {
+      to?: string;
+      saveTo?: string;
+      files?: IncidentChatUploadedFile[];
+    } = {},
   ) {
     const room = await this.getIncidentConversation(tenantId, incidentId, actor);
+    const files = opts.files ?? [];
     const trimmed = content.trim();
-    if (!trimmed) throw new ForbiddenException('Message required');
+    if (!trimmed && files.length === 0) {
+      throw new BadRequestException('Message must include text or an attachment');
+    }
+    for (const file of files) {
+      if (file.size > MAX_INCIDENT_CHAT_FILE_BYTES) {
+        throw new BadRequestException(`File "${file.originalname}" exceeds 25 MB limit`);
+      }
+    }
+
+    const messageContent =
+      trimmed ||
+      (files.length === 1
+        ? `Sent ${files[0].originalname}`
+        : `Sent ${files.length} attachments`);
+
     const message = await this.prisma.message.create({
       data: {
         conversationId: room.data.conversationId,
         senderUserId: actor.id,
-        content: trimmed,
+        content: messageContent,
       },
+    });
+
+    if (files.length) {
+      const tenantDir = join(INCIDENT_CHAT_UPLOAD_ROOT, tenantId);
+      await mkdir(tenantDir, { recursive: true });
+      const apiBase = process.env.API_PUBLIC_URL ?? 'http://localhost:4010';
+      const saveTo = (opts.saveTo ?? 'chat').trim();
+
+      await Promise.all(
+        files.map(async (file) => {
+          const safeName = file.originalname.replace(/[^\w.\-()+ ]/g, '_');
+          const storedName = `${message.id}-${crypto.randomUUID()}${extname(safeName)}`;
+          const diskPath = join(tenantDir, storedName);
+          await writeFile(diskPath, file.buffer);
+          const fileUrl = `${apiBase}/uploads/chat/${tenantId}/${storedName}`;
+          const kind = this.resolveChatAttachmentKind(file.mimetype);
+          await this.prisma.messageAttachment.create({
+            data: {
+              messageId: message.id,
+              fileName: safeName,
+              fileType: file.mimetype,
+              fileUrl,
+              fileSize: file.size,
+              kind,
+            },
+          });
+
+          if (saveTo && saveTo !== 'chat') {
+            let folderId: string | null = null;
+            if (saveTo !== 'incident') {
+              const folder = await this.prisma.documentFolder.findFirst({
+                where: { id: saveTo, tenantId },
+                select: { id: true },
+              });
+              folderId = folder?.id ?? null;
+            } else {
+              const evidence = await this.prisma.documentFolder.findFirst({
+                where: {
+                  tenantId,
+                  OR: [
+                    { name: { equals: 'Incident Evidence', mode: 'insensitive' } },
+                    { name: { contains: 'Evidence', mode: 'insensitive' } },
+                  ],
+                },
+                select: { id: true },
+              });
+              folderId = evidence?.id ?? null;
+            }
+
+            await this.prisma.document.create({
+              data: {
+                tenantId,
+                title: safeName.replace(/\.[^.]+$/, '').replace(/[-_]+/g, ' ') || safeName,
+                description: `Attached from incident chat${opts.to ? ` (${opts.to})` : ''}`,
+                category: DocumentCategory.INCIDENT_EVIDENCE,
+                folderId,
+                incidentId,
+                fileName: safeName,
+                fileType: file.mimetype,
+                fileUrl,
+                fileSizeKb: Math.max(1, Math.round(file.size / 1024)),
+                tags: ['incident-chat', ...(opts.to ? [opts.to] : [])],
+                uploadedBy: `${actor.firstName} ${actor.lastName}`.trim() || actor.id,
+              },
+            });
+          }
+        }),
+      );
+    }
+
+    const full = await this.prisma.message.findUniqueOrThrow({
+      where: { id: message.id },
       include: {
         sender: {
           select: { id: true, firstName: true, lastName: true, role: true, phone: true },
@@ -650,13 +762,14 @@ export class IncidentKernelService {
         attachments: true,
       },
     });
+
     await this.recordEvent({
       tenantId,
       incidentId,
       type: PlatformEvent.MESSAGE_CREATED,
       source: this.sourceFromRole(actor.role),
       actorUserId: actor.id,
-      payload: { messageId: message.id },
+      payload: { messageId: full.id },
     });
     this.realtime.emitPlatformEvent(
       tenantId,
@@ -665,15 +778,16 @@ export class IncidentKernelService {
         incidentId,
         conversationId: room.data.conversationId,
         message: {
-          id: message.id,
-          content: message.content,
-          createdAt: message.createdAt.toISOString(),
-          sender: message.sender,
+          id: full.id,
+          content: full.content,
+          createdAt: full.createdAt.toISOString(),
+          sender: full.sender,
+          attachments: full.attachments,
         },
       },
       { incidentId, userId: undefined },
     );
-    return { success: true as const, data: message };
+    return { success: true as const, data: full };
   }
 
   async recordEvent(opts: {

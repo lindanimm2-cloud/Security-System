@@ -217,26 +217,24 @@ export function NotificationCenter() {
         >
           <div className="notification-panel__header">
             <div className="notification-panel__header-text">
-              <h3>Notification Centre</h3>
+              <h3>Notifications</h3>
               <p className="notification-panel__subtitle">
                 {criticalUnread.length > 0
-                  ? `${criticalUnread.length} critical need attention`
+                  ? `${criticalUnread.length} critical`
                   : unreadCount > 0
-                    ? `${unreadCount} unread · prioritized by severity`
-                    : notifications.length === 0
-                      ? 'All clear'
-                      : 'All clear · newest updates below'}
+                    ? `${unreadCount} unread`
+                    : 'All clear'}
               </p>
             </div>
             <div className="notification-panel__header-actions">
               {unreadCount > 0 ? (
                 <button type="button" className="notification-mark-all" onClick={() => void markAllRead()}>
-                  Mark all read
+                  Read all
                 </button>
               ) : null}
               {notifications.length > 0 ? (
                 <button type="button" className="notification-mark-all" onClick={() => void clearAll()}>
-                  Clear all
+                  Clear
                 </button>
               ) : null}
               <Link href="/control-room/alert-history" className="notification-mark-all" onClick={() => setOpen(false)}>
@@ -253,7 +251,7 @@ export function NotificationCenter() {
             >
               <span className="notification-critical-strip__pulse" aria-hidden />
               <strong>{criticalUnread.length} critical</strong>
-              <span>Panic / silent / life-safety — tap to focus</span>
+              <span>Tap to focus</span>
             </button>
           )}
 
@@ -326,7 +324,7 @@ export function NotificationCenter() {
                         className="notification-action notification-action--secondary"
                         onClick={() => void markRead(n.id)}
                       >
-                        Mark read
+                        Read
                       </button>
                     )}
                     <button
@@ -348,6 +346,7 @@ export function NotificationCenter() {
     <div className="notification-center notification-center--control-room" ref={rootRef}>
       <button
         type="button"
+        id="ops-notification-bell"
         className={`notification-bell ${criticalUnread.length > 0 ? 'notification-bell--critical' : ''} ${!bellEnabled ? 'notification-bell--muted' : ''}`}
         onClick={() => {
           if (!bellEnabled) return;

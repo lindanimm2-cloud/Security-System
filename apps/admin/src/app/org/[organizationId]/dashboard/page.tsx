@@ -51,7 +51,7 @@ export default function OrgDashboardPage() {
         <div>
           <h1>Security operations</h1>
           <p>
-            {org.name} · {org.typeLabel} · is anything wrong, where, and can you see it
+            {org.typeLabel} · cameras, map, and response
           </p>
         </div>
         <div className="org-page-header__actions">

@@ -97,6 +97,34 @@ export type DemoAccessLog = {
   message: string;
 };
 
+export type DemoIntercomStatus = 'IDLE' | 'RINGING' | 'IN_CALL' | 'OFFLINE';
+
+export type DemoIntercomStation = {
+  id: string;
+  propertyId: string;
+  propertyType: DemoPropertyType;
+  name: string;
+  site: string;
+  linkedAccessPointId: string | null;
+  cameraId: string | null;
+  cameraName: string | null;
+  cameraStreamUrl: string | null;
+  cameraSnapshotUrl: string | null;
+  status: DemoIntercomStatus;
+  lastRingAt: string | null;
+  answeredBy: string | null;
+  talkActive: boolean;
+};
+
+export type DemoParkingTicket = {
+  code: string;
+  status: 'PAID' | 'UNPAID' | 'UNKNOWN' | 'EXPIRED';
+  plate: string | null;
+  paidAt: string | null;
+  amountLabel: string | null;
+  note: string;
+};
+
 const ago = (ms: number) => new Date(Date.now() - ms).toISOString();
 
 function uiStatus(state: DemoAccessState): DemoAccessPoint['status'] {
@@ -407,6 +435,38 @@ let points: DemoAccessPoint[] = [
     openSince: ago(6 * 60_000),
     readerCount: 1,
   }),
+  point({
+    id: 'ap-mall-park-entry',
+    propertyId: 'demo-prop-4',
+    propertyType: 'MALL',
+    name: 'Parking entry boom',
+    site: 'Retail — Gateway',
+    kind: 'PARKING_GATE',
+    state: 'CLOSED',
+    cameraId: 'demo-cam-45',
+    cameraName: 'Parking entry lane',
+    lastEvent: 'Ticket issued',
+    lastEventAt: ago(12 * 60_000),
+    lastCommandAt: ago(12 * 60_000),
+    openSince: null,
+    readerCount: 1,
+  }),
+  point({
+    id: 'ap-mall-park-exit',
+    propertyId: 'demo-prop-4',
+    propertyType: 'MALL',
+    name: 'Parking exit boom',
+    site: 'Retail — Gateway',
+    kind: 'PARKING_GATE',
+    state: 'CLOSED',
+    cameraId: 'demo-cam-46',
+    cameraName: 'Parking exit lane',
+    lastEvent: 'Card machine fault reported',
+    lastEventAt: ago(4 * 60_000),
+    lastCommandAt: ago(90 * 60_000),
+    openSince: null,
+    readerCount: 1,
+  }),
 
   // ——— RURAL / FARM (demo-prop-5) ———
   point({
@@ -514,6 +574,100 @@ let logs: DemoAccessLog[] = [
   },
 ];
 
+let intercoms: DemoIntercomStation[] = [
+  {
+    id: 'ic-home-front',
+    propertyId: 'demo-prop-1',
+    propertyType: 'HOUSE',
+    name: 'Front door intercom',
+    site: 'Home — Umhlanga',
+    linkedAccessPointId: 'ap-ped',
+    cameraId: 'demo-cam-3',
+    cameraName: 'Front porch',
+    cameraStreamUrl: 'demo',
+    cameraSnapshotUrl: null,
+    status: 'IDLE',
+    lastRingAt: null,
+    answeredBy: null,
+    talkActive: false,
+  },
+  {
+    id: 'ic-home-gate',
+    propertyId: 'demo-prop-1',
+    propertyType: 'HOUSE',
+    name: 'Driveway gate intercom',
+    site: 'Home — Umhlanga',
+    linkedAccessPointId: 'ap-main-gate',
+    cameraId: 'demo-cam-1',
+    cameraName: 'Front gate',
+    cameraStreamUrl: 'demo',
+    cameraSnapshotUrl: null,
+    status: 'IDLE',
+    lastRingAt: ago(45 * 60_000),
+    answeredBy: null,
+    talkActive: false,
+  },
+  {
+    id: 'ic-mall-exit',
+    propertyId: 'demo-prop-4',
+    propertyType: 'MALL',
+    name: 'Parking exit booth',
+    site: 'Retail — Gateway',
+    linkedAccessPointId: 'ap-mall-park-exit',
+    cameraId: 'demo-cam-46',
+    cameraName: 'Parking exit lane',
+    cameraStreamUrl: 'demo',
+    cameraSnapshotUrl: null,
+    status: 'IDLE',
+    lastRingAt: ago(4 * 60_000),
+    answeredBy: null,
+    talkActive: false,
+  },
+  {
+    id: 'ic-mall-loading',
+    propertyId: 'demo-prop-4',
+    propertyType: 'MALL',
+    name: 'Loading bay intercom',
+    site: 'Retail — Gateway',
+    linkedAccessPointId: 'ap-mall-loading',
+    cameraId: 'demo-cam-42',
+    cameraName: 'Loading bay',
+    cameraStreamUrl: 'demo',
+    cameraSnapshotUrl: null,
+    status: 'IDLE',
+    lastRingAt: null,
+    answeredBy: null,
+    talkActive: false,
+  },
+];
+
+const DEMO_TICKETS: DemoParkingTicket[] = [
+  {
+    code: 'T-48291',
+    status: 'PAID',
+    plate: 'ND 441-882',
+    paidAt: ago(8 * 60_000),
+    amountLabel: 'R 28.00',
+    note: 'Paid at exit kiosk — card machine later reported fault.',
+  },
+  {
+    code: 'T-10001',
+    status: 'UNPAID',
+    plate: 'NP 209-110',
+    paidAt: null,
+    amountLabel: 'R 42.00 due',
+    note: 'No payment recorded for this ticket.',
+  },
+  {
+    code: 'T-77820',
+    status: 'EXPIRED',
+    plate: 'CA 991-204',
+    paidAt: ago(2 * 24 * 60 * 60_000),
+    amountLabel: 'R 18.00',
+    note: 'Ticket expired overnight — re-issue required.',
+  },
+];
+
 function ok<T>(data: T) {
   return { success: true, data };
 }
@@ -595,6 +749,43 @@ export function listDemoAccessHistory(propertyId?: string, take = 40) {
     ? new Set(points.filter((p) => p.propertyId === propertyId).map((p) => p.id))
     : null;
   return logs.filter((l) => !ids || ids.has(l.accessPointId)).slice(0, take);
+}
+
+export function listDemoIntercoms(propertyId?: string): DemoIntercomStation[] {
+  const rows = propertyId ? intercoms.filter((i) => i.propertyId === propertyId) : intercoms;
+  return rows.map((i) => ({ ...i }));
+}
+
+export function lookupDemoParkingTicket(code: string): DemoParkingTicket {
+  const normalized = code.trim().toUpperCase();
+  const found = DEMO_TICKETS.find((t) => t.code === normalized);
+  if (found) return { ...found };
+  return {
+    code: normalized || '—',
+    status: 'UNKNOWN',
+    plate: null,
+    paidAt: null,
+    amountLabel: null,
+    note: 'No ticket found in parking system for this code.',
+  };
+}
+
+function serializeIntercom(station: DemoIntercomStation) {
+  const linked = station.linkedAccessPointId
+    ? points.find((p) => p.id === station.linkedAccessPointId) ?? null
+    : null;
+  return {
+    ...station,
+    linkedAccessPoint: linked
+      ? {
+          id: linked.id,
+          name: linked.name,
+          kind: linked.kind,
+          state: linked.state,
+          status: syncLegacyStatus({ ...linked }).status,
+        }
+      : null,
+  };
 }
 
 export type PhysicalDemoResult =
@@ -684,7 +875,231 @@ export function handlePhysicalControlDemo(input: {
     return { handled: true, response: runCommand(found.id, payload, actor, 'portal') };
   }
 
+  // ——— Intercoms ———
+  if (clean === '/control-room/intercoms' && m === 'GET') {
+    const propertyId = typeof payload.propertyId === 'string' ? payload.propertyId : undefined;
+    return { handled: true, response: ok(listDemoIntercoms(propertyId).map(serializeIntercom)) };
+  }
+
+  const crIc = clean.match(/^\/control-room\/intercoms\/([^/]+)\/(press|answer|decline|end|talk)$/);
+  if (crIc && m === 'POST') {
+    return { handled: true, response: runIntercomAction(crIc[1], crIc[2], actor, 'control-room') };
+  }
+
+  const crIcUnlock = clean.match(/^\/control-room\/intercoms\/([^/]+)\/unlock$/);
+  if (crIcUnlock && m === 'POST') {
+    return { handled: true, response: unlockFromIntercom(crIcUnlock[1], payload, actor, 'control-room') };
+  }
+
+  if (clean === '/control-room/parking-tickets/lookup' && m === 'POST') {
+    const code = String(payload.code ?? '');
+    return { handled: true, response: ok(lookupDemoParkingTicket(code)) };
+  }
+
+  if (clean === '/control-room/parking-tickets/assist-open' && m === 'POST') {
+    return { handled: true, response: assistOpenBoom(payload, actor, 'control-room') };
+  }
+
+  const clientIcList = clean.match(/^\/client\/properties\/([^/]+)\/intercoms$/);
+  if (clientIcList && m === 'GET') {
+    return {
+      handled: true,
+      response: ok(listDemoIntercoms(clientIcList[1]).map(serializeIntercom)),
+    };
+  }
+
+  const clientIc = clean.match(
+    /^\/client\/properties\/([^/]+)\/intercoms\/([^/]+)\/(press|answer|decline|end|talk)$/,
+  );
+  if (clientIc && m === 'POST') {
+    const station = intercoms.find((i) => i.id === clientIc[2] && i.propertyId === clientIc[1]);
+    if (!station) {
+      return { handled: true, response: { success: false, data: { error: 'Intercom not found' } } };
+    }
+    return { handled: true, response: runIntercomAction(station.id, clientIc[3], actor, 'portal') };
+  }
+
+  const clientIcUnlock = clean.match(
+    /^\/client\/properties\/([^/]+)\/intercoms\/([^/]+)\/unlock$/,
+  );
+  if (clientIcUnlock && m === 'POST') {
+    const station = intercoms.find(
+      (i) => i.id === clientIcUnlock[2] && i.propertyId === clientIcUnlock[1],
+    );
+    if (!station) {
+      return { handled: true, response: { success: false, data: { error: 'Intercom not found' } } };
+    }
+    return { handled: true, response: unlockFromIntercom(station.id, payload, actor, 'portal') };
+  }
+
+  const orgIcList = clean.match(/^\/org\/properties\/([^/]+)\/intercoms$/);
+  if (orgIcList && m === 'GET') {
+    return {
+      handled: true,
+      response: ok(listDemoIntercoms(orgIcList[1]).map(serializeIntercom)),
+    };
+  }
+
+  if (clean === '/org/access-points' && m === 'GET') {
+    const propertyId = typeof payload.propertyId === 'string' ? payload.propertyId : 'demo-prop-4';
+    return { handled: true, response: ok(listDemoAccessPoints(propertyId)) };
+  }
+
+  const orgCmd = clean.match(/^\/org\/access-points\/([^/]+)\/command$/);
+  if (orgCmd && m === 'POST') {
+    return { handled: true, response: runCommand(orgCmd[1], payload, actor, 'org-portal') };
+  }
+
+  if (clean === '/org/parking-tickets/lookup' && m === 'POST') {
+    return { handled: true, response: ok(lookupDemoParkingTicket(String(payload.code ?? ''))) };
+  }
+
+  if (clean === '/org/parking-tickets/assist-open' && m === 'POST') {
+    return { handled: true, response: assistOpenBoom(payload, actor, 'org-portal') };
+  }
+
+  const orgIc = clean.match(/^\/org\/intercoms\/([^/]+)\/(press|answer|decline|end|talk)$/);
+  if (orgIc && m === 'POST') {
+    return { handled: true, response: runIntercomAction(orgIc[1], orgIc[2], actor, 'org-portal') };
+  }
+
+  const orgIcUnlock = clean.match(/^\/org\/intercoms\/([^/]+)\/unlock$/);
+  if (orgIcUnlock && m === 'POST') {
+    return { handled: true, response: unlockFromIntercom(orgIcUnlock[1], payload, actor, 'org-portal') };
+  }
+
+  if (clean === '/org/intercoms' && m === 'GET') {
+    const propertyId = typeof payload.propertyId === 'string' ? payload.propertyId : 'demo-prop-4';
+    return { handled: true, response: ok(listDemoIntercoms(propertyId).map(serializeIntercom)) };
+  }
+
   return { handled: false };
+}
+
+function runIntercomAction(
+  id: string,
+  action: string,
+  actor: string,
+  source: string,
+) {
+  const station = intercoms.find((i) => i.id === id);
+  if (!station) return { success: false, data: { error: 'Intercom not found' } };
+  if (station.status === 'OFFLINE') {
+    return { success: false, data: { error: 'Intercom offline', station: serializeIntercom(station) } };
+  }
+
+  const ts = new Date().toISOString();
+  if (action === 'press') {
+    station.status = 'RINGING';
+    station.lastRingAt = ts;
+    station.answeredBy = null;
+    station.talkActive = false;
+  } else if (action === 'answer') {
+    station.status = 'IN_CALL';
+    station.answeredBy = actor;
+    station.talkActive = true;
+  } else if (action === 'decline' || action === 'end') {
+    station.status = 'IDLE';
+    station.answeredBy = null;
+    station.talkActive = false;
+  } else if (action === 'talk') {
+    if (station.status !== 'IN_CALL') {
+      return { success: false, data: { error: 'No active call', station: serializeIntercom(station) } };
+    }
+    station.talkActive = !station.talkActive;
+  }
+
+  logs.unshift({
+    id: `alog-${Date.now()}`,
+    accessPointId: station.linkedAccessPointId ?? station.id,
+    accessPointName: station.name,
+    command: 'UNLOCK',
+    phase: 'SUCCEEDED',
+    actorName: actor,
+    source,
+    createdAt: ts,
+    message: `${actor} · intercom ${action} · ${station.name}`,
+  });
+
+  return ok(serializeIntercom(station));
+}
+
+function unlockFromIntercom(
+  id: string,
+  payload: Record<string, unknown>,
+  actor: string,
+  source: string,
+) {
+  const station = intercoms.find((i) => i.id === id);
+  if (!station) return { success: false, data: { error: 'Intercom not found' } };
+  if (!station.linkedAccessPointId) {
+    return { success: false, data: { error: 'No linked gate for this intercom' } };
+  }
+  const result = runCommand(
+    station.linkedAccessPointId,
+    { command: payload.command ?? 'OPEN', confirmedClear: true, note: payload.note },
+    actor,
+    source,
+  );
+  return ok({
+    station: serializeIntercom(station),
+    unlock: result.data,
+  });
+}
+
+function assistOpenBoom(
+  payload: Record<string, unknown>,
+  actor: string,
+  source: string,
+) {
+  const accessPointId = String(payload.accessPointId ?? 'ap-mall-park-exit');
+  const code = String(payload.code ?? '').trim().toUpperCase();
+  const override = payload.override === true;
+  const reason = String(payload.reason ?? '').trim();
+  const ticket = lookupDemoParkingTicket(code);
+
+  if (ticket.status !== 'PAID' && !override) {
+    return ok({
+      denied: true,
+      error: 'Ticket is not paid — use override with a reason to open manually.',
+      ticket,
+    });
+  }
+  if (override && reason.length < 3) {
+    return ok({
+      denied: true,
+      error: 'Override requires a short reason for the audit log.',
+      ticket,
+    });
+  }
+
+  const result = runCommand(
+    accessPointId,
+    { command: 'OPEN', confirmedClear: true },
+    actor,
+    source,
+  );
+  const note = override
+    ? `Ticket assist override · ${code || 'no code'} · ${reason}`
+    : `Ticket assist · ${code} · PAID · boom raised`;
+  logs.unshift({
+    id: `alog-${Date.now()}`,
+    accessPointId,
+    accessPointName: points.find((p) => p.id === accessPointId)?.name ?? accessPointId,
+    command: 'OPEN',
+    phase: 'SUCCEEDED',
+    actorName: actor,
+    source,
+    createdAt: new Date().toISOString(),
+    message: `${actor} · ${note}`,
+  });
+
+  return ok({
+    ticket,
+    override,
+    note,
+    command: (result as { data: unknown }).data,
+  });
 }
 
 function runCommand(

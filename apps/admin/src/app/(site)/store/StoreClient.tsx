@@ -308,7 +308,7 @@ export default function StorePage() {
             <Link href="/services" className="nx-btn nx-btn--ghost-light">
               Installation services
             </Link>
-            <Link href="/portals" className="nx-btn nx-btn--ghost-light">
+            <Link href="/login" className="nx-btn nx-btn--ghost-light">
               Login
             </Link>
           </div>

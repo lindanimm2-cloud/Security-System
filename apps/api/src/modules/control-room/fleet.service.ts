@@ -21,6 +21,7 @@ const VEHICLE_TYPES = new Set<string>(Object.values(CompanyVehicleType));
 
 const TEAM_LABELS: Record<string, string> = {
   ARMED_RESPONSE: 'Armed response',
+  VIP_TRANSPORT: 'VIP transport',
   MEDICAL: 'Medical',
   PATROL: 'Patrol',
   FIRE_TRUCK: 'Fire',

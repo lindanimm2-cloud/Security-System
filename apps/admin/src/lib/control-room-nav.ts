@@ -2,11 +2,12 @@ import type { NavIconName } from '@/components/nav/NavIcon';
 
 export type ControlRoomNavSectionId =
   | 'development'
-  | 'operations'
+  | 'command'
+  | 'watch'
   | 'field'
-  | 'business'
-  | 'management'
-  | 'system';
+  | 'clients'
+  | 'insight'
+  | 'admin';
 
 export type ControlRoomNavItem = {
   href: string;
@@ -27,16 +28,16 @@ export type ControlRoomNavSection = {
   items: ControlRoomNavItem[];
 };
 
-const OWNER_STORE_ROLES = ['OWNER', 'TENANT_ADMIN', 'MANAGER', 'SUPER_ADMIN', 'DEVELOPER'];
-const SALES_ROLES = [...OWNER_STORE_ROLES, 'SALES'];
+const OWNER_ADMIN_ROLES = ['OWNER', 'TENANT_ADMIN', 'MANAGER', 'SUPER_ADMIN', 'DEVELOPER'];
 
 const SECTION_ORDER: ControlRoomNavSectionId[] = [
   'development',
-  'operations',
+  'command',
+  'watch',
   'field',
-  'business',
-  'management',
-  'system',
+  'clients',
+  'insight',
+  'admin',
 ];
 
 export const CONTROL_ROOM_SECTION_META: Record<
@@ -44,11 +45,12 @@ export const CONTROL_ROOM_SECTION_META: Record<
   { title: string; icon: NavIconName }
 > = {
   development: { title: 'Development', icon: 'report' },
-  operations: { title: 'Overview', icon: 'hub' },
-  field: { title: 'Monitoring', icon: 'surveillance' },
-  business: { title: 'Site operations', icon: 'customers' },
-  management: { title: 'Management', icon: 'analytics' },
-  system: { title: 'System', icon: 'grid' },
+  command: { title: 'Command', icon: 'hub' },
+  watch: { title: 'Watch', icon: 'surveillance' },
+  field: { title: 'Field', icon: 'officers' },
+  clients: { title: 'Clients', icon: 'customers' },
+  insight: { title: 'Insight', icon: 'analytics' },
+  admin: { title: 'Administration', icon: 'lock' },
 };
 
 export const CONTROL_ROOM_NAV: ControlRoomNavItem[] = [
@@ -59,54 +61,34 @@ export const CONTROL_ROOM_NAV: ControlRoomNavItem[] = [
     roles: ['DEVELOPER'],
     section: 'development',
   },
-  { href: '/control-room', label: 'Dashboard', icon: 'overview', exact: true, section: 'operations' },
-  { href: '/control-room/map', label: 'Live Map', icon: 'live-map', section: 'operations' },
-  { href: '/control-room/command', label: 'Command Hub', icon: 'hub', section: 'operations' },
-  { href: '/control-room/surveillance', label: 'CCTV', icon: 'surveillance', section: 'field' },
-  { href: '/control-room/incidents', label: 'Incidents', icon: 'incidents', section: 'field' },
-  { href: '/control-room/dispatch', label: 'Dispatch', icon: 'dispatch', section: 'field' },
-  { href: '/control-room/alarm-systems', label: 'Alarms & sensors', icon: 'incidents', section: 'field' },
-  { href: '/control-room/cctv-systems', label: 'CCTV systems', icon: 'devices', section: 'field' },
-  { href: '/control-room/device-security', label: 'Panic & devices', icon: 'devices', section: 'field' },
-  { href: '/control-room/officers', label: 'Officers & posts', icon: 'officers', section: 'business' },
-  { href: '/control-room/fleet', label: 'Vehicles', icon: 'fleet', section: 'business' },
-  { href: '/control-room/communications', label: 'Gates & comms', icon: 'communications', section: 'business' },
-  { href: '/control-room/chat', label: 'Internal chat', icon: 'chat', section: 'business' },
-  { href: '/control-room/documents', label: 'Documents', icon: 'documents', section: 'management' },
-  { href: '/control-room/customers', label: 'Customers', icon: 'customers', section: 'business' },
-  {
-    href: '/control-room/sales',
-    label: 'Sales Desk',
-    icon: 'sales',
-    roles: SALES_ROLES,
-    section: 'business',
-  },
+  { href: '/control-room', label: 'Command', icon: 'overview', exact: true, section: 'command' },
+  { href: '/control-room/map', label: 'Live Map', icon: 'live-map', section: 'command' },
+  { href: '/control-room/command', label: 'Property command', icon: 'hub', section: 'command' },
+  { href: '/control-room/surveillance', label: 'Cameras', icon: 'surveillance', section: 'watch' },
+  { href: '/control-room/emap', label: 'E-map', icon: 'hub', section: 'watch' },
+  { href: '/control-room/cctv-systems', label: 'Devices', icon: 'devices', section: 'watch' },
+  { href: '/control-room/alarm-systems', label: 'Alarms', icon: 'alarm', section: 'watch' },
+  { href: '/control-room/device-security', label: 'Panic & Devices', icon: 'emergency', section: 'watch' },
+  { href: '/control-room/incidents', label: 'Incidents', icon: 'incidents', section: 'watch' },
+  { href: '/control-room/dispatch', label: 'Dispatch', icon: 'dispatch', section: 'watch' },
+  { href: '/control-room/fleet', label: 'Vehicles', icon: 'fleet', section: 'field' },
+  { href: '/control-room/communications', label: 'Access & gates', icon: 'key', section: 'field' },
+  { href: '/control-room/officers', label: 'Officers', icon: 'officers', section: 'field' },
+  { href: '/control-room/chat', label: 'Communications', icon: 'chat', section: 'field' },
+  { href: '/control-room/customers', label: 'Subscriptions', icon: 'customers', section: 'clients' },
   {
     href: '/control-room/installs',
     label: 'Install Jobs',
     icon: 'install',
-    roles: [...OWNER_STORE_ROLES, 'SUPERVISOR', 'SALES'],
-    section: 'business',
+    roles: [...OWNER_ADMIN_ROLES, 'SUPERVISOR'],
+    section: 'clients',
   },
-  {
-    href: '/control-room/store',
-    label: 'Gear Store',
-    icon: 'store',
-    roles: OWNER_STORE_ROLES,
-    section: 'business',
-  },
-  { href: '/control-room/analytics', label: 'Analytics', icon: 'analytics', section: 'management' },
-  { href: '/control-room/teams', label: 'Teams & Users', icon: 'teams', section: 'management' },
-  { href: '/control-room/settings', label: 'Ops Settings', icon: 'grid', section: 'system' },
-  { href: '/control-room/alert-history', label: 'Alert History', icon: 'history', section: 'system' },
-  {
-    href: '/control-room/assurance',
-    label: 'Assurance',
-    icon: 'lock',
-    roles: OWNER_STORE_ROLES,
-    section: 'system',
-  },
-  { href: '/control-room/my-settings', label: 'Settings', icon: 'account', section: 'system' },
+  { href: '/control-room/documents', label: 'Documents', icon: 'documents', section: 'insight' },
+  { href: '/control-room/analytics', label: 'Analytics', icon: 'analytics', section: 'insight' },
+  { href: '/control-room/alert-history', label: 'Alarm history', icon: 'history', section: 'insight' },
+  { href: '/control-room/teams', label: 'Teams & users', icon: 'teams', section: 'admin' },
+  { href: '/control-room/settings', label: 'Ops settings', icon: 'grid', section: 'admin' },
+  { href: '/control-room/my-settings', label: 'Settings', icon: 'account', section: 'admin' },
   { href: '/control-room/profile', label: 'My Profile', icon: 'profile', pin: 'bottom' },
 ];
 
@@ -135,9 +117,9 @@ function hrefsAllowedForRole(role: string): Set<string> | null {
     return new Set([
       '/control-room',
       '/control-room/customers',
-      '/control-room/sales',
       '/control-room/installs',
       '/control-room/chat',
+      '/control-room/documents',
       '/control-room/profile',
       '/control-room/my-settings',
       '/control-room/settings',
@@ -149,10 +131,13 @@ function hrefsAllowedForRole(role: string): Set<string> | null {
       '/control-room',
       '/control-room/map',
       '/control-room/surveillance',
+      '/control-room/emap',
+      '/control-room/alert-history',
       '/control-room/fleet',
       '/control-room/incidents',
       '/control-room/command',
       '/control-room/device-security',
+      '/control-room/alarm-systems',
       '/control-room/dispatch',
       '/control-room/communications',
       '/control-room/chat',
@@ -167,21 +152,16 @@ function hrefsAllowedForRole(role: string): Set<string> | null {
       '/control-room',
       '/control-room/officers',
       '/control-room/customers',
-      '/control-room/store',
-      '/control-room/sales',
       '/control-room/analytics',
       '/control-room/my-settings',
       '/control-room/profile',
       '/control-room/settings',
-      '/control-room/assurance',
     ]);
   }
 
   if (role === 'DEVELOPER') {
     return new Set(
-      CONTROL_ROOM_NAV.filter(
-        (item) => item.href !== '/control-room/sales' && item.href !== '/control-room/teams',
-      ).map((item) => item.href),
+      CONTROL_ROOM_NAV.filter((item) => item.href !== '/control-room/teams').map((item) => item.href),
     );
   }
 
@@ -212,16 +192,16 @@ export function pinnedNavForRole(role: string): ControlRoomNavItem[] {
 
 /** Short labels for the floating mobile bottom bar (max 5). */
 const MOBILE_LABELS: Record<string, string> = {
-  '/control-room': 'Ops',
+  '/control-room': 'Command',
   '/control-room/developer': 'Desk',
   '/control-room/map': 'Map',
-  '/control-room/surveillance': 'CCTV',
-  '/control-room/fleet': 'Fleet',
-  '/control-room/customers': 'Clients',
-  '/control-room/incidents': 'File',
-  '/control-room/sales': 'Sales',
+  '/control-room/surveillance': 'Cameras',
+  '/control-room/alarm-systems': 'Alarms',
+  '/control-room/fleet': 'Vehicles',
+  '/control-room/customers': 'Subs',
   '/control-room/installs': 'Jobs',
-  '/control-room/settings': 'Ops',
+  '/control-room/incidents': 'Incidents',
+  '/control-room/settings': 'Admin',
   '/control-room/my-settings': 'Settings',
   '/control-room/profile': 'More',
 };
@@ -230,16 +210,16 @@ const MOBILE_PREFERRED: Record<string, string[]> = {
   SALES: [
     '/control-room',
     '/control-room/customers',
-    '/control-room/sales',
     '/control-room/installs',
+    '/control-room/chat',
     '/control-room/my-settings',
   ],
   DEFAULT: [
     '/control-room',
-    '/control-room/map',
     '/control-room/surveillance',
-    '/control-room/fleet',
-    '/control-room/my-settings',
+    '/control-room/alarm-systems',
+    '/control-room/map',
+    '/control-room/incidents',
   ],
   DEVELOPER: [
     '/control-room/developer',
@@ -264,14 +244,7 @@ export function mobileNavForRole(role: string): ControlRoomMobileNavItem[] {
       return {
         ...item,
         mobileLabel: MOBILE_LABELS[href] ?? item.label,
-        icon:
-          href === '/control-room' && role !== 'DEVELOPER'
-            ? ('incidents' as const)
-            : href === '/control-room/profile'
-              ? ('grid' as const)
-              : href === '/control-room/settings'
-                ? ('profile' as const)
-                : item.icon,
+        icon: item.icon,
       };
     })
     .filter((item): item is ControlRoomMobileNavItem => item != null)

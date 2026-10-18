@@ -7,6 +7,7 @@ import { OfficerLayout } from '@/components/officer/OfficerLayout';
 import { ThemeSettings } from '@/components/ThemeSettings';
 import { OfficerStatusPicker } from '@/components/officer/OfficerStatusPicker';
 import { OfficerStatusBadge } from '@/components/officer/StatusBadges';
+import { PasskeysSettingsPanel } from '@/components/auth/PasskeysSettingsPanel';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { OpsDialog } from '@/components/ops/OpsDialog';
 import { UserAvatar } from '@/components/ui/UserAvatar';
@@ -125,6 +126,9 @@ function ProfileContent() {
         </p>
         <OfficerStatusPicker status={o.status} onUpdated={reloadProfile} />
       </section>
+
+      {/* Biometrics / Face ID on this phone */}
+      <PasskeysSettingsPanel portal="officer" />
 
       {/* Theme */}
       <section className="portal-card profile-section">

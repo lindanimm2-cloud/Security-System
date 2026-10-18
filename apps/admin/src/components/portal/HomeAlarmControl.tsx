@@ -292,6 +292,11 @@ export function HomeAlarmControl({
       {isDashboard ? (
         <div className="home-dash-zones" aria-label="Zones sensors and alarm status">
           <Link href={`/portal/home/${primary.id}`} className="home-dash-zones__item">
+            <span className="home-dash-zones__icon" aria-hidden>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7">
+                <path d="M12 3 4.5 6.5v7.2c0 4.2 3.1 7.8 7.5 8.8 4.4-1 7.5-4.6 7.5-8.8V6.5L12 3z" />
+              </svg>
+            </span>
             <span className="home-dash-zones__label">Alarm</span>
             <span
               className={`home-dash-zones__value ${
@@ -302,10 +307,16 @@ export function HomeAlarmControl({
                     : 'home-dash-zones__value--muted'
               }`}
             >
-              {isTriggered ? 'Triggered' : armed ? 'Armed · active' : 'Disarmed'}
+              {isTriggered ? 'Triggered' : armed ? 'Armed' : 'Disarmed'}
             </span>
           </Link>
           <Link href={`/portal/home/${primary.id}`} className="home-dash-zones__item">
+            <span className="home-dash-zones__icon" aria-hidden>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7">
+                <path d="M12 3 4 7.5v9L12 21l8-4.5v-9L12 3z" />
+                <path d="M12 12v9M4 7.5l8 4.5 8-4.5" />
+              </svg>
+            </span>
             <span className="home-dash-zones__label">Zones</span>
             <span
               className={`home-dash-zones__value ${
@@ -315,11 +326,17 @@ export function HomeAlarmControl({
               }`}
             >
               {(primary.zoneHealth?.fault ?? 0) > 0
-                ? `${primary.zoneHealth?.fault} fault · ${primary.zoneHealth?.active ?? 0} active`
-                : `${primary.zoneHealth?.active ?? primary.zoneHealth?.total ?? 0} active`}
+                ? `${primary.zoneHealth?.fault} fault`
+                : `${primary.zoneHealth?.active ?? primary.zoneHealth?.total ?? 0}`}
             </span>
           </Link>
           <Link href={`/portal/home/${primary.id}`} className="home-dash-zones__item">
+            <span className="home-dash-zones__icon" aria-hidden>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7">
+                <circle cx="12" cy="12" r="3" />
+                <path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6l1.4 1.4M17 17l1.4 1.4M5.6 18.4 7 17M17 7l1.4-1.4" />
+              </svg>
+            </span>
             <span className="home-dash-zones__label">Sensors</span>
             <span
               className={`home-dash-zones__value ${
@@ -331,10 +348,8 @@ export function HomeAlarmControl({
               }`}
             >
               {(primary.zoneHealth?.alert ?? 0) > 0
-                ? `${primary.zoneHealth?.alert} open/alarm`
-                : (primary.zoneHealth?.disabled ?? 0) > 0
-                  ? `${primary.zoneHealth?.total ?? 0} total · ${primary.zoneHealth?.disabled} off`
-                  : `${primary.zoneHealth?.total ?? 0} monitoring`}
+                ? `${primary.zoneHealth?.alert} open`
+                : `${primary.zoneHealth?.total ?? 0}`}
             </span>
           </Link>
         </div>

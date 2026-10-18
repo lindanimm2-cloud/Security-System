@@ -47,7 +47,8 @@ export type NavIconName =
   | 'key'
   | 'lock'
   | 'history'
-  | 'hub';
+  | 'hub'
+  | 'alarm';
 
 const ICONS: Record<NavIconName, ReactNode> = {
   dashboard: (
@@ -235,9 +236,9 @@ const ICONS: Record<NavIconName, ReactNode> = {
   ),
   communications: (
     <>
-      <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
-      <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
-      <path d="M12 19v3" />
+      <path d="M3 14v-3a9 9 0 0 1 18 0v3" />
+      <path d="M21 14v2a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-2a2 2 0 0 1 2-2h3z" />
+      <path d="M3 14v2a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-2a2 2 0 0 0-2-2H3z" />
     </>
   ),
   chat: (
@@ -315,10 +316,8 @@ const ICONS: Record<NavIconName, ReactNode> = {
   ),
   services: (
     <>
-      <rect x="3" y="3" width="7" height="7" rx="1.5" />
-      <rect x="14" y="3" width="7" height="7" rx="1.5" />
-      <rect x="3" y="14" width="7" height="7" rx="1.5" />
-      <rect x="14" y="14" width="7" height="7" rx="1.5" />
+      <path d="M12 2 4 6v6c0 5 3.4 8.4 8 10 4.6-1.6 8-5 8-10V6l-8-4z" />
+      <path d="M9.2 12.2 11 14l3.8-4" />
     </>
   ),
   devices: (
@@ -350,6 +349,12 @@ const ICONS: Record<NavIconName, ReactNode> = {
       <circle cx="12" cy="12" r="2.4" />
       <path d="M12 4v3.2M12 16.8V20M4 12h3.2M16.8 12H20" />
       <path d="m6.4 6.4 2.3 2.3M15.3 15.3l2.3 2.3M17.6 6.4l-2.3 2.3M8.7 15.3l-2.3 2.3" />
+    </>
+  ),
+  alarm: (
+    <>
+      <path d="M6 9a6 6 0 0 1 12 0c0 7 2 7 2 9H4c0-2 2-2 2-9" />
+      <path d="M10 21a2 2 0 0 0 4 0" />
     </>
   ),
 };

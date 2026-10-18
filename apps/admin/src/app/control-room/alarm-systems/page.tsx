@@ -1,7 +1,9 @@
 'use client';
 
 import Link from 'next/link';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useMemo, useState, type FormEvent } from 'react';
+import { AlarmRulesPanel } from '@/components/vms/AlarmRulesPanel';
 import { ErrorAlert } from '@/components/ErrorAlert';
 import { ControlRoomLayout } from '@/components/control-room/ControlRoomLayout';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
@@ -14,6 +16,10 @@ import { CONTROL_ROOM_ROUTES } from '@/lib/control-room-routes';
 import { matchesSearch } from '@/lib/list-search';
 import { formatSplitAddress } from '@/lib/phone-countries';
 import { SplitAddressFields, type SplitAddressValue } from '@/components/ui/SplitAddressFields';
+import {
+  openBrandedSpecSheet,
+  openBrandedTableReport,
+} from '@/lib/branded-document';
 
 type SiteType = { value: string; label: string };
 
@@ -116,6 +122,75 @@ function clientLabel(c: ClientRow) {
   return c.name || `${c.firstName ?? ''} ${c.lastName ?? ''}`.trim() || c.email;
 }
 
+function panelFeatureSummary(s: AlarmSystemRow) {
+  return (
+    [
+      s.rfidEnabled ? 'RFID' : null,
+      s.touchKeypad ? 'Touch keypad' : null,
+      s.mobileAppEnabled ? 'App' : null,
+      s.zoneCount ? `${s.zoneCount} zones` : null,
+    ]
+      .filter(Boolean)
+      .join(' · ') || '—'
+  );
+}
+
+function panelSheetMeta(s: AlarmSystemRow) {
+  return [
+    { label: 'Site', value: `${s.property?.name ?? '—'} · ${s.property?.propertyType ?? '—'}` },
+    { label: 'Address', value: s.property?.address ?? '—' },
+    { label: 'Customer', value: s.property?.client?.name ?? '—' },
+    { label: 'Brand / model', value: [s.brand, s.model].filter(Boolean).join(' · ') || '—' },
+    { label: 'Kit SKU', value: s.kitSku || '—' },
+    { label: 'Connectivity', value: s.connectivity.replace(/_/g, ' ') },
+    { label: 'Panel serial', value: s.panelSerial || '—' },
+    { label: 'IMEI / SIM', value: [s.imei, s.simIccid].filter(Boolean).join(' · ') || '—' },
+    { label: 'WiFi', value: [s.wifiSsid, s.wifiMac].filter(Boolean).join(' · ') || '—' },
+    { label: 'Cloud / app', value: [s.cloudId, s.appAccount].filter(Boolean).join(' · ') || '—' },
+    {
+      label: 'RF / coding',
+      value: [s.wirelessFrequency, s.wirelessCoding].filter(Boolean).join(' · ') || '—',
+    },
+    {
+      label: 'Power',
+      value: [s.inputVoltage, s.backupBattery].filter(Boolean).join(' · ') || '—',
+    },
+    { label: 'ICASA', value: s.icasaCert || '—' },
+    { label: 'Features', value: panelFeatureSummary(s) },
+    { label: 'Firmware', value: s.firmware || '—' },
+    { label: 'Status', value: s.status },
+  ];
+}
+
+function openPanelSheet(s: AlarmSystemRow) {
+  openBrandedSpecSheet({
+    title: s.name,
+    referenceStem: s.panelSerial || s.kitSku || s.id.slice(0, 8),
+    status: s.status,
+    preparedFor: s.property?.client
+      ? {
+          name: s.property.client.name,
+          email: s.property.client.email || undefined,
+          address: s.property.address || undefined,
+        }
+      : s.property
+        ? { name: s.property.name, address: s.property.address || undefined }
+        : undefined,
+    meta: panelSheetMeta(s),
+    notes: [
+      ...(s.techNotes ? [`Tech notes: ${s.techNotes}`] : []),
+      'Share this sheet with the client or install team via Print → Save as PDF.',
+    ],
+  });
+}
+
+function statusTone(status: string) {
+  if (status === 'ONLINE') return 'ok';
+  if (status === 'FAULT') return 'danger';
+  if (status === 'OFFLINE') return 'warn';
+  return 'info';
+}
+
 export default function AlarmSystemsPage() {
   return (
     <ControlRoomLayout title="Alarm systems">
@@ -145,6 +220,13 @@ function AlarmSystemsContent() {
   const clients = clientsData?.data ?? [];
   const sites = surveillanceData?.data?.sites ?? [];
 
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const tab: 'panels' | 'rules' = searchParams.get('tab') === 'rules' ? 'rules' : 'panels';
+  const setTab = (next: 'panels' | 'rules') =>
+    router.replace(next === 'rules' ? `${CONTROL_ROOM_ROUTES.alarmSystems}?tab=rules` : CONTROL_ROOM_ROUTES.alarmSystems, {
+      scroll: false,
+    });
   const [search, setSearch] = useState('');
   const [showForm, setShowForm] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -346,21 +428,59 @@ function AlarmSystemsContent() {
 
   return (
     <div className="ops-page cctv-systems-page">
-      <header className="ops-page-header">
+      <header className="ops-page-header ops-page-header--compact">
         <div>
           <h1 className="ops-page-header__title">Alarm systems</h1>
           <p className="ops-page-header__subtitle">
-            Integrate panels like mixbox PG-103 (WiFi+4G), Paradox, and dual-path controllers —
-            serial, IMEI, WiFi, and tech specs for the install team.
+            Panel register — serial, IMEI, WiFi &amp; install specs
           </p>
         </div>
         <div className="ops-page-header__actions">
           <Link href={CONTROL_ROOM_ROUTES.cctvSystems} className="btn btn-ghost btn-sm">
-            CCTV kits
+            Devices
           </Link>
           <Link href={CONTROL_ROOM_ROUTES.surveillance} className="btn btn-ghost btn-sm">
             Live CCTV
           </Link>
+          <button
+            type="button"
+            className="btn btn-ghost btn-sm"
+            disabled={!filtered.length}
+            onClick={() =>
+              openBrandedTableReport({
+                title: 'Alarm panel register',
+                filenameStem: 'alarm-panels',
+                headers: [
+                  'Panel',
+                  'Status',
+                  'Site',
+                  'Customer',
+                  'Address',
+                  'Serial',
+                  'IMEI',
+                  'Link',
+                  'Features',
+                ],
+                rows: filtered.map((s) => [
+                  s.name,
+                  s.status,
+                  s.property?.name ?? '',
+                  s.property?.client?.name ?? '',
+                  s.property?.address ?? '',
+                  s.panelSerial ?? '',
+                  s.imei ?? '',
+                  s.connectivity.replace(/_/g, ' '),
+                  panelFeatureSummary(s),
+                ]),
+                notes: [
+                  'Filtered alarm panel register for install / client packs.',
+                  'Use Print / Save as PDF for a letterheaded archive copy.',
+                ],
+              })
+            }
+          >
+            Print register
+          </button>
           <button
             type="button"
             className="btn btn-primary btn-sm"
@@ -373,6 +493,35 @@ function AlarmSystemsContent() {
           </button>
         </div>
       </header>
+
+      <div className="vms-tabs" role="tablist" aria-label="Alarm configuration" style={{ alignSelf: 'flex-start' }}>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={tab === 'panels'}
+          className={`vms-tab ${tab === 'panels' ? 'is-on' : ''}`}
+          onClick={() => setTab('panels')}
+        >
+          Alarm panels ({systems.length})
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={tab === 'rules'}
+          className={`vms-tab ${tab === 'rules' ? 'is-on' : ''}`}
+          onClick={() => setTab('rules')}
+        >
+          Camera rules
+        </button>
+        <Link href={CONTROL_ROOM_ROUTES.alertHistory} className="vms-tab">
+          Alarm history
+        </Link>
+      </div>
+
+      {tab === 'rules' ? (
+        <AlarmRulesPanel />
+      ) : (
+      <>
 
       {error ? <ErrorAlert error={error} onRetry={() => void reload()} /> : null}
       {formMsg ? (
@@ -677,59 +826,83 @@ function AlarmSystemsContent() {
           body="Integrate a mixbox PG-103 or other panel against a house, store, mall or branch."
         />
       ) : (
-        <div className="cctv-system-grid">
+        <div className="cctv-system-grid alarm-panel-grid">
           {filtered.map((s) => (
-            <article key={s.id} className="ops-panel cctv-system-card">
+            <article key={s.id} className="ops-panel cctv-system-card alarm-panel-card">
               <header className="cctv-system-card__head">
-                <div>
-                  <h3>{s.name}</h3>
-                  <p className="text-muted">
+                <div className="alarm-panel-card__title">
+                  <p className="alarm-panel-card__eyebrow">Alarm panel</p>
+                  <h3 title={s.name}>{s.name}</h3>
+                  <p className="alarm-panel-card__meta">
                     {[s.brand, s.model].filter(Boolean).join(' · ') || 'Custom panel'}
                     {s.kitSku ? ` · ${s.kitSku}` : ''}
                   </p>
                 </div>
                 <span className={`ops-status ops-status--${statusTone(s.status)}`}>{s.status}</span>
               </header>
-              <dl className="cctv-system-card__facts">
+
+              <div className="alarm-panel-card__site">
                 <div>
-                  <dt>Site</dt>
-                  <dd>
-                    {s.property?.name ?? '—'}
-                    <span className="text-muted"> · {s.property?.propertyType ?? '—'}</span>
-                  </dd>
+                  <span className="alarm-panel-card__site-label">Site</span>
+                  <strong title={s.property?.name ?? undefined}>
+                    {s.property?.name ?? 'Unlinked site'}
+                  </strong>
+                  <span className="text-muted">
+                    {s.property?.propertyType ? s.property.propertyType.replace(/_/g, ' ') : '—'}
+                  </span>
                 </div>
                 <div>
-                  <dt>Address</dt>
-                  <dd>{s.property?.address ?? '—'}</dd>
+                  <span className="alarm-panel-card__site-label">Customer</span>
+                  <strong title={s.property?.client?.name ?? undefined}>
+                    {s.property?.client?.name ?? '—'}
+                  </strong>
+                  <span className="text-muted" title={s.property?.address ?? undefined}>
+                    {s.property?.address ?? 'No address on file'}
+                  </span>
                 </div>
-                <div>
-                  <dt>Customer</dt>
-                  <dd>{s.property?.client?.name ?? '—'}</dd>
-                </div>
+              </div>
+
+              <dl className="alarm-panel-card__facts">
                 <div>
                   <dt>Link</dt>
                   <dd>{s.connectivity.replace(/_/g, ' ')}</dd>
                 </div>
                 <div>
-                  <dt>Panel serial</dt>
-                  <dd>{s.panelSerial || '—'}</dd>
+                  <dt>Serial</dt>
+                  <dd className="alarm-panel-card__mono" title={s.panelSerial || undefined}>
+                    {s.panelSerial || '—'}
+                  </dd>
                 </div>
                 <div>
-                  <dt>IMEI / SIM</dt>
-                  <dd>{[s.imei, s.simIccid].filter(Boolean).join(' · ') || '—'}</dd>
+                  <dt>IMEI</dt>
+                  <dd className="alarm-panel-card__mono" title={s.imei || undefined}>
+                    {s.imei || '—'}
+                  </dd>
+                </div>
+                <div>
+                  <dt>SIM</dt>
+                  <dd className="alarm-panel-card__mono" title={s.simIccid || undefined}>
+                    {s.simIccid || '—'}
+                  </dd>
                 </div>
                 <div>
                   <dt>WiFi</dt>
-                  <dd>{[s.wifiSsid, s.wifiMac].filter(Boolean).join(' · ') || '—'}</dd>
+                  <dd title={[s.wifiSsid, s.wifiMac].filter(Boolean).join(' · ') || undefined}>
+                    <span>{s.wifiSsid || '—'}</span>
+                    {s.wifiMac ? <em className="alarm-panel-card__mono">{s.wifiMac}</em> : null}
+                  </dd>
                 </div>
                 <div>
-                  <dt>Cloud / app</dt>
-                  <dd>{[s.cloudId, s.appAccount].filter(Boolean).join(' · ') || '—'}</dd>
-                </div>
-                <div>
-                  <dt>RF / coding</dt>
+                  <dt>RF</dt>
                   <dd>
                     {[s.wirelessFrequency, s.wirelessCoding].filter(Boolean).join(' · ') || '—'}
+                  </dd>
+                </div>
+                <div>
+                  <dt>Cloud</dt>
+                  <dd title={[s.cloudId, s.appAccount].filter(Boolean).join(' · ') || undefined}>
+                    <span>{s.cloudId || '—'}</span>
+                    {s.appAccount ? <em>{s.appAccount}</em> : null}
                   </dd>
                 </div>
                 <div>
@@ -738,49 +911,53 @@ function AlarmSystemsContent() {
                     {[s.inputVoltage, s.backupBattery].filter(Boolean).join(' · ') || '—'}
                   </dd>
                 </div>
-                <div>
-                  <dt>ICASA</dt>
-                  <dd>{s.icasaCert || '—'}</dd>
-                </div>
-                <div>
+                <div className="alarm-panel-card__facts-span">
                   <dt>Features</dt>
-                  <dd>
-                    {[
-                      s.rfidEnabled ? 'RFID' : null,
-                      s.touchKeypad ? 'Touch keypad' : null,
-                      s.mobileAppEnabled ? 'App' : null,
-                      s.zoneCount ? `${s.zoneCount} zones` : null,
-                    ]
-                      .filter(Boolean)
-                      .join(' · ') || '—'}
-                  </dd>
+                  <dd>{panelFeatureSummary(s)}</dd>
                 </div>
+                {s.icasaCert ? (
+                  <div className="alarm-panel-card__facts-span">
+                    <dt>ICASA</dt>
+                    <dd className="alarm-panel-card__mono" title={s.icasaCert}>
+                      {s.icasaCert}
+                    </dd>
+                  </div>
+                ) : null}
               </dl>
+
               {s.techNotes ? (
-                <p className="ops-safety-note">
+                <div className="alarm-panel-card__notes">
                   <strong>Tech notes</strong>
-                  {s.techNotes}
-                </p>
+                  <p title={s.techNotes}>{s.techNotes}</p>
+                </div>
               ) : null}
-              {s.property?.id ? (
-                <Link
-                  href={`${CONTROL_ROOM_ROUTES.surveillance}/${s.property.id}`}
-                  className="btn btn-ghost btn-sm"
+
+              <div className="alarm-panel-card__actions">
+                {s.property?.id ? (
+                  <Link
+                    href={`${CONTROL_ROOM_ROUTES.surveillance}/${s.property.id}`}
+                    className="btn btn-ghost btn-sm"
+                  >
+                    Live site
+                  </Link>
+                ) : (
+                  <span className="text-muted alarm-panel-card__actions-spacer">No live site</span>
+                )}
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-sm"
+                  onClick={() => openPanelSheet(s)}
+                  title="Open letterheaded panel sheet — Print → Save as PDF"
                 >
-                  Open live site
-                </Link>
-              ) : null}
+                  Print / PDF
+                </button>
+              </div>
             </article>
           ))}
         </div>
       )}
+      </>
+      )}
     </div>
   );
-}
-
-function statusTone(status: string) {
-  if (status === 'ONLINE') return 'ok';
-  if (status === 'FAULT') return 'danger';
-  if (status === 'OFFLINE') return 'warn';
-  return 'info';
 }

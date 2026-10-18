@@ -529,13 +529,59 @@
 
 .prop-cmd__zone-feed,
 .prop-cmd__cctv--live {
-  border-radius: 8px;
+  border-radius: 10px;
   overflow: hidden;
 }
 
 .prop-cmd__zone-feed .cctv-feed,
 .prop-cmd__cctv--live .cctv-feed {
-  min-height: 140px;
+  min-height: 0;
+  gap: 0;
+}
+
+/* Name sits on the live tile (not a dark empty slab with dead contrast) */
+.prop-cmd__zone-feed .cctv-feed--compact,
+.prop-cmd__cctv--live .cctv-feed--compact {
+  position: relative !important;
+  background: transparent !important;
+  overflow: hidden;
+  border-radius: 10px;
+}
+
+.prop-cmd__zone-feed .cctv-feed--compact .cctv-feed__stage,
+.prop-cmd__cctv--live .cctv-feed--compact .cctv-feed__stage {
+  min-height: 148px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: #0f1419;
+}
+
+.prop-cmd__zone-feed .cctv-feed--compact .cctv-feed__footer,
+.prop-cmd__cctv--live .cctv-feed--compact .cctv-feed__footer {
+  position: absolute !important;
+  inset: auto 0 0 0 !important;
+  z-index: 3;
+  padding: 1.35rem 0.55rem 0.45rem !important;
+  background: linear-gradient(0deg, rgba(0, 0, 0, 0.9), transparent) !important;
+  pointer-events: none;
+}
+
+.prop-cmd__zone-feed .cctv-feed--compact .cctv-feed__footer strong,
+.prop-cmd__cctv--live .cctv-feed--compact .cctv-feed__footer strong {
+  color: #fff !important;
+  font-size: 0.78rem !important;
+}
+
+html[data-theme='light'] .prop-cmd__zone-cctv-preview {
+  background: #f3f5f8;
+  border: 1px dashed rgba(23, 33, 43, 0.2);
+  color: #5c6975;
+}
+
+html[data-theme='light'] .prop-cmd__zone-cctv-preview:hover {
+  color: #17212b;
+  border-color: rgba(59, 130, 246, 0.45);
+  background: #eef2f7;
 }
 
 .prop-cmd__live h3 {
@@ -616,4 +662,258 @@
 
 .prop-cmd-wrap .prop-cmd__head h2 {
   font-size: 1.1rem;
+}
+
+/* ——— Intercoms ——— */
+.ic-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.ic-panel__head h2 {
+  margin: 0.15rem 0 0.25rem;
+  font-size: 1.15rem;
+}
+
+.ic-panel__eyebrow,
+.ticket-assist__eyebrow {
+  margin: 0;
+  font-size: 0.66rem;
+  font-weight: 750;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.ic-panel__note,
+.ticket-assist__msg {
+  margin: 0;
+  padding: 0.55rem 0.7rem;
+  border-radius: 10px;
+  border: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
+  background: color-mix(in srgb, var(--surface-2) 80%, transparent);
+  font-size: 0.82rem;
+}
+
+.ic-panel__ring {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  padding: 0.7rem 0.85rem;
+  border-radius: 12px;
+  border: 1px solid rgba(251, 191, 36, 0.35);
+  background: rgba(251, 191, 36, 0.08);
+}
+
+.ic-panel__call {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  padding: 0.85rem;
+  border-radius: 14px;
+  border: 1px solid color-mix(in srgb, #3b82f6 40%, var(--border));
+  background: color-mix(in srgb, var(--surface) 94%, transparent);
+}
+
+.ic-panel__call-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  align-items: flex-start;
+}
+
+.ic-panel__call-meta h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.ic-panel__feed {
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+}
+
+.ic-panel__call-actions,
+.ic-card__actions,
+.ticket-assist__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.ic-panel__hint {
+  margin: 0;
+  font-size: 0.72rem;
+  color: var(--muted);
+}
+
+.ic-panel__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 0.65rem;
+}
+
+.ic-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  padding: 0.75rem 0.85rem;
+  border-radius: 12px;
+  border: 1px solid color-mix(in srgb, var(--border) 75%, transparent);
+  background: color-mix(in srgb, var(--surface) 94%, transparent);
+}
+
+.ic-card--ring {
+  border-color: rgba(251, 191, 36, 0.45);
+  box-shadow: 0 0 0 1px rgba(251, 191, 36, 0.12);
+}
+
+.ic-card--live {
+  border-color: color-mix(in srgb, #3b82f6 45%, var(--border));
+}
+
+.ic-card__top {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  align-items: flex-start;
+}
+
+.ic-card__top strong {
+  display: block;
+  font-size: 0.9rem;
+}
+
+.ic-card__top .text-muted,
+.ic-card__link {
+  display: block;
+  font-size: 0.74rem;
+  color: var(--muted);
+  margin: 0.15rem 0 0;
+}
+
+/* ——— Ticket assist ——— */
+.ticket-assist {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+  padding: 0.95rem 1rem;
+  border-radius: 14px;
+  border: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
+  background: color-mix(in srgb, var(--surface) 94%, transparent);
+}
+
+.ticket-assist__head h2 {
+  margin: 0.15rem 0 0.25rem;
+  font-size: 1.05rem;
+}
+
+.ticket-assist__form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: flex-end;
+}
+
+.ticket-assist__field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  flex: 1 1 12rem;
+  font-size: 0.72rem;
+  font-weight: 650;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.ticket-assist__field input {
+  min-height: 2.2rem;
+  border-radius: 10px;
+  border: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
+  background: color-mix(in srgb, var(--surface-2) 90%, transparent);
+  color: var(--text);
+  padding: 0.4rem 0.65rem;
+  font-size: 0.9rem;
+  text-transform: none;
+  letter-spacing: 0;
+  font-weight: 500;
+}
+
+.ticket-assist__hint {
+  margin: 0;
+  font-size: 0.72rem;
+  color: var(--muted);
+}
+
+.ticket-assist__result {
+  padding: 0.7rem 0.8rem;
+  border-radius: 10px;
+  border: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+}
+
+.ticket-assist__result > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+}
+
+.ticket-assist__result--paid {
+  border-color: rgba(74, 222, 128, 0.35);
+  background: rgba(74, 222, 128, 0.06);
+}
+
+.ticket-assist__result--unpaid,
+.ticket-assist__result--expired {
+  border-color: rgba(251, 191, 36, 0.35);
+  background: rgba(251, 191, 36, 0.06);
+}
+
+.ticket-assist__result--unknown {
+  border-color: rgba(148, 163, 184, 0.35);
+}
+
+.ticket-assist__check {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.82rem;
+}
+
+.gates-comms-page {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.gates-comms-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.gates-comms-tabs__btn {
+  appearance: none;
+  border: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
+  background: color-mix(in srgb, var(--surface) 92%, transparent);
+  color: var(--text);
+  border-radius: 999px;
+  padding: 0.35rem 0.85rem;
+  font-size: 0.8rem;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.gates-comms-tabs__btn.is-active {
+  background: #2b2b2b;
+  border-color: #3a3a3a;
+  color: #fff;
+}
+
+.gates-comms-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
 }

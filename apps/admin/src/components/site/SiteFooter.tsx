@@ -7,8 +7,9 @@ export function SiteFooter() {
         <div className="nx-footer-brand">
           <p className="nx-footer-name">4DS Nexus</p>
           <p>
-            Integrated protection, response, and professional security supply —
-            built for families, fleets, and sites that cannot afford downtime.
+            Integrated protection and response — close protection, private
+            escort, monitoring, and rapid dispatch for people and sites that
+            cannot afford downtime.
           </p>
         </div>
         <div>
@@ -16,9 +17,6 @@ export function SiteFooter() {
           <ul>
             <li>
               <Link href="/about">About</Link>
-            </li>
-            <li>
-              <Link href="/services">Services</Link>
             </li>
             <li>
               <Link href="/careers">Careers</Link>
@@ -32,31 +30,25 @@ export function SiteFooter() {
           </ul>
         </div>
         <div>
-          <h3>Shop</h3>
+          <h3>Services</h3>
           <ul>
             <li>
-              <Link href="/store">All products</Link>
+              <Link href="/services#close-protection">Close protection</Link>
             </li>
             <li>
-              <Link href="/store?category=CCTV">CCTV cameras</Link>
+              <Link href="/services#private-escort">Private escort</Link>
             </li>
             <li>
-              <Link href="/store?category=ALARMS">Alarm systems</Link>
+              <Link href="/services#personal-protection">Personal protection</Link>
             </li>
             <li>
-              <Link href="/store?category=ACCESS_CONTROL">Access control</Link>
+              <Link href="/services#rapid-response">Armed response</Link>
             </li>
             <li>
-              <Link href="/store?category=ELECTRIC_FENCING">Electric fencing</Link>
+              <Link href="/services#cctv-installs">CCTV &amp; access</Link>
             </li>
             <li>
-              <Link href="/store?category=PACKAGES">Security packages</Link>
-            </li>
-            <li>
-              <Link href="/store?category=BODY_ARMOUR">Body armour</Link>
-            </li>
-            <li>
-              <Link href="/services">Installation services</Link>
+              <Link href="/services">All services</Link>
             </li>
           </ul>
         </div>
@@ -64,13 +56,10 @@ export function SiteFooter() {
           <h3>Access</h3>
           <ul>
             <li>
-              <Link href="/account">Client account</Link>
-            </li>
-            <li>
               <Link href="/portal/login">Protection portal</Link>
             </li>
             <li>
-              <Link href="/portals">Login</Link>
+              <Link href="/login">Staff login</Link>
             </li>
             <li>
               <a href="mailto:hello@4dsnexus.co.za">hello@4dsnexus.co.za</a>

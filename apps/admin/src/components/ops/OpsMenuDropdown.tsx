@@ -20,7 +20,7 @@ export type OpsMenuItem = {
 };
 
 type OpsMenuDropdownProps = {
-  label: string;
+  label: ReactNode;
   items: OpsMenuItem[];
   className?: string;
   triggerClassName?: string;
@@ -83,6 +83,7 @@ export function OpsMenuDropdown({
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [mounted, setMounted] = useState(false);
+  const [onSite, setOnSite] = useState(false);
   const [pos, setPos] = useState({ top: 0, left: 0, width: 260, maxHeight: 320, ready: false });
   const visibleItems = searchable ? filterMenuItems(items, query) : items;
   const rootRef = useRef<HTMLDivElement>(null);
@@ -93,6 +94,11 @@ export function OpsMenuDropdown({
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  useEffect(() => {
+    if (!open) return;
+    setOnSite(Boolean(rootRef.current?.closest('.nx-site')));
+  }, [open]);
 
   useEffect(() => {
     if (!open) setQuery('');
@@ -298,7 +304,7 @@ export function OpsMenuDropdown({
             <>
               <button
                 type="button"
-                className="ops-menu__scrim"
+                className={`ops-menu__scrim${onSite ? ' ops-menu__scrim--soft' : ''}`}
                 aria-label="Close menu"
                 onClick={() => setOpen(false)}
               />
@@ -310,19 +316,23 @@ export function OpsMenuDropdown({
                   'ops-menu__panel--fixed',
                   `ops-menu__panel--${align}`,
                   searchable ? 'ops-menu__panel--searchable' : '',
+                  onSite ? 'ops-menu__panel--site' : '',
                   panelClassName,
                 ]
                   .filter(Boolean)
                   .join(' ')}
                 role="menu"
+                onMouseDown={(e) => e.stopPropagation()}
+                onTouchStart={(e) => e.stopPropagation()}
                 style={{
                   position: 'fixed',
                   top: pos.top,
                   left: pos.left,
                   width: pos.width,
                   maxHeight: pos.maxHeight,
+                  zIndex: 10050,
                   opacity: pos.ready ? 1 : 0,
-                  pointerEvents: pos.ready ? 'auto' : 'none',
+                  pointerEvents: 'auto',
                 }}
               >
                 {searchable ? (

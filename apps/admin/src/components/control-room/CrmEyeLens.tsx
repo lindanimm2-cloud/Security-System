@@ -37,20 +37,6 @@ import { fetchInternalChat } from '@/lib/internal-chat-api';
 import { type OpsIncident } from '@/lib/ops-incident';
 import { CrmEyeLensIcons as I } from '@/components/control-room/CrmEyeLensIcons';
 
-type Lead = {
-  id: string;
-  companyName: string | null;
-  contactName: string;
-  contactEmail: string | null;
-  contactPhone: string | null;
-  status: string;
-  interest: string | null;
-  estimatedFormatted: string | null;
-  nextFollowUp: string | null;
-  ownerName: string;
-};
-
-type SalesDash = { leads: Lead[] };
 type NotificationData = { unreadCount: number };
 type CustomerRow = { id: string; firstName: string; lastName: string; email: string; phone: string | null };
 type CustomersResponse = { data: CustomerRow[] };
@@ -93,12 +79,6 @@ const DEFAULT_PLACEHOLDER: CrLensSettings = {
   dockEdge: 'bottom',
 };
 
-function startOfDay(d = new Date()) {
-  return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
-}
-function endOfDay(d = new Date()) {
-  return startOfDay(d) + 86400000 - 1;
-}
 
 function Badge({ count, tone }: { count: number; tone?: 'critical' | 'panic' | 'info' }) {
   if (count <= 0) return null;
@@ -164,7 +144,6 @@ export function CrmEyeLens() {
     () => softGet<ApiResponse<DashboardLite>>('/control-room/dashboard'),
     [],
   );
-  const { data: salesRes } = useApi(() => softGet<ApiResponse<SalesDash>>('/store/sales/dashboard'), []);
   const { data: notifRes, reload: reloadNotifs } = useApi(
     () => softGet<ApiResponse<NotificationData>>('/control-room/notifications'),
     [],
@@ -379,7 +358,6 @@ export function CrmEyeLens() {
     return () => window.clearTimeout(id);
   }, [open, settings.autoCollapse, panicLive, selectedId, tab]);
 
-  const leads = Array.isArray(salesRes?.data?.leads) ? salesRes.data.leads : [];
   const unread = notifRes?.data?.unreadCount ?? 0;
   const customers = useMemo(() => {
     const raw = customersRes?.data;
@@ -393,35 +371,17 @@ export function CrmEyeLens() {
     return messages.filter((m) => m.sender?.id !== me && new Date(m.createdAt).getTime() > cutoff).length;
   }, [chatRes, session]);
 
-  const followUps = useMemo(() => {
-    const nowEnd = endOfDay(new Date(Date.now() + 2 * 86400000));
-    return leads
-      .filter((l) => l.nextFollowUp && !['WON', 'LOST'].includes(l.status))
-      .filter((l) => new Date(l.nextFollowUp!).getTime() <= nowEnd)
-      .sort((a, b) => new Date(a.nextFollowUp!).getTime() - new Date(b.nextFollowUp!).getTime());
-  }, [leads]);
-  const calendarBadge = followUps.filter((l) => new Date(l.nextFollowUp!).getTime() <= endOfDay()).length;
-
   const searchHits = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (q.length < 2) return { leads: [] as Lead[], customers: [] as CustomerRow[] };
+    if (q.length < 2) return { customers: [] as CustomerRow[] };
     return {
-      leads: leads
-        .filter((l) =>
-          [l.contactName, l.companyName, l.contactEmail, l.contactPhone, l.interest]
-            .filter(Boolean)
-            .join(' ')
-            .toLowerCase()
-            .includes(q),
-        )
-        .slice(0, 6),
       customers: customers
         .filter((c) =>
           [`${c.firstName} ${c.lastName}`, c.email, c.phone].filter(Boolean).join(' ').toLowerCase().includes(q),
         )
         .slice(0, 6),
     };
-  }, [query, leads, customers]);
+  }, [query, customers]);
 
   const callTarget = useCallback(
     async (target: { userId?: string; name: string; phone?: string | null; incidentId?: string }) => {
@@ -736,16 +696,6 @@ export function CrmEyeLens() {
                   <I.Fleet />
                 </button>
               ) : null}
-              <button
-                type="button"
-                className="eye-lens__tool"
-                aria-label="Operations Calendar"
-                data-tip="Operations Calendar"
-                onClick={() => router.push('/control-room/sales')}
-              >
-                <I.Calendar />
-                <Badge count={calendarBadge} tone="info" />
-              </button>
             </div>
             <span className="eye-lens__rule" aria-hidden />
             <div className="eye-lens__group" role="group" aria-label="System">
@@ -843,7 +793,7 @@ export function CrmEyeLens() {
                 <header className="eye-lens-head">
                   <div>
                     <p className="eye-lens-head__title">Global Search</p>
-                    <p className="eye-lens-head__sub">Customers and leads</p>
+                    <p className="eye-lens-head__sub">Customers</p>
                   </div>
                   <button type="button" className="eye-lens-collapse" aria-label="Collapse search" onClick={() => setOpen(false)}>
                     <Chevron />
@@ -851,66 +801,41 @@ export function CrmEyeLens() {
                 </header>
                 <label className="eye-lens-search">
                   <I.Search />
-                  <input autoFocus type="search" placeholder="Search leads or customers…" value={query} onChange={(e) => setQuery(e.target.value)} />
+                  <input autoFocus type="search" placeholder="Search customers…" value={query} onChange={(e) => setQuery(e.target.value)} />
                 </label>
                 {query.trim().length < 2 ? (
                   <p className="eye-lens-empty">Type at least 2 characters to search.</p>
-                ) : searchHits.leads.length === 0 && searchHits.customers.length === 0 ? (
+                ) : searchHits.customers.length === 0 ? (
                   <p className="eye-lens-empty">No matches for “{query.trim()}”.</p>
                 ) : (
-                  <>
-                    {searchHits.leads.length > 0 ? (
-                      <div className="eye-lens-section">
-                        <h4>Leads</h4>
-                        <ul className="eye-lens-list">
-                          {searchHits.leads.map((l) => (
-                            <li key={l.id}>
-                              <div>
-                                <strong>{l.contactName}</strong>
-                                <span>
-                                  {l.status}
-                                  {l.estimatedFormatted ? ` · ${l.estimatedFormatted}` : ''}
-                                </span>
-                              </div>
-                              <Link href="/control-room/sales" onClick={() => setOpen(false)}>
-                                Open
-                              </Link>
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    ) : null}
-                    {searchHits.customers.length > 0 ? (
-                      <div className="eye-lens-section">
-                        <h4>Customers</h4>
-                        <ul className="eye-lens-list">
-                          {searchHits.customers.map((c) => (
-                            <li key={c.id}>
-                              <div>
-                                <strong>
-                                  {c.firstName} {c.lastName}
-                                </strong>
-                                <span>{c.email}</span>
-                              </div>
-                              <div className="eye-lens-list__actions">
-                                <button
-                                  type="button"
-                                  className="eye-lens-call-btn"
-                                  disabled={callBusy}
-                                  onClick={() => void callTarget({ userId: c.id, name: `${c.firstName} ${c.lastName}`, phone: c.phone })}
-                                >
-                                  Call
-                                </button>
-                                <Link href={customerHref(c.id)} onClick={() => setOpen(false)}>
-                                  Open
-                                </Link>
-                              </div>
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    ) : null}
-                  </>
+                  <div className="eye-lens-section">
+                    <h4>Customers</h4>
+                    <ul className="eye-lens-list">
+                      {searchHits.customers.map((c) => (
+                        <li key={c.id}>
+                          <div>
+                            <strong>
+                              {c.firstName} {c.lastName}
+                            </strong>
+                            <span>{c.email}</span>
+                          </div>
+                          <div className="eye-lens-list__actions">
+                            <button
+                              type="button"
+                              className="eye-lens-call-btn"
+                              disabled={callBusy}
+                              onClick={() => void callTarget({ userId: c.id, name: `${c.firstName} ${c.lastName}`, phone: c.phone })}
+                            >
+                              Call
+                            </button>
+                            <Link href={customerHref(c.id)} onClick={() => setOpen(false)}>
+                              Open
+                            </Link>
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
                 )}
               </div>
             ) : null}

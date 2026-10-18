@@ -32,7 +32,7 @@ export function OrgCommandSearch({
       <input
         className="org-search__input"
         value={query}
-        placeholder="Search cameras, people, vehicles, incidents…"
+        placeholder="Search cameras, people, incidents…"
         aria-label="Search operations"
         onChange={(e) => {
           setQuery(e.target.value);

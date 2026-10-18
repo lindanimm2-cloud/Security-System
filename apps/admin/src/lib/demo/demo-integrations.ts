@@ -159,7 +159,7 @@ export function handleIntegrationsDemo(input: {
       lat: Number(payload.lat ?? -29.8587),
       lng: Number(payload.lng ?? 31.0218),
       createdAt: now,
-      user: 'Nomsa Client',
+      user: 'Demo Client',
       publicRef,
     };
 
@@ -209,7 +209,7 @@ export function handleIntegrationsDemo(input: {
       lat: Number(payload.lat ?? -29.81),
       lng: Number(payload.lng ?? 31.04),
       createdAt: now,
-      user: 'Nomsa Client',
+      user: 'Demo Client',
       publicRef,
     };
 

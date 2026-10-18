@@ -5,13 +5,73 @@ import { SiteDispatchStrip } from '@/components/site/SiteDispatchStrip';
 export const metadata: Metadata = {
   title: 'Services',
   description:
-    'Personal protection, fleet recovery, armed response, CCTV installs, corporate supply, and readiness training from 4DS Nexus.',
+    'Close protection, private escort, personal protection, fleet recovery, armed response, CCTV installs, and readiness training from 4DS Nexus.',
 };
 
 const SERVICES = [
   {
-    id: 'personal-protection',
+    id: 'close-protection',
     index: '01',
+    title: 'Close protection & bodyguarding',
+    tagline: 'Protective presence for people who cannot rely on chance.',
+    summary:
+      'PSIRA-aligned close-protection officers for executives, principals, and high-visibility families — planned advances, live check-ins, and control-room backup for the duration of the detail.',
+    who: [
+      'Executives and board-level principals',
+      'High-net-worth families and visiting dignitaries',
+      'Public figures and media-facing individuals',
+      'Clients needing discrete residential or event cover',
+    ],
+    includes: [
+      'Risk assessment and protective plan before deployment',
+      'Trained close-protection officers for static or mobile details',
+      'Live location visibility to the 4DS Nexus control room',
+      'Escalation path to armed response if the situation changes',
+      'Advance work for venues, hotels, and private residences',
+      'Incident notes and debrief for each engagement',
+    ],
+    process: [
+      'Brief us on dates, principals, and risk profile',
+      'Receive a protective plan and officer profile pack',
+      'Detail deploys with live control-room oversight',
+      'Close-out report and recommendations after the engagement',
+    ],
+    note: 'Minimum notice and officer ratios depend on risk level and venue. Pricing confirmed on consultation.',
+    cta: { href: '/contact?service=close-protection', label: 'Request close protection' },
+  },
+  {
+    id: 'private-escort',
+    index: '02',
+    title: 'Private escort & VIP transport',
+    tagline: 'Secure moves between airports, venues, and homes.',
+    summary:
+      'Planned private escort for airport transfers, court appearances, medical appointments, and discreet point-to-point travel — with route planning, check-ins, and rapid backup if something goes wrong.',
+    who: [
+      'Executives and travelling principals',
+      'Families needing secure school or airport runs',
+      'Clients attending court, medical, or high-risk venues',
+      'Visitors who need a trusted local security escort',
+    ],
+    includes: [
+      'Pre-planned routes and time windows',
+      'Escort officer(s) with live control-room link',
+      'Airport, hotel, and venue liaison where needed',
+      'Status updates to a nominated contact',
+      'Option to combine with close protection for longer stays',
+      'Evidence-ready timeline if an incident occurs',
+    ],
+    process: [
+      'Share pickup, destination, and preferred time',
+      'Confirm route, officer count, and contact protocol',
+      'Escort runs with live check-ins to control room',
+      'Safe hand-off at destination and engagement close-out',
+    ],
+    note: 'Gauteng metro coverage is strongest; corridor and out-of-area escorts available on request.',
+    cta: { href: '/contact?service=private-escort', label: 'Request private escort' },
+  },
+  {
+    id: 'personal-protection',
+    index: '03',
     title: 'Personal & family protection',
     tagline: 'Always-on safety for people who move.',
     summary:
@@ -40,7 +100,7 @@ const SERVICES = [
   },
   {
     id: 'fleet-recovery',
-    index: '02',
+    index: '04',
     title: 'Fleet & vehicle recovery',
     tagline: 'Know where assets are — and act when they move wrong.',
     summary:
@@ -69,7 +129,7 @@ const SERVICES = [
   },
   {
     id: 'rapid-response',
-    index: '03',
+    index: '05',
     title: 'Armed & rapid response',
     tagline: 'Dispatch that starts the moment the alert hits.',
     summary:
@@ -98,7 +158,7 @@ const SERVICES = [
   },
   {
     id: 'cctv-installs',
-    index: '04',
+    index: '06',
     title: 'CCTV, alarms & access control',
     tagline: 'Site systems designed to be monitored — not just recorded.',
     summary:
@@ -126,38 +186,8 @@ const SERVICES = [
     note: 'Typical residential installs complete in 1–3 days after survey; multi-building commercial sites scheduled in phases.',
   },
   {
-    id: 'corporate-supply',
-    index: '05',
-    title: 'Corporate security supply',
-    tagline: 'Duty gear and site kit — ordered, licensed, delivered.',
-    summary:
-      'A professional catalog for security teams and protected sites: soft armor and plate carriers, batons, CEDs, radios, CCTV kits, and licensed firearms pathways — with account billing and install add-ons where needed.',
-    who: [
-      'In-house security departments',
-      'Guarding companies outfitting units',
-      'Estate and facilities managers',
-      'Corporate HSE / risk teams',
-    ],
-    includes: [
-      'Curated catalog with stock visibility',
-      'Bulk and account pricing for repeat buyers',
-      'Licence-required SKU flagging and sales follow-up',
-      'Optional technician install for camera and alarm kits',
-      'Consolidated invoicing and order history',
-      'Advice on armor ratings, duty kit, and site packages',
-    ],
-    process: [
-      'Browse the Nexus Supply catalog or request a kit list',
-      'Cart checkout or sales-assisted quote for large orders',
-      'Licence verification where firearms / CEDs apply',
-      'Delivery or scheduled install job created',
-    ],
-    note: 'Minimum order quantities apply on some bulk lines. Open an account for net-term billing.',
-    cta: { href: '/store', label: 'Browse the catalog' },
-  },
-  {
     id: 'training',
-    index: '06',
+    index: '07',
     title: 'Training & readiness',
     tagline: 'Technology only works if people know what to do.',
     summary:
@@ -186,7 +216,7 @@ const SERVICES = [
   },
   {
     id: 'install-services',
-    index: '07',
+    index: '08',
     title: 'Installation, repairs & monitoring',
     tagline: 'Electronic + physical security fitted by Nexus techs.',
     summary:
@@ -195,7 +225,7 @@ const SERVICES = [
       'Homeowners and estates needing full site systems',
       'Warehouses and industrial yards',
       'Retail and commercial shopfronts',
-      'Clients buying hardware from Nexus Supply who need commissioning',
+      'Clients needing systems commissioned into monitoring',
     ],
     includes: [
       'CCTV installation, repairs, and maintenance',
@@ -210,12 +240,12 @@ const SERVICES = [
     ],
     process: [
       'Site survey and coverage / risk quote',
-      'Hardware from Nexus Supply or client-supplied kit',
+      'Hardware selection and install booking',
       'Install, test, and train on-site contacts',
       'Optional monitoring link and maintenance schedule',
     ],
-    note: 'Residential installs often complete in 1–3 days after survey; multi-building sites are phased. Browse the catalogue for packages that include optional install.',
-    cta: { href: '/store?category=PACKAGES', label: 'View security packages' },
+    note: 'Residential installs often complete in 1–3 days after survey; multi-building sites are phased.',
+    cta: { href: '/contact?service=install', label: 'Request a site survey' },
   },
 ] as const;
 
@@ -227,15 +257,15 @@ export default function ServicesPage() {
           <p className="nx-eyebrow">Services</p>
           <h1>Protection across people, vehicles, and sites</h1>
           <p>
-            4DS Nexus runs a connected security stack: subscriber apps, 24/7
-            control room, rapid response, professional installs, and duty
-            supply — so every alert has a clear next step.
+            4DS Nexus runs a connected security stack: close protection, private
+            escort, subscriber apps, 24/7 control room, rapid response, and
+            professional installs — so every engagement has a clear next step.
           </p>
           <div className="nx-hero-actions" style={{ marginTop: '1.5rem' }}>
-            <Link href="/contact" className="nx-btn nx-btn--primary">
+            <Link href="/contact?service=private-escort" className="nx-btn nx-btn--primary">
               Request a quote
             </Link>
-            <a href="#personal-protection" className="nx-btn nx-btn--ghost-light">
+            <a href="#close-protection" className="nx-btn nx-btn--ghost-light">
               Explore services
             </a>
           </div>
@@ -335,7 +365,10 @@ export default function ServicesPage() {
                   {s.cta.label}
                 </Link>
               ) : null}
-              <Link href="/contact" className="nx-btn nx-btn--outline">
+              <Link
+                href={`/contact?service=${s.id === 'fleet-recovery' ? 'fleet' : s.id}`}
+                className="nx-btn nx-btn--outline"
+              >
                 Ask about {s.title.toLowerCase()}
               </Link>
             </div>
@@ -351,15 +384,15 @@ export default function ServicesPage() {
         <div className="nx-band-inner">
           <h2>Need a mixed package?</h2>
           <p>
-            Most commercial clients combine protection plans, site installs, and
+            Most clients combine close protection or escort with monitoring and
             response cover. Tell us how you operate — we&apos;ll map a stack.
           </p>
           <div className="nx-hero-actions">
-            <Link href="/contact" className="nx-btn nx-btn--primary">
+            <Link href="/contact?service=close-protection" className="nx-btn nx-btn--primary">
               Book a discovery call
             </Link>
-            <Link href="/store" className="nx-btn nx-btn--ghost-light">
-              Shop equipment
+            <Link href="/services#close-protection" className="nx-btn nx-btn--ghost-light">
+              Close protection
             </Link>
           </div>
         </div>

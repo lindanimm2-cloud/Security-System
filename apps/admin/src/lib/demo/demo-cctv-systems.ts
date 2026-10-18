@@ -149,7 +149,7 @@ export let demoCctvSystems: DemoCctvSystem[] = [
       propertyType: 'STORE',
       client: {
         id: 'demo-user-client-demo-local',
-        name: 'Nomsa Client',
+        name: 'Demo Client',
         email: 'client@demo.local',
       },
     },
@@ -290,7 +290,7 @@ export let demoCctvSystems: DemoCctvSystem[] = [
       propertyType: 'HOUSE',
       client: {
         id: 'demo-user-client-demo-local',
-        name: 'Nomsa Client',
+        name: 'Demo Client',
         email: 'client@demo.local',
       },
     },

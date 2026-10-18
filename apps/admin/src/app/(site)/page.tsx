@@ -1,106 +1,177 @@
 import Link from 'next/link';
-import { FeaturedProducts } from '@/components/site/FeaturedProducts';
 import { SiteDispatchStrip } from '@/components/site/SiteDispatchStrip';
-import { STORE_DEPARTMENTS } from '@/lib/store-catalog';
 
-const DEPARTMENTS = [
-  ...STORE_DEPARTMENTS.slice(0, 15).map((d) => ({
-    href: `/store?category=${d.id}`,
-    icon: d.icon,
-    title: d.label,
-    body: d.blurb,
-  })),
+const SOLUTIONS = [
   {
-    href: '/services',
-    icon: '🛠️',
-    title: 'Installation services',
-    body: 'CCTV, alarms, fencing & more',
+    href: '/contact?service=close-protection',
+    kicker: 'Close protection',
+    title: 'Bodyguards when presence matters',
+    body: 'Trained close-protection officers for executives, families, and high-visibility events — briefed, tracked, and backed by the same control room.',
+    cta: 'Request close protection',
+    tone: 'cctv' as const,
+    image: '/brand/nx-story-cctv.jpg',
+  },
+  {
+    href: '/contact?service=private-escort',
+    kicker: 'Private escort',
+    title: 'Secure moves, airports, and venues',
+    body: 'Private escort and VIP transport for airport runs, court appearances, medical transfers, and discreet point-to-point movements across Gauteng.',
+    cta: 'Request private escort',
+    tone: 'access' as const,
+    image: '/brand/nx-story-access.png',
+  },
+  {
+    href: '/contact?service=personal-protection',
+    kicker: 'Always-on monitoring',
+    title: 'Panic, GPS, and family safety',
+    body: 'Subscriber protection with one-tap panic, live tracking, medical context, and trusted-contact alerts — monitored 24/7.',
+    cta: 'Request protection plan',
+    tone: 'pack' as const,
+    image: '/brand/nx-story-pack.png',
   },
 ];
 
-const QUICK = [
+const CAPABILITIES = [
   {
-    href: '/store?category=CCTV',
-    title: 'CCTV & NVR',
-    body: 'Cameras, recorders, PoE kits',
+    title: '24/7 control room',
+    body: 'Priority triage, live briefings, and verified emergency dispatch from one operating desk.',
   },
   {
-    href: '/store?category=PACKAGES',
-    title: 'Security packages',
-    body: 'Home, business & industrial bundles',
+    title: 'Close protection',
+    body: 'Bodyguards and protective details coordinated with live location and incident context.',
+  },
+  {
+    title: 'Private escort',
+    body: 'Planned secure movements with advance routes, check-ins, and rapid backup if needed.',
+  },
+  {
+    title: 'Field response',
+    body: 'Officers navigate with incident context — status, chat, and close-out on the same platform.',
+  },
+];
+
+const SERVICE_LINKS = [
+  {
+    href: '/services#close-protection',
+    title: 'Close protection / bodyguarding',
+    body: 'Executive and personal protective details',
+  },
+  {
+    href: '/services#private-escort',
+    title: 'Private escort',
+    body: 'Airport, venue, and VIP transport security',
+  },
+  {
+    href: '/services#personal-protection',
+    title: 'Personal & family protection',
+    body: 'Panic, GPS, and monitored safety plans',
+  },
+  {
+    href: '/services#rapid-response',
+    title: 'Armed & rapid response',
+    body: 'Dispatch linked to alerts and sites',
+  },
+  {
+    href: '/services#fleet-recovery',
+    title: 'Fleet & vehicle recovery',
+    body: 'Tracking and recovery workflows',
+  },
+  {
+    href: '/services#cctv-installs',
+    title: 'CCTV, alarms & access',
+    body: 'Site systems built to be monitored',
+  },
+  {
+    href: '/services#training',
+    title: 'Training & readiness',
+    body: 'Practical briefings for households and sites',
   },
   {
     href: '/services#install-services',
-    title: 'Install & repairs',
-    body: 'Fence, gates, access, networking',
+    title: 'Installs & monitoring',
+    body: 'Survey, fit, and control-room handover',
   },
-  {
-    href: '/portals',
-    title: 'Staff portals',
-    body: 'Control room, officers, techs',
-  },
-];
-
-const TRUST = [
-  { label: 'Control room', value: '24/7' },
-  { label: 'Departments', value: `${STORE_DEPARTMENTS.length}+` },
-  { label: 'Install team', value: 'In-house' },
-  { label: 'Supply', value: 'Licensed lines' },
 ];
 
 export default function HomePage() {
   return (
-    <div className="nx-hub">
-      <div className="nx-promo-grid">
-        <Link href="/store" className="nx-promo">
-          <span className="nx-promo-kicker">Nexus Supply</span>
-          <h2>One-stop security catalogue</h2>
-          <p>
-            CCTV, alarms, access control, electric fencing, guard kit, body
-            armour, and licensed equipment — plus install services.
+    <div className="nx-enterprise">
+      <section className="nx-ent-hero" aria-label="4DS Nexus">
+        <div className="nx-ent-hero__media" aria-hidden />
+        <div className="nx-ent-hero__veil" aria-hidden />
+        <div className="nx-ent-hero__inner">
+          <p className="nx-ent-hero__brand">4DS Nexus</p>
+          <h1>Protection and response — one operating standard</h1>
+          <p className="nx-ent-hero__lead">
+            Close protection, private escort, monitoring, and rapid response for
+            homes, executives, and multi-site properties across Gauteng.
           </p>
-          <span className="nx-btn nx-btn--primary nx-btn--sm">Shop catalog</span>
-        </Link>
-        <div className="nx-promo-side">
-          <Link
-            href="/store?category=CCTV"
-            className="nx-promo nx-promo--sm nx-promo--cctv"
-          >
-            <span className="nx-promo-kicker">Largest aisle</span>
-            <h2>CCTV cameras</h2>
-            <p>IP, PTZ, thermal, doorbell — with optional Nexus install.</p>
-          </Link>
-          <Link
-            href="/store?category=PACKAGES"
-            className="nx-promo nx-promo--sm nx-promo--armor"
-          >
-            <span className="nx-promo-kicker">Bundles</span>
-            <h2>Home & site packages</h2>
-            <p>Cameras + alarm + access packages ready to quote.</p>
-          </Link>
-        </div>
-      </div>
-
-      <section className="nx-trust-strip nx-trust-strip--hub" aria-label="Capabilities">
-        {TRUST.map((t) => (
-          <div key={t.label} className="nx-trust-item">
-            <strong>{t.value}</strong>
-            <span>{t.label}</span>
+          <div className="nx-ent-hero__actions">
+            <Link href="/services" className="nx-btn nx-btn--primary nx-btn--lg">
+              Explore services
+            </Link>
+            <Link href="/contact?service=private-escort" className="nx-btn nx-btn--ghost-light nx-btn--lg">
+              Request a quote
+            </Link>
           </div>
+        </div>
+      </section>
+
+      <section className="nx-ent-solutions" aria-label="Featured services">
+        {SOLUTIONS.map((s, i) => (
+          <article
+            key={s.href}
+            className={`nx-ent-story nx-ent-story--${s.tone}${i % 2 === 1 ? ' nx-ent-story--flip' : ''}`}
+          >
+            <div className="nx-ent-story__visual" aria-hidden>
+              <img
+                className="nx-ent-story__img"
+                src={s.image}
+                alt=""
+                loading="lazy"
+                decoding="async"
+              />
+              <span className="nx-ent-story__glow" />
+            </div>
+            <div className="nx-ent-story__copy">
+              <p className="nx-eyebrow">{s.kicker}</p>
+              <h2>{s.title}</h2>
+              <p>{s.body}</p>
+              <Link href={s.href} className="nx-btn nx-btn--primary">
+                {s.cta}
+              </Link>
+            </div>
+          </article>
         ))}
       </section>
 
-      <section>
-        <div className="nx-dept-head">
-          <h2>Shop by department</h2>
-          <Link href="/store">View full catalogue →</Link>
+      <section className="nx-section nx-ent-capabilities">
+        <div className="nx-section-head">
+          <p className="nx-eyebrow">Platform</p>
+          <h2>Core capabilities</h2>
+          <p>
+            From the moment an alert fires — or a detail is booked — apps,
+            officers, and the control room run as one company.
+          </p>
         </div>
-        <div className="nx-dept-grid">
-          {DEPARTMENTS.map((d) => (
-            <Link key={d.href + d.title} href={d.href} className="nx-dept">
-              <span className="nx-dept-icon" aria-hidden>
-                {d.icon}
-              </span>
+        <div className="nx-ent-cap-grid">
+          {CAPABILITIES.map((c) => (
+            <div key={c.title} className="nx-ent-cap">
+              <h3>{c.title}</h3>
+              <p>{c.body}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section className="nx-section nx-ent-catalog">
+        <div className="nx-dept-head">
+          <h2>Browse services</h2>
+          <Link href="/services">View all services →</Link>
+        </div>
+        <div className="nx-ent-cat-grid">
+          {SERVICE_LINKS.map((d) => (
+            <Link key={d.href} href={d.href} className="nx-ent-cat">
               <strong>{d.title}</strong>
               <span>{d.body}</span>
             </Link>
@@ -108,42 +179,22 @@ export default function HomePage() {
         </div>
       </section>
 
-      <FeaturedProducts dense />
+      <div className="nx-ent-dispatch">
+        <SiteDispatchStrip />
+      </div>
 
-      <section className="nx-rail">
-        <div className="nx-rail-head">
-          <div>
-            <h2>Protection & install services</h2>
-            <p>Same company behind the catalogue — apps, response, and installs.</p>
-          </div>
-          <Link href="/services" className="nx-btn nx-btn--outline nx-btn--sm">
-            All services
-          </Link>
-        </div>
-        <div className="nx-quick-services">
-          {QUICK.map((s) => (
-            <Link key={s.href} href={s.href} className="nx-quick-service">
-              <strong>{s.title}</strong>
-              <span>{s.body}</span>
-            </Link>
-          ))}
-        </div>
-      </section>
-
-      <SiteDispatchStrip />
-
-      <section className="nx-band" style={{ borderRadius: 10, margin: 0 }}>
+      <section className="nx-band nx-ent-band">
         <div className="nx-band-inner">
-          <h2>Employee & client portals</h2>
+          <h2>Client &amp; staff access</h2>
           <p>
-            Staff: control room, officer, and technician access. Clients: panic,
-            tracking, and incident history.
+            Subscribers use the protection portal. Operators and officers sign
+            in through staff portals.
           </p>
           <div className="nx-hero-actions">
-            <Link href="/portals" className="nx-btn nx-btn--primary">
+            <Link href="/login" className="nx-btn nx-btn--primary">
               Login
             </Link>
-            <Link href="/contact" className="nx-btn nx-btn--ghost-light">
+            <Link href="/contact?service=private-escort" className="nx-btn nx-btn--ghost-light">
               Request a quote
             </Link>
           </div>

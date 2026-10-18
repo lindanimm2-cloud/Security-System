@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { type ReactNode, useState } from 'react';
+import { type ReactNode, useMemo, useState } from 'react';
 import { UserAvatar } from '@/components/ui/UserAvatar';
 import { ThemeSettings } from '@/components/ThemeSettings';
 import { OpsDialog } from '@/components/ops/OpsDialog';
@@ -39,6 +39,10 @@ export function SettingsHub({
   profile,
   sections,
   footer,
+  desk = false,
+  detail,
+  activeId,
+  onActiveChange,
 }: {
   title?: string;
   lede?: string | null;
@@ -47,9 +51,143 @@ export function SettingsHub({
   profile: SettingsProfile;
   sections: SettingsSection[];
   footer?: ReactNode;
+  /** Ops-settings style: nav column + detail pane */
+  desk?: boolean;
+  detail?: ReactNode;
+  activeId?: string | null;
+  onActiveChange?: (id: string) => void;
 }) {
   const fullName = `${profile.firstName} ${profile.lastName}`.trim() || 'Account';
   const meta = [profile.roleLabel, profile.orgLabel].filter(Boolean).join(' · ');
+
+  const flatItems = useMemo(
+    () => sections.flatMap((section) => section.items),
+    [sections],
+  );
+
+  function selectItem(item: SettingsRow) {
+    onActiveChange?.(item.id);
+    if (!desk) {
+      item.onClick?.();
+    }
+  }
+
+  function renderRow(item: SettingsRow) {
+    const active = desk && activeId === item.id;
+    const inner = (
+      <>
+        <span className="settings-hub__icon" aria-hidden>
+          <NavIcon name={item.icon} />
+        </span>
+        <span className="settings-hub__label">
+          <strong>{item.label}</strong>
+          {item.hint ? <em>{item.hint}</em> : null}
+        </span>
+        {item.trailing ?? (
+          <span className="settings-hub__chevron" aria-hidden>
+            ›
+          </span>
+        )}
+      </>
+    );
+
+    if (desk) {
+      return (
+        <li key={item.id}>
+          <button
+            type="button"
+            className={`settings-hub__row ${active ? 'settings-hub__row--active' : ''}`}
+            aria-current={active ? 'true' : undefined}
+            onClick={() => selectItem(item)}
+          >
+            {inner}
+          </button>
+        </li>
+      );
+    }
+
+    if (item.href) {
+      return (
+        <li key={item.id}>
+          <Link href={item.href} className="settings-hub__row">
+            {inner}
+          </Link>
+        </li>
+      );
+    }
+
+    return (
+      <li key={item.id}>
+        <button type="button" className="settings-hub__row" onClick={item.onClick}>
+          {inner}
+        </button>
+      </li>
+    );
+  }
+
+  const nav = (
+    <>
+      <Link
+        href={profile.profileHref ?? '#'}
+        className="settings-hub__profile"
+        aria-label={`Open profile for ${fullName}`}
+      >
+        <UserAvatar
+          firstName={profile.firstName}
+          lastName={profile.lastName}
+          avatarUrl={profile.avatarUrl}
+          size="lg"
+        />
+        <div className="settings-hub__profile-text">
+          <strong>{fullName}</strong>
+          <span>{meta}</span>
+          <em className="settings-hub__profile-go">View profile</em>
+        </div>
+        <span className="settings-hub__chevron" aria-hidden>
+          ›
+        </span>
+      </Link>
+
+      <div className="settings-hub__sections">
+        {sections.map((section) => (
+          <section key={section.title} className="settings-hub__section">
+            <h2>{section.title}</h2>
+            <ul className="settings-hub__list">{section.items.map(renderRow)}</ul>
+          </section>
+        ))}
+      </div>
+
+      {footer ? <div className="settings-hub__footer">{footer}</div> : null}
+    </>
+  );
+
+  if (desk) {
+    const activeItem = flatItems.find((item) => item.id === activeId) ?? flatItems[0] ?? null;
+    return (
+      <div className="page-content settings-hub settings-hub--desk">
+        <header className="settings-hub__top">
+          {backHref ? (
+            <Link href={backHref} className="settings-hub__back" aria-label={backLabel}>
+              <span aria-hidden>‹</span>
+            </Link>
+          ) : (
+            <span className="settings-hub__back settings-hub__back--spacer" aria-hidden />
+          )}
+          <div className="settings-hub__heading">
+            <h1>{title}</h1>
+            {lede ? <p className="settings-hub__lede">{lede}</p> : null}
+          </div>
+        </header>
+
+        <div className="settings-hub__workspace">
+          <aside className="settings-hub__nav">{nav}</aside>
+          <div className="settings-hub__detail" role="region" aria-label={activeItem?.label ?? 'Settings detail'}>
+            {detail}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="page-content settings-hub">
@@ -97,44 +235,7 @@ export function SettingsHub({
           {sections.map((section) => (
             <section key={section.title} className="settings-hub__section">
               <h2>{section.title}</h2>
-              <ul className="settings-hub__list">
-                {section.items.map((item) => {
-                  const inner = (
-                    <>
-                      <span className="settings-hub__icon" aria-hidden>
-                        <NavIcon name={item.icon} />
-                      </span>
-                      <span className="settings-hub__label">
-                        <strong>{item.label}</strong>
-                        {item.hint ? <em>{item.hint}</em> : null}
-                      </span>
-                      {item.trailing ?? (
-                        <span className="settings-hub__chevron" aria-hidden>
-                          ›
-                        </span>
-                      )}
-                    </>
-                  );
-
-                  if (item.href) {
-                    return (
-                      <li key={item.id}>
-                        <Link href={item.href} className="settings-hub__row">
-                          {inner}
-                        </Link>
-                      </li>
-                    );
-                  }
-
-                  return (
-                    <li key={item.id}>
-                      <button type="button" className="settings-hub__row" onClick={item.onClick}>
-                        {inner}
-                      </button>
-                    </li>
-                  );
-                })}
-              </ul>
+              <ul className="settings-hub__list">{section.items.map(renderRow)}</ul>
             </section>
           ))}
         </div>

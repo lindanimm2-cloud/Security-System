@@ -9,6 +9,7 @@
     "start": "next start --port 3010"
   },
   "dependencies": {
+    "@simplewebauthn/browser": "^14.0.0",
     "leaflet": "^1.9.4",
     "leaflet.markercluster": "^1.5.3",
     "next": "^15.1.2",

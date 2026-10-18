@@ -47,10 +47,11 @@ export function CoverageBadges({
 }) {
   if (!access) return null;
   const items = [
-    { key: 'home', label: 'Home' },
-    { key: 'vehicle', label: 'Vehicle' },
-    { key: 'family', label: 'Family' },
+    { key: 'emergency', label: 'Panic' },
     { key: 'medical', label: 'Medical' },
+    { key: 'vehicle', label: 'VIP / Vehicle' },
+    { key: 'home', label: 'Home' },
+    { key: 'family', label: 'Family' },
   ];
 
   return (

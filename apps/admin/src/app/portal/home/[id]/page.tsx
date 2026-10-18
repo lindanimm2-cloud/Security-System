@@ -12,6 +12,7 @@ import { useSubscriptionAccess } from '@/hooks/useSubscriptionAccess';
 import { useApi } from '@/hooks/useApi';
 import { clientApi, type ApiResponse } from '@/lib/api-client';
 import { PropertyCommandPanel } from '@/components/access/PropertyCommandPanel';
+import { IntercomStationPanel } from '@/components/access/IntercomStationPanel';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { HoldToActivate, OpsPanicIcon, OpsSirenIcon } from '@/components/ops/EmergencyMode';
 import { IncidentTimeline } from '@/components/incident/IncidentTimeline';
@@ -286,6 +287,10 @@ function SiteContent() {
           {site.accessNotes && <p className="text-muted">{site.accessNotes}</p>}
         </section>
       )}
+
+      <section className="portal-card">
+        <IntercomStationPanel mode="portal" propertyId={site.id} allowSimulatePress />
+      </section>
 
       <section className="portal-card prop-cmd-wrap">
         <PropertyCommandPanel mode="portal" propertyId={site.id} propertyType={site.propertyType} />

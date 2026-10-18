@@ -10,6 +10,7 @@ import { useApi } from '@/hooks/useApi';
 import { adminApi, type ApiResponse } from '@/lib/api-client';
 import { dispatchIncidentHref, CONTROL_ROOM_ROUTES } from '@/lib/control-room-routes';
 import { SensorZonePanel, type SensorRow } from '@/components/portal/SensorZonePanel';
+import { SiteMonitoringAdmin } from '@/components/control-room/SiteMonitoringAdmin';
 import { CctvLiveFeed } from '@/components/portal/CctvLiveFeed';
 import { HoldToActivate, OpsDisarmIcon, OpsSirenIcon } from '@/components/ops/EmergencyMode';
 import { alarmStatusLabel, summarizeZones } from '@/lib/sa-alarm';
@@ -24,6 +25,12 @@ type SiteDetail = {
   keyHolder: string | null;
   alarmStatus: string;
   monitoringEnabled: boolean;
+  checkInHours?: number | null;
+  lastCheckInAt?: string | null;
+  monitoringSchedule?: {
+    toleranceMinutes?: number;
+    days?: Record<string, { open?: string; close?: string }>;
+  } | null;
   privacy?: {
     shareInteriorCameras: boolean;
     interiorUnlocked: boolean;
@@ -421,10 +428,10 @@ function SiteContent() {
       </section>
 
       {/* Sensors */}
-      <section className="portal-card">
+      <section className="portal-card sz-section">
         <div className="card-header-row">
           <div className="site-detail__card-head">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden><circle cx="12" cy="12" r="3"/><path d="M5 12H3M21 12h-2M12 5V3M12 21v-2M7.05 7.05 5.636 5.636M18.364 18.364l-1.414-1.414M7.05 16.95l-1.414 1.414M18.364 5.636l-1.414 1.414"/></svg>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden><path d="M12 3 4 7.5v9L12 21l8-4.5v-9L12 3z"/><path d="M12 12v9M4 7.5l8 4.5 8-4.5"/></svg>
             <h2>Zones &amp; sensors</h2>
           </div>
           {(() => {
@@ -459,6 +466,14 @@ function SiteContent() {
           onUpdated={reload}
         />
       </section>
+
+      <SiteMonitoringAdmin
+        siteId={site.id}
+        sensors={site.sensors ?? []}
+        checkInHours={site.checkInHours}
+        monitoringSchedule={site.monitoringSchedule}
+        onUpdated={reload}
+      />
 
       {/* Alarm events */}
       <section className="portal-card">
