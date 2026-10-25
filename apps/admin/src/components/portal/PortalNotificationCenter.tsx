@@ -23,7 +23,7 @@ type NotificationData = {
   unreadCount: number;
 };
 
-export function PortalNotificationCenter() {
+export function PortalNotificationCenter({ bellId }: { bellId?: string } = {}) {
   const { data, reload } = useApi(
     () => clientApi.get<ApiResponse<NotificationData>>('/client/notifications'),
     [],
@@ -250,6 +250,7 @@ export function PortalNotificationCenter() {
     <div className="notification-center notification-center--portal" ref={rootRef}>
       <button
         type="button"
+        id={bellId}
         className="notification-bell notification-bell--portal"
         onClick={() => setOpen((v) => !v)}
         aria-label="Your notifications"

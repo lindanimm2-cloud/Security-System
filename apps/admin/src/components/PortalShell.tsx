@@ -1,10 +1,8 @@
 'use client';
 
-import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 import { AuthSession, clearSession } from '@/lib/auth';
-import { NavIcon } from '@/components/nav/NavIcon';
 import { filterPortalNav, portalMobileNav, portalPathRequiresAccess } from '@/lib/portal-nav';
 import { useSubscriptionAccess } from '@/hooks/useSubscriptionAccess';
 import { PortalNotificationCenter } from './portal/PortalNotificationCenter';
@@ -16,16 +14,14 @@ import { BrandMark } from './BrandMark';
 import { ThemeToggle } from './ThemeToggle';
 import { MobileBottomNav } from './nav/MobileBottomNav';
 import { clientApi } from '@/lib/api-client';
-import { useSidebarCollapsed } from '@/hooks/useSidebarCollapsed';
 import { useActionHandoff } from '@/hooks/useActionHandoff';
 import { getOrCreateLocalDeviceId } from '@/lib/device-security';
-import { navHrefIsActive } from '@/lib/nav-active';
 import { jobKickerForEngagementKind, shouldShowPortalWelcome } from '@/lib/temp-engagements';
-import { SidebarCollapseButton, SidebarWebsiteLink, SignOutIcon } from '@/components/nav/SidebarCollapseButton';
 import { FloatingSupportDock } from './FloatingSupportDock';
 import { ShellRouteActions } from './nav/ShellRouteActions';
 import { PortalAmbientProvider, usePortalAmbient } from './portal/PortalAmbientProvider';
 import { PortalHomeStatusLight } from './portal/PortalHomeStatusLight';
+import { PortalOpsRail } from './portal/PortalOpsRail';
 
 export function PortalShell({
   session,
@@ -51,8 +47,8 @@ function PortalShellInner({
   const { ambient } = usePortalAmbient();
   const router = useRouter();
   const pathname = usePathname();
-  const [menuOpen, setMenuOpen] = useState(false);
-  const { collapsed, toggle, setCollapsed } = useSidebarCollapsed();
+  const [moreOpen, setMoreOpen] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const handoff = useActionHandoff();
   const { access, loading: accessLoading, tierCode, engagement, jobOnly } = useSubscriptionAccess();
   const jobMode = Boolean(engagement);
@@ -65,6 +61,7 @@ function PortalShellInner({
     pathname === '/portal/emergency';
   const showSilentFab =
     !hasPanicConsole && /^\/portal\/security(?:\/|$)/.test(pathname);
+
   const navSections = useMemo(() => {
     const sections = filterPortalNav(access, accessLoading, undefined, { jobOnly });
     if (tierCode !== 'PREMIUM') return sections;
@@ -94,12 +91,9 @@ function PortalShellInner({
   }, [access, accessLoading, pathname, router]);
 
   useEffect(() => {
-    setMenuOpen(false);
+    setMoreOpen(false);
+    setMobileMenuOpen(false);
   }, [pathname]);
-
-  useEffect(() => {
-    if (jobMode) setCollapsed(true);
-  }, [jobMode, setCollapsed]);
 
   useEffect(() => {
     if (!jobMode) return;
@@ -117,18 +111,13 @@ function PortalShellInner({
   }, []);
 
   useEffect(() => {
-    document.body.style.overflow = menuOpen ? 'hidden' : '';
-    document.documentElement.style.overflow = menuOpen ? 'hidden' : '';
+    document.body.style.overflow = moreOpen || mobileMenuOpen ? 'hidden' : '';
+    document.documentElement.style.overflow = moreOpen || mobileMenuOpen ? 'hidden' : '';
     return () => {
       document.body.style.overflow = '';
       document.documentElement.style.overflow = '';
     };
-  }, [menuOpen]);
-
-  useEffect(() => {
-    document.body.style.overflow = '';
-    document.documentElement.style.overflow = '';
-  }, []);
+  }, [moreOpen, mobileMenuOpen]);
 
   function logout() {
     handoff.begin('sign-out', () => {
@@ -137,165 +126,124 @@ function PortalShellInner({
     });
   }
 
-  const navHrefs = useMemo(
-    () => navSections.flatMap((section) => section.items.map((item) => item.href)),
-    [navSections],
-  );
-
-  function isActive(href: string, exact?: boolean) {
-    return navHrefIsActive(pathname, href, exact, navHrefs);
+  function openNotifications() {
+    const bell =
+      document.getElementById('portal-notification-bell') ??
+      document.getElementById('portal-notification-bell-mobile');
+    bell?.click();
   }
+
+  const title =
+    jobMode && engagement
+      ? `${jobKickerForEngagementKind(engagement.kind)} desk`
+      : 'Protection Dashboard';
 
   return (
     <>
       {handoff.overlay}
-    <div
-      className={`shell shell--portal shell--ops shell--with-bottom-nav${jobMode ? ' shell--portal-ops' : ''}`}
-      data-portal-ambient={ambient}
-      data-job-mode={jobMode ? '1' : undefined}
-    >
-      <header className="mobile-shell-header mobile-shell-header--portal">
-        <button
-          type="button"
-          className="menu-toggle"
-          onClick={() => setMenuOpen((open) => !open)}
-          aria-expanded={menuOpen}
-          aria-label={menuOpen ? 'Close menu' : 'Open menu'}
-        >
-          <span className={`menu-toggle-icon ${menuOpen ? 'menu-toggle-icon--open' : ''}`} />
-        </button>
-        <BrandMark variant="portal" compact showProduct={false} />
-        <h1 className="mobile-shell-header__title">
-          {jobMode && engagement ? jobKickerForEngagementKind(engagement.kind) : '4DS Protect'}
-        </h1>
-        <div className="mobile-topbar-actions">
-          <ShellRouteActions homeHref="/portal" compact />
-          {jobOnly ? null : <PortalHomeStatusLight compact />}
-          <ThemeToggle className="theme-toggle--compact" />
-          <PortalNotificationCenter />
-        </div>
-      </header>
-
-      {menuOpen && (
-        <button
-          type="button"
-          className="sidebar-overlay"
-          aria-label="Close menu"
-          onClick={() => setMenuOpen(false)}
-        />
-      )}
-
-      <aside
-        className={`portal-sidebar ${menuOpen ? 'portal-sidebar--open' : ''} ${collapsed ? 'sidebar--collapsed' : ''}`}
+      <div
+        className="shell shell--portal shell--ops shell--portal-ops shell--with-bottom-nav"
+        data-portal-ambient={ambient}
+        data-job-mode={jobMode ? '1' : undefined}
       >
-        <div className="portal-sidebar-brand">
-          <SidebarCollapseButton collapsed={collapsed} onClick={toggle} />
-        </div>
-        <nav className="portal-sidebar-nav">
-          {navSections.map((section) => (
-            <div key={section.title} className="portal-nav-section">
-              <span className="portal-nav-section-title">
-                <NavIcon name={section.icon} size={14} className="nav-icon--section" />
-                {section.title}
-              </span>
-              {section.items.map((item) => (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  data-tip={item.label}
-                  aria-label={item.label}
-                  className={`portal-sidebar-link ${isActive(item.href, item.exact) ? 'portal-sidebar-link--active' : ''}`}
-                >
-                  <span className="sidebar-link__icon">
-                    <NavIcon name={item.icon} size={collapsed ? 20 : 18} />
-                  </span>
-                  <span className="sidebar-link__label">{item.label}</span>
-                </Link>
-              ))}
-            </div>
-          ))}
-        </nav>
-        <div className="portal-sidebar-footer">
-          <div className="portal-sidebar-user sidebar-user-copy">
-            {session.user.firstName} {session.user.lastName}
-          </div>
-          <Link
-            href="/org"
-            className="btn-ghost btn-ghost--full sidebar-signout sidebar-website"
-            title="Organization portal"
-            aria-label="Organization portal"
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
-              <path
-                d="M4 20.5V9.2L12 5l8 4.2v11.3"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-              <path
-                d="M9.5 20.5v-5h5v5"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-            <span>Organization</span>
-          </Link>
-          <SidebarWebsiteLink />
+        <header className="mobile-shell-header mobile-shell-header--portal">
           <button
             type="button"
-            className="btn-ghost btn-ghost--full sidebar-signout"
-            onClick={logout}
-            title="Sign out"
-            aria-label="Sign out"
+            className="menu-toggle"
+            onClick={() => {
+              setMobileMenuOpen((open) => {
+                const next = !open;
+                if (!next) setMoreOpen(false);
+                return next;
+              });
+            }}
+            aria-expanded={mobileMenuOpen}
+            aria-label={mobileMenuOpen ? 'Close menu' : 'Open menu'}
           >
-            <SignOutIcon />
-            <span>Sign out</span>
+            <span className={`menu-toggle-icon ${mobileMenuOpen ? 'menu-toggle-icon--open' : ''}`} />
           </button>
-        </div>
-      </aside>
-
-      <div className="shell-main portal-shell-main">
-        <header className="topbar topbar--portal">
-          <div className="topbar-brand">
-            <BrandMark variant="portal" compact showProduct={false} href={false} />
-            <div>
-              <h1>
-                {jobMode && engagement
-                  ? `${jobKickerForEngagementKind(engagement.kind)} desk`
-                  : 'Protection Dashboard'}
-              </h1>
-              <p>
-                {session.user.firstName} {session.user.lastName} ·{' '}
-                {session.user.tenant?.name ?? '4DS Protection'}
-              </p>
-            </div>
-          </div>
-          <div className="topbar-actions">
-            <ShellRouteActions homeHref="/portal" />
-            <PortalNavClock />
+          <BrandMark variant="portal" compact showProduct={false} />
+          <h1 className="mobile-shell-header__title">
+            {jobMode && engagement ? jobKickerForEngagementKind(engagement.kind) : '4DS Protect'}
+          </h1>
+          <div className="mobile-topbar-actions">
+            <ShellRouteActions homeHref="/portal" compact />
+            {jobOnly ? null : <PortalHomeStatusLight compact />}
             <ThemeToggle className="theme-toggle--compact" />
-            {jobOnly ? null : <PortalHomeStatusLight />}
-            <PortalProtectionBadge />
-            <PortalNotificationCenter />
+            <PortalNotificationCenter bellId="portal-notification-bell-mobile" />
           </div>
         </header>
-        <main className="portal-main portal-main--with-sidebar portal-main--with-call-bar">
-          <PortalPermissionsBanner />
-          {children}
-        </main>
-      </div>
 
-      {!hideQuickActions && (
-        <div className="portal-floating-actions" aria-label="Portal quick actions">
-          <FloatingSupportDock chatHref="/portal/chat" className="support-fab-dock--inline" />
-          {!showSilentFab ? null : <MiniCallSafetyBar variant="docked" />}
+        {(moreOpen || mobileMenuOpen) && (
+          <button
+            type="button"
+            className="portal-rail-scrim"
+            aria-label="Close menu"
+            onClick={() => {
+              setMoreOpen(false);
+              setMobileMenuOpen(false);
+            }}
+          />
+        )}
+
+        <PortalOpsRail
+          sections={navSections}
+          pathname={pathname}
+          expanded={moreOpen}
+          mobileOpen={mobileMenuOpen}
+          onToggle={() => {
+            setMoreOpen((open) => {
+              const next = !open;
+              if (next) setMobileMenuOpen(true);
+              return next;
+            });
+          }}
+          jobOnly={jobOnly}
+          onNotifications={openNotifications}
+          onSignOut={logout}
+          onNavigate={() => {
+            setMoreOpen(false);
+            setMobileMenuOpen(false);
+          }}
+        />
+
+        <div className="shell-main portal-shell-main portal-shell-main--rail">
+          <header className="topbar topbar--portal">
+            <div className="topbar-brand">
+              <BrandMark variant="portal" compact showProduct={false} href={false} />
+              <div>
+                <h1>{title}</h1>
+                <p>
+                  {session.user.firstName} {session.user.lastName} ·{' '}
+                  {session.user.tenant?.name ?? '4DS Protection'}
+                </p>
+              </div>
+            </div>
+            <div className="topbar-actions">
+              <ShellRouteActions homeHref="/portal" />
+              <PortalNavClock />
+              <ThemeToggle className="theme-toggle--compact" />
+              {jobOnly ? null : <PortalHomeStatusLight />}
+              <PortalProtectionBadge />
+              <span className="portal-topbar-notify">
+                <PortalNotificationCenter bellId="portal-notification-bell" />
+              </span>
+            </div>
+          </header>
+          <main className="portal-main portal-main--with-sidebar portal-main--with-call-bar">
+            <PortalPermissionsBanner />
+            {children}
+          </main>
         </div>
-      )}
-      <MobileBottomNav items={mobileNavItems} ariaLabel="Client Portal" />
-    </div>
+
+        {!hideQuickActions && (
+          <div className="portal-floating-actions" aria-label="Portal quick actions">
+            <FloatingSupportDock chatHref="/portal/chat" className="support-fab-dock--inline" />
+            {!showSilentFab ? null : <MiniCallSafetyBar variant="docked" />}
+          </div>
+        )}
+        <MobileBottomNav items={mobileNavItems} ariaLabel="Client Portal" />
+      </div>
     </>
   );
 }

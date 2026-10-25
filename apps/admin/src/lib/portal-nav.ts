@@ -1,4 +1,5 @@
 import type { NavIconName } from '@/components/nav/NavIcon';
+import { navHrefIsActive } from '@/lib/nav-active';
 import type { AddonCode, AccessMap } from './subscription-plans';
 
 export type PortalNavItem = {
@@ -213,4 +214,108 @@ export function portalMobileNav(
       requiresAccess: item.requiresAccess,
     }))
     .slice(0, 5);
+}
+
+export type PortalRailDockItem = {
+  id: string;
+  href: string;
+  label: string;
+  icon: NavIconName;
+  exact?: boolean;
+};
+
+/** Icon-rail primary dock (control-room style). Everything else lives in More. */
+export function portalRailDock(
+  sections: PortalNavSection[],
+  options?: { jobOnly?: boolean },
+): PortalRailDockItem[] {
+  const flat = sections.flatMap((section) => section.items);
+  const byHref = (href: string) => flat.find((item) => item.href === href);
+
+  if (options?.jobOnly) {
+    return [
+      byHref('/portal') && {
+        id: 'dashboard',
+        href: '/portal',
+        label: 'Dashboard',
+        icon: 'dashboard' as NavIconName,
+        exact: true,
+      },
+      byHref('/portal/protect') && {
+        id: 'protect',
+        href: '/portal/protect',
+        label: 'Protect',
+        icon: 'emergency' as NavIconName,
+      },
+      byHref('/portal/chat') && {
+        id: 'chat',
+        href: '/portal/chat',
+        label: 'Chat',
+        icon: 'dispatch-chat' as NavIconName,
+      },
+      byHref('/portal/contacts') && {
+        id: 'contacts',
+        href: '/portal/contacts',
+        label: 'Contacts',
+        icon: 'contacts' as NavIconName,
+      },
+    ].filter(Boolean) as PortalRailDockItem[];
+  }
+
+  return [
+    byHref('/portal') && {
+      id: 'dashboard',
+      href: '/portal',
+      label: 'Dashboard',
+      icon: 'dashboard' as NavIconName,
+      exact: true,
+    },
+    byHref('/portal/protect') && {
+      id: 'protect',
+      href: '/portal/protect',
+      label: 'Protect',
+      icon: 'emergency' as NavIconName,
+    },
+    byHref('/portal/chat') && {
+      id: 'chat',
+      href: '/portal/chat',
+      label: 'Chat',
+      icon: 'dispatch-chat' as NavIconName,
+    },
+    byHref('/portal/home') && {
+      id: 'home',
+      href: '/portal/home',
+      label: 'Home',
+      icon: 'home' as NavIconName,
+    },
+    byHref('/portal/family') && {
+      id: 'family',
+      href: '/portal/family',
+      label: 'Family',
+      icon: 'family' as NavIconName,
+    },
+    byHref('/portal/vehicles') && {
+      id: 'vehicle',
+      href: '/portal/vehicles',
+      label: 'Vehicles',
+      icon: 'vehicle' as NavIconName,
+    },
+  ]
+    .filter(Boolean)
+    .slice(0, 5) as PortalRailDockItem[];
+}
+
+export function portalRailMoreActive(
+  sections: PortalNavSection[],
+  pathname: string,
+  dock: PortalRailDockItem[],
+): boolean {
+  const dockHrefs = new Set(dock.map((item) => item.href));
+  const candidates = sections.flatMap((section) => section.items.map((item) => item.href));
+  return sections.some((section) =>
+    section.items.some((item) => {
+      if (dockHrefs.has(item.href)) return false;
+      return navHrefIsActive(pathname, item.href, item.exact, candidates);
+    }),
+  );
 }
