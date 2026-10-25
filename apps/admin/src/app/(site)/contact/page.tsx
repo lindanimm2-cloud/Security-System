@@ -5,6 +5,7 @@ import { useSearchParams } from 'next/navigation';
 import { Suspense } from 'react';
 import { SiteDispatchStrip } from '@/components/site/SiteDispatchStrip';
 import { ServiceRequestForm } from '@/components/site/ServiceRequestForm';
+import { CONTROL_ROOM_LINE } from '@/lib/control-room-line';
 
 function ContactFormPanel() {
   const searchParams = useSearchParams();
@@ -41,7 +42,9 @@ export default function ContactPage() {
             </div>
             <div>
               <dt>Phone</dt>
-              <dd>+27 11 100 4400</dd>
+              <dd>
+                <a href={`tel:${CONTROL_ROOM_LINE.phone}`}>{CONTROL_ROOM_LINE.display}</a>
+              </dd>
             </div>
             <div>
               <dt>HQ</dt>

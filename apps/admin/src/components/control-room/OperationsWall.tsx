@@ -144,6 +144,7 @@ export function OperationsWall() {
 
   useEffect(() => {
     setPage(0);
+    setSelectedFeed(null);
   }, [layout, desk.propertyId, desk.query]);
 
   const incidents = useMemo(() => {

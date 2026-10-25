@@ -15,6 +15,7 @@ import { clientApi, type ApiResponse } from '@/lib/api-client';
 import { OpsDialog } from '@/components/ops/OpsDialog';
 import { OpsMenuDropdown } from '@/components/ops/OpsMenuDropdown';
 import { PhoneWithCountryField } from '@/components/ui/PhoneWithCountryField';
+import { CONTROL_ROOM_LINE } from '@/lib/control-room-line';
 import {
   DEFAULT_PHONE_COUNTRY,
   formatInternationalPhone,
@@ -122,7 +123,10 @@ function ContactsContent() {
   if (loading) return <LoadingSpinner label="Loading contacts..." fullScreen />;
   if (error) return <ErrorAlert error={error} onRetry={reload} />;
 
-  const dispatch = data!.meta?.dispatchLine ?? { name: '4DS Control Room', phone: '+27111004400' };
+  const dispatch = data!.meta?.dispatchLine ?? {
+    name: CONTROL_ROOM_LINE.name,
+    phone: CONTROL_ROOM_LINE.phone,
+  };
   const personal = (data!.data ?? []).filter((c) => !isSystemDispatch(c));
   const verifiedCount = personal.filter((c) => c.verifiedAt).length;
 

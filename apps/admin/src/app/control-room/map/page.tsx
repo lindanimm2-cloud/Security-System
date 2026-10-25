@@ -65,6 +65,7 @@ import { setActiveIncidentId } from '@/lib/dispatch-context';
 import { maskMapDataForScreenshot } from '@/lib/map-screenshot';
 import { DispatchMenuButton } from '@/components/control-room/DispatchMenuButton';
 import { IncidentDetailsMenu } from '@/components/control-room/IncidentDetailsMenu';
+import { CONTROL_ROOM_LINE } from '@/lib/control-room-line';
 import { CONTROL_ROOM_ROUTES } from '@/lib/control-room-routes';
 import { getSocketUrl } from '@/lib/socket';
 import { isDemoMode, shouldBackgroundPoll } from '@/lib/demo/is-demo-mode';
@@ -448,7 +449,7 @@ function MapContent() {
           </div>
         </div>
         <div className="command-centre__toolbar-right">
-          <DispatchLineButton phone="+27111004400" name="4DS Dispatch" />
+          <DispatchLineButton phone={CONTROL_ROOM_LINE.phone} name={CONTROL_ROOM_LINE.name} />
           <div className="command-actions--desktop">
             <button
               type="button"

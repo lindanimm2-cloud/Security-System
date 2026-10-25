@@ -4,8 +4,10 @@ import { useState } from 'react';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { useCallsOptional } from '@/components/calls/CallProvider';
 import { friendlyErrorMessage } from '@/lib/friendly-error';
-import { CONTROL_ROOM_LINE } from '@/lib/control-room-line';
+import { CONTROL_ROOM_LINE, formatZaPhone } from '@/lib/control-room-line';
 import type { CallChannel } from '@/types/calls';
+
+export { formatZaPhone } from '@/lib/control-room-line';
 
 type Props = {
   name: string;
@@ -16,17 +18,6 @@ type Props = {
   size?: 'sm' | 'lg';
   className?: string;
 };
-
-export function formatZaPhone(phone: string) {
-  const digits = phone.replace(/\D/g, '');
-  if (digits.startsWith('27') && digits.length >= 11) {
-    const rest = digits.slice(2);
-    if (rest.length === 9) {
-      return `+27 ${rest.slice(0, 2)} ${rest.slice(2, 5)} ${rest.slice(5)}`;
-    }
-  }
-  return phone;
-}
 
 function isDispatchContact(
   name: string,
@@ -111,9 +102,9 @@ export function EmergencyDispatchCallCard({
   name?: string;
 }) {
   return (
-    <section className="ec-dispatch" aria-label="4DS Control Room">
+    <section className="ec-dispatch" aria-label={name}>
       <div className="ec-dispatch__top">
-        <p className="ec-kicker">4DS Control Room</p>
+        <p className="ec-kicker">{name}</p>
         <span className="ec-online">
           <span className="ec-dot" aria-hidden />
           Online · 24/7 response

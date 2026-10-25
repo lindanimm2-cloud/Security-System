@@ -298,6 +298,17 @@ body:has(.ops-console) {
   min-width: 0;
 }
 
+/* Keep "All …" pinned so you can always jump back to the full wall */
+.ops-property__menu > .ops-property__pin {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  margin: -6px -6px 2px;
+  padding: 6px 6px 4px;
+  background: #1a1a1a;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
 .ops-property__menu::-webkit-scrollbar {
   width: 6px;
 }
@@ -305,6 +316,11 @@ body:has(.ops-console) {
 .ops-property__menu::-webkit-scrollbar-thumb {
   background: rgba(255, 255, 255, 0.16);
   border-radius: 6px;
+}
+
+html[data-theme='light'] .ops-property__menu > .ops-property__pin {
+  background: #ffffff;
+  box-shadow: 0 1px 0 rgba(23, 33, 43, 0.1);
 }
 
 .ops-health {

@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { CONTROL_ROOM_LINE } from '@/lib/control-room-line';
 
 export function SiteFooter() {
   return (
@@ -65,7 +66,7 @@ export function SiteFooter() {
               <a href="mailto:hello@4dsnexus.co.za">hello@4dsnexus.co.za</a>
             </li>
             <li>
-              <span>+27 11 100 4400</span>
+              <a href={`tel:${CONTROL_ROOM_LINE.phone}`}>{CONTROL_ROOM_LINE.display}</a>
             </li>
           </ul>
         </div>

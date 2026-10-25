@@ -1,4 +1,5 @@
 import type { AuthPortal, AuthSession } from '../auth';
+import { CONTROL_ROOM_LINE } from '../control-room-line';
 import {
   DEMO_DEV_TICKET_EVENT,
   DEMO_ERROR_REPORTS_KEY,
@@ -3700,7 +3701,9 @@ export async function handleDemoRequest<T>({
     return {
       success: true,
       data: demoContacts,
-      meta: { dispatchLine: { name: '4DS Control Room', phone: '+27111004400' } },
+      meta: {
+        dispatchLine: { name: CONTROL_ROOM_LINE.name, phone: CONTROL_ROOM_LINE.phone },
+      },
     } as T;
   }
   if (clean === '/client/subscription/access' && m === 'GET') {
@@ -6378,7 +6381,7 @@ export async function handleDemoRequest<T>({
   }
   if (clean === '/calls/directory' && m === 'GET') {
     return ok({
-      dispatchLine: { name: '4DS Control Room', phone: '+27111004400' },
+      dispatchLine: { name: CONTROL_ROOM_LINE.name, phone: CONTROL_ROOM_LINE.phone },
       officers: [
         {
           officerId: 'demo-off-1',

@@ -2,6 +2,7 @@ import {
   MEDICAL_PROFILE_CONSENT_NOTICE,
   NATIVE_SOS_DISCLAIMER,
 } from '@/lib/device-security';
+import { CONTROL_ROOM_LINE } from '@/lib/control-room-line';
 
 /** Public URL of the legal instrument. Must stay outside any auth-gated route group. */
 export const PUBLIC_LEGAL_PATH = '/legal';
@@ -11,7 +12,7 @@ export const LEGAL_DOC_ID = 'PP-EMERG-01';
 export const LEGAL_CONTACT = {
   company: '4DS Nexus',
   email: 'hello@4dsnexus.co.za',
-  phone: '+27 11 100 4400',
+  phone: CONTROL_ROOM_LINE.display,
 };
 
 export const SERVICE_TERMS_CLAUSES = [

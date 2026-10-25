@@ -3,16 +3,16 @@ import { CONTROL_ROOM_LINE } from '@/lib/control-room-line';
 
 export function SiteDispatchStrip() {
   return (
-    <section className="nx-dispatch" aria-label="4DS Control Room">
+    <section className="nx-dispatch" aria-label={CONTROL_ROOM_LINE.name}>
       <div className="nx-dispatch__top">
-        <p className="nx-dispatch__kicker">4DS Control Room</p>
+        <p className="nx-dispatch__kicker">{CONTROL_ROOM_LINE.name}</p>
         <span className="nx-dispatch__live">
           <span className="nx-dispatch__dot" aria-hidden />
           Online · 24/7 response
         </span>
       </div>
       <h2>24/7 security response</h2>
-      <p className="nx-dispatch__phone">+27 11 100 4400</p>
+      <p className="nx-dispatch__phone">{CONTROL_ROOM_LINE.display}</p>
       <a href={`tel:${CONTROL_ROOM_LINE.phone}`} className="nx-dispatch__cta">
         Call Control Room
       </a>

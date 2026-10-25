@@ -5,7 +5,6 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { ThemeToggle } from '@/components/ThemeToggle';
-import { useSiteClient } from './SiteClientProvider';
 
 const NAV = [
   { href: '/', label: 'Home' },
@@ -17,7 +16,6 @@ const NAV = [
 
 export function SiteHeader() {
   const pathname = usePathname();
-  const { ready, session, fullName } = useSiteClient();
   const [open, setOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
 
@@ -82,19 +80,6 @@ export function SiteHeader() {
                 </Link>
               );
             })}
-            <Link
-              href="/portal/login"
-              className={
-                pathname.startsWith('/portal')
-                  ? 'nx-nav-link nx-nav-link--active'
-                  : 'nx-nav-link'
-              }
-              onClick={() => setOpen(false)}
-            >
-              {ready && session
-                ? fullName?.split(' ')[0] || 'Portal'
-                : 'Client portal'}
-            </Link>
           </nav>
 
           <div className="nx-header-actions">

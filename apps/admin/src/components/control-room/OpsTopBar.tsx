@@ -67,8 +67,22 @@ export function OpsTopBar({
     selectedPropertyId === 'all'
       ? null
       : (desk.properties.find((site) => site.id === selectedPropertyId) ?? null);
-  const propertyLabel = onVehicleScope ? 'All properties' : property?.name ?? 'All properties';
+  const propertyLabel = onVehicleScope
+    ? 'Properties'
+    : property?.name ?? 'All properties';
   const health = propertyHealth(desk.properties, onVehicleScope ? 'all' : selectedPropertyId);
+
+  function choosePropertyScope(id: string) {
+    desk.setPropertyId(id);
+    setPropertyOpen(false);
+    setDashcamOpen(false);
+  }
+
+  function chooseDashcamScope(id: string) {
+    desk.setPropertyId(id);
+    setDashcamOpen(false);
+    setPropertyOpen(false);
+  }
 
   const dashcamVehicles = useMemo(
     () => desk.vehicles.filter((vehicle) => (vehicle.cameras?.length ?? 0) > 0),
@@ -171,15 +185,16 @@ export function OpsTopBar({
           </button>
           {propertyOpen ? (
             <ul className="ops-property__menu" role="listbox" aria-label="Properties">
-              <li role="presentation">
+              <li className="ops-property__pin" role="presentation">
                 <button
                   type="button"
                   role="option"
                   aria-selected={!onVehicleScope && selectedPropertyId === 'all'}
                   className={!onVehicleScope && selectedPropertyId === 'all' ? 'is-on' : ''}
-                  onClick={() => {
-                    desk.setPropertyId('all');
-                    setPropertyOpen(false);
+                  onMouseDown={(event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    choosePropertyScope('all');
                   }}
                 >
                   <strong>All properties</strong>
@@ -193,9 +208,10 @@ export function OpsTopBar({
                     role="option"
                     aria-selected={!onVehicleScope && selectedPropertyId === site.id}
                     className={!onVehicleScope && selectedPropertyId === site.id ? 'is-on' : ''}
-                    onClick={() => {
-                      desk.setPropertyId(site.id);
-                      setPropertyOpen(false);
+                    onMouseDown={(event) => {
+                      event.preventDefault();
+                      event.stopPropagation();
+                      choosePropertyScope(site.id);
                     }}
                   >
                     <strong>{site.name}</strong>
@@ -241,15 +257,16 @@ export function OpsTopBar({
           </button>
           {dashcamOpen ? (
             <ul className="ops-property__menu ops-dashcam__menu" role="listbox" aria-label="Dashcams">
-              <li role="presentation">
+              <li className="ops-property__pin" role="presentation">
                 <button
                   type="button"
                   role="option"
                   aria-selected={desk.propertyId === OPS_ALL_DASHCAMS_SCOPE}
                   className={desk.propertyId === OPS_ALL_DASHCAMS_SCOPE ? 'is-on' : ''}
-                  onClick={() => {
-                    desk.setPropertyId(OPS_ALL_DASHCAMS_SCOPE);
-                    setDashcamOpen(false);
+                  onMouseDown={(event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    chooseDashcamScope(OPS_ALL_DASHCAMS_SCOPE);
                   }}
                 >
                   <strong>All dashcams</strong>
@@ -274,9 +291,10 @@ export function OpsTopBar({
                         role="option"
                         aria-selected={selected}
                         className={selected ? 'is-on' : ''}
-                        onClick={() => {
-                          desk.setPropertyId(opsVehicleScopeId(vehicle.id));
-                          setDashcamOpen(false);
+                        onMouseDown={(event) => {
+                          event.preventDefault();
+                          event.stopPropagation();
+                          chooseDashcamScope(opsVehicleScopeId(vehicle.id));
                         }}
                       >
                         <strong>{vehicle.callSign || vehicle.registration || 'Vehicle'}</strong>
