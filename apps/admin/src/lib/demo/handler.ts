@@ -172,7 +172,7 @@ const officerDispatches: OfficerDispatch[] = [
       client: 'Demo Client',
       phone: '+27821234567',
       lat: -29.728,
-      lng: 31.085,
+      lng: 31.078,
     },
   },
   {
@@ -966,11 +966,15 @@ function officerFullName(id: string) {
   return o ? `${o.firstName} ${o.lastName}` : 'Officer';
 }
 
+/** Inland approach polyline — biased west so coastal endpoints never draw across the bay. */
 function mapTrail(lat: number, lng: number) {
-  return Array.from({ length: 8 }, (_, i) => ({
-    lat: lat - (7 - i) * 0.0022,
-    lng: lng - (7 - i) * 0.0014,
-  }));
+  return Array.from({ length: 8 }, (_, i) => {
+    const t = (7 - i) / 7;
+    return {
+      lat: lat - t * 0.016,
+      lng: lng - t * 0.024,
+    };
+  });
 }
 
 function demoDashCams(id: string, callSign: string, live: boolean) {
@@ -1030,7 +1034,7 @@ function writeRevenueFlag(enabled: boolean) {
   }
 }
 
-let demoClientLocation = { lat: -29.7267, lng: 31.0857 };
+let demoClientLocation = { lat: -29.728, lng: 31.078 };
 
 let demoFamilyMessagingEnabled = true;
 function demoFamilyEligible() {
@@ -1076,8 +1080,9 @@ let demoVehicleState = {
   immobiliserOn: false,
   doorsLocked: true,
   trackingMode: 'THEFT_RECOVERY' as 'OFF' | 'TRACKER' | 'PHONE' | 'THEFT_RECOVERY',
-  lat: -29.81,
-  lng: 31.04,
+  // Inland of the Bluff / south Durban corridor — not over the Bay of Natal.
+  lat: -29.875,
+  lng: 30.985,
 };
 
 let demoVehiclePanicId: string | null = null;
@@ -1353,7 +1358,7 @@ let demoMedical = {
 };
 
 const demoSafeZones = [
-  { id: 'demo-zone-1', name: 'Home — Umhlanga', lat: '-29.7267', lng: '31.0857', radiusM: 400 },
+  { id: 'demo-zone-1', name: 'Home — Umhlanga', lat: '-29.728', lng: '31.078', radiusM: 400 },
   { id: 'demo-zone-2', name: 'School drop-off', lat: '-29.8488', lng: '31.0099', radiusM: 250 },
   { id: 'demo-zone-3', name: 'Warehouse — Prospecton', lat: '-29.978', lng: '30.955', radiusM: 600 },
   { id: 'demo-zone-4', name: 'Gateway retail', lat: '-29.726', lng: '31.067', radiusM: 350 },
@@ -6214,10 +6219,15 @@ export async function handleDemoRequest<T>({
   }
 
   if (clean === '/control-room/map' && m === 'GET') {
+    // Land-safe pins only — never walk longitude east into the Bay of Natal.
     const incidentCoords: Record<string, { lat: number; lng: number }> = {
-      'demo-inc-1': { lat: -29.728, lng: 31.085 },
-      'demo-inc-2': { lat: DURBAN.lat + 0.01, lng: DURBAN.lng + 0.008 },
-      'demo-inc-3': { lat: demoVehicleState.lat, lng: demoVehicleState.lng },
+      'demo-inc-1': { lat: -29.728, lng: 31.078 }, // Umhlanga Rocks Dr (inland of lagoon)
+      'demo-inc-2': { lat: -29.86, lng: 30.99 }, // Glenwood
+      'demo-inc-3': { lat: -29.978, lng: 30.955 }, // Prospecton industrial
+      'demo-inc-4': { lat: -29.726, lng: 31.067 }, // Gateway
+      'demo-inc-5': { lat: -29.78, lng: 30.762 }, // Hillcrest
+      'demo-inc-6': { lat: -29.735, lng: 31.055 }, // Umhlanga Ridge
+      'demo-inc-7': { lat: -29.832, lng: 31.012 }, // Morningside
     };
     return ok({
       center: DURBAN,
@@ -6250,7 +6260,7 @@ export async function handleDemoRequest<T>({
           id: 'demo-off-4',
           name: `${demoOfficerRoster.find((o) => o.id === 'demo-off-4')?.firstName ?? 'Zanele'} ${demoOfficerRoster.find((o) => o.id === 'demo-off-4')?.lastName ?? 'Khumalo'}`,
           lat: -29.76,
-          lng: 31.03,
+          lng: 31.015,
           officerType: 'TACTICAL',
           unitNumber: 'TAC-1',
           status: demoOfficerRoster.find((o) => o.id === 'demo-off-4')?.status ?? 'AVAILABLE',
@@ -6260,8 +6270,8 @@ export async function handleDemoRequest<T>({
         {
           id: 'demo-off-6',
           name: `${demoOfficerRoster.find((o) => o.id === 'demo-off-6')?.firstName ?? 'Aisha'} ${demoOfficerRoster.find((o) => o.id === 'demo-off-6')?.lastName ?? 'Khan'}`,
-          lat: -29.55,
-          lng: 31.2,
+          lat: -29.545,
+          lng: 31.19,
           officerType: 'RAPID_RESPONSE',
           unitNumber: 'BIKE-1',
           status: demoOfficerRoster.find((o) => o.id === 'demo-off-6')?.status ?? 'AVAILABLE',
@@ -6286,8 +6296,9 @@ export async function handleDemoRequest<T>({
       }),
       fleet: demoFleet.map((v, i) => ({
         id: v.id,
-        lat: DURBAN.lat + 0.012 - i * 0.007,
-        lng: DURBAN.lng - 0.01 + i * 0.006,
+        // Spread west of the CBD so units stay on the M19 / Berea corridor.
+        lat: DURBAN.lat + 0.01 - i * 0.008,
+        lng: DURBAN.lng - 0.022 - i * 0.005,
         vehicleType: v.vehicleType,
         teamName: v.teamName ?? fleetTeamLabel(v.vehicleType),
         registration: v.registration,
@@ -6306,8 +6317,8 @@ export async function handleDemoRequest<T>({
       properties: demoMapProperties(),
       incidents: activeDemoIncidents().map((i, idx) => {
         const coords = incidentCoords[i.id] ?? {
-          lat: DURBAN.lat + idx * 0.01,
-          lng: DURBAN.lng + idx * 0.008,
+          lat: DURBAN.lat - 0.01 - (idx % 4) * 0.012,
+          lng: DURBAN.lng - 0.02 - (idx % 5) * 0.01,
         };
         return {
           id: i.id,
