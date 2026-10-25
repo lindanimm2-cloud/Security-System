@@ -85,7 +85,8 @@ export function maskMapDataForScreenshot(data: MapCommandData): MapCommandData {
 
   const vehicles = vehiclesIn.map((v) => ({
     ...v,
-    owner: clientNameToAlias.get(v.owner) ?? 'Client vehicle',
+    // Keep a readable owner label — membership aliases belong on people, not plates.
+    owner: clientNameToAlias.get(v.owner) ? 'Subscriber' : 'Client vehicle',
     updatedAt: FROZEN_ISO,
   }));
 

@@ -3599,8 +3599,8 @@ export async function handleDemoRequest<T>({
         {
           id: 'demo-veh-1',
           registration: 'ND 123-456',
-          make: 'Mercedes-Benz',
-          model: 'C-Class',
+          make: 'Tesla',
+          model: 'Model 3',
           year: 2024,
           color: 'White',
           theftRecovery: demoVehicleState.theftRecovery,
@@ -4397,9 +4397,9 @@ export async function handleDemoRequest<T>({
       const v = live ?? {
         id: vehicleId,
         registration: 'ND 123-456',
-        make: 'Mercedes-Benz',
-        model: 'C-Class',
-        variant: 'W206',
+        make: 'Tesla',
+        model: 'Model 3',
+        variant: 'Long Range',
         year: 2024,
         color: 'White',
         vin: 'W1KAF4HB0PR123456',

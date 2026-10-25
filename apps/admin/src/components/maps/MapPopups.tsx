@@ -244,6 +244,7 @@ export function VehiclePopup({
               colour: vehicle.color,
             }}
             meta={{
+              title: [vehicle.make, vehicle.model].filter(Boolean).join(' ') || undefined,
               registration: vehicle.registration,
               online: true,
               gpsLive: vehicle.lat != null && vehicle.lng != null,

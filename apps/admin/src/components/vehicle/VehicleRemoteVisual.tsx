@@ -397,18 +397,20 @@ export function VehicleRemoteVisual({
         />
       ) : null}
 
-      <div className="vehicle-car__caption">
-        <p className="vehicle-car__caption-kicker">Digital twin</p>
-        <p className="vehicle-car__caption-title">
-          {title}
-          {meta?.registration ? (
-            <>
-              {' '}
-              <em>· {meta.registration}</em>
-            </>
-          ) : null}
-        </p>
-      </div>
+      {variant === 'compact' ? null : (
+        <div className="vehicle-car__caption">
+          <p className="vehicle-car__caption-kicker">Digital twin</p>
+          <p className="vehicle-car__caption-title">
+            {title}
+            {meta?.registration ? (
+              <>
+                {' '}
+                <em>· {meta.registration}</em>
+              </>
+            ) : null}
+          </p>
+        </div>
+      )}
 
       <div className={`vehicle-car__state-bar is-${securityTone}`} role="status">
         <span className={online ? 'is-ok' : 'is-off'}>{online ? '● Online' : '○ Offline'}</span>
@@ -427,75 +429,85 @@ export function VehicleRemoteVisual({
         {panic ? <span className="is-panic">Panic active</span> : null}
       </div>
 
-      <div className="vehicle-car__telemetry" aria-label="Vehicle telemetry">
-        <div className="vehicle-car__tele">
-          <span>Speed</span>
-          <strong>
-            {speed} <em>km/h</em>
-          </strong>
-        </div>
-        <div className="vehicle-car__tele">
-          <span>Trip</span>
-          <strong>
-            {formatKm(meta?.tripKm)} <em>km</em>
-          </strong>
-        </div>
-        <div className="vehicle-car__tele">
-          <span>Odometer</span>
-          <strong>
-            {formatKm(meta?.odoKm)} <em>km</em>
-          </strong>
-        </div>
-        <div className="vehicle-car__tele">
-          <span>GPS</span>
-          <strong className={gps ? 'is-live' : ''}>{gps ? 'Linked' : '—'}</strong>
-        </div>
-      </div>
+      {variant === 'compact' ? null : (
+        <>
+          <div className="vehicle-car__telemetry" aria-label="Vehicle telemetry">
+            <div className="vehicle-car__tele">
+              <span>Speed</span>
+              <strong>
+                {speed} <em>km/h</em>
+              </strong>
+            </div>
+            <div className="vehicle-car__tele">
+              <span>Trip</span>
+              <strong>
+                {formatKm(meta?.tripKm)} <em>km</em>
+              </strong>
+            </div>
+            <div className="vehicle-car__tele">
+              <span>Odometer</span>
+              <strong>
+                {formatKm(meta?.odoKm)} <em>km</em>
+              </strong>
+            </div>
+            <div className="vehicle-car__tele">
+              <span>GPS</span>
+              <strong className={gps ? 'is-live' : ''}>{gps ? 'Linked' : '—'}</strong>
+            </div>
+          </div>
 
-      <div className={`vehicle-car__security is-${securityTone}`}>
-        <div className="vehicle-car__security-head">
-          <p className="vehicle-car__kicker">Security status</p>
-          <strong>{securityHeadline}</strong>
-        </div>
-        <ul className="vehicle-car__security-list">
-          <li>
-            <span>Status</span>
-            <em>{statusLabel}</em>
-          </li>
-          <li>
-            <span>Classification</span>
-            <em>
-              {classifiedStolen
-                ? 'Stolen'
-                : String(meta?.vehicleType ?? '')
-                    .trim()
-                    .replace(/_/g, ' ') || 'Client'}
-            </em>
-          </li>
-          <li>
-            <span>Doors</span>
-            <em>{component.locked ? 'Locked' : Object.values(component.doors).some((d) => d.open) ? 'Open' : 'Unlocked'}</em>
-          </li>
-          <li>
-            <span>Ignition</span>
-            <em className={component.immobiliserOn ? 'is-cut' : undefined}>
-              {component.immobiliserOn ? 'Disabled' : 'Enabled'}
-            </em>
-          </li>
-          <li>
-            <span>Alarm</span>
-            <em>{panic ? 'Triggered' : 'Armed'}</em>
-          </li>
-          <li>
-            <span>GPS</span>
-            <em>{gps ? 'Connected' : 'Offline'}</em>
-          </li>
-          <li>
-            <span>Panic</span>
-            <em>{panic ? 'Active' : 'Clear'}</em>
-          </li>
-        </ul>
-      </div>
+          <div className={`vehicle-car__security is-${securityTone}`}>
+            <div className="vehicle-car__security-head">
+              <p className="vehicle-car__kicker">Security status</p>
+              <strong>{securityHeadline}</strong>
+            </div>
+            <ul className="vehicle-car__security-list">
+              <li>
+                <span>Status</span>
+                <em>{statusLabel}</em>
+              </li>
+              <li>
+                <span>Classification</span>
+                <em>
+                  {classifiedStolen
+                    ? 'Stolen'
+                    : String(meta?.vehicleType ?? '')
+                        .trim()
+                        .replace(/_/g, ' ') || 'Client'}
+                </em>
+              </li>
+              <li>
+                <span>Doors</span>
+                <em>
+                  {component.locked
+                    ? 'Locked'
+                    : Object.values(component.doors).some((d) => d.open)
+                      ? 'Open'
+                      : 'Unlocked'}
+                </em>
+              </li>
+              <li>
+                <span>Ignition</span>
+                <em className={component.immobiliserOn ? 'is-cut' : undefined}>
+                  {component.immobiliserOn ? 'Disabled' : 'Enabled'}
+                </em>
+              </li>
+              <li>
+                <span>Alarm</span>
+                <em>{panic ? 'Triggered' : 'Armed'}</em>
+              </li>
+              <li>
+                <span>GPS</span>
+                <em>{gps ? 'Connected' : 'Offline'}</em>
+              </li>
+              <li>
+                <span>Panic</span>
+                <em>{panic ? 'Active' : 'Clear'}</em>
+              </li>
+            </ul>
+          </div>
+        </>
+      )}
     </section>
   );
 }
