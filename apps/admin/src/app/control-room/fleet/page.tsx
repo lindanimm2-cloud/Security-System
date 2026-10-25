@@ -172,6 +172,8 @@ function FleetContent() {
   const [search, setSearch] = useState('');
   const [notice, setNotice] = useState<{ tone: 'success' | 'warning' | 'error'; text: string } | null>(null);
   const [dialog, setDialog] = useState<'add' | FleetVehicle | null>(null);
+  /** Roster shows every unit; detail opens remote control for one selection. */
+  const [browseAll, setBrowseAll] = useState(true);
   const [selection, setSelection] = useState<Selection | null>(null);
   const [tab, setTab] = useState<VehicleTab>('commands');
   const [busyAction, setBusyAction] = useState<VehicleRemoteAction | null>(null);
@@ -234,6 +236,7 @@ function FleetContent() {
           tone: v.status === 'ON_DUTY' ? 'ok' : v.status === 'MAINTENANCE' ? 'danger' : 'default',
           onClick: () => {
             setSelection({ kind: 'fleet', id: v.id });
+            setBrowseAll(false);
             setTab('commands');
           },
         });
@@ -250,6 +253,7 @@ function FleetContent() {
           active: selection?.kind === 'tracked' && selection.id === v.id,
           onClick: () => {
             setSelection({ kind: 'tracked', id: v.id });
+            setBrowseAll(false);
             setTab('commands');
           },
         });
@@ -259,22 +263,31 @@ function FleetContent() {
   }, [visibleFleet, visibleTracked, selection]);
 
   const selectedFleet =
-    selection?.kind === 'fleet' ? fleet.find((v) => v.id === selection.id) ?? null : null;
+    !browseAll && selection?.kind === 'fleet'
+      ? fleet.find((v) => v.id === selection.id) ?? null
+      : null;
   const selectedTracked =
-    selection?.kind === 'tracked'
-      ? tracked.find((v) => v.id === selection.id) ?? null
-      : selectedFleet
-        ? tracked.find((t) => normReg(t.registration) === normReg(selectedFleet.registration)) ?? null
-        : null;
+    browseAll
+      ? null
+      : selection?.kind === 'tracked'
+        ? tracked.find((v) => v.id === selection.id) ?? null
+        : selectedFleet
+          ? tracked.find((t) => normReg(t.registration) === normReg(selectedFleet.registration)) ?? null
+          : null;
 
-  useEffect(() => {
-    if (selection) return;
-    if (visibleFleet[0]) {
-      setSelection({ kind: 'fleet', id: visibleFleet[0].id });
-      return;
-    }
-    if (visibleTracked[0]) setSelection({ kind: 'tracked', id: visibleTracked[0].id });
-  }, [selection, visibleFleet, visibleTracked]);
+  function openUnit(next: Selection) {
+    setSelection(next);
+    setBrowseAll(false);
+    setTab('commands');
+  }
+
+  function showAllVehicles() {
+    setFilter('all');
+    setSearch('');
+    setSelection(null);
+    setBrowseAll(true);
+    setTab('commands');
+  }
 
   useEffect(() => {
     if (!selectedTracked) {
@@ -525,9 +538,9 @@ function FleetContent() {
         <div className="ops-page-header__actions">
           <button
             type="button"
-            className={`btn-ghost ${filter === 'all' ? 'btn-ghost--active' : ''}`}
-            onClick={() => setFilter('all')}
-            aria-pressed={filter === 'all'}
+            className={`btn-ghost ${browseAll ? 'btn-ghost--active' : ''}`}
+            onClick={showAllVehicles}
+            aria-pressed={browseAll}
           >
             Show all
           </button>
@@ -603,23 +616,27 @@ function FleetContent() {
           searchPlaceholder="Find unit…"
           ariaLabel="Select vehicle"
           label={
-            selectedFleet?.callSign ||
-            selectedTracked?.callSign ||
-            selectedTracked?.registration ||
-            'Select vehicle'
+            browseAll
+              ? 'All vehicles'
+              : selectedFleet?.callSign ||
+                selectedTracked?.callSign ||
+                selectedTracked?.registration ||
+                'Select vehicle'
           }
           summary={
-            selectedFleet
-              ? `${selectedFleet.registration} · ${selectedFleet.status.replace(/_/g, ' ')} · ${selectedFleet.crewCount} crew`
-              : selectedTracked
-                ? `${selectedTracked.make} ${selectedTracked.model}${
-                    selectedTracked.status ? ` · ${selectedTracked.status.replace(/_/g, ' ')}` : ''
-                  }`
-                : visibleFleet.length || visibleTracked.length
-                  ? 'Choose a unit'
-                  : search.trim()
-                    ? 'No matches'
-                    : 'No units'
+            browseAll
+              ? `${visibleFleet.length + visibleTracked.length} on roster`
+              : selectedFleet
+                ? `${selectedFleet.registration} · ${selectedFleet.status.replace(/_/g, ' ')} · ${selectedFleet.crewCount} crew`
+                : selectedTracked
+                  ? `${selectedTracked.make} ${selectedTracked.model}${
+                      selectedTracked.status ? ` · ${selectedTracked.status.replace(/_/g, ' ')}` : ''
+                    }`
+                  : visibleFleet.length || visibleTracked.length
+                    ? 'Choose a unit'
+                    : search.trim()
+                      ? 'No matches'
+                      : 'No units'
           }
           items={vehiclePickerItems}
           disabled={!vehiclePickerItems.some((item) => !item.heading)}
@@ -628,7 +645,111 @@ function FleetContent() {
 
       <div className="ops-vehicle-layout ops-vehicle-layout--picker">
         <div className="ops-vehicle-main">
-          {!selectedFleet && !selectedTracked ? (
+          {browseAll ? (
+            <div className="ops-panel ops-vehicle-roster" aria-label="All vehicles">
+              <div className="ops-vehicle-roster__head">
+                <div>
+                  <p className="ops-vehicle-roster__kicker">Roster</p>
+                  <h2 className="ops-vehicle-roster__title">
+                    {visibleFleet.length + visibleTracked.length} vehicle
+                    {visibleFleet.length + visibleTracked.length === 1 ? '' : 's'}
+                  </h2>
+                </div>
+                <p className="text-muted ops-vehicle-roster__hint">
+                  Select a unit for remote commands, tracking, and history.
+                </p>
+              </div>
+
+              {visibleFleet.length === 0 && visibleTracked.length === 0 ? (
+                <p className="text-muted" style={{ margin: 0 }}>
+                  {search.trim() ? 'No vehicles match this search.' : 'No vehicles on the roster yet.'}
+                </p>
+              ) : (
+                <>
+                  {visibleFleet.length > 0 ? (
+                    <section className="ops-vehicle-roster__section" aria-label="Company fleet">
+                      <h3 className="ops-vehicle-roster__section-title">Company fleet</h3>
+                      <div className="fleet-grid">
+                        {visibleFleet.map((v) => {
+                          const driver =
+                            v.crew.find((c) => c.role === 'DRIVER') ?? v.crew[0] ?? null;
+                          const accent = v.vehicleType.toLowerCase().replace(/_/g, '-');
+                          return (
+                            <button
+                              key={v.id}
+                              type="button"
+                              className={`fleet-card fleet-card--${accent} fleet-card--button`}
+                              onClick={() => openUnit({ kind: 'fleet', id: v.id })}
+                            >
+                              <div className="fleet-card__header">
+                                <strong>{v.callSign}</strong>
+                                <OpsStatusBadge
+                                  label={v.status.replace(/_/g, ' ')}
+                                  tone={fleetStatusTone(v.status)}
+                                />
+                              </div>
+                              <p className="fleet-card__vehicle">
+                                {v.registration} · {v.make} {v.model}
+                              </p>
+                              <p className="fleet-card__team">
+                                <strong>{fleetTeamLabel(v.vehicleType, v.teamName)}</strong>
+                                <span>
+                                  {driver ? driver.name : 'No driver'} · {v.crewCount} crew
+                                </span>
+                              </p>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </section>
+                  ) : null}
+
+                  {visibleTracked.length > 0 ? (
+                    <section className="ops-vehicle-roster__section" aria-label="Tracked vehicles">
+                      <h3 className="ops-vehicle-roster__section-title">Tracked vehicles</h3>
+                      <div className="fleet-grid">
+                        {visibleTracked.map((v) => (
+                          <button
+                            key={v.id}
+                            type="button"
+                            className="fleet-card fleet-card--unmarked fleet-card--button"
+                            onClick={() => openUnit({ kind: 'tracked', id: v.id })}
+                          >
+                            <div className="fleet-card__header">
+                              <strong>{v.callSign || v.registration}</strong>
+                              <OpsStatusBadge
+                                label={(v.status ?? (v.theftRecovery ? 'STOLEN' : 'TRACKED')).replace(
+                                  /_/g,
+                                  ' ',
+                                )}
+                                tone={
+                                  v.theftRecovery
+                                    ? 'danger'
+                                    : v.trackerLinked === false
+                                      ? 'muted'
+                                      : 'ok'
+                                }
+                              />
+                            </div>
+                            <p className="fleet-card__vehicle">
+                              {v.registration} · {v.make} {v.model}
+                            </p>
+                            <p className="fleet-card__team">
+                              <strong>{v.owner || 'Client vehicle'}</strong>
+                              <span>
+                                {typeof v.speed === 'number' ? `${Math.round(v.speed)} km/h` : 'Tracker'}
+                                {v.updatedAt ? ` · ${relativeUpdated(v.updatedAt)}` : ''}
+                              </span>
+                            </p>
+                          </button>
+                        ))}
+                      </div>
+                    </section>
+                  ) : null}
+                </>
+              )}
+            </div>
+          ) : !selectedFleet && !selectedTracked ? (
             <div className="ops-panel">
               <p className="text-muted" style={{ margin: 0 }}>
                 Select a unit to open vehicle control.
