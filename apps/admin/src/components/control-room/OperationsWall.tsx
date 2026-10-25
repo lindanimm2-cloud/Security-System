@@ -559,7 +559,7 @@ function CameraFocus({
         <h2>{feed.camera.name}</h2>
       </header>
       <div className="ops-focus__video">
-        <CctvLiveFeed camera={feed.camera} showControls />
+        <CctvLiveFeed camera={feed.camera} featured showControls dockedControls />
       </div>
       <dl className="ops-focus__meta">
         <div>
@@ -615,6 +615,7 @@ function CameraTile({
 }) {
   const tileRef = useRef<HTMLElement>(null);
   const [menu, setMenu] = useState(false);
+  const [isFs, setIsFs] = useState(false);
   const online = cameraOnline(feed.camera);
   const label = `CAM-${String(feed.camera.channel || number).padStart(2, '0')}`;
 
@@ -627,6 +628,14 @@ function CameraTile({
     return () => document.removeEventListener('mousedown', close);
   }, [menu]);
 
+  useEffect(() => {
+    function onFs() {
+      setIsFs(document.fullscreenElement === tileRef.current);
+    }
+    document.addEventListener('fullscreenchange', onFs);
+    return () => document.removeEventListener('fullscreenchange', onFs);
+  }, []);
+
   function toggleFullscreen() {
     const node = tileRef.current;
     if (!node) return;
@@ -637,7 +646,7 @@ function CameraTile({
   return (
     <article
       ref={tileRef}
-      className={`ops-tile ${online ? '' : 'ops-tile--offline'} ${feed.hasEvent ? 'ops-tile--event' : ''} ${selected ? 'ops-tile--on' : ''}`}
+      className={`ops-tile ${online ? '' : 'ops-tile--offline'} ${feed.hasEvent ? 'ops-tile--event' : ''} ${selected ? 'ops-tile--on' : ''} ${isFs ? 'ops-tile--fs' : ''}`}
       onClick={(event) => {
         if ((event.target as HTMLElement).closest('button, a')) return;
         onSelect(feed);
@@ -647,8 +656,9 @@ function CameraTile({
       <div className="ops-tile__stage">
         <CctvLiveFeed
           camera={feed.camera}
-          compact
-          showControls={false}
+          compact={!isFs}
+          showControls={isFs}
+          dockedControls={isFs}
           onSelect={() => onSelect(feed)}
         />
       </div>

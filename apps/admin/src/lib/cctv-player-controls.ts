@@ -29,6 +29,11 @@ export type CctvPlayerUiState = {
   isTouchDevice: boolean;
   /** True once the operator has left live for buffered playback. */
   isPlayback?: boolean;
+  /**
+   * Focus / fullscreen larger view — always show rewind, FF, live, audio, speed
+   * regardless of tile width.
+   */
+  forceFullTransport?: boolean;
 };
 
 export type CctvVisibleControls = {
@@ -105,16 +110,31 @@ export function getVisibleControls(state: CctvPlayerUiState): CctvVisibleControl
     containerWidth,
     isTouchDevice,
     isPlayback = false,
+    forceFullTransport = false,
   } = state;
 
   const width = Number.isFinite(containerWidth) ? containerWidth : 0;
-  const wantPlaybackTools = isFullscreen || isExpanded || isPlayback;
-  const controls = maxControlsForWidth(width, wantPlaybackTools, isPlayback);
+  const wantPlaybackTools = isFullscreen || isExpanded || isPlayback || forceFullTransport;
+  const controls = forceFullTransport
+    ? isPlayback
+      ? (['expand', 'rewind', 'play', 'forward', 'speed', 'live', 'mute', 'mini', 'snapshot'] as CctvControlId[])
+      : (['expand', 'rewind', 'play', 'forward', 'speed', 'mute', 'mini', 'snapshot', 'record'] as CctvControlId[])
+    : maxControlsForWidth(width, wantPlaybackTools, isPlayback);
 
   const density: CctvVisibleControls['density'] =
     controls.length <= 1 ? 'minimal' : controls.length <= 2 ? 'compact' : 'full';
 
   const interactionOpen = isHovered || isFocused || isTouchRevealed;
+
+  // Larger focus / docked transport: always keep the full bar visible.
+  if (forceFullTransport) {
+    return {
+      controls,
+      toolbarVisible: true,
+      peekExpand: false,
+      density: 'full',
+    };
+  }
 
   // Fullscreen / large expanded: full toolbar when interacting (auto-hide driven by caller).
   if (isFullscreen) {

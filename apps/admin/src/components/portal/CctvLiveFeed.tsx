@@ -47,6 +47,11 @@ type CctvLiveFeedProps = {
   className?: string;
   /** Hide toolbar (rare). Default shows intelligent controls. */
   showControls?: boolean;
+  /**
+   * Larger focus / fullscreen view — dock rewind, FF, live, audio, and speed
+   * in a persistent transport bar.
+   */
+  dockedControls?: boolean;
 };
 
 const TOUCH_REVEAL_MS = 3200;
@@ -409,6 +414,7 @@ function FeedInner({
   featured,
   compact,
   showControls = true,
+  dockedControls = false,
   href,
   onSelect,
 }: {
@@ -416,6 +422,7 @@ function FeedInner({
   featured?: boolean;
   compact?: boolean;
   showControls?: boolean;
+  dockedControls?: boolean;
   href?: string;
   onSelect?: () => void;
 }) {
@@ -446,7 +453,7 @@ function FeedInner({
   const live =
     camera.isLiveCapable !== false && (status === 'online' || status === 'recording');
   const offline = status === 'offline' || status === 'fault';
-  const isExpanded = Boolean(featured) || isFullscreen;
+  const isExpanded = Boolean(featured) || isFullscreen || dockedControls;
 
   useEffect(() => {
     setIsTouchDevice(detectTouchDevice());
@@ -549,7 +556,63 @@ function FeedInner({
     containerWidth,
     isTouchDevice,
     isPlayback,
+    forceFullTransport: dockedControls,
   });
+
+  const controlsEl =
+    showControls ? (
+      <FeedControls
+        camera={camera}
+        stageRef={stageRef}
+        muted={muted}
+        volume={volume}
+        recording={recording}
+        paused={paused}
+        isFullscreen={isFullscreen}
+        isPlayback={isPlayback}
+        reverse={reverse}
+        speed={speed}
+        visibleIds={visibility.controls}
+        toolbarVisible={visibility.toolbarVisible}
+        peekExpand={visibility.peekExpand}
+        density={visibility.density}
+        volumeOpen={volumeOpen}
+        onMute={toggleMute}
+        onVolume={setVolumeValue}
+        onVolumeOpen={setVolumeOpen}
+        onMini={popMiniPlayer}
+        onRecord={() => setRecording((r) => !r)}
+        onPlay={() => {
+          if (!isPlayback) enterPlayback({ reverse: false });
+          setPaused((p) => !p);
+        }}
+        onRewind={() => {
+          if (!isPlayback) {
+            enterPlayback({ reverse: true });
+            return;
+          }
+          setReverse((r) => !r);
+          setPaused(false);
+        }}
+        onForward={() => {
+          if (!isPlayback || reverse) {
+            enterPlayback({ reverse: false });
+            setSpeed((s) => (s < 2 ? 2 : s));
+            setPaused(false);
+            return;
+          }
+          setSpeed((s) => nextFastForwardSpeed(s));
+          setPaused(false);
+        }}
+        onSpeed={() => {
+          if (!isPlayback) enterPlayback({ reverse: false });
+          setSpeed((s) => nextPlaybackSpeed(s));
+          setPaused(false);
+        }}
+        onLive={returnToLive}
+        onReveal={reveal}
+      />
+    ) : null;
 
   function enterPlayback(opts?: { reverse?: boolean }) {
     setIsPlayback(true);
@@ -624,6 +687,7 @@ function FeedInner({
         `cctv-feed--${status}`,
         featured ? 'cctv-feed--featured' : '',
         compact ? 'cctv-feed--compact' : '',
+        dockedControls ? 'cctv-feed--docked' : '',
         live ? 'cctv-feed--live' : '',
         recording ? 'cctv-feed--user-rec' : '',
         paused ? 'cctv-feed--paused' : '',
@@ -699,19 +763,19 @@ function FeedInner({
           {recording ? (
             <span className="cctv-feed__rec cctv-feed__rec--user" id={recLabelId}>
               <i aria-hidden />
-              {compact ? null : ' REC'}
+              {compact && !dockedControls ? null : ' REC'}
             </span>
           ) : isPlayback ? (
             <span className="cctv-feed__rec cctv-feed__rec--playback">
               <i aria-hidden />
-              {compact
+              {compact && !dockedControls
                 ? null
                 : ` ${reverse ? 'REW' : speed > 1 ? 'FF' : 'PLAY'} ${formatPlaybackSpeed(speed, false)}`}
             </span>
           ) : live ? (
             <span className="cctv-feed__rec">
               <i aria-hidden />
-              {compact ? null : ' LIVE'}
+              {compact && !dockedControls ? null : ' LIVE'}
             </span>
           ) : (
             <span className="cctv-feed__rec cctv-feed__rec--off">
@@ -724,75 +788,30 @@ function FeedInner({
             {!muted ? <span className="cctv-feed__audio-pill">AUDIO</span> : null}
           </span>
         </div>
-        {showControls ? (
-          <FeedControls
-            camera={camera}
-            stageRef={stageRef}
-            muted={muted}
-            volume={volume}
-            recording={recording}
-            paused={paused}
-            isFullscreen={isFullscreen}
-            isPlayback={isPlayback}
-            reverse={reverse}
-            speed={speed}
-            visibleIds={visibility.controls}
-            toolbarVisible={visibility.toolbarVisible}
-            peekExpand={visibility.peekExpand}
-            density={visibility.density}
-            volumeOpen={volumeOpen}
-            onMute={toggleMute}
-            onVolume={setVolumeValue}
-            onVolumeOpen={setVolumeOpen}
-            onMini={popMiniPlayer}
-            onRecord={() => setRecording((r) => !r)}
-            onPlay={() => {
-              if (!isPlayback) enterPlayback({ reverse: false });
-              setPaused((p) => !p);
-            }}
-            onRewind={() => {
-              if (!isPlayback) {
-                enterPlayback({ reverse: true });
-                return;
-              }
-              setReverse((r) => !r);
-              setPaused(false);
-            }}
-            onForward={() => {
-              if (!isPlayback || reverse) {
-                enterPlayback({ reverse: false });
-                setSpeed((s) => (s < 2 ? 2 : s));
-                setPaused(false);
-                return;
-              }
-              setSpeed((s) => nextFastForwardSpeed(s));
-              setPaused(false);
-            }}
-            onSpeed={() => {
-              if (!isPlayback) enterPlayback({ reverse: false });
-              setSpeed((s) => nextPlaybackSpeed(s));
-              setPaused(false);
-            }}
-            onLive={returnToLive}
-            onReveal={reveal}
-          />
-        ) : null}
+        {dockedControls ? null : controlsEl}
       </div>
+      {dockedControls ? controlsEl : null}
       <div className="cctv-feed__footer">
         {onSelect ? (
           <button type="button" className="cctv-feed__footer-link" onClick={onSelect}>
             <strong>{camera.name}</strong>
-            {compact ? null : <span className="cctv-feed__loc">{camera.locationLabel}</span>}
+            {compact && !dockedControls ? null : (
+              <span className="cctv-feed__loc">{camera.locationLabel}</span>
+            )}
           </button>
         ) : href ? (
           <Link href={href} className="cctv-feed__footer-link" aria-label={`View ${camera.name}`}>
             <strong>{camera.name}</strong>
-            {compact ? null : <span className="cctv-feed__loc">{camera.locationLabel}</span>}
+            {compact && !dockedControls ? null : (
+              <span className="cctv-feed__loc">{camera.locationLabel}</span>
+            )}
           </Link>
         ) : (
           <>
             <strong>{camera.name}</strong>
-            {compact ? null : <span className="cctv-feed__loc">{camera.locationLabel}</span>}
+            {compact && !dockedControls ? null : (
+              <span className="cctv-feed__loc">{camera.locationLabel}</span>
+            )}
           </>
         )}
       </div>
@@ -808,6 +827,7 @@ export function CctvLiveFeed({
   compact,
   className = '',
   showControls = true,
+  dockedControls = false,
 }: CctvLiveFeedProps) {
   return (
     <div className={`cctv-feed-link ${className}`.trim()}>
@@ -816,6 +836,7 @@ export function CctvLiveFeed({
         featured={featured}
         compact={compact}
         showControls={showControls}
+        dockedControls={dockedControls}
         href={href}
         onSelect={onSelect}
       />

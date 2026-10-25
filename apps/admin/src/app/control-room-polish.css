@@ -1681,6 +1681,61 @@ html[data-theme='light'] .cctv-mini__btn {
   height: 100%;
 }
 
+.cctv-feed--docked {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.cctv-feed--docked .cctv-feed__stage {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.cctv-feed--docked .cctv-feed__controls {
+  position: relative;
+  left: auto;
+  right: auto;
+  bottom: auto;
+  flex: 0 0 auto;
+  opacity: 1;
+  transform: none;
+  pointer-events: auto;
+  justify-content: center;
+  padding: 0.4rem 0.5rem 0.5rem;
+  background: color-mix(in srgb, #0a0a0a 92%, transparent);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.cctv-feed--docked .cctv-feed__controls-scrim {
+  display: none;
+}
+
+.cctv-feed--docked .cctv-feed__controls-row {
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.35rem;
+  max-width: 100%;
+  pointer-events: auto;
+}
+
+.cctv-feed--docked .cctv-feed__ctrl {
+  width: 2rem;
+  height: 2rem;
+}
+
+.cctv-feed--docked .cctv-feed__speed,
+.cctv-feed--docked .cctv-feed__live-jump {
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.cctv-feed--docked .cctv-feed__footer {
+  display: none;
+}
+
 .cctv-feed__stage:fullscreen .cctv-feed__controls,
 .cctv-feed__stage:-webkit-full-screen .cctv-feed__controls {
   padding: 2.5rem 1rem 1rem;

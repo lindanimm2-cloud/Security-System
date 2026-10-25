@@ -724,8 +724,9 @@ function AlertCamTile({
       <div className="ops-alert-cam__tile-stage">
         <CctvLiveFeed
           camera={camera}
-          compact
-          showControls={false}
+          compact={!expanded && !isFs}
+          showControls={expanded || isFs}
+          dockedControls={expanded || isFs}
           onSelect={() =>
             openCctvMiniPlayer({
               ...camera,

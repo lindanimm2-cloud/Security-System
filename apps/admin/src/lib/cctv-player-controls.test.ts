@@ -91,6 +91,30 @@ const base = {
   assert.equal(open.toolbarVisible, true);
 }
 
+// Docked / focus larger view — full transport even on a narrow panel
+{
+  const live = getVisibleControls({
+    ...base,
+    forceFullTransport: true,
+    containerWidth: 200,
+  });
+  assert.equal(live.toolbarVisible, true);
+  assert.ok(live.controls.includes('rewind'));
+  assert.ok(live.controls.includes('forward'));
+  assert.ok(live.controls.includes('speed'));
+  assert.ok(live.controls.includes('mute'));
+  assert.ok(!live.controls.includes('live'));
+
+  const playback = getVisibleControls({
+    ...base,
+    forceFullTransport: true,
+    isPlayback: true,
+    containerWidth: 200,
+  });
+  assert.ok(playback.controls.includes('live'));
+  assert.ok(playback.controls.includes('speed'));
+}
+
 // Width squeeze drops secondary before expand
 {
   const v = getVisibleControls({
