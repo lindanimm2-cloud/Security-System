@@ -20,6 +20,8 @@ type DemoUser = {
   tenantId: string;
   jobTitle?: string | null;
   phone?: string | null;
+  mustChangePassword?: boolean;
+  engagementId?: string | null;
   tenant?: {
     id: string;
     name: string;
@@ -48,6 +50,8 @@ type DemoAccount = {
 type StoredDemoClientAccount = DemoAccount & {
   portal: 'client';
   password: string;
+  mustChangePassword?: boolean;
+  engagementId?: string | null;
 };
 
 const ACCOUNTS: DemoAccount[] = [
@@ -304,7 +308,7 @@ const ACCOUNTS: DemoAccount[] = [
   },
 ];
 
-function toUser(account: DemoAccount): DemoUser {
+function toUser(account: DemoAccount & { mustChangePassword?: boolean; engagementId?: string | null }): DemoUser {
   return {
     id: `demo-user-${account.email.replace(/[^a-z0-9]/gi, '-')}`,
     email: account.email,
@@ -314,6 +318,8 @@ function toUser(account: DemoAccount): DemoUser {
     tenantId: TENANT.id,
     jobTitle: account.jobTitle ?? null,
     phone: account.phone ?? null,
+    mustChangePassword: Boolean(account.mustChangePassword),
+    engagementId: account.engagementId ?? null,
     tenant: TENANT,
   };
 }
@@ -352,7 +358,11 @@ function readPasswordOverrides(): Record<string, string> {
 }
 
 /** Persist a control-room password reset for demo logins. */
-export function setDemoAccountPassword(email: string, password: string) {
+export function setDemoAccountPassword(
+  email: string,
+  password: string,
+  options?: { clearMustChangePassword?: boolean },
+) {
   if (typeof window === 'undefined') return;
   const normalized = email.trim().toLowerCase();
   const next = password.trim();
@@ -364,12 +374,48 @@ export function setDemoAccountPassword(email: string, password: string) {
     const clients = readStoredDemoClients();
     const idx = clients.findIndex((entry) => entry.email === normalized);
     if (idx >= 0) {
-      clients[idx] = { ...clients[idx], password: next };
+      clients[idx] = {
+        ...clients[idx],
+        password: next,
+        ...(options?.clearMustChangePassword ? { mustChangePassword: false } : {}),
+      };
       writeStoredDemoClients(clients);
     }
   } catch {
     // Ignore demo persistence issues.
   }
+}
+
+/**
+ * Provision a temporary client login for a contact-form engagement.
+ * Returns the one-time temp password (shown once in the UI).
+ */
+export function provisionTempEngagementClient(input: {
+  email: string;
+  firstName: string;
+  lastName: string;
+  phone?: string;
+  engagementId: string;
+  tempPassword: string;
+}): { email: string; tempPassword: string } {
+  const email = input.email.trim().toLowerCase();
+  persistRegisteredDemoClient({
+    email,
+    portal: 'client',
+    role: 'CLIENT',
+    firstName: input.firstName || 'Guest',
+    lastName: input.lastName || 'Client',
+    phone: input.phone,
+    password: input.tempPassword,
+    mustChangePassword: true,
+    engagementId: input.engagementId,
+  });
+  return { email, tempPassword: input.tempPassword };
+}
+
+export function getStoredDemoClient(email: string): StoredDemoClientAccount | null {
+  const normalized = email.trim().toLowerCase();
+  return readStoredDemoClients().find((entry) => entry.email === normalized) ?? null;
 }
 
 function expectedDemoPassword(email: string, storedPassword?: string): string {

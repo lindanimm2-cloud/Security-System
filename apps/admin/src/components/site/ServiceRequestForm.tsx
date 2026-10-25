@@ -1,8 +1,17 @@
 'use client';
 
+import Link from 'next/link';
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { NxDateField, NxTimeField, todayIso } from '@/components/site/NxScheduleFields';
 import { UiSelect } from '@/components/ui/UiSelect';
+import { formatSplitAddress } from '@/lib/phone-countries';
+import {
+  activateEngagementPortalAccess,
+  createTempEngagement,
+  ENGAGEMENT_FLOW_STEPS,
+  labelForEngagementKind,
+  type TempEngagement,
+} from '@/lib/temp-engagements';
 
 export const SERVICE_OPTIONS = [
   { value: 'private-escort', label: 'Private escort / VIP transport' },
@@ -16,6 +25,33 @@ export const SERVICE_OPTIONS = [
 
 export type ServiceInterest = (typeof SERVICE_OPTIONS)[number]['value'];
 
+const PROPERTY_TYPE_OPTIONS = [
+  { value: '', label: 'Prefer not to say' },
+  { value: 'house', label: 'House / stand-alone home' },
+  { value: 'apartment', label: 'Apartment / flat' },
+  { value: 'estate', label: 'Estate / complex' },
+  { value: 'office', label: 'Office / commercial' },
+  { value: 'warehouse', label: 'Warehouse / industrial' },
+  { value: 'retail', label: 'Retail / mall unit' },
+  { value: 'other', label: 'Other' },
+] as const;
+
+type AddressParts = {
+  street: string;
+  suburb: string;
+  city: string;
+  postalCode: string;
+  landmark: string;
+};
+
+const EMPTY_ADDRESS: AddressParts = {
+  street: '',
+  suburb: '',
+  city: '',
+  postalCode: '',
+  landmark: '',
+};
+
 type FormState = {
   name: string;
   email: string;
@@ -26,9 +62,10 @@ type FormState = {
   time: string;
   endDate: string;
   people: string;
-  pickup: string;
-  destination: string;
-  location: string;
+  pickup: AddressParts;
+  destination: AddressParts;
+  site: AddressParts;
+  propertyType: string;
   returnTrip: string;
   vehicles: string;
   message: string;
@@ -44,9 +81,10 @@ const EMPTY: FormState = {
   time: '',
   endDate: '',
   people: '1',
-  pickup: '',
-  destination: '',
-  location: '',
+  pickup: { ...EMPTY_ADDRESS },
+  destination: { ...EMPTY_ADDRESS },
+  site: { ...EMPTY_ADDRESS },
+  propertyType: '',
   returnTrip: 'one-way',
   vehicles: '',
   message: '',
@@ -61,6 +99,13 @@ function normalizeInterest(value?: string | null): ServiceInterest {
   return 'private-escort';
 }
 
+function composeAddress(parts: AddressParts) {
+  const base = formatSplitAddress(parts);
+  const landmark = parts.landmark.trim();
+  if (!landmark) return base;
+  return base ? `${base} (${landmark})` : landmark;
+}
+
 type ServiceRequestFormProps = {
   initialInterest?: string | null;
   className?: string;
@@ -72,6 +117,10 @@ export function ServiceRequestForm({
 }: ServiceRequestFormProps) {
   const [sent, setSent] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [engagement, setEngagement] = useState<TempEngagement | null>(null);
+  const [portalCreds, setPortalCreds] = useState<{ email: string; tempPassword: string } | null>(
+    null,
+  );
   const [form, setForm] = useState<FormState>(() => ({
     ...EMPTY,
     interest: normalizeInterest(initialInterest),
@@ -88,6 +137,17 @@ export function ServiceRequestForm({
     setForm((prev) => ({ ...prev, [key]: value }));
   }
 
+  function patchAddress(
+    key: 'pickup' | 'destination' | 'site',
+    field: keyof AddressParts,
+    value: string,
+  ) {
+    setForm((prev) => ({
+      ...prev,
+      [key]: { ...prev[key], [field]: value },
+    }));
+  }
+
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
     setSubmitting(true);
@@ -96,7 +156,25 @@ export function ServiceRequestForm({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          ...form,
+          name: form.name,
+          email: form.email,
+          phone: form.phone,
+          company: form.company,
+          interest: form.interest,
+          date: form.date,
+          time: form.time,
+          endDate: form.endDate,
+          people: form.people,
+          pickup: composeAddress(form.pickup),
+          destination: composeAddress(form.destination),
+          location: composeAddress(form.site),
+          propertyType: form.propertyType || undefined,
+          pickupDetails: form.pickup,
+          destinationDetails: form.destination,
+          siteDetails: form.site,
+          returnTrip: form.returnTrip,
+          vehicles: form.vehicles,
+          message: form.message,
           kind: 'service-request',
           submittedAt: new Date().toISOString(),
         }),
@@ -104,18 +182,105 @@ export function ServiceRequestForm({
     } catch {
       /* demo / offline — still show confirmation */
     } finally {
+      const created = createTempEngagement({
+        name: form.name,
+        email: form.email,
+        phone: form.phone,
+        company: form.company,
+        kind: form.interest,
+        date: form.date,
+        time: form.time,
+        endDate: form.endDate,
+        people: form.people,
+        pickup: composeAddress(form.pickup),
+        destination: composeAddress(form.destination),
+        location: composeAddress(form.site),
+        message: form.message,
+      });
+      setEngagement(created);
       setSubmitting(false);
       setSent(true);
     }
   }
 
-  if (sent) {
+  function enableWebPortal() {
+    if (!engagement) return;
+    const activated = activateEngagementPortalAccess(engagement.id);
+    if (!activated) return;
+    setEngagement(activated.engagement);
+    setPortalCreds({ email: activated.email, tempPassword: activated.tempPassword });
+  }
+
+  if (sent && engagement) {
+    const kindLabel = labelForEngagementKind(engagement.kind);
     return (
-      <div className={`nx-contact-form ${className}`.trim()}>
+      <div className={`nx-contact-form nx-engagement-followup ${className}`.trim()}>
         <div className="nx-success">
-          Thanks — we have your request details. A Nexus advisor will confirm
-          availability and next steps shortly.
+          Thanks — your {kindLabel.toLowerCase()} request is in. Download the app for live
+          check-ins, or enable a temporary web portal login now.
         </div>
+
+        <section className="nx-engagement-flow" aria-label="Engagement flow">
+          <h3>Engagement flow</h3>
+          <ol>
+            {ENGAGEMENT_FLOW_STEPS.map((step, index) => (
+              <li key={step}>
+                <span className="nx-engagement-flow__n" aria-hidden>
+                  {index + 1}
+                </span>
+                <span>{step}</span>
+              </li>
+            ))}
+          </ol>
+          <p className="nx-engagement-flow__note">
+            Evidence-ready timeline if an incident occurs.
+          </p>
+        </section>
+
+        <div className="nx-engagement-followup__actions">
+          <Link
+            href={`/apps?from=engagement&id=${encodeURIComponent(engagement.id)}`}
+            className="nx-btn nx-btn--primary"
+          >
+            Download the 4DS app
+          </Link>
+          {!portalCreds ? (
+            <button type="button" className="nx-btn nx-btn--ghost-light" onClick={enableWebPortal}>
+              Enable web portal access
+            </button>
+          ) : null}
+        </div>
+
+        {portalCreds ? (
+          <div className="nx-engagement-creds" role="status">
+            <p>
+              Temporary login created. Sign in once, then create your own password.
+            </p>
+            <dl>
+              <div>
+                <dt>Organisation</dt>
+                <dd>
+                  <code>demo</code>
+                </dd>
+              </div>
+              <div>
+                <dt>Email</dt>
+                <dd>
+                  <code>{portalCreds.email}</code>
+                </dd>
+              </div>
+              <div>
+                <dt>Temp password</dt>
+                <dd>
+                  <code>{portalCreds.tempPassword}</code>
+                </dd>
+              </div>
+            </dl>
+            <Link href="/portal/login" className="nx-btn nx-btn--primary">
+              Open client portal login
+            </Link>
+          </div>
+        ) : null}
       </div>
     );
   }
@@ -238,24 +403,23 @@ export function ServiceRequestForm({
       {detail.showTrip ? (
         <div className="nx-service-request__block">
           <p className="nx-service-request__block-title">Trip details</p>
-          <label>
-            Pickup location
-            <input
-              required
-              placeholder="e.g. OR Tambo International, Terminal A"
-              value={form.pickup}
-              onChange={(e) => patch('pickup', e.target.value)}
-            />
-          </label>
-          <label>
-            Destination
-            <input
-              required
-              placeholder="e.g. Sandton City / private residence"
-              value={form.destination}
-              onChange={(e) => patch('destination', e.target.value)}
-            />
-          </label>
+
+          <AddressSection
+            title="Pickup"
+            required
+            value={form.pickup}
+            streetPlaceholder="e.g. OR Tambo International, Terminal A"
+            onChange={(field, value) => patchAddress('pickup', field, value)}
+          />
+
+          <AddressSection
+            title="Destination"
+            required
+            value={form.destination}
+            streetPlaceholder="e.g. 12 West Street or Sandton City"
+            onChange={(field, value) => patchAddress('destination', field, value)}
+          />
+
           <label>
             Trip type
             <UiSelect
@@ -274,15 +438,33 @@ export function ServiceRequestForm({
       ) : null}
 
       {detail.showLocation ? (
-        <label>
-          Primary location / venue
-          <input
+        <div className="nx-service-request__block">
+          <p className="nx-service-request__block-title">
+            {detail.locationTitle}
+          </p>
+
+          <AddressSection
+            title="Site address"
             required
-            placeholder="Address, suburb, or venue name"
-            value={form.location}
-            onChange={(e) => patch('location', e.target.value)}
+            value={form.site}
+            streetPlaceholder="Street / complex / venue"
+            onChange={(field, value) => patchAddress('site', field, value)}
           />
-        </label>
+
+          {detail.showPropertyType ? (
+            <label>
+              Property type{' '}
+              <span className="nx-service-request__optional">(optional)</span>
+              <UiSelect
+                compact={false}
+                ariaLabel="Property type"
+                value={form.propertyType}
+                onChange={(propertyType) => patch('propertyType', propertyType)}
+                options={[...PROPERTY_TYPE_OPTIONS]}
+              />
+            </label>
+          ) : null}
+        </div>
       ) : null}
 
       {detail.showVehicles ? (
@@ -321,6 +503,78 @@ export function ServiceRequestForm({
   );
 }
 
+function AddressSection({
+  title,
+  required,
+  value,
+  streetPlaceholder,
+  onChange,
+}: {
+  title: string;
+  required?: boolean;
+  value: AddressParts;
+  streetPlaceholder: string;
+  onChange: (field: keyof AddressParts, value: string) => void;
+}) {
+  return (
+    <div className="nx-service-request__address">
+      <p className="nx-service-request__address-title">{title}</p>
+      <label>
+        Street / place {required ? null : <span className="nx-service-request__optional">(optional)</span>}
+        <input
+          required={required}
+          autoComplete="street-address"
+          placeholder={streetPlaceholder}
+          value={value.street}
+          onChange={(e) => onChange('street', e.target.value)}
+        />
+      </label>
+      <div className="nx-service-request__row">
+        <label>
+          Suburb
+          <input
+            required={required}
+            autoComplete="address-level3"
+            placeholder="e.g. Sandton"
+            value={value.suburb}
+            onChange={(e) => onChange('suburb', e.target.value)}
+          />
+        </label>
+        <label>
+          City
+          <input
+            required={required}
+            autoComplete="address-level2"
+            placeholder="e.g. Johannesburg"
+            value={value.city}
+            onChange={(e) => onChange('city', e.target.value)}
+          />
+        </label>
+      </div>
+      <div className="nx-service-request__row">
+        <label>
+          Postal code <span className="nx-service-request__optional">(optional)</span>
+          <input
+            autoComplete="postal-code"
+            inputMode="numeric"
+            placeholder="e.g. 2196"
+            value={value.postalCode}
+            onChange={(e) => onChange('postalCode', e.target.value)}
+          />
+        </label>
+        <label>
+          Landmark / gate <span className="nx-service-request__optional">(optional)</span>
+          <input
+            placeholder="Complex name, gate code hint, terminal…"
+            value={value.landmark}
+            onChange={(e) => onChange('landmark', e.target.value)}
+          />
+        </label>
+      </div>
+    </div>
+  );
+}
+
 function detailFieldsFor(interest: ServiceInterest) {
   switch (interest) {
     case 'private-escort':
@@ -330,6 +584,8 @@ function detailFieldsFor(interest: ServiceInterest) {
         showPeople: true,
         showTrip: true,
         showLocation: false,
+        showPropertyType: false,
+        locationTitle: 'Site address',
         showVehicles: false,
         messagePlaceholder:
           'Flight numbers, luggage, preferred vehicle type, special instructions…',
@@ -341,6 +597,8 @@ function detailFieldsFor(interest: ServiceInterest) {
         showPeople: true,
         showTrip: false,
         showLocation: true,
+        showPropertyType: true,
+        locationTitle: 'Primary venue / base',
         showVehicles: false,
         messagePlaceholder:
           'Principals, risk notes, venues, dress code, or advance requirements…',
@@ -352,6 +610,8 @@ function detailFieldsFor(interest: ServiceInterest) {
         showPeople: true,
         showTrip: false,
         showLocation: true,
+        showPropertyType: true,
+        locationTitle: 'Home / protection site',
         showVehicles: false,
         messagePlaceholder:
           'Who needs cover, school runs, medical notes, or preferred start date…',
@@ -363,8 +623,10 @@ function detailFieldsFor(interest: ServiceInterest) {
         showPeople: false,
         showTrip: false,
         showLocation: true,
+        showPropertyType: true,
+        locationTitle: 'Protected property',
         showVehicles: false,
-        messagePlaceholder: 'Site type, current alarm provider, response expectations…',
+        messagePlaceholder: 'Current alarm provider, response expectations, access notes…',
       };
     case 'fleet':
       return {
@@ -373,6 +635,8 @@ function detailFieldsFor(interest: ServiceInterest) {
         showPeople: false,
         showTrip: false,
         showLocation: false,
+        showPropertyType: false,
+        locationTitle: 'Site address',
         showVehicles: true,
         messagePlaceholder: 'Vehicle types, operating areas, current trackers…',
       };
@@ -383,6 +647,8 @@ function detailFieldsFor(interest: ServiceInterest) {
         showPeople: false,
         showTrip: false,
         showLocation: true,
+        showPropertyType: true,
+        locationTitle: 'Install site',
         showVehicles: false,
         messagePlaceholder: 'Cameras, alarms, access control, or monitoring needs…',
       };
@@ -393,9 +659,10 @@ function detailFieldsFor(interest: ServiceInterest) {
         showPeople: false,
         showTrip: false,
         showLocation: false,
+        showPropertyType: false,
+        locationTitle: 'Site address',
         showVehicles: false,
         messagePlaceholder: 'Tell us what you need…',
       };
   }
 }
-

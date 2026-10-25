@@ -18,6 +18,9 @@ export type AuthUser = {
   jobTitle?: string | null;
   phone?: string | null;
   mfaEnabled?: boolean;
+  /** Temporary engagement accounts must set their own password after first login. */
+  mustChangePassword?: boolean;
+  engagementId?: string | null;
   tenant?: {
     id: string;
     name: string;
@@ -739,6 +742,7 @@ export function updateSessionUser(portal: AuthPortal, patch: Partial<AuthUser>) 
     user: { ...session.user, ...patch },
   };
   writeSessionRaw(sessionKey(portal), JSON.stringify(next));
+  notifyAuthChanged();
 }
 
 export function clearSession(portal: AuthPortal) {

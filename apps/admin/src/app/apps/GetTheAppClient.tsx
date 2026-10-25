@@ -1,7 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
+import { Suspense, useEffect, useMemo, useState } from 'react';
 import {
   APP_CATALOG,
   PLATFORM_DISCLAIMER,
@@ -10,6 +11,12 @@ import {
   type AppCatalogEntry,
   type DetectedClient,
 } from '@/lib/platform';
+import {
+  activateEngagementPortalAccess,
+  getTempEngagement,
+  labelForEngagementKind,
+  type TempEngagement,
+} from '@/lib/temp-engagements';
 
 function statusBadge(status: AppCatalogEntry['status']) {
   if (status === 'live') return { label: 'Live', className: 'apps-hub__badge--live' };
@@ -18,7 +25,58 @@ function statusBadge(status: AppCatalogEntry['status']) {
   return { label: 'Coming soon', className: 'apps-hub__badge--planned' };
 }
 
-export default function GetTheAppClient() {
+function EngagementAcceptBanner() {
+  const params = useSearchParams();
+  const engagementId = params.get('from') === 'engagement' ? params.get('id') : null;
+  const [engagement, setEngagement] = useState<TempEngagement | null>(null);
+  const [creds, setCreds] = useState<{ email: string; tempPassword: string } | null>(null);
+
+  useEffect(() => {
+    if (!engagementId) return;
+    setEngagement(getTempEngagement(engagementId));
+  }, [engagementId]);
+
+  if (!engagementId || !engagement) return null;
+
+  function accept() {
+    if (!engagement) return;
+    const activated = activateEngagementPortalAccess(engagement.id);
+    if (!activated) return;
+    setEngagement(activated.engagement);
+    setCreds({ email: activated.email, tempPassword: activated.tempPassword });
+  }
+
+  return (
+    <section className="apps-hub__engagement" aria-label="Temporary engagement access">
+      <p className="dash-ops__eyebrow">Temporary job</p>
+      <h2>{labelForEngagementKind(engagement.kind)}</h2>
+      <p className="text-muted">
+        Accept app access to create a temporary portal login. You will set your own password after
+        the first sign-in.
+      </p>
+      {!creds ? (
+        <button type="button" className="ops-act ops-act--dispatch" onClick={accept}>
+          Accept app access
+        </button>
+      ) : (
+        <div className="apps-hub__creds" role="status">
+          <p>Temp login ready — organisation <code>demo</code></p>
+          <p>
+            Email <code>{creds.email}</code>
+          </p>
+          <p>
+            Password <code>{creds.tempPassword}</code>
+          </p>
+          <Link href="/portal/login" className="ops-act ops-act--dispatch">
+            Sign in to client portal
+          </Link>
+        </div>
+      )}
+    </section>
+  );
+}
+
+function GetTheAppInner() {
   const [detected, setDetected] = useState<DetectedClient | null>(null);
 
   useEffect(() => {
@@ -46,6 +104,10 @@ export default function GetTheAppClient() {
           hardware adapters share the same cloud, incidents, AlertEngine, and realtime bus.
         </p>
       </header>
+
+      <Suspense fallback={null}>
+        <EngagementAcceptBanner />
+      </Suspense>
 
       {detected ? (
         <section className="apps-hub__detect">
@@ -130,5 +192,13 @@ export default function GetTheAppClient() {
         <p className="text-muted">{PLATFORM_DISCLAIMER}</p>
       </section>
     </div>
+  );
+}
+
+export default function GetTheAppClient() {
+  return (
+    <Suspense fallback={null}>
+      <GetTheAppInner />
+    </Suspense>
   );
 }

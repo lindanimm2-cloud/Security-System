@@ -13184,6 +13184,148 @@ html[data-theme='light'] .inc-hud-page {
   margin-bottom: 1.5rem;
 }
 
+.apps-hub__engagement {
+  border: 1px solid color-mix(in srgb, #7f1d1d 35%, var(--border));
+  border-radius: 16px;
+  padding: 1.1rem 1.2rem;
+  margin-bottom: 1.35rem;
+  background: color-mix(in srgb, var(--surface, #111) 88%, #7f1d1d);
+  display: grid;
+  gap: 0.65rem;
+}
+
+.apps-hub__engagement h2 {
+  margin: 0;
+}
+
+.apps-hub__creds {
+  display: grid;
+  gap: 0.35rem;
+  padding: 0.85rem;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: color-mix(in srgb, var(--surface-2, #1a1a1a) 92%, transparent);
+}
+
+.apps-hub__creds code {
+  font-size: 0.92rem;
+}
+
+.temp-engagement-banner {
+  display: grid;
+  gap: 0.85rem;
+  margin-bottom: 0.85rem;
+}
+
+.temp-engagement-banner__head {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  align-items: flex-start;
+}
+
+.temp-engagement-banner__kicker {
+  margin: 0;
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted, #9ca3af);
+}
+
+.temp-engagement-banner h2 {
+  margin: 0.15rem 0 0.25rem;
+  font-size: 1.15rem;
+}
+
+.temp-engagement-banner__route {
+  margin: 0.35rem 0 0;
+  font-size: 0.88rem;
+}
+
+.temp-engagement-banner__panic {
+  display: grid;
+  gap: 0.65rem;
+  padding: 0.85rem;
+  border-radius: 12px;
+  border: 1px dashed color-mix(in srgb, #f59e0b 45%, var(--border));
+  background: color-mix(in srgb, #f59e0b 8%, transparent);
+}
+
+.temp-engagement-banner__panic--on {
+  border-style: solid;
+  border-color: color-mix(in srgb, #22c55e 40%, var(--border));
+  background: color-mix(in srgb, #22c55e 8%, transparent);
+}
+
+.temp-engagement-banner__panic-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.portal-welcome-card .portal-welcome-steps {
+  margin: 0 0 1rem;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 0.55rem;
+}
+
+.portal-welcome-steps li {
+  display: grid;
+  grid-template-columns: 1.5rem 1fr;
+  gap: 0.5rem;
+  align-items: start;
+  color: var(--muted, #9ca3af);
+  font-size: 0.9rem;
+}
+
+.portal-welcome-steps span {
+  display: inline-grid;
+  place-items: center;
+  width: 1.35rem;
+  height: 1.35rem;
+  border-radius: 999px;
+  background: #c02a22;
+  color: #fff;
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+
+.portal-welcome-actions {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.portal-job-details__form {
+  display: grid;
+  gap: 0.85rem;
+  max-width: 36rem;
+}
+
+.portal-job-details__form label {
+  display: grid;
+  gap: 0.35rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.portal-job-details__form input,
+.portal-job-details__form textarea {
+  font: inherit;
+  padding: 0.55rem 0.65rem;
+  border-radius: 8px;
+  border: 1px solid var(--border, #2a2a2a);
+  background: var(--surface, #111);
+  color: inherit;
+}
+
+.portal-job-details__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+}
+
 .apps-hub__kicker {
   margin: 0 0 0.35rem;
   font-size: 0.72rem;

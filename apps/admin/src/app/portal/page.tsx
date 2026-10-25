@@ -30,6 +30,7 @@ import { IncidentTimeline } from '@/components/incident/IncidentTimeline';
 import { SlidingSection } from '@/components/portal/SlidingSection';
 import { FamilyProfilePopup, type FamilyProfilePerson } from '@/components/portal/FamilyProfilePopup';
 import { EmergencyProtectionBanner } from '@/components/security/EmergencyProtectionBanner';
+import { TempEngagementBanner } from '@/components/portal/TempEngagementBanner';
 import { CONTROL_ROOM_LINE } from '@/lib/control-room-line';
 import { showClientEmergencyNotification } from '@/lib/client-push';
 import { responseHref } from '@/lib/live-response';
@@ -112,7 +113,7 @@ function OverviewDashboard() {
     () => clientApi.get<ApiResponse<Overview>>('/client/overview'),
     [],
   );
-  const { access } = useSubscriptionAccess();
+  const { access, engagement, reload: reloadAccess } = useSubscriptionAccess();
   const { data: contactsPayload } = useApi(
     () =>
       clientApi.get<
@@ -313,6 +314,9 @@ function OverviewDashboard() {
   return (
     <div className="portal-dash">
       <div className="portal-dash__stage">
+      {engagement ? (
+        <TempEngagementBanner engagement={engagement} onChanged={() => reloadAccess()} />
+      ) : null}
       {(hasAlert || alertMsg.includes('Panic') || alertMsg.includes('Medical') || alertMsg.includes('Fire') || alertMsg.includes('Vehicle')) && (
         <EmergencyModeBanner
           title={activeIncidents[0]?.title ?? 'Emergency active'}

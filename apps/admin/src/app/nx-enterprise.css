@@ -1005,6 +1005,28 @@ html[data-theme='light'] .nx-site .nx-ent-band .nx-btn--primary {
   color: var(--nx-steel);
 }
 
+.nx-service-request__address {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 0.85rem 0.9rem;
+  border: 1px solid color-mix(in srgb, var(--nx-line) 85%, transparent);
+  border-radius: 8px;
+  background: color-mix(in srgb, #fff 70%, var(--nx-paper-2, #f3f5f8));
+}
+
+.nx-service-request__address-title {
+  margin: 0;
+  font-size: 0.78rem;
+  font-weight: 750;
+  letter-spacing: 0.04em;
+  color: var(--nx-ink);
+}
+
+html[data-theme='dark'] .nx-service-request__address {
+  background: color-mix(in srgb, var(--nx-paper, #171a20) 88%, #000);
+}
+
 .nx-service-request__optional {
   font-weight: 500;
   color: var(--nx-steel);
@@ -1326,4 +1348,93 @@ html[data-theme='dark'] .nx-schedule__clock-col {
 
 html[data-theme='dark'] .nx-schedule__done {
   background: var(--nx-signal, #c02a22);
+}
+
+/* Temporary engagement follow-up after contact signup */
+.nx-engagement-followup {
+  display: grid;
+  gap: 1.1rem;
+}
+
+.nx-engagement-flow {
+  margin: 0;
+  padding: 1rem 1.05rem;
+  border: 1px solid rgba(26, 29, 35, 0.1);
+  border-radius: 12px;
+  background: #f7f8fa;
+}
+
+.nx-engagement-flow h3 {
+  margin: 0 0 0.75rem;
+  font-size: 0.78rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.nx-engagement-flow ol {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 0.65rem;
+}
+
+.nx-engagement-flow li {
+  display: grid;
+  grid-template-columns: 1.5rem 1fr;
+  gap: 0.55rem;
+  align-items: start;
+  color: #4b5563;
+  font-size: 0.9rem;
+  line-height: 1.4;
+}
+
+.nx-engagement-flow__n {
+  display: inline-grid;
+  place-items: center;
+  width: 1.4rem;
+  height: 1.4rem;
+  border-radius: 999px;
+  background: #c02a22;
+  color: #fff;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.nx-engagement-flow__note {
+  margin: 0.85rem 0 0;
+  font-size: 0.82rem;
+  color: #6b7280;
+}
+
+.nx-engagement-followup__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+}
+
+.nx-engagement-creds {
+  padding: 1rem;
+  border-radius: 12px;
+  border: 1px solid rgba(192, 42, 34, 0.25);
+  background: rgba(192, 42, 34, 0.06);
+  display: grid;
+  gap: 0.75rem;
+}
+
+.nx-engagement-creds dl {
+  margin: 0;
+  display: grid;
+  gap: 0.45rem;
+}
+
+.nx-engagement-creds dt {
+  font-size: 0.7rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #6b7280;
+}
+
+.nx-engagement-creds dd {
+  margin: 0.15rem 0 0;
 }

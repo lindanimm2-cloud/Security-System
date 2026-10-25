@@ -48,6 +48,18 @@ export function AuthGuard({
         router.replace(`${loginPath}?reason=site-session`);
         return;
       }
+      if (
+        portal === 'client' &&
+        s.user.mustChangePassword &&
+        typeof window !== 'undefined' &&
+        !window.location.pathname.startsWith('/portal/set-password')
+      ) {
+        setSession(s);
+        setReady(true);
+        applyTabTitle(s, portal);
+        router.replace('/portal/set-password');
+        return;
+      }
       setSession(s);
       setReady(true);
       applyTabTitle(s, portal);

@@ -7,6 +7,7 @@ export const CONTROL_ROOM_ROUTES = {
   customers: '/control-room/customers',
   officers: '/control-room/officers',
   fleet: '/control-room/fleet',
+  engagements: '/control-room/engagements',
   documents: '/control-room/documents',
   communications: '/control-room/communications',
   chat: '/control-room/chat',

@@ -237,7 +237,15 @@ function LoginFormInner({
     }
     setActionKind('sign-in');
     setRedirecting(true);
-    router.push(portal === 'admin' ? adminHomeForRole(session.user.role) : redirectTo);
+    if (portal === 'admin') {
+      router.push(adminHomeForRole(session.user.role));
+      return;
+    }
+    if (portal === 'client' && session.user.mustChangePassword) {
+      router.push('/portal/set-password');
+      return;
+    }
+    router.push(redirectTo);
   }
 
   async function beginMfaSetup(challenge: MfaChallenge) {

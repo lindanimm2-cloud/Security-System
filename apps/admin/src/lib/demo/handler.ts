@@ -29,6 +29,14 @@ import { DEMO_DISPATCH_RULES } from '../psim/integration-catalog';
 import { DEMO_TENANT, demoRegisterSession, setDemoAccountPassword } from './users';
 import { canManageUserPasswords } from '../password-access';
 import {
+  accessForEngagement,
+  getActiveEngagementForEmail,
+  getTempEngagement,
+  labelForEngagementKind,
+  listTempEngagements,
+  updateTempEngagement,
+} from '../temp-engagements';
+import {
   claimDemoEvent,
   closeDemoEvent,
   dispatchDemoEvent,
@@ -3712,6 +3720,33 @@ export async function handleDemoRequest<T>({
     } as T;
   }
   if (clean === '/client/subscription/access' && m === 'GET') {
+    const engagement = user?.email ? getActiveEngagementForEmail(user.email) : null;
+    if (engagement && (engagement.status === 'ACTIVE' || engagement.status === 'PENDING_APP')) {
+      const access = accessForEngagement(engagement) ?? {
+        home: false,
+        vehicle: false,
+        family: false,
+        medical: false,
+        personal: false,
+        emergency: false,
+      };
+      return ok({
+        tierCode: 'TEMP_ENGAGEMENT',
+        addons: [],
+        access,
+        engagement: {
+          id: engagement.id,
+          kind: engagement.kind,
+          kindLabel: labelForEngagementKind(engagement.kind),
+          status: engagement.status,
+          panicEnabled: engagement.panicEnabled,
+          pickup: engagement.pickup,
+          destination: engagement.destination,
+          date: engagement.date,
+          time: engagement.time,
+        },
+      }) as T;
+    }
     return ok({
       tierCode: 'FAMILY',
       addons: ['HOME_SECURITY', 'VEHICLE_RESPONSE', 'FAMILY', 'MEDICAL_PLUS'],
@@ -3724,6 +3759,38 @@ export async function handleDemoRequest<T>({
         emergency: true,
       },
     }) as T;
+  }
+
+  if (clean === '/client/engagement/panic' && m === 'POST') {
+    const engagement = user?.email ? getActiveEngagementForEmail(user.email) : null;
+    if (!engagement) {
+      return { success: false, error: { message: 'No active engagement' } } as T;
+    }
+    const enabled = Boolean(payload.enabled);
+    const next = updateTempEngagement(engagement.id, { panicEnabled: enabled });
+    return ok(next) as T;
+  }
+
+  if (clean === '/control-room/engagements' && m === 'GET') {
+    return ok(
+      listTempEngagements().map((row) => ({
+        ...row,
+        kindLabel: labelForEngagementKind(row.kind),
+      })),
+    ) as T;
+  }
+
+  if (clean.match(/^\/control-room\/engagements\/[^/]+\/complete$/) && m === 'POST') {
+    const id = clean.split('/')[3];
+    const existing = getTempEngagement(id);
+    if (!existing) {
+      return { success: false, error: { message: 'Engagement not found' } } as T;
+    }
+    const next = updateTempEngagement(id, {
+      status: 'COMPLETED',
+      panicEnabled: false,
+    });
+    return ok(next) as T;
   }
   if (clean === '/client/plans' && m === 'GET') {
     return ok({
