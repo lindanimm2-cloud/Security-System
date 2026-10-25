@@ -51576,20 +51576,29 @@ html[data-theme='light'] .layout-view-toggle__btn--on {
   background: rgba(74, 222, 128, 0.08);
 }
 
-.ops-status--info {
+.ops-status--info,
+.ops-metric.ops-status--info .ops-metric__label {
   color: #60a5fa;
+}
+.ops-status--info {
   border-color: rgba(96, 165, 250, 0.28);
   background: rgba(96, 165, 250, 0.08);
 }
 
-.ops-status--warn {
+.ops-status--warn,
+.ops-metric.ops-status--warn .ops-metric__label {
   color: #fbbf24;
+}
+.ops-status--warn {
   border-color: rgba(251, 191, 36, 0.28);
   background: rgba(251, 191, 36, 0.08);
 }
 
-.ops-status--danger {
+.ops-status--danger,
+.ops-metric.ops-status--danger .ops-metric__label {
   color: #fb7185;
+}
+.ops-status--danger {
   border-color: rgba(251, 113, 133, 0.32);
   background: rgba(225, 29, 72, 0.1);
 }
@@ -53088,9 +53097,29 @@ button.ops-metric {
   white-space: nowrap;
 }
 
-.ops-metrics--compact .ops-metric:first-child,
 .ops-metrics--compact .ops-metric--active {
   background: color-mix(in srgb, var(--surface-2) 92%, #2b2b2b);
+}
+
+.ops-metrics--compact .ops-metric.ops-status--ok,
+.ops-metrics--compact .ops-metric.ops-status--info,
+.ops-metrics--compact .ops-metric.ops-status--warn,
+.ops-metrics--compact .ops-metric.ops-status--danger {
+  background: transparent;
+  border-color: transparent;
+}
+
+.ops-metrics--compact .ops-metric.ops-status--ok.ops-metric--active {
+  background: rgba(74, 222, 128, 0.12);
+}
+.ops-metrics--compact .ops-metric.ops-status--info.ops-metric--active {
+  background: rgba(96, 165, 250, 0.12);
+}
+.ops-metrics--compact .ops-metric.ops-status--warn.ops-metric--active {
+  background: rgba(251, 191, 36, 0.12);
+}
+.ops-metrics--compact .ops-metric.ops-status--danger.ops-metric--active {
+  background: rgba(225, 29, 72, 0.12);
 }
 
 .ops-metrics--compact .ops-metric__value {

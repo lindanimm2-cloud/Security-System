@@ -184,12 +184,24 @@ function FleetContent() {
   const officers = officersData?.data ?? [];
   const tracked = trackedData?.data ?? [];
 
+  const fleetCounts = useMemo(() => {
+    let active = 0;
+    let ready = 0;
+    let maintenance = 0;
+    for (const v of fleet) {
+      if (v.status === 'ON_DUTY' || v.status === 'EN_ROUTE') active += 1;
+      else if (v.status === 'AVAILABLE') ready += 1;
+      else if (v.status === 'MAINTENANCE' || v.status === 'RECOVERY') maintenance += 1;
+    }
+    return { units: fleet.length, active, ready, maintenance };
+  }, [fleet]);
+
   const statusFiltered = useMemo(
     () =>
       fleet.filter((v) => {
-        if (filter === 'active') return v.status === 'ON_DUTY';
-        if (filter === 'ready') return ['AVAILABLE', 'ON_DUTY'].includes(v.status);
-        if (filter === 'maintenance') return v.status === 'MAINTENANCE';
+        if (filter === 'active') return v.status === 'ON_DUTY' || v.status === 'EN_ROUTE';
+        if (filter === 'ready') return v.status === 'AVAILABLE';
+        if (filter === 'maintenance') return v.status === 'MAINTENANCE' || v.status === 'RECOVERY';
         return true;
       }),
     [fleet, filter],
@@ -557,46 +569,50 @@ function FleetContent() {
       ) : null}
 
       <div className="ops-metrics ops-metrics--compact" aria-label="Fleet summary">
-        <article className="ops-metric">
+        <button
+          type="button"
+          className={`ops-metric ${filter === 'all' ? 'ops-metric--active' : ''}`}
+          onClick={() => setFilter('all')}
+          aria-pressed={filter === 'all'}
+        >
           <span className="ops-metric__label">Units</span>
-          <strong className="ops-metric__value">{fleet.length}</strong>
-        </article>
+          <strong className="ops-metric__value">{fleetCounts.units}</strong>
+        </button>
         <button
           type="button"
           className={`ops-metric ops-status--ok ${filter === 'active' ? 'ops-metric--active' : ''}`}
           onClick={() => setFilter(filter === 'active' ? 'all' : 'active')}
+          aria-pressed={filter === 'active'}
         >
           <span className="ops-metric__label">
             <span className="ops-status__dot" aria-hidden />
             Active
           </span>
-          <strong className="ops-metric__value">{fleet.filter((v) => v.status === 'ON_DUTY').length}</strong>
+          <strong className="ops-metric__value">{fleetCounts.active}</strong>
         </button>
         <button
           type="button"
           className={`ops-metric ops-status--info ${filter === 'ready' ? 'ops-metric--active' : ''}`}
           onClick={() => setFilter(filter === 'ready' ? 'all' : 'ready')}
+          aria-pressed={filter === 'ready'}
         >
           <span className="ops-metric__label">
             <span className="ops-status__dot" aria-hidden />
             Ready
           </span>
-          <strong className="ops-metric__value">
-            {fleet.filter((v) => ['AVAILABLE', 'ON_DUTY'].includes(v.status)).length}
-          </strong>
+          <strong className="ops-metric__value">{fleetCounts.ready}</strong>
         </button>
         <button
           type="button"
-          className={`ops-metric ops-status--warn ${filter === 'maintenance' ? 'ops-metric--active' : ''}`}
+          className={`ops-metric ops-status--danger ${filter === 'maintenance' ? 'ops-metric--active' : ''}`}
           onClick={() => setFilter(filter === 'maintenance' ? 'all' : 'maintenance')}
+          aria-pressed={filter === 'maintenance'}
         >
           <span className="ops-metric__label">
             <span className="ops-status__dot" aria-hidden />
             Maint
           </span>
-          <strong className="ops-metric__value">
-            {fleet.filter((v) => v.status === 'MAINTENANCE').length}
-          </strong>
+          <strong className="ops-metric__value">{fleetCounts.maintenance}</strong>
         </button>
       </div>
 
