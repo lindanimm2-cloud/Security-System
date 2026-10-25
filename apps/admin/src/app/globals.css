@@ -8111,6 +8111,36 @@ html[data-theme='dark'] .map-popup-panel--incident .call-action-btn--whatsapp {
   margin-bottom: 0.5rem;
 }
 
+.map-popup-panel--vehicle {
+  min-width: min(20rem, 86vw);
+}
+
+.map-popup-vehicle-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin: 0 0 0.45rem;
+}
+
+.map-popup-vehicle-meta span {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.22rem 0.5rem;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+  background: color-mix(in srgb, var(--surface) 78%, transparent);
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.map-popup-vehicle-sub {
+  margin: 0 0 0.75rem;
+  font-size: 0.78rem;
+  line-height: 1.4;
+  color: var(--muted);
+}
+
 .map-popup-panel__header--officer {
   align-items: center;
   justify-content: flex-start;

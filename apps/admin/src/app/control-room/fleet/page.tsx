@@ -9,7 +9,6 @@ import { OpsDialog } from '@/components/ops/OpsDialog';
 import { OpsActivityRow, OpsStatusBadge } from '@/components/ops/OpsUi';
 import { CctvLiveFeed, type CctvCamera } from '@/components/portal/CctvLiveFeed';
 import { VehicleRemotePad } from '@/components/vehicle/VehicleRemotePad';
-import { VehicleRemoteVisual } from '@/components/vehicle/VehicleRemoteVisual';
 import { ListSearch } from '@/components/ui/ListSearch';
 import { UiSelect } from '@/components/ui/UiSelect';
 import { OpsMenuDropdown, type OpsMenuItem } from '@/components/ops/OpsMenuDropdown';
@@ -638,46 +637,10 @@ function FleetContent() {
           ) : (
             <>
               <section
-                className={`ops-vehicle-hero ops-vehicle-hero--viz${
+                className={`ops-vehicle-hero${
                   remoteState && selectedTracked ? '' : ' ops-vehicle-hero--empty'
                 }`}
               >
-                {remoteState && selectedTracked ? (
-                  <div className="ops-vehicle-hero__visual">
-                    <VehicleRemoteVisual
-                      variant="full"
-                      appearance="ops"
-                      state={remoteState}
-                      meta={{
-                        title: overviewMake || overviewTitle,
-                        registration: overviewReg,
-                        online,
-                        gpsLive: selectedTracked.lat != null && selectedTracked.lng != null,
-                        speedKph: typeof selectedTracked.speed === 'number' ? selectedTracked.speed : null,
-                        batteryPct: selectedTracked.batteryPct ?? null,
-                        lastUpdate: relativeUpdated(selectedTracked?.updatedAt),
-                        vehicleType: selectedTracked.vehicleType ?? selectedFleet?.vehicleType ?? null,
-                        stolen:
-                          selectedTracked.vehicleType === 'STOLEN' ||
-                          Boolean(selectedTracked.theftRecovery),
-                        emergencyStatus:
-                          remoteState.emergencyStatus ??
-                          selectedTracked.emergencyStatus ??
-                          (selectedTracked.theftRecovery ? 'STOLEN' : null),
-                      }}
-                      model={{
-                        make: selectedFleet?.make ?? selectedTracked.make,
-                        model: selectedFleet?.model ?? selectedTracked.model,
-                        colour: selectedFleet?.color ?? selectedTracked.color,
-                      }}
-                      busyAction={busyAction}
-                      hidePanic={false}
-                      onCommand={(action) => sendRemote(action)}
-                      onEmergencyStatusChange={updateEmergencyStatus}
-                    />
-                  </div>
-                ) : null}
-
                 <div className="ops-vehicle-hero__meta">
                   <div className="ops-vehicle-hero__identity">
                     <OpsStatusBadge
@@ -694,8 +657,8 @@ function FleetContent() {
                       {!remoteState || !selectedTracked ? (
                         <p className="ops-vehicle-empty ops-vehicle-empty--inline" role="status">
                           {selectedFleet
-                            ? 'No linked tracker for remote visualization on this fleet unit.'
-                            : 'Vehicle visualization unavailable.'}
+                            ? 'No linked tracker for remote controls on this fleet unit.'
+                            : 'Vehicle remote unavailable.'}
                         </p>
                       ) : null}
                     </div>

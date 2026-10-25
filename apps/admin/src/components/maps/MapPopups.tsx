@@ -6,7 +6,6 @@ import { IncidentDetailsMenu } from '@/components/control-room/IncidentDetailsMe
 import { QuickDispatchPanel } from '@/components/control-room/QuickDispatchPanel';
 import { isAwaitingDispatch } from '@/lib/incident-status';
 import { VehicleRemotePad } from '@/components/vehicle/VehicleRemotePad';
-import { VehicleRemoteVisual } from '@/components/vehicle/VehicleRemoteVisual';
 import type { VehicleRemoteAction } from '@/lib/vehicle-remote';
 import type { MapClient, MapFleetVehicle, MapIncident, MapOfficer, MapProperty, MapVehicle } from './map-types';
 import { customerHref } from '@/lib/control-room-routes';
@@ -202,82 +201,47 @@ export function VehiclePopup({
   vehicle: MapVehicle;
   onRemote?: (action: VehicleRemoteAction) => void | Promise<void>;
 }) {
+  const modelLabel = [vehicle.make, vehicle.model].filter(Boolean).join(' ') || 'Vehicle';
+  const remoteState = {
+    doorsLocked: vehicle.doorsLocked ?? true,
+    immobiliserOn: Boolean(vehicle.immobiliserOn),
+    theftRecovery: Boolean(vehicle.theftRecovery || vehicle.vehicleType === 'STOLEN'),
+    emergencyStatus:
+      vehicle.emergencyStatus ??
+      (vehicle.theftRecovery || vehicle.vehicleType === 'STOLEN' ? 'STOLEN' : null),
+  };
+
   return (
-    <div className="map-popup-panel">
+    <div className={`map-popup-panel ${onRemote ? 'map-popup-panel--vehicle' : ''}`.trim()}>
       <div className="map-popup-panel__header">
         <strong>{vehicle.registration}</strong>
         <span className="map-popup-tag map-popup-tag--vehicle">{vehicle.vehicleType.replace('_', ' ')}</span>
       </div>
-      <dl className="map-popup-dl">
-        <dt>Make / Model</dt>
-        <dd>{vehicle.make} {vehicle.model}</dd>
-        <dt>Colour</dt>
-        <dd>{vehicle.color ?? '—'}</dd>
-        <dt>Owner</dt>
-        <dd>{vehicle.owner}</dd>
-        <dt>Tracker</dt>
-        <dd>{vehicle.trackerStatus}</dd>
-        <dt>Doors</dt>
-        <dd>{vehicle.doorsLocked === false ? 'Unlocked' : 'Locked'}</dd>
-        <dt>Immobiliser</dt>
-        <dd>{vehicle.immobiliserOn ? 'Engaged' : 'Released'}</dd>
-        <dt>Speed</dt>
-        <dd>{vehicle.speed} km/h</dd>
-        <dt>Last updated</dt>
-        <dd>{formatTime(vehicle.updatedAt)}</dd>
-      </dl>
+      <div className="map-popup-vehicle-meta" aria-label="Vehicle summary">
+        <span>{modelLabel}</span>
+        <span>{vehicle.color || '—'}</span>
+        <span>{vehicle.speed} km/h</span>
+        <span>{vehicle.trackerStatus}</span>
+      </div>
+      <p className="map-popup-vehicle-sub">
+        {vehicle.owner}
+        {vehicle.updatedAt ? ` · ${formatTime(vehicle.updatedAt)}` : ''}
+        {' · '}
+        {vehicle.doorsLocked === false ? 'Unlocked' : 'Locked'}
+        {' · '}
+        {vehicle.immobiliserOn ? 'Immobiliser on' : 'Ignition live'}
+      </p>
       {onRemote ? (
-        <>
-          <VehicleRemoteVisual
-            variant="compact"
-            state={{
-              doorsLocked: vehicle.doorsLocked ?? true,
-              immobiliserOn: Boolean(vehicle.immobiliserOn),
-              theftRecovery: Boolean(vehicle.theftRecovery || vehicle.vehicleType === 'STOLEN'),
-              emergencyStatus:
-                vehicle.emergencyStatus ??
-                (vehicle.theftRecovery || vehicle.vehicleType === 'STOLEN' ? 'STOLEN' : null),
-            }}
-            model={{
-              make: vehicle.make,
-              model: vehicle.model,
-              colour: vehicle.color,
-            }}
-            meta={{
-              title: [vehicle.make, vehicle.model].filter(Boolean).join(' ') || undefined,
-              registration: vehicle.registration,
-              online: true,
-              gpsLive: vehicle.lat != null && vehicle.lng != null,
-              speedKph: typeof vehicle.speed === 'number' ? vehicle.speed : null,
-              vehicleType: vehicle.vehicleType ?? null,
-              stolen: vehicle.vehicleType === 'STOLEN' || Boolean(vehicle.theftRecovery),
-              emergencyStatus:
-                vehicle.emergencyStatus ??
-                (vehicle.theftRecovery || vehicle.vehicleType === 'STOLEN' ? 'STOLEN' : null),
-            }}
-            onCommand={onRemote}
-          />
-          <VehicleRemotePad
-            variant="ops"
-            layout="command"
-            compact
-            state={{
-              doorsLocked: vehicle.doorsLocked ?? true,
-              immobiliserOn: Boolean(vehicle.immobiliserOn),
-              theftRecovery: Boolean(vehicle.theftRecovery || vehicle.vehicleType === 'STOLEN'),
-              emergencyStatus:
-                vehicle.emergencyStatus ??
-                (vehicle.theftRecovery || vehicle.vehicleType === 'STOLEN' ? 'STOLEN' : null),
-            }}
-            vehicleLabel={[vehicle.make, vehicle.model].filter(Boolean).join(' ') || null}
-            registration={vehicle.registration ?? null}
-            emergencyStatus={
-              vehicle.emergencyStatus ??
-              (vehicle.theftRecovery || vehicle.vehicleType === 'STOLEN' ? 'STOLEN' : null)
-            }
-            onCommand={onRemote}
-          />
-        </>
+        <VehicleRemotePad
+          variant="ops"
+          layout="command"
+          compact
+          state={remoteState}
+          vehicleLabel={modelLabel}
+          registration={vehicle.registration ?? null}
+          emergencyStatus={remoteState.emergencyStatus}
+          onCommand={onRemote}
+        />
       ) : null}
     </div>
   );

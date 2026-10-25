@@ -4,7 +4,6 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { DashboardLiveCctv } from '@/components/portal/DashboardLiveCctv';
 import { VehicleRemotePad } from '@/components/vehicle/VehicleRemotePad';
-import { VehicleRemoteVisual } from '@/components/vehicle/VehicleRemoteVisual';
 import { clientApi, type ApiResponse } from '@/lib/api-client';
 import type { VehicleEmergencyStatus } from '@/lib/vehicle-emergency-status';
 import type { VehicleRemoteAction, VehicleRemoteState } from '@/lib/vehicle-remote';
@@ -115,30 +114,9 @@ export function ClientVehicleRemote({
 
   return (
     <section className="vehicle-remote--dash" aria-label="Remote vehicle">
-      <VehicleRemoteVisual
-        variant={compact ? 'compact' : 'full'}
-        state={local}
-        model={{
-          make: vehicle.make,
-          model: vehicle.model,
-          year: vehicle.year,
-          colour: vehicle.colour ?? vehicle.color,
-          assetUrl: vehicle.modelAsset,
-        }}
-        meta={{
-          registration: vehicle.registration,
-          emergencyStatus: emergency,
-          stolen: Boolean(local.theftRecovery),
-          vehicleType: local.theftRecovery ? 'STOLEN' : 'CLIENT',
-        }}
-        busyAction={busy ?? (statusBusy ? 'panic' : null)}
-        hidePanic={hidePanic}
-        onCommand={(action) => send(action)}
-        onEmergencyStatusChange={setEmergencyStatus}
-      />
       <VehicleRemotePad
         state={local}
-        busyAction={busy}
+        busyAction={busy ?? (statusBusy ? 'panic' : null)}
         layout="command"
         compact={compact}
         hidePanic={hidePanic}
