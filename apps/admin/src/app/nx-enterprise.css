@@ -1039,6 +1039,118 @@ html[data-theme='dark'] .nx-service-request__address {
   color: var(--nx-steel);
 }
 
+.nx-service-request__section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  border-radius: 10px;
+}
+
+.nx-form-errors {
+  position: sticky;
+  top: 0.75rem;
+  z-index: 4;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  margin: 0.15rem 0 0.35rem;
+  padding: 0.85rem 0.95rem;
+  border: 1px solid color-mix(in srgb, var(--nx-signal) 35%, var(--nx-line));
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--nx-signal) 8%, #fff);
+  box-shadow: 0 8px 22px rgba(26, 29, 35, 0.08);
+}
+
+.nx-form-errors p {
+  margin: 0;
+  font-size: 0.88rem;
+  font-weight: 650;
+  color: var(--nx-signal-hover);
+}
+
+.nx-form-errors__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.nx-form-errors__chip {
+  appearance: none;
+  border: 1px solid color-mix(in srgb, var(--nx-signal) 40%, transparent);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--nx-signal-hover);
+  font: inherit;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  padding: 0.35rem 0.7rem;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.nx-form-errors__chip:hover,
+.nx-form-errors__chip:focus-visible {
+  background: color-mix(in srgb, var(--nx-signal) 12%, #fff);
+  border-color: var(--nx-signal);
+  color: var(--nx-signal);
+  outline: none;
+}
+
+.nx-field-error {
+  display: block;
+  margin: 0.3rem 0 0;
+  font-size: 0.78rem;
+  font-weight: 600;
+  line-height: 1.3;
+  color: var(--nx-signal-hover);
+}
+
+.nx-field--invalid input,
+.nx-field--invalid .nx-schedule__trigger,
+.nx-service-request__address.is-invalid input {
+  border-color: color-mix(in srgb, var(--nx-signal) 65%, var(--nx-line)) !important;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--nx-signal) 16%, transparent);
+}
+
+.nx-service-request__block.is-invalid,
+.nx-service-request__section.is-invalid,
+.nx-service-request__address.is-invalid {
+  border-color: color-mix(in srgb, var(--nx-signal) 45%, var(--nx-line));
+  background: color-mix(in srgb, var(--nx-signal) 5%, #fff);
+}
+
+.nx-section--flash {
+  animation: nx-section-flash 1.1s ease;
+}
+
+@keyframes nx-section-flash {
+  0% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--nx-signal) 0%, transparent);
+  }
+  25% {
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--nx-signal) 28%, transparent);
+  }
+  100% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--nx-signal) 0%, transparent);
+  }
+}
+
+html[data-theme='dark'] .nx-form-errors {
+  background: color-mix(in srgb, var(--nx-signal) 18%, var(--nx-paper, #171a20));
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.28);
+}
+
+html[data-theme='dark'] .nx-form-errors__chip {
+  background: color-mix(in srgb, var(--nx-paper, #171a20) 90%, #000);
+}
+
+html[data-theme='dark'] .nx-service-request__block.is-invalid,
+html[data-theme='dark'] .nx-service-request__section.is-invalid,
+html[data-theme='dark'] .nx-service-request__address.is-invalid {
+  background: color-mix(in srgb, var(--nx-signal) 12%, var(--nx-paper, #171a20));
+}
+
 @media (max-width: 640px) {
   .nx-service-request__row {
     grid-template-columns: 1fr;

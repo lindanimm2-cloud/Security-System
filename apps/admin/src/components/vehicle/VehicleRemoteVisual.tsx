@@ -72,10 +72,10 @@ function partTone(open: boolean, locked: boolean, panic: boolean): 'open' | 'loc
   return 'unlocked';
 }
 
-function partCaption(open: boolean, locked: boolean) {
+function partCaption(open: boolean, locked: boolean, short = false) {
   if (open) return 'OPEN';
-  if (locked) return 'LOCKED';
-  return 'UNLOCKED';
+  if (locked) return short ? 'LCK' : 'LOCKED';
+  return short ? 'ULK' : 'UNLOCKED';
 }
 
 const PART_HOLD_MS = 1100;
@@ -88,6 +88,7 @@ type PartHoldProps = {
   panic: boolean;
   disabled?: boolean;
   loading?: boolean;
+  shortCaption?: boolean;
   onToggle: () => void;
 };
 
@@ -99,10 +100,11 @@ function PartHoldLabel({
   panic,
   disabled,
   loading,
+  shortCaption = false,
   onToggle,
 }: PartHoldProps) {
   const tone = partTone(open, locked, panic);
-  const caption = partCaption(open, locked);
+  const caption = partCaption(open, locked, shortCaption);
   const action = locked ? 'unlock' : 'lock';
   return (
     <HoldToActivate
@@ -273,24 +275,26 @@ export function VehicleRemoteVisual({
         .join(' ')}
       aria-label="Interactive 3D vehicle remote"
     >
-      <header className="vehicle-car__console-head">
-        <div className="vehicle-car__console-head-copy">
-          <p className="vehicle-car__kicker">Field unit</p>
-          <h3 className="vehicle-car__name">{title}</h3>
-          {meta?.registration ? <p className="vehicle-car__reg">{meta.registration}</p> : null}
-        </div>
-        <div className="vehicle-car__console-head-status">
-          <span className={`vehicle-car__link-pill ${online ? 'is-ok' : 'is-off'}`}>
-            <i aria-hidden />
-            {online ? 'Online' : 'Offline'}
-          </span>
-          {meta?.lastUpdate ? (
-            <span className="vehicle-car__update">
-              Updated <time>{meta.lastUpdate}</time>
+      {variant === 'compact' ? null : (
+        <header className="vehicle-car__console-head">
+          <div className="vehicle-car__console-head-copy">
+            <p className="vehicle-car__kicker">Field unit</p>
+            <h3 className="vehicle-car__name">{title}</h3>
+            {meta?.registration ? <p className="vehicle-car__reg">{meta.registration}</p> : null}
+          </div>
+          <div className="vehicle-car__console-head-status">
+            <span className={`vehicle-car__link-pill ${online ? 'is-ok' : 'is-off'}`}>
+              <i aria-hidden />
+              {online ? 'Online' : 'Offline'}
             </span>
-          ) : null}
-        </div>
-      </header>
+            {meta?.lastUpdate ? (
+              <span className="vehicle-car__update">
+                Updated <time>{meta.lastUpdate}</time>
+              </span>
+            ) : null}
+          </div>
+        </header>
+      )}
 
       <div className="vehicle-car__stage vehicle-car__stage--hero">
         <div className="vehicle-car__stage-glow" aria-hidden />
@@ -319,10 +323,11 @@ export function VehicleRemoteVisual({
         <div className="vehicle-car__part-hud" role="group" aria-label="Door and panel locks">
           <PartHoldLabel
             slot="bonnet"
-            name="Bonnet"
+            name="Hood"
             open={component.bonnet.open}
             locked={Boolean(component.bonnet.locked ?? component.locked)}
             panic={panic}
+            shortCaption={variant === 'compact'}
             disabled={disabled || anyBusy}
             loading={feedback.lock === 'loading' || feedback.unlock === 'loading' || busyAction === 'lock' || busyAction === 'unlock'}
             onToggle={() =>
@@ -340,6 +345,7 @@ export function VehicleRemoteVisual({
                 open={d.open}
                 locked={locked}
                 panic={panic}
+                shortCaption={variant === 'compact'}
                 disabled={disabled || anyBusy}
                 loading={
                   feedback.lock === 'loading' ||
@@ -357,6 +363,7 @@ export function VehicleRemoteVisual({
             open={component.boot.open}
             locked={Boolean(component.boot.locked ?? component.locked)}
             panic={panic}
+            shortCaption={variant === 'compact'}
             disabled={disabled || anyBusy}
             loading={feedback.lock === 'loading' || feedback.unlock === 'loading' || busyAction === 'lock' || busyAction === 'unlock'}
             onToggle={() =>

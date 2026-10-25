@@ -1,8 +1,9 @@
 'use client';
 
 import Link from 'next/link';
-import { useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useEffect, useMemo, useState } from 'react';
+import { isMfaChallenge, login } from '@/lib/auth';
 import {
   APP_CATALOG,
   PLATFORM_DISCLAIMER,
@@ -27,9 +28,12 @@ function statusBadge(status: AppCatalogEntry['status']) {
 
 function EngagementAcceptBanner() {
   const params = useSearchParams();
+  const router = useRouter();
   const engagementId = params.get('from') === 'engagement' ? params.get('id') : null;
   const [engagement, setEngagement] = useState<TempEngagement | null>(null);
   const [creds, setCreds] = useState<{ email: string; tempPassword: string } | null>(null);
+  const [opening, setOpening] = useState(false);
+  const [error, setError] = useState('');
 
   useEffect(() => {
     if (!engagementId) return;
@@ -38,12 +42,32 @@ function EngagementAcceptBanner() {
 
   if (!engagementId || !engagement) return null;
 
-  function accept() {
-    if (!engagement) return;
+  async function accept() {
+    if (!engagement || opening) return;
+    setError('');
+    setOpening(true);
     const activated = activateEngagementPortalAccess(engagement.id);
-    if (!activated) return;
+    if (!activated) {
+      setOpening(false);
+      setError('Could not create temporary portal access.');
+      return;
+    }
     setEngagement(activated.engagement);
     setCreds({ email: activated.email, tempPassword: activated.tempPassword });
+    try {
+      const result = await login('client', activated.email, activated.tempPassword, 'demo', {
+        authSource: 'portal',
+      });
+      if (isMfaChallenge(result)) {
+        setOpening(false);
+        setError('Sign in from the client portal login page to continue.');
+        return;
+      }
+      router.push(result.user.mustChangePassword ? '/portal/set-password' : '/portal');
+    } catch {
+      setOpening(false);
+      setError('Portal login failed. Use the credentials below to sign in.');
+    }
   }
 
   return (
@@ -51,27 +75,41 @@ function EngagementAcceptBanner() {
       <p className="dash-ops__eyebrow">Temporary job</p>
       <h2>{labelForEngagementKind(engagement.kind)}</h2>
       <p className="text-muted">
-        Accept app access to create a temporary portal login. You will set your own password after
+        Accept app access to open a temporary portal login. You will set your own password after
         the first sign-in.
       </p>
       {!creds ? (
-        <button type="button" className="ops-act ops-act--dispatch" onClick={accept}>
-          Accept app access
+        <button
+          type="button"
+          className="ops-act ops-act--dispatch"
+          disabled={opening}
+          onClick={() => void accept()}
+        >
+          {opening ? 'Opening portal…' : 'Accept app access'}
         </button>
       ) : (
         <div className="apps-hub__creds" role="status">
-          <p>Temp login ready — organisation <code>demo</code></p>
+          <p>
+            {opening
+              ? 'Signing you into the temporary client portal…'
+              : 'Temp login ready — organisation '}
+            {!opening ? <code>demo</code> : null}
+          </p>
           <p>
             Email <code>{creds.email}</code>
           </p>
           <p>
             Password <code>{creds.tempPassword}</code>
           </p>
-          <Link href="/portal/login" className="ops-act ops-act--dispatch">
-            Sign in to client portal
-          </Link>
+          {error ? <p className="nx-field-error">{error}</p> : null}
+          {!opening ? (
+            <button type="button" className="ops-act ops-act--dispatch" onClick={() => void accept()}>
+              Open temp client portal
+            </button>
+          ) : null}
         </div>
       )}
+      {error && !creds ? <p className="nx-field-error">{error}</p> : null}
     </section>
   );
 }
