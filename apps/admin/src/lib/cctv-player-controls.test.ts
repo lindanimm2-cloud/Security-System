@@ -70,25 +70,28 @@ const base = {
   assert.ok(!v.controls.includes('record'));
 }
 
-// Fullscreen always space-aware but interaction-gated
+// Fullscreen keeps the full transport bar visible (same features as side menu)
 {
   const idle = getVisibleControls({
     ...base,
     isFullscreen: true,
     containerWidth: 800,
   });
-  assert.equal(idle.toolbarVisible, false);
+  assert.equal(idle.toolbarVisible, true);
   assert.ok(idle.controls.includes('play'));
   assert.ok(idle.controls.includes('rewind'));
   assert.ok(idle.controls.includes('forward'));
+  assert.ok(idle.controls.includes('mute'));
 
-  const open = getVisibleControls({
+  const force = getVisibleControls({
     ...base,
     isFullscreen: true,
-    isHovered: true,
-    containerWidth: 800,
+    forceFullTransport: true,
+    containerWidth: 200,
   });
-  assert.equal(open.toolbarVisible, true);
+  assert.equal(force.toolbarVisible, true);
+  assert.ok(force.controls.includes('record'));
+  assert.ok(force.controls.includes('speed'));
 }
 
 // Docked / focus larger view — full transport even on a narrow panel

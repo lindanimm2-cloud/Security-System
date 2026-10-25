@@ -112,7 +112,7 @@ function ExpandIcon({ exit }: { exit?: boolean }) {
 
 function FeedControls({
   camera,
-  stageRef,
+  fsTargetRef,
   muted,
   volume,
   recording,
@@ -140,7 +140,8 @@ function FeedControls({
   onReveal,
 }: {
   camera: CctvCamera;
-  stageRef: RefObject<HTMLDivElement | null>;
+  /** Fullscreen the whole feed so docked transport stays on screen. */
+  fsTargetRef: RefObject<HTMLDivElement | null>;
   muted: boolean;
   volume: number;
   recording: boolean;
@@ -168,14 +169,14 @@ function FeedControls({
   onReveal: () => void;
 }) {
   const toggleFullscreen = useCallback(() => {
-    const el = stageRef.current;
+    const el = fsTargetRef.current;
     if (!el) return;
     if (document.fullscreenElement) {
       void document.exitFullscreen().catch(() => undefined);
       return;
     }
     void el.requestFullscreen?.().catch(() => undefined);
-  }, [stageRef]);
+  }, [fsTargetRef]);
 
   const takeSnapshot = useCallback(() => {
     const stamp = new Date().toISOString().replace(/[:.]/g, '-');
@@ -189,7 +190,7 @@ function FeedControls({
       a.click();
       return;
     }
-    const stage = stageRef.current;
+    const stage = fsTargetRef.current;
     if (!stage) return;
     const canvas = document.createElement('canvas');
     canvas.width = Math.max(320, stage.clientWidth * 2);
@@ -215,7 +216,7 @@ function FeedControls({
       'image/jpeg',
       0.92,
     );
-  }, [camera, stageRef]);
+  }, [camera, fsTargetRef]);
 
   const show = (id: CctvControlId) => visibleIds.includes(id);
   const expandOnlyPeek = peekExpand && !toolbarVisible && show('expand');
@@ -495,6 +496,8 @@ function FeedInner({
   const live =
     camera.isLiveCapable !== false && (status === 'online' || status === 'recording');
   const offline = status === 'offline' || status === 'fault';
+  /** Side menu + browser fullscreen share the same docked transport. */
+  const useDockedTransport = dockedControls || isFullscreen;
   const isExpanded = Boolean(featured) || isFullscreen || dockedControls;
 
   useEffect(() => {
@@ -540,10 +543,11 @@ function FeedInner({
     if (idleTimer.current != null) window.clearTimeout(idleTimer.current);
     if (!document.fullscreenElement) return;
     setIsTouchRevealed(true);
+    // Keep transport visible in FS — only auto-hide the peek chrome, not the docked bar.
     idleTimer.current = window.setTimeout(() => {
       setIsTouchRevealed((open) => {
         return open && document.activeElement
-          ? Boolean(stageRef.current?.contains(document.activeElement))
+          ? Boolean(feedRef.current?.contains(document.activeElement))
           : false;
       });
     }, FULLSCREEN_IDLE_MS);
@@ -552,24 +556,34 @@ function FeedInner({
   const scheduleTouchHide = useCallback(() => {
     if (touchTimer.current != null) window.clearTimeout(touchTimer.current);
     touchTimer.current = window.setTimeout(() => {
-      if (document.activeElement && stageRef.current?.contains(document.activeElement)) return;
+      if (document.activeElement && feedRef.current?.contains(document.activeElement)) return;
       setIsTouchRevealed(false);
     }, TOUCH_REVEAL_MS);
   }, []);
 
   const reveal = useCallback(() => {
     setIsTouchRevealed(true);
-    if (document.fullscreenElement === stageRef.current) bumpFullscreenIdle();
-    else if (detectTouchDevice()) scheduleTouchHide();
+    const fsEl = document.fullscreenElement;
+    if (fsEl && (fsEl === feedRef.current || feedRef.current?.contains(fsEl))) {
+      bumpFullscreenIdle();
+    } else if (detectTouchDevice()) {
+      scheduleTouchHide();
+    }
   }, [bumpFullscreenIdle, scheduleTouchHide]);
 
   useEffect(() => {
     function onFs() {
-      const active = document.fullscreenElement === stageRef.current;
+      const fsEl = document.fullscreenElement;
+      const active =
+        fsEl === feedRef.current ||
+        fsEl === stageRef.current ||
+        (fsEl instanceof Element && Boolean(feedRef.current?.contains(fsEl)));
       setIsFullscreen(active);
       if (active) {
         setIsTouchRevealed(true);
         bumpFullscreenIdle();
+      } else {
+        setVolumeOpen(false);
       }
     }
     document.addEventListener('fullscreenchange', onFs);
@@ -598,14 +612,14 @@ function FeedInner({
     containerWidth,
     isTouchDevice,
     isPlayback,
-    forceFullTransport: dockedControls,
+    forceFullTransport: useDockedTransport,
   });
 
   const controlsEl =
     showControls ? (
       <FeedControls
         camera={camera}
-        stageRef={stageRef}
+        fsTargetRef={feedRef}
         muted={muted}
         volume={volume}
         recording={recording}
@@ -619,7 +633,7 @@ function FeedInner({
         peekExpand={visibility.peekExpand}
         density={visibility.density}
         volumeOpen={volumeOpen}
-        docked={dockedControls}
+        docked={useDockedTransport}
         onMute={toggleMute}
         onVolume={setVolumeValue}
         onVolumeOpen={setVolumeOpen}
@@ -743,7 +757,7 @@ function FeedInner({
         `cctv-feed--${status}`,
         featured ? 'cctv-feed--featured' : '',
         compact ? 'cctv-feed--compact' : '',
-        dockedControls ? 'cctv-feed--docked' : '',
+        useDockedTransport ? 'cctv-feed--docked' : '',
         live ? 'cctv-feed--live' : '',
         recording ? 'cctv-feed--user-rec' : '',
         paused ? 'cctv-feed--paused' : '',
@@ -780,6 +794,23 @@ function FeedInner({
         setVolumeOpen(false);
       }}
     >
+      {isFullscreen ? (
+        <button
+          type="button"
+          className="cctv-feed__fs-exit"
+          aria-label="Exit fullscreen"
+          title="Exit fullscreen"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            void document.exitFullscreen().catch(() => undefined);
+          }}
+        >
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+            <path d="M18 6 6 18M6 6l12 12" />
+          </svg>
+        </button>
+      ) : null}
       <div
         className="cctv-feed__stage"
         ref={stageRef}
@@ -788,7 +819,7 @@ function FeedInner({
           if (isFullscreen) bumpFullscreenIdle();
         }}
       >
-        {onSelect ? (
+        {onSelect && !isFullscreen ? (
           <button
             type="button"
             className="cctv-feed__open"
@@ -798,7 +829,7 @@ function FeedInner({
               onSelect();
             }}
           />
-        ) : href ? (
+        ) : href && !isFullscreen ? (
           <Link
             href={href}
             className="cctv-feed__open"
@@ -819,19 +850,19 @@ function FeedInner({
           {recording ? (
             <span className="cctv-feed__rec cctv-feed__rec--user" id={recLabelId}>
               <i aria-hidden />
-              {compact && !dockedControls ? null : ' REC'}
+              {compact && !useDockedTransport ? null : ' REC'}
             </span>
           ) : isPlayback ? (
             <span className="cctv-feed__rec cctv-feed__rec--playback">
               <i aria-hidden />
-              {compact && !dockedControls
+              {compact && !useDockedTransport
                 ? null
                 : ` ${reverse ? 'REW' : speed > 1 ? 'FF' : 'PLAY'} ${formatPlaybackSpeed(speed, false)}`}
             </span>
           ) : live ? (
             <span className="cctv-feed__rec">
               <i aria-hidden />
-              {compact && !dockedControls ? null : ' LIVE'}
+              {compact && !useDockedTransport ? null : ' LIVE'}
             </span>
           ) : (
             <span className="cctv-feed__rec cctv-feed__rec--off">
@@ -844,28 +875,28 @@ function FeedInner({
             {!muted ? <span className="cctv-feed__audio-pill">AUDIO</span> : null}
           </span>
         </div>
-        {dockedControls ? null : controlsEl}
+        {useDockedTransport ? null : controlsEl}
       </div>
-      {dockedControls ? controlsEl : null}
+      {useDockedTransport ? controlsEl : null}
       <div className="cctv-feed__footer">
         {onSelect ? (
           <button type="button" className="cctv-feed__footer-link" onClick={onSelect}>
             <strong>{camera.name}</strong>
-            {compact && !dockedControls ? null : (
+            {compact && !useDockedTransport ? null : (
               <span className="cctv-feed__loc">{camera.locationLabel}</span>
             )}
           </button>
         ) : href ? (
           <Link href={href} className="cctv-feed__footer-link" aria-label={`View ${camera.name}`}>
             <strong>{camera.name}</strong>
-            {compact && !dockedControls ? null : (
+            {compact && !useDockedTransport ? null : (
               <span className="cctv-feed__loc">{camera.locationLabel}</span>
             )}
           </Link>
         ) : (
           <>
             <strong>{camera.name}</strong>
-            {compact && !dockedControls ? null : (
+            {compact && !useDockedTransport ? null : (
               <span className="cctv-feed__loc">{camera.locationLabel}</span>
             )}
           </>

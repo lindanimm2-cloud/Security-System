@@ -158,11 +158,13 @@ export function getVisibleControls(state: CctvPlayerUiState): CctvVisibleControl
     };
   }
 
-  // Fullscreen / large expanded: full toolbar when interacting (auto-hide driven by caller).
+  // Fullscreen (non-docked path): keep transport visible — same features as side menu.
   if (isFullscreen) {
     return {
-      controls,
-      toolbarVisible: interactionOpen || isFocused,
+      controls: forceFullTransport
+        ? controls
+        : maxControlsForWidth(Math.max(width, WIDTH_FULL), true, isPlayback),
+      toolbarVisible: true,
       peekExpand: false,
       density: 'full',
     };
