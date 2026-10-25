@@ -752,60 +752,62 @@ function OverviewDashboard() {
         )}
 
         {jobOnly ? null : (
-        <section className="portal-card">
-          <Link href="/portal/emergency" className="card-title-link">
-            <h2>Active Services</h2>
-          </Link>
-          <div className="service-status-grid">
-            {Object.entries(d.services ?? {})
-              .filter(([key]) => key !== 'communications')
-              .map(([key, status]) => (
+          <>
+            <section className="portal-card">
+              <Link href="/portal/emergency" className="card-title-link">
+                <h2>Active Services</h2>
+              </Link>
+              <div className="service-status-grid">
+                {Object.entries(d.services ?? {})
+                  .filter(([key]) => key !== 'communications')
+                  .map(([key, status]) => (
+                    <Link
+                      key={key}
+                      href={
+                        status === 'upgrade'
+                          ? `/portal/subscription/upgrade?addon=${key === 'home' ? 'HOME_SECURITY' : key === 'vehicle' ? 'VEHICLE_RESPONSE' : key === 'family' ? 'FAMILY' : ''}`
+                          : (SERVICE_HREFS[key] ?? '/portal')
+                      }
+                      className="service-status-card"
+                    >
+                      <span className="service-status-name">
+                        {SERVICE_LABELS[key] ?? key}
+                      </span>
+                      <span className={`service-status-badge service-status-badge--${status}`}>
+                        {status === 'upgrade' ? 'Upgrade' : status}
+                      </span>
+                    </Link>
+                  ))}
+              </div>
+            </section>
+
+            <section className="portal-card">
+              <div className="card-header-row">
+                <Link href="/portal/subscription" className="card-title-link">
+                  <h2>Subscription</h2>
+                </Link>
+                <Link href="/portal/subscription" className="link-sm">
+                  Manage
+                </Link>
+              </div>
+              {d.subscription ? (
                 <Link
-                  key={key}
-                  href={
-                    status === 'upgrade'
-                      ? `/portal/subscription/upgrade?addon=${key === 'home' ? 'HOME_SECURITY' : key === 'vehicle' ? 'VEHICLE_RESPONSE' : key === 'family' ? 'FAMILY' : ''}`
-                      : (SERVICE_HREFS[key] ?? '/portal')
-                  }
-                  className="service-status-card"
+                  href="/portal/subscription"
+                  className="subscription-summary subscription-summary--link"
                 >
-                  <span className="service-status-name">
-                    {SERVICE_LABELS[key] ?? key}
-                  </span>
-                  <span className={`service-status-badge service-status-badge--${status}`}>
-                    {status === 'upgrade' ? 'Upgrade' : status}
+                  <strong>{d.subscription.planName}</strong>
+                  <span className="text-muted">Member ID: {d.subscription.memberId}</span>
+                  <span className={`status-pill status-pill--${d.subscription.status.toLowerCase()}`}>
+                    {d.subscription.status}
                   </span>
                 </Link>
-              ))}
-          </div>
-        </section>
-
-        <section className="portal-card">
-          <div className="card-header-row">
-            <Link href="/portal/subscription" className="card-title-link">
-              <h2>Subscription</h2>
-            </Link>
-            <Link href="/portal/subscription" className="link-sm">
-              Manage
-            </Link>
-          </div>
-          {d.subscription ? (
-            <Link
-              href="/portal/subscription"
-              className="subscription-summary subscription-summary--link"
-            >
-              <strong>{d.subscription.planName}</strong>
-              <span className="text-muted">Member ID: {d.subscription.memberId}</span>
-              <span className={`status-pill status-pill--${d.subscription.status.toLowerCase()}`}>
-                {d.subscription.status}
-              </span>
-            </Link>
-          ) : (
-            <Link href="/portal/subscription" className="text-muted interactive-text">
-              No active subscription — set up plan
-            </Link>
-          )}
-        </section>
+              ) : (
+                <Link href="/portal/subscription" className="text-muted interactive-text">
+                  No active subscription — set up plan
+                </Link>
+              )}
+            </section>
+          </>
         )}
 
         {!hasAlert && (
