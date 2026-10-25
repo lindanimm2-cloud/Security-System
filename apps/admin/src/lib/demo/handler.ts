@@ -4936,8 +4936,8 @@ export async function handleDemoRequest<T>({
         onSceneAt: null,
         resolvedAt: null,
         createdAt: new Date(Date.now() - 180_000).toISOString(),
-        lat: -29.725,
-        lng: 31.085,
+        lat: -29.728,
+        lng: 31.078,
         unit: {
           callSign: 'Unit 14',
           kind: 'SECURITY',
