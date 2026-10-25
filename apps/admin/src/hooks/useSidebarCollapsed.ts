@@ -15,6 +15,15 @@ export function useSidebarCollapsed() {
     }
   }, []);
 
+  const persist = useCallback((next: boolean) => {
+    setCollapsed(next);
+    try {
+      localStorage.setItem(KEY, next ? '1' : '0');
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
   const toggle = useCallback(() => {
     setCollapsed((current) => {
       const next = !current;
@@ -27,5 +36,5 @@ export function useSidebarCollapsed() {
     });
   }, []);
 
-  return { collapsed, toggle };
+  return { collapsed, toggle, setCollapsed: persist };
 }

@@ -15,7 +15,9 @@ import {
 import {
   activateEngagementPortalAccess,
   getTempEngagement,
+  jobKickerForEngagementKind,
   labelForEngagementKind,
+  nextPortalPathAfterAuth,
   type TempEngagement,
 } from '@/lib/temp-engagements';
 
@@ -63,7 +65,12 @@ function EngagementAcceptBanner() {
         setError('Sign in from the client portal login page to continue.');
         return;
       }
-      router.push(result.user.mustChangePassword ? '/portal/set-password' : '/portal');
+      router.push(
+        nextPortalPathAfterAuth({
+          mustChangePassword: result.user.mustChangePassword,
+          email: result.user.email,
+        }),
+      );
     } catch {
       setOpening(false);
       setError('Portal login failed. Use the credentials below to sign in.');
@@ -71,12 +78,12 @@ function EngagementAcceptBanner() {
   }
 
   return (
-    <section className="apps-hub__engagement" aria-label="Temporary engagement access">
-      <p className="dash-ops__eyebrow">Temporary job</p>
+    <section className="apps-hub__engagement" aria-label="Engagement access">
+      <p className="dash-ops__eyebrow">{jobKickerForEngagementKind(engagement.kind)}</p>
       <h2>{labelForEngagementKind(engagement.kind)}</h2>
       <p className="text-muted">
-        Accept app access to open a temporary portal login. You will set your own password after
-        the first sign-in.
+        Accept to open a portal login for this job. You will set your own password after the first
+        sign-in.
       </p>
       {!creds ? (
         <button

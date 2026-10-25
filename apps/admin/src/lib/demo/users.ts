@@ -397,20 +397,26 @@ export function provisionTempEngagementClient(input: {
   phone?: string;
   engagementId: string;
   tempPassword: string;
-}): { email: string; tempPassword: string } {
+  existingClient?: boolean;
+}): { email: string; tempPassword: string; existingClient: boolean } {
   const email = input.email.trim().toLowerCase();
+  const prior = getStoredDemoClient(email);
+  const keepExisting = Boolean(input.existingClient || (prior && !prior.engagementId));
+  const password = keepExisting
+    ? prior?.password || input.tempPassword
+    : input.tempPassword;
   persistRegisteredDemoClient({
     email,
     portal: 'client',
     role: 'CLIENT',
-    firstName: input.firstName || 'Guest',
-    lastName: input.lastName || 'Client',
-    phone: input.phone,
-    password: input.tempPassword,
-    mustChangePassword: true,
+    firstName: input.firstName || prior?.firstName || 'Guest',
+    lastName: input.lastName || prior?.lastName || 'Client',
+    phone: input.phone || prior?.phone,
+    password,
+    mustChangePassword: keepExisting ? false : true,
     engagementId: input.engagementId,
   });
-  return { email, tempPassword: input.tempPassword };
+  return { email, tempPassword: password, existingClient: keepExisting };
 }
 
 export function getStoredDemoClient(email: string): StoredDemoClientAccount | null {

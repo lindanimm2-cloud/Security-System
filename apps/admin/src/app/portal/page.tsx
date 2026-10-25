@@ -113,7 +113,7 @@ function OverviewDashboard() {
     () => clientApi.get<ApiResponse<Overview>>('/client/overview'),
     [],
   );
-  const { access, engagement, reload: reloadAccess } = useSubscriptionAccess();
+  const { access, engagement, jobOnly, reload: reloadAccess } = useSubscriptionAccess();
   const { data: contactsPayload } = useApi(
     () =>
       clientApi.get<
@@ -343,8 +343,8 @@ function OverviewDashboard() {
       {access?.emergency !== false && (
         <PanicNeuConsole
           className="panic-section"
-          showHub
-          showMedical={access?.medical !== false}
+          showHub={!jobOnly}
+          showMedical={!jobOnly && access?.medical !== false}
           busy={
             (panicLoading
               ? 'panic'
@@ -360,25 +360,27 @@ function OverviewDashboard() {
           }
           onPanic={() => handlePanic(false)}
           onSilent={() => handlePanic(true)}
-          onMedical={() => void handleMedicalEmergency()}
-          onFire={() => void handleFireEmergency()}
+          onMedical={jobOnly ? undefined : () => void handleMedicalEmergency()}
+          onFire={jobOnly ? undefined : () => void handleFireEmergency()}
           onVehicle={
-            access?.vehicle !== false && primaryVehicle
+            !jobOnly && access?.vehicle !== false && primaryVehicle
               ? () => void handleVehiclePanic(primaryVehicle.id)
               : undefined
           }
         />
       )}
 
-      <HomeAlarmControl
-        variant="dashboard"
-        properties={d.properties ?? []}
-        hasAccess={!!access?.home}
-        onUpdated={reload}
-        feeds={<DashboardLiveCctv embedded kind="home" />}
-      />
+      {jobOnly ? null : (
+        <HomeAlarmControl
+          variant="dashboard"
+          properties={d.properties ?? []}
+          hasAccess={!!access?.home}
+          onUpdated={reload}
+          feeds={<DashboardLiveCctv embedded kind="home" />}
+        />
+      )}
 
-      {access?.vehicle !== false && primaryVehicle ? (
+      {!jobOnly && access?.vehicle !== false && primaryVehicle ? (
         <ClientVehicleRemote
           vehicle={primaryVehicle}
           onUpdated={() => void reload({ silent: true })}
@@ -412,47 +414,71 @@ function OverviewDashboard() {
       ) : null}
       </div>
 
-      <div className="portal-status-dock">
-        <ProtectionStatusCard
-          tone={tone}
-          title={
-            tone === 'emergency'
-              ? 'Emergency active'
-              : tone === 'attention'
-                ? 'Attention required'
-                : 'You are protected'
-          }
-          lines={[
-            primaryAlarm
-              ? `Home security · ${primaryAlarm.alarmStatus}`
-              : 'Home security ready',
-            `${d.stats.familyCount} family connected`,
-            `Last check · just now`,
-          ]}
-        />
-        <EmergencyProtectionBanner />
-      </div>
+      {jobOnly ? (
+        <div className="portal-status-dock">
+          <ProtectionStatusCard
+            tone={tone}
+            title={
+              tone === 'emergency'
+                ? 'Emergency active'
+                : tone === 'attention'
+                  ? 'Attention required'
+                  : engagement
+                    ? `${engagement.jobKicker || engagement.kindLabel} active`
+                    : 'Job cover active'
+            }
+            lines={[
+              engagement?.panicEnabled ? 'Panic armed · control room linked' : 'Panic off until you arm it',
+              engagement?.date ? `Scheduled · ${engagement.date}${engagement.time ? ` ${engagement.time}` : ''}` : 'Live check-ins ready',
+              'Mobile cover for this engagement',
+            ]}
+          />
+        </div>
+      ) : (
+        <>
+          <div className="portal-status-dock">
+            <ProtectionStatusCard
+              tone={tone}
+              title={
+                tone === 'emergency'
+                  ? 'Emergency active'
+                  : tone === 'attention'
+                    ? 'Attention required'
+                    : 'You are protected'
+              }
+              lines={[
+                primaryAlarm
+                  ? `Home security · ${primaryAlarm.alarmStatus}`
+                  : 'Home security ready',
+                `${d.stats.familyCount} family connected`,
+                `Last check · just now`,
+              ]}
+            />
+            <EmergencyProtectionBanner />
+          </div>
 
-      <div className="portal-brief">
-        <PortalCommandBrief
-          firstName={d.user.firstName}
-          address={d.user.address}
-          eventsCount={
-            d.stats.activeIncidents + d.stats.unreadNotifications + (primaryAlarm ? 1 : 0)
-          }
-          alertsCount={d.stats.activeIncidents}
-          updatesCount={d.stats.unreadNotifications}
-          trackingOn={d.user.trackingEnabled}
-          familyCount={d.stats.familyCount}
-          familyTrackingCount={family.filter((m) => m.trackingEnabled).length}
-          safeZoneCount={d.safeZoneCount}
-          homeAccess={access?.home !== false}
-          cctvReady={access?.home !== false}
-          property={primaryAlarm ?? null}
-          incidents={activeIncidents.length ? activeIncidents : recentIncidents}
-          activity={d.recentActivity ?? []}
-        />
-      </div>
+          <div className="portal-brief">
+            <PortalCommandBrief
+              firstName={d.user.firstName}
+              address={d.user.address}
+              eventsCount={
+                d.stats.activeIncidents + d.stats.unreadNotifications + (primaryAlarm ? 1 : 0)
+              }
+              alertsCount={d.stats.activeIncidents}
+              updatesCount={d.stats.unreadNotifications}
+              trackingOn={d.user.trackingEnabled}
+              familyCount={d.stats.familyCount}
+              familyTrackingCount={family.filter((m) => m.trackingEnabled).length}
+              safeZoneCount={d.safeZoneCount}
+              homeAccess={access?.home !== false}
+              cctvReady={access?.home !== false}
+              property={primaryAlarm ?? null}
+              incidents={activeIncidents.length ? activeIncidents : recentIncidents}
+              activity={d.recentActivity ?? []}
+            />
+          </div>
+        </>
+      )}
 
       <OpsNeedsYou
         items={[
@@ -532,9 +558,13 @@ function OverviewDashboard() {
       )}
 
       <SlidingSection
-        title="Contacts & services"
-        subtitle="Family, vehicles, subscription & activity"
-        defaultOpen={false}
+        title={jobOnly ? 'Contacts' : 'Contacts & services'}
+        subtitle={
+          jobOnly
+            ? 'Emergency contacts for this job'
+            : 'Family, vehicles, subscription & activity'
+        }
+        defaultOpen={jobOnly}
         storageKey="portal-dashboard-details"
       >
       <div className="overview-grid">
@@ -571,124 +601,157 @@ function OverviewDashboard() {
           </ul>
         </section>
 
-        <section className="portal-card">
-          <div className="card-header-row">
-            <Link href="/portal/family" className="card-title-link">
-              <h2>Family Status</h2>
-            </Link>
-            <Link href="/portal/family" className="link-sm">
-              View all
-            </Link>
-          </div>
-          <ul className="status-list">
-            {family.length === 0 ? (
-              <li>
-                <Link href="/portal/family" className="interactive-text">
-                  No family members linked — set up family
-                </Link>
-              </li>
-            ) : (
-              family.map((m) => (
-                <li key={m.id} className="status-list-item">
-                  <button
-                    type="button"
-                    className="status-list-link"
-                    onClick={() =>
-                      setSelectedFamily({
-                        id: m.id,
-                        name: m.name,
-                        trackingEnabled: m.trackingEnabled,
-                        phone: m.phone,
-                        userId: m.id,
-                      })
-                    }
-                  >
-                    {m.name}
-                  </button>
-                  <button
-                    type="button"
-                    className={`status-dot status-dot--link ${m.trackingEnabled ? 'status-dot--on' : ''}`}
-                    onClick={() =>
-                      setSelectedFamily({
-                        id: m.id,
-                        name: m.name,
-                        trackingEnabled: m.trackingEnabled,
-                        phone: m.phone,
-                        userId: m.id,
-                      })
-                    }
-                  >
-                    {m.trackingEnabled ? 'Tracking on' : 'Offline'}
-                  </button>
-                </li>
-              ))
-            )}
-          </ul>
-        </section>
-
-        <section className="portal-card">
-          <div className="card-header-row">
-            <Link href="/portal/vehicles" className="card-title-link">
-              <h2>Vehicle Status</h2>
-            </Link>
-            <Link href="/portal/vehicles" className="link-sm">
-              Manage
-            </Link>
-          </div>
-          {vehicles.length === 0 ? (
-            <Link href="/portal/vehicles" className="interactive-text text-muted">
-              No vehicles registered — add vehicle
-            </Link>
-          ) : (
+        {jobOnly ? null : (
+          <section className="portal-card">
+            <div className="card-header-row">
+              <Link href="/portal/family" className="card-title-link">
+                <h2>Family Status</h2>
+              </Link>
+              <Link href="/portal/family" className="link-sm">
+                View all
+              </Link>
+            </div>
             <ul className="status-list">
-              {vehicles.map((v) => (
-                <li key={v.id} className="status-list-item">
-                  <Link href={`/portal/vehicles/${v.id}`} className="status-list-link">
-                    {v.registration} — {v.make} {v.model}
-                  </Link>
-                  <Link
-                    href={`/portal/vehicles/${v.id}`}
-                    className={`status-pill status-pill--link ${v.theftRecovery ? 'status-pill--alert' : 'status-pill--ok'}`}
-                  >
-                    {v.theftRecovery
-                      ? vehicleEmergencyMeta(v.emergencyStatus).label
-                      : 'Secure'}
+              {family.length === 0 ? (
+                <li>
+                  <Link href="/portal/family" className="interactive-text">
+                    No family members linked — set up family
                   </Link>
                 </li>
-              ))}
+              ) : (
+                family.map((m) => (
+                  <li key={m.id} className="status-list-item">
+                    <button
+                      type="button"
+                      className="status-list-link"
+                      onClick={() =>
+                        setSelectedFamily({
+                          id: m.id,
+                          name: m.name,
+                          trackingEnabled: m.trackingEnabled,
+                          phone: m.phone,
+                          userId: m.id,
+                        })
+                      }
+                    >
+                      {m.name}
+                    </button>
+                    <button
+                      type="button"
+                      className={`status-dot status-dot--link ${m.trackingEnabled ? 'status-dot--on' : ''}`}
+                      onClick={() =>
+                        setSelectedFamily({
+                          id: m.id,
+                          name: m.name,
+                          trackingEnabled: m.trackingEnabled,
+                          phone: m.phone,
+                          userId: m.id,
+                        })
+                      }
+                    >
+                      {m.trackingEnabled ? 'Tracking on' : 'Offline'}
+                    </button>
+                  </li>
+                ))
+              )}
             </ul>
-          )}
-        </section>
+          </section>
+        )}
 
-        <section className="portal-card">
-          <Link href="/portal/personal" className="card-title-link">
-            <h2>Quick Actions</h2>
-          </Link>
-          <div className="action-grid">
-            <Link href="/portal/location" className="action-tile">
-              <span className="action-icon">📍</span>
-              <span className="action-label">Share Location</span>
-              <span className="action-desc">
-                {d.user.trackingEnabled ? 'Live GPS active' : 'Enable tracking'}
-              </span>
-            </Link>
-            <Link href="/portal/theft" className="action-tile">
-              <span className="action-icon">🚗</span>
-              <span className="action-label">Report Theft</span>
-              <span className="action-desc">Vehicle recovery</span>
-            </Link>
-            <Link href="/portal/incidents" className="action-tile">
-              <span className="action-icon">📋</span>
-              <span className="action-label">Alerts</span>
-              <span className="action-desc">{d.stats.activeIncidents} active</span>
-            </Link>
-            <Link href="/portal/emergency" className="action-tile">
-              <span className="action-icon">🚨</span>
-              <span className="action-label">Emergency Hub</span>
-            </Link>
-          </div>
-        </section>
+        {jobOnly ? null : (
+          <section className="portal-card">
+            <div className="card-header-row">
+              <Link href="/portal/vehicles" className="card-title-link">
+                <h2>Vehicle Status</h2>
+              </Link>
+              <Link href="/portal/vehicles" className="link-sm">
+                Manage
+              </Link>
+            </div>
+            {vehicles.length === 0 ? (
+              <Link href="/portal/vehicles" className="interactive-text text-muted">
+                No vehicles registered — add vehicle
+              </Link>
+            ) : (
+              <ul className="status-list">
+                {vehicles.map((v) => (
+                  <li key={v.id} className="status-list-item">
+                    <Link href={`/portal/vehicles/${v.id}`} className="status-list-link">
+                      {v.registration} — {v.make} {v.model}
+                    </Link>
+                    <Link
+                      href={`/portal/vehicles/${v.id}`}
+                      className={`status-pill status-pill--link ${v.theftRecovery ? 'status-pill--alert' : 'status-pill--ok'}`}
+                    >
+                      {v.theftRecovery
+                        ? vehicleEmergencyMeta(v.emergencyStatus).label
+                        : 'Secure'}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+        )}
 
+        {jobOnly ? (
+          <section className="portal-card">
+            <h2>Job tools</h2>
+            <div className="action-grid">
+              <Link href="/portal/protect" className="action-tile">
+                <span className="action-icon">🛡</span>
+                <span className="action-label">Protect</span>
+                <span className="action-desc">Panic & silent alert</span>
+              </Link>
+              <Link href="/portal/chat" className="action-tile">
+                <span className="action-icon">💬</span>
+                <span className="action-label">Control room</span>
+                <span className="action-desc">Live chat</span>
+              </Link>
+              <Link href="/portal/incidents" className="action-tile">
+                <span className="action-icon">📋</span>
+                <span className="action-label">Response</span>
+                <span className="action-desc">{d.stats.activeIncidents} active</span>
+              </Link>
+              <Link href="/portal/job-details" className="action-tile">
+                <span className="action-icon">✎</span>
+                <span className="action-label">Job details</span>
+                <span className="action-desc">Route & notes</span>
+              </Link>
+            </div>
+          </section>
+        ) : (
+          <section className="portal-card">
+            <Link href="/portal/personal" className="card-title-link">
+              <h2>Quick Actions</h2>
+            </Link>
+            <div className="action-grid">
+              <Link href="/portal/location" className="action-tile">
+                <span className="action-icon">📍</span>
+                <span className="action-label">Share Location</span>
+                <span className="action-desc">
+                  {d.user.trackingEnabled ? 'Live GPS active' : 'Enable tracking'}
+                </span>
+              </Link>
+              <Link href="/portal/theft" className="action-tile">
+                <span className="action-icon">🚗</span>
+                <span className="action-label">Report Theft</span>
+                <span className="action-desc">Vehicle recovery</span>
+              </Link>
+              <Link href="/portal/incidents" className="action-tile">
+                <span className="action-icon">📋</span>
+                <span className="action-label">Alerts</span>
+                <span className="action-desc">{d.stats.activeIncidents} active</span>
+              </Link>
+              <Link href="/portal/emergency" className="action-tile">
+                <span className="action-icon">🚨</span>
+                <span className="action-label">Emergency Hub</span>
+              </Link>
+            </div>
+          </section>
+        )}
+
+        {jobOnly ? null : (
         <section className="portal-card">
           <Link href="/portal/emergency" className="card-title-link">
             <h2>Active Services</h2>
@@ -743,6 +806,7 @@ function OverviewDashboard() {
             </Link>
           )}
         </section>
+        )}
 
         {!hasAlert && (
           <section className="portal-card">

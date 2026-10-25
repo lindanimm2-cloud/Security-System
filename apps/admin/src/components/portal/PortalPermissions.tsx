@@ -82,11 +82,22 @@ export function PortalPermissionsSection() {
 }
 
 const BANNER_DISMISS_KEY = 'portal-perms-banner-dismiss';
+const BANNER_HIDE_AFTER_ACCEPT_MS = 2800;
+
+function dismissBanner(setDismissed: (value: boolean) => void) {
+  setDismissed(true);
+  try {
+    sessionStorage.setItem(BANNER_DISMISS_KEY, '1');
+  } catch {
+    /* ignore */
+  }
+}
 
 export function PortalPermissionsBanner() {
   const { access, loading: accessLoading } = useSubscriptionAccess();
-  const { missing, allowAll, requesting } = usePortalPermissions(access);
+  const { missing, allowAll, requesting, allGranted } = usePortalPermissions(access);
   const [dismissed, setDismissed] = useState(true);
+  const [justAccepted, setJustAccepted] = useState(false);
 
   useEffect(() => {
     try {
@@ -96,55 +107,77 @@ export function PortalPermissionsBanner() {
     }
   }, []);
 
-  if (accessLoading || !access || missing.length === 0 || dismissed) return null;
+  useEffect(() => {
+    if (!justAccepted) return;
+    const timer = window.setTimeout(() => {
+      dismissBanner(setDismissed);
+      setJustAccepted(false);
+    }, BANNER_HIDE_AFTER_ACCEPT_MS);
+    return () => window.clearTimeout(timer);
+  }, [justAccepted]);
 
+  useEffect(() => {
+    if (!allGranted || dismissed || justAccepted || missing.length > 0) return;
+    dismissBanner(setDismissed);
+  }, [allGranted, dismissed, justAccepted, missing.length]);
+
+  async function onAllowNow() {
+    try {
+      await allowAll();
+    } finally {
+      setJustAccepted(true);
+    }
+  }
+
+  if (accessLoading || !access || dismissed) return null;
+  if (missing.length === 0 && !justAccepted) return null;
+
+  const showAccepted = justAccepted || allGranted;
   const denied = missing.filter((m) => m.state === 'denied');
   const prompt = missing.filter((m) => m.state === 'prompt');
 
   return (
-    <div className="portal-permissions-banner" role="status">
+    <div
+      className={`portal-permissions-banner ${showAccepted ? 'is-accepted' : ''}`}
+      role="status"
+    >
       <div className="portal-permissions-banner__copy">
         <strong>
-          {denied.length > 0
-            ? 'Some safety features need permission'
-            : 'Enable emergency protection'}
+          {showAccepted
+            ? 'Emergency protection enabled'
+            : denied.length > 0
+              ? 'Some safety features need permission'
+              : 'Enable emergency protection'}
         </strong>
         <p className="text-muted">
-          {prompt.length > 0
-            ? `${prompt.map((m) => m.label).join(', ')} — open Emergency Setup so alerts, vibration and location work.`
-            : `${denied.map((m) => m.label).join(', ')} blocked in browser settings.`}
+          {showAccepted
+            ? 'This notice will close in a few seconds.'
+            : prompt.length > 0
+              ? `${prompt.map((m) => m.label).join(', ')} — open Emergency Setup so alerts, vibration and location work.`
+              : `${denied.map((m) => m.label).join(', ')} blocked in browser settings.`}
         </p>
       </div>
-      <div className="portal-permissions-banner__actions">
-        <Link href="/portal/security/emergency-setup" className="btn-sm btn-primary">
-          Emergency setup
-        </Link>
-        <button
-          type="button"
-          className="btn-sm btn-secondary"
-          disabled={!!requesting}
-          onClick={() => void allowAll()}
-        >
-          {requesting ? '…' : 'Allow now'}
-        </button>
-        <Link href="/portal/security/emergency-setup" className="btn-sm btn-secondary">
-          Manage
-        </Link>
-        <button
-          type="button"
-          className="btn-sm btn-ghost"
-          onClick={() => {
-            setDismissed(true);
-            try {
-              sessionStorage.setItem(BANNER_DISMISS_KEY, '1');
-            } catch {
-              /* ignore */
-            }
-          }}
-        >
-          Later
-        </button>
-      </div>
+      {showAccepted ? null : (
+        <div className="portal-permissions-banner__actions">
+          <Link href="/portal/security/emergency-setup" className="btn-sm btn-primary">
+            Emergency setup
+          </Link>
+          <button
+            type="button"
+            className="btn-sm btn-secondary"
+            disabled={!!requesting}
+            onClick={() => void onAllowNow()}
+          >
+            {requesting ? '…' : 'Allow now'}
+          </button>
+          <Link href="/portal/security/emergency-setup" className="btn-sm btn-secondary">
+            Manage
+          </Link>
+          <button type="button" className="btn-sm btn-ghost" onClick={() => dismissBanner(setDismissed)}>
+            Later
+          </button>
+        </div>
+      )}
     </div>
   );
 }

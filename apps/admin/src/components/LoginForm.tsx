@@ -26,6 +26,7 @@ import { clearActionKind, getActionKind, setActionKind } from '@/lib/action-stat
 import { friendlyErrorMessage } from '@/lib/friendly-error';
 import { adminHomeForRole } from '@/lib/admin-home';
 import { DEMO_PASSWORD } from '@/lib/demo/users';
+import { nextPortalPathAfterAuth } from '@/lib/temp-engagements';
 import { LegalPolicyLink } from './legal/LegalPolicyLink';
 import { BrandMark } from './BrandMark';
 import { ButtonSpinner } from './ButtonSpinner';
@@ -241,8 +242,13 @@ function LoginFormInner({
       router.push(adminHomeForRole(session.user.role));
       return;
     }
-    if (portal === 'client' && session.user.mustChangePassword) {
-      router.push('/portal/set-password');
+    if (portal === 'client') {
+      router.push(
+        nextPortalPathAfterAuth({
+          mustChangePassword: session.user.mustChangePassword,
+          email: session.user.email,
+        }),
+      );
       return;
     }
     router.push(redirectTo);

@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useState } from 'react';
 import { clientApi } from '@/lib/api-client';
 import type { EngagementAccessMeta } from '@/hooks/useSubscriptionAccess';
+import { jobKickerForEngagementKind } from '@/lib/temp-engagements';
 
 export function TempEngagementBanner({
   engagement,
@@ -14,6 +15,7 @@ export function TempEngagementBanner({
 }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const jobKicker = engagement.jobKicker || jobKickerForEngagementKind(engagement.kind);
 
   async function togglePanic(enabled: boolean) {
     setBusy(true);
@@ -29,10 +31,10 @@ export function TempEngagementBanner({
   }
 
   return (
-    <section className="portal-card temp-engagement-banner" aria-label="Temporary engagement">
+    <section className="portal-card temp-engagement-banner" aria-label={jobKicker}>
       <div className="temp-engagement-banner__head">
         <div>
-          <p className="temp-engagement-banner__kicker">Temporary job</p>
+          <p className="temp-engagement-banner__kicker">{jobKicker}</p>
           <h2>{engagement.kindLabel}</h2>
           <p className="text-muted">
             {engagement.status === 'ACTIVE' ? 'Engagement active' : engagement.status.replace(/_/g, ' ')}
@@ -53,8 +55,8 @@ export function TempEngagementBanner({
       {!engagement.panicEnabled ? (
         <div className="temp-engagement-banner__panic">
           <p>
-            Temporary panic features are off until you enable them for this job. Control room can
-            disable them when the engagement closes.
+            Panic is off until you arm it for this {jobKicker.toLowerCase()}. Control room can turn
+            it off when the job closes.
           </p>
           <button
             type="button"
@@ -62,12 +64,12 @@ export function TempEngagementBanner({
             disabled={busy}
             onClick={() => void togglePanic(true)}
           >
-            {busy ? 'Enabling…' : 'Enable temporary panic'}
+            {busy ? 'Enabling…' : 'Enable panic'}
           </button>
         </div>
       ) : (
         <div className="temp-engagement-banner__panic temp-engagement-banner__panic--on">
-          <p>Temporary panic is armed for this engagement.</p>
+          <p>Panic is armed for this {jobKicker.toLowerCase()}.</p>
           <div className="temp-engagement-banner__panic-actions">
             <Link href="/portal/protect" className="btn-ok">
               Open Protect

@@ -32,6 +32,7 @@ import {
   accessForEngagement,
   getActiveEngagementForEmail,
   getTempEngagement,
+  jobKickerForEngagementKind,
   labelForEngagementKind,
   listTempEngagements,
   updateTempEngagement,
@@ -3730,16 +3731,20 @@ export async function handleDemoRequest<T>({
         personal: false,
         emergency: false,
       };
+      const jobOnly = !engagement.existingClient;
       return ok({
-        tierCode: 'TEMP_ENGAGEMENT',
-        addons: [],
+        tierCode: jobOnly ? 'TEMP_ENGAGEMENT' : 'FAMILY',
+        addons: jobOnly ? [] : ['HOME_SECURITY', 'VEHICLE_RESPONSE', 'FAMILY', 'MEDICAL_PLUS'],
         access,
+        jobOnly,
         engagement: {
           id: engagement.id,
           kind: engagement.kind,
           kindLabel: labelForEngagementKind(engagement.kind),
+          jobKicker: jobKickerForEngagementKind(engagement.kind),
           status: engagement.status,
           panicEnabled: engagement.panicEnabled,
+          existingClient: engagement.existingClient,
           pickup: engagement.pickup,
           destination: engagement.destination,
           date: engagement.date,

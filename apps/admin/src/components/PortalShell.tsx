@@ -20,6 +20,7 @@ import { useSidebarCollapsed } from '@/hooks/useSidebarCollapsed';
 import { useActionHandoff } from '@/hooks/useActionHandoff';
 import { getOrCreateLocalDeviceId } from '@/lib/device-security';
 import { navHrefIsActive } from '@/lib/nav-active';
+import { jobKickerForEngagementKind, shouldShowPortalWelcome } from '@/lib/temp-engagements';
 import { SidebarCollapseButton, SidebarWebsiteLink, SignOutIcon } from '@/components/nav/SidebarCollapseButton';
 import { FloatingSupportDock } from './FloatingSupportDock';
 import { ShellRouteActions } from './nav/ShellRouteActions';
@@ -51,9 +52,10 @@ function PortalShellInner({
   const router = useRouter();
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
-  const { collapsed, toggle } = useSidebarCollapsed();
+  const { collapsed, toggle, setCollapsed } = useSidebarCollapsed();
   const handoff = useActionHandoff();
-  const { access, loading: accessLoading, tierCode } = useSubscriptionAccess();
+  const { access, loading: accessLoading, tierCode, engagement, jobOnly } = useSubscriptionAccess();
+  const jobMode = Boolean(engagement);
   const hideQuickActions = /^\/portal\/(?:chat|messages|communications|family\/chat|contacts)(?:\/|$)/.test(
     pathname,
   );
@@ -64,23 +66,23 @@ function PortalShellInner({
   const showSilentFab =
     !hasPanicConsole && /^\/portal\/security(?:\/|$)/.test(pathname);
   const navSections = useMemo(() => {
-    const sections = filterPortalNav(access, accessLoading);
+    const sections = filterPortalNav(access, accessLoading, undefined, { jobOnly });
     if (tierCode !== 'PREMIUM') return sections;
     return sections.map((section) => ({
       ...section,
       items: section.items.filter((item) => item.href !== '/portal/subscription/upgrade'),
     }));
-  }, [access, accessLoading, tierCode]);
+  }, [access, accessLoading, tierCode, jobOnly]);
 
   const mobileNavItems = useMemo(
     () =>
-      portalMobileNav(access, accessLoading).map((item) => ({
+      portalMobileNav(access, accessLoading, { jobOnly }).map((item) => ({
         href: item.href,
         label: item.mobileLabel,
         icon: item.icon,
         exact: item.exact,
       })),
-    [access, accessLoading],
+    [access, accessLoading, jobOnly],
   );
 
   useEffect(() => {
@@ -94,6 +96,16 @@ function PortalShellInner({
   useEffect(() => {
     setMenuOpen(false);
   }, [pathname]);
+
+  useEffect(() => {
+    if (jobMode) setCollapsed(true);
+  }, [jobMode, setCollapsed]);
+
+  useEffect(() => {
+    if (!jobMode) return;
+    if (!shouldShowPortalWelcome()) return;
+    router.replace('/portal/welcome');
+  }, [jobMode, router]);
 
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -138,8 +150,9 @@ function PortalShellInner({
     <>
       {handoff.overlay}
     <div
-      className="shell shell--portal shell--ops shell--with-bottom-nav"
+      className={`shell shell--portal shell--ops shell--with-bottom-nav${jobMode ? ' shell--portal-ops' : ''}`}
       data-portal-ambient={ambient}
+      data-job-mode={jobMode ? '1' : undefined}
     >
       <header className="mobile-shell-header mobile-shell-header--portal">
         <button
@@ -152,10 +165,12 @@ function PortalShellInner({
           <span className={`menu-toggle-icon ${menuOpen ? 'menu-toggle-icon--open' : ''}`} />
         </button>
         <BrandMark variant="portal" compact showProduct={false} />
-        <h1 className="mobile-shell-header__title">4DS Protect</h1>
+        <h1 className="mobile-shell-header__title">
+          {jobMode && engagement ? jobKickerForEngagementKind(engagement.kind) : '4DS Protect'}
+        </h1>
         <div className="mobile-topbar-actions">
           <ShellRouteActions homeHref="/portal" compact />
-          <PortalHomeStatusLight compact />
+          {jobOnly ? null : <PortalHomeStatusLight compact />}
           <ThemeToggle className="theme-toggle--compact" />
           <PortalNotificationCenter />
         </div>
@@ -247,7 +262,11 @@ function PortalShellInner({
           <div className="topbar-brand">
             <BrandMark variant="portal" compact showProduct={false} href={false} />
             <div>
-              <h1>Protection Dashboard</h1>
+              <h1>
+                {jobMode && engagement
+                  ? `${jobKickerForEngagementKind(engagement.kind)} desk`
+                  : 'Protection Dashboard'}
+              </h1>
               <p>
                 {session.user.firstName} {session.user.lastName} ·{' '}
                 {session.user.tenant?.name ?? '4DS Protection'}
@@ -258,7 +277,7 @@ function PortalShellInner({
             <ShellRouteActions homeHref="/portal" />
             <PortalNavClock />
             <ThemeToggle className="theme-toggle--compact" />
-            <PortalHomeStatusLight />
+            {jobOnly ? null : <PortalHomeStatusLight />}
             <PortalProtectionBadge />
             <PortalNotificationCenter />
           </div>

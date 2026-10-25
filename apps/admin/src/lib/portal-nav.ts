@@ -93,22 +93,49 @@ export type FeatureCard = {
   requiresAccess?: keyof AccessMap;
 };
 
+const JOB_ONLY_ACCOUNT_HREFS = new Set([
+  '/portal/profile',
+  '/portal/settings',
+  '/portal/updates',
+]);
+
+const JOB_ONLY_OVERVIEW_HREFS = new Set(['/portal', '/portal/chat']);
+
 /** Sidebar sections/items visible for the current subscription */
 export function filterPortalNav(
   access: AccessMap | null,
   loading: boolean,
   nav: PortalNavSection[] = PORTAL_NAV,
+  options?: { jobOnly?: boolean },
 ): PortalNavSection[] {
   if (loading || !access) {
     return nav.filter((section) => section.title === 'Overview' || section.title === 'Account');
   }
 
+  const jobOnly = Boolean(options?.jobOnly);
+
   return nav
     .map((section) => ({
       ...section,
-      items: section.items.filter(
-        (item) => !item.requiresAccess || access[item.requiresAccess],
-      ),
+      items: section.items.filter((item) => {
+        if (item.requiresAccess && !access[item.requiresAccess]) return false;
+        if (!jobOnly) return true;
+        if (section.title === 'Home' || section.title === 'Vehicle' || section.title === 'Family') {
+          return false;
+        }
+        if (section.title === 'Account') return JOB_ONLY_ACCOUNT_HREFS.has(item.href);
+        if (section.title === 'Overview') return JOB_ONLY_OVERVIEW_HREFS.has(item.href);
+        if (section.title === 'Personal') return false;
+        if (section.title === 'Emergency') {
+          return (
+            item.href === '/portal/protect' ||
+            item.href === '/portal/contacts' ||
+            item.href === '/portal/incidents' ||
+            item.href === '/portal/emergency'
+          );
+        }
+        return true;
+      }),
     }))
     .filter((section) => section.items.length > 0);
 }
@@ -150,16 +177,33 @@ const PORTAL_MOBILE_PREFERRED: Array<{
   { href: '/portal/settings', mobileLabel: 'Account', icon: 'account' },
 ];
 
+const JOB_ONLY_MOBILE: Array<{
+  href: string;
+  mobileLabel: string;
+  icon: NavIconName;
+  exact?: boolean;
+  requiresAccess?: keyof AccessMap;
+}> = [
+  { href: '/portal', mobileLabel: 'Job', icon: 'dashboard', exact: true },
+  { href: '/portal/protect', mobileLabel: 'Protect', icon: 'emergency', requiresAccess: 'emergency' },
+  { href: '/portal/chat', mobileLabel: 'Chat', icon: 'dispatch-chat' },
+  { href: '/portal/contacts', mobileLabel: 'Contacts', icon: 'contacts', requiresAccess: 'emergency' },
+  { href: '/portal/settings', mobileLabel: 'Account', icon: 'account' },
+];
+
 /** Floating mobile bottom bar — up to 5 primary portal destinations. */
 export function portalMobileNav(
   access: AccessMap | null,
   loading: boolean,
+  options?: { jobOnly?: boolean },
 ): PortalMobileNavItem[] {
-  return PORTAL_MOBILE_PREFERRED.filter((item) => {
-    if (!item.requiresAccess) return true;
-    if (loading || !access) return false;
-    return access[item.requiresAccess];
-  })
+  const preferred = options?.jobOnly ? JOB_ONLY_MOBILE : PORTAL_MOBILE_PREFERRED;
+  return preferred
+    .filter((item) => {
+      if (!item.requiresAccess) return true;
+      if (loading || !access) return false;
+      return access[item.requiresAccess];
+    })
     .map((item) => ({
       href: item.href,
       label: item.mobileLabel,

@@ -4,7 +4,7 @@ import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { LoginForm } from '@/components/LoginForm';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
-import { shouldShowMobileWelcome } from '@/lib/temp-engagements';
+import { shouldShowPortalWelcome } from '@/lib/temp-engagements';
 
 function PortalLoginInner() {
   const params = useSearchParams();
@@ -14,10 +14,10 @@ function PortalLoginInner() {
   const subtitle =
     reason === 'site-session'
       ? 'Website sign-in does not open the protection portal. Sign in here to continue.'
-      : 'Sign in to access your protection dashboard — including temporary engagement jobs.';
+      : 'Sign in to access your protection dashboard — including escort and protection jobs.';
 
   useEffect(() => {
-    if (shouldShowMobileWelcome()) {
+    if (shouldShowPortalWelcome()) {
       router.replace('/portal/welcome');
       return;
     }

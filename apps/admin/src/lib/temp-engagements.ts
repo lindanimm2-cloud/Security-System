@@ -37,6 +37,8 @@ export type TempEngagement = {
   status: TempEngagementStatus;
   panicEnabled: boolean;
   mustChangePassword: boolean;
+  /** Existing 4DS client — keep full portal features alongside the job. */
+  existingClient: boolean;
   tempPassword?: string;
   date?: string;
   time?: string;
@@ -53,7 +55,7 @@ export type TempEngagement = {
 };
 
 const STORE_KEY = '4ds_temp_engagements';
-const WELCOME_SEEN_KEY = '4ds-portal-welcome-seen';
+const WELCOME_SEEN_KEY = '4ds-portal-welcome-seen-v2';
 const QUESTIONS_SKIP_PREFIX = '4ds-job-details-done:';
 
 const ACCESS_NONE: AccessMap = {
@@ -102,12 +104,58 @@ export function labelForEngagementKind(kind: TempEngagementKind): string {
     case 'install':
       return 'Install / monitoring';
     case 'other':
-      return 'Temporary engagement';
+      return 'Booked engagement';
     default: {
       const _exhaustive: never = kind;
       return _exhaustive;
     }
   }
+}
+
+/** Short portal kicker — prefer service name over “temporary job”. */
+export function jobKickerForEngagementKind(kind: TempEngagementKind): string {
+  switch (kind) {
+    case 'private-escort':
+      return 'Escort job';
+    case 'close-protection':
+      return 'Close protection';
+    case 'personal-protection':
+      return 'Protection detail';
+    case 'armed-response':
+      return 'Response cover';
+    case 'fleet':
+      return 'Fleet job';
+    case 'install':
+      return 'Install job';
+    case 'other':
+      return 'Booked cover';
+    default: {
+      const _exhaustive: never = kind;
+      return _exhaustive;
+    }
+  }
+}
+
+/** Where to send a client after auth for engagement / first-run welcome. */
+export function nextPortalPathAfterAuth(options: {
+  mustChangePassword?: boolean;
+  email?: string;
+  engagement?: TempEngagement | null;
+}): string {
+  if (!hasSeenPortalWelcome()) return '/portal/welcome';
+  if (options.mustChangePassword) return '/portal/set-password';
+  const engagement =
+    options.engagement ??
+    (options.email ? getActiveEngagementForEmail(options.email) : null);
+  if (
+    engagement &&
+    options.email &&
+    !hasCompletedJobDetails(options.email) &&
+    !engagement.questionsCompletedAt
+  ) {
+    return '/portal/job-details';
+  }
+  return '/portal';
 }
 
 export function isTempEngagementKind(value: string): value is TempEngagementKind {
@@ -126,7 +174,11 @@ function readStore(): TempEngagement[] {
     const raw = window.localStorage.getItem(STORE_KEY);
     if (!raw) return [];
     const parsed = JSON.parse(raw) as TempEngagement[];
-    return Array.isArray(parsed) ? parsed : [];
+    if (!Array.isArray(parsed)) return [];
+    return parsed.map((row) => ({
+      ...row,
+      existingClient: Boolean(row.existingClient),
+    }));
   } catch {
     return [];
   }
@@ -164,6 +216,7 @@ export function createTempEngagement(input: {
   destination?: string;
   location?: string;
   message?: string;
+  existingClient?: boolean;
 }): TempEngagement {
   const now = new Date().toISOString();
   const engagement: TempEngagement = {
@@ -175,7 +228,8 @@ export function createTempEngagement(input: {
     kind: normalizeEngagementKind(input.kind),
     status: 'PENDING_APP',
     panicEnabled: false,
-    mustChangePassword: true,
+    mustChangePassword: !input.existingClient,
+    existingClient: Boolean(input.existingClient),
     date: input.date,
     time: input.time,
     endDate: input.endDate,
@@ -235,11 +289,24 @@ export function accessForEngagement(engagement: TempEngagement | null): AccessMa
   if (engagement.status === 'COMPLETED' || engagement.status === 'CANCELLED') {
     return { ...ACCESS_NONE };
   }
-  const base = accessForEngagementKind(engagement.kind);
-  if (!engagement.panicEnabled) {
-    return { ...base, emergency: false };
+  if (engagement.existingClient) {
+    return {
+      home: true,
+      vehicle: true,
+      family: true,
+      medical: true,
+      personal: true,
+      emergency: true,
+    };
   }
-  return base;
+  const base = accessForEngagementKind(engagement.kind);
+  // Job-only: keep emergency tools available so panic can be armed from Protect.
+  return { ...base, emergency: true };
+}
+
+/** Slim mobile job portal — no home/vehicle/family unless they are an existing client. */
+export function isJobOnlyEngagement(engagement: TempEngagement | null | undefined): boolean {
+  return Boolean(engagement && !engagement.existingClient);
 }
 
 export function hasSeenPortalWelcome(): boolean {
@@ -253,11 +320,13 @@ export function markPortalWelcomeSeen() {
 }
 
 export function shouldShowMobileWelcome(): boolean {
+  return shouldShowPortalWelcome();
+}
+
+/** First-run welcome for engagement / mobile clients who have not seen it yet. */
+export function shouldShowPortalWelcome(): boolean {
   if (typeof window === 'undefined') return false;
-  if (hasSeenPortalWelcome()) return false;
-  const coarse = window.matchMedia('(pointer: coarse)').matches;
-  const narrow = window.matchMedia('(max-width: 820px)').matches;
-  return coarse || narrow;
+  return !hasSeenPortalWelcome();
 }
 
 export function hasCompletedJobDetails(email: string): boolean {
@@ -282,6 +351,7 @@ export function activateEngagementPortalAccess(engagementId: string): {
   engagement: TempEngagement;
   tempPassword: string;
   email: string;
+  existingClient: boolean;
 } | null {
   const engagement = getTempEngagement(engagementId);
   if (!engagement) return null;
@@ -291,23 +361,30 @@ export function activateEngagementPortalAccess(engagementId: string): {
   const firstName = nameParts[0] || 'Guest';
   const lastName = nameParts.slice(1).join(' ') || 'Client';
 
-  provisionTempEngagementClient({
+  const provisioned = provisionTempEngagementClient({
     email: engagement.email,
     firstName,
     lastName,
     phone: engagement.phone,
     engagementId: engagement.id,
     tempPassword,
+    existingClient: engagement.existingClient,
   });
 
   const next = updateTempEngagement(engagementId, {
     status: 'ACTIVE',
-    tempPassword,
-    mustChangePassword: true,
+    tempPassword: provisioned.tempPassword,
+    mustChangePassword: !provisioned.existingClient,
+    existingClient: provisioned.existingClient || engagement.existingClient,
     // Panic stays off until the client enables temp protection or control room arms it.
-    panicEnabled: false,
+    panicEnabled: engagement.panicEnabled,
   });
 
   if (!next) return null;
-  return { engagement: next, tempPassword, email: next.email };
+  return {
+    engagement: next,
+    tempPassword: provisioned.tempPassword,
+    email: next.email,
+    existingClient: next.existingClient,
+  };
 }

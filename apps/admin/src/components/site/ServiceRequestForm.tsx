@@ -12,6 +12,7 @@ import {
   createTempEngagement,
   ENGAGEMENT_FLOW_STEPS,
   labelForEngagementKind,
+  nextPortalPathAfterAuth,
   type TempEngagement,
 } from '@/lib/temp-engagements';
 
@@ -186,6 +187,7 @@ type FormState = {
   phone: string;
   company: string;
   interest: ServiceInterest;
+  existingClient: boolean;
   date: string;
   time: string;
   endDate: string;
@@ -205,6 +207,7 @@ const EMPTY: FormState = {
   phone: '',
   company: '',
   interest: 'private-escort',
+  existingClient: false,
   date: '',
   time: '',
   endDate: '',
@@ -361,6 +364,7 @@ export function ServiceRequestForm({
           returnTrip: form.returnTrip,
           vehicles: form.vehicles,
           message: form.message,
+          existingClient: form.existingClient,
           kind: 'service-request',
           submittedAt: new Date().toISOString(),
         }),
@@ -374,6 +378,7 @@ export function ServiceRequestForm({
         phone: form.phone,
         company: form.company,
         kind: form.interest,
+        existingClient: form.existingClient,
         date: form.date,
         time: form.time,
         endDate: form.endDate,
@@ -411,7 +416,10 @@ export function ServiceRequestForm({
         return;
       }
       router.push(
-        result.user.mustChangePassword ? '/portal/set-password' : '/portal',
+        nextPortalPathAfterAuth({
+          mustChangePassword: result.user.mustChangePassword,
+          email: result.user.email,
+        }),
       );
     } catch {
       setOpeningPortal(false);
@@ -603,6 +611,21 @@ export function ServiceRequestForm({
           value={form.company}
           onChange={(e) => patch('company', e.target.value)}
         />
+      </label>
+
+      <label className="nx-service-request__check">
+        <input
+          type="checkbox"
+          checked={form.existingClient}
+          onChange={(e) => patch('existingClient', e.target.checked)}
+        />
+        <span>
+          I&apos;m already a 4DS client / protected by 4DS
+          <span className="nx-service-request__optional">
+            {' '}
+            — keep my full portal (home, vehicles, family) with this job
+          </span>
+        </span>
       </label>
 
       <label>

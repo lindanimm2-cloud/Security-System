@@ -1032,6 +1032,26 @@ html[data-theme='dark'] .nx-service-request__address {
   color: var(--nx-steel);
 }
 
+.nx-service-request__check {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.65rem;
+  padding: 0.75rem 0.85rem;
+  border: 1px solid var(--nx-line);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--nx-paper-2, #f3f5f8) 70%, #fff);
+  font-size: 0.88rem;
+  line-height: 1.4;
+  cursor: pointer;
+}
+
+.nx-service-request__check input {
+  margin-top: 0.2rem;
+  width: 1rem;
+  height: 1rem;
+  flex-shrink: 0;
+}
+
 .nx-service-request__fine {
   margin: 0.15rem 0 0;
   font-size: 0.78rem;

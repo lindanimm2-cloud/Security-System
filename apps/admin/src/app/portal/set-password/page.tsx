@@ -6,8 +6,8 @@ import { getSession, updateSessionUser, type AuthSession } from '@/lib/auth';
 import { setDemoAccountPassword } from '@/lib/demo/users';
 import {
   getActiveEngagementForEmail,
-  hasCompletedJobDetails,
   markJobDetailsDone,
+  nextPortalPathAfterAuth,
   updateTempEngagement,
 } from '@/lib/temp-engagements';
 import { BrandMark } from '@/components/BrandMark';
@@ -57,16 +57,16 @@ export default function PortalSetPasswordPage() {
       updateTempEngagement(engagement.id, { mustChangePassword: false });
     }
     setSaving(false);
-    if (
-      engagement &&
-      !hasCompletedJobDetails(session.user.email) &&
-      !engagement.questionsCompletedAt
-    ) {
-      router.replace('/portal/job-details');
-      return;
+    if (!engagement) {
+      markJobDetailsDone(session.user.email);
     }
-    markJobDetailsDone(session.user.email);
-    router.replace('/portal');
+    router.replace(
+      nextPortalPathAfterAuth({
+        mustChangePassword: false,
+        email: session.user.email,
+        engagement,
+      }),
+    );
   }
 
   if (!ready || !session) {
