@@ -1,6 +1,7 @@
 'use client';
 
 import { FormEvent, useEffect, useMemo, useState } from 'react';
+import { NxDateField, NxTimeField, todayIso } from '@/components/site/NxScheduleFields';
 import { UiSelect } from '@/components/ui/UiSelect';
 
 export const SERVICE_OPTIONS = [
@@ -188,38 +189,32 @@ export function ServiceRequestForm({
       {detail.showSchedule ? (
         <div className="nx-service-request__block">
           <p className="nx-service-request__block-title">When</p>
-          <div className="nx-service-request__row">
-            <label>
-              {detail.endDate ? 'Start date' : 'Date'}
-              <input
-                type="date"
-                required
-                value={form.date}
-                min={todayIso()}
-                onChange={(e) => patch('date', e.target.value)}
-              />
-            </label>
+          <div className="nx-service-request__row nx-service-request__row--schedule">
+            <NxDateField
+              label={detail.endDate ? 'Start date' : 'Date'}
+              required
+              value={form.date}
+              min={todayIso()}
+              onChange={(date) => {
+                patch('date', date);
+                if (form.endDate && form.endDate < date) patch('endDate', date);
+              }}
+            />
             {detail.endDate ? (
-              <label>
-                End date
-                <input
-                  type="date"
-                  required
-                  value={form.endDate}
-                  min={form.date || todayIso()}
-                  onChange={(e) => patch('endDate', e.target.value)}
-                />
-              </label>
+              <NxDateField
+                label="End date"
+                required
+                value={form.endDate}
+                min={form.date || todayIso()}
+                onChange={(endDate) => patch('endDate', endDate)}
+              />
             ) : (
-              <label>
-                Preferred time
-                <input
-                  type="time"
-                  required
-                  value={form.time}
-                  onChange={(e) => patch('time', e.target.value)}
-                />
-              </label>
+              <NxTimeField
+                label="Preferred time"
+                required
+                value={form.time}
+                onChange={(time) => patch('time', time)}
+              />
             )}
           </div>
         </div>
@@ -404,9 +399,3 @@ function detailFieldsFor(interest: ServiceInterest) {
   }
 }
 
-function todayIso() {
-  const now = new Date();
-  const month = String(now.getMonth() + 1).padStart(2, '0');
-  const day = String(now.getDate()).padStart(2, '0');
-  return `${now.getFullYear()}-${month}-${day}`;
-}
