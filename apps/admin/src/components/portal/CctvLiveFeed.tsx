@@ -126,6 +126,7 @@ function FeedControls({
   peekExpand,
   density,
   volumeOpen,
+  docked,
   onMute,
   onVolume,
   onVolumeOpen,
@@ -153,6 +154,7 @@ function FeedControls({
   peekExpand: boolean;
   density: 'minimal' | 'compact' | 'full';
   volumeOpen: boolean;
+  docked?: boolean;
   onMute: () => void;
   onVolume: (value: number) => void;
   onVolumeOpen: (open: boolean) => void;
@@ -218,6 +220,32 @@ function FeedControls({
   const show = (id: CctvControlId) => visibleIds.includes(id);
   const expandOnlyPeek = peekExpand && !toolbarVisible && show('expand');
   const volPct = Math.round((muted ? 0 : volume) * 100);
+  const trayVolume = Boolean(docked);
+
+  const volumeSlider = (
+    <label className="cctv-feed__vol" title={`Volume ${volPct}%`}>
+      <span className="sr-only">Camera volume</span>
+      <input
+        type="range"
+        min={0}
+        max={100}
+        step={1}
+        value={volPct}
+        aria-valuetext={`${volPct} percent`}
+        style={{ ['--cctv-vol' as string]: `${volPct}%` }}
+        onClick={(e) => e.stopPropagation()}
+        onPointerDown={(e) => {
+          e.stopPropagation();
+          onVolumeOpen(true);
+        }}
+        onChange={(e) => {
+          onVolume(Number(e.target.value) / 100);
+          onVolumeOpen(true);
+        }}
+      />
+      {trayVolume ? <span className="cctv-feed__vol-pct">{volPct}%</span> : null}
+    </label>
+  );
 
   return (
     <div
@@ -227,6 +255,8 @@ function FeedControls({
         toolbarVisible ? 'is-visible' : '',
         expandOnlyPeek ? 'is-peek' : '',
         !toolbarVisible && !expandOnlyPeek ? 'is-hidden' : '',
+        trayVolume ? 'cctv-feed__controls--docked' : '',
+        trayVolume && volumeOpen ? 'has-vol-tray' : '',
       ]
         .filter(Boolean)
         .join(' ')}
@@ -306,26 +336,43 @@ function FeedControls({
         ) : null}
         {toolbarVisible && show('mute') ? (
           <div
-            className={`cctv-feed__audio ${volumeOpen ? 'is-open' : ''}`}
+            className={`cctv-feed__audio ${volumeOpen ? 'is-open' : ''} ${trayVolume ? 'cctv-feed__audio--tray' : ''}`}
             onMouseLeave={(e) => {
-              if (e.buttons !== 0) return;
+              if (trayVolume || e.buttons !== 0) return;
               onVolumeOpen(false);
             }}
             onClick={(e) => e.stopPropagation()}
-            onPointerDown={(e) => {
-              e.stopPropagation();
-              onVolumeOpen(true);
-            }}
           >
             <span
               className="cctv-feed__audio-hit"
-              onMouseEnter={() => onVolumeOpen(true)}
+              onMouseEnter={() => {
+                if (!trayVolume) onVolumeOpen(true);
+              }}
               onFocusCapture={() => onVolumeOpen(true)}
             >
               <CtrlBtn
-                title={muted ? 'Unmute camera audio' : `Mute · ${volPct}%`}
-                active={muted}
-                onClick={onMute}
+                title={
+                  muted
+                    ? 'Unmute camera audio'
+                    : trayVolume
+                      ? volumeOpen
+                        ? `Hide volume · ${volPct}%`
+                        : `Volume · ${volPct}%`
+                      : `Mute · ${volPct}%`
+                }
+                active={muted || (trayVolume && volumeOpen)}
+                onClick={() => {
+                  if (trayVolume) {
+                    if (muted) {
+                      onMute();
+                      onVolumeOpen(true);
+                      return;
+                    }
+                    onVolumeOpen(!volumeOpen);
+                    return;
+                  }
+                  onMute();
+                }}
               >
                 {muted || volPct === 0 ? (
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
@@ -346,27 +393,7 @@ function FeedControls({
                 )}
               </CtrlBtn>
             </span>
-            <label className="cctv-feed__vol" title={`Volume ${volPct}%`}>
-              <span className="sr-only">Camera volume</span>
-              <input
-                type="range"
-                min={0}
-                max={100}
-                step={1}
-                value={volPct}
-                aria-valuetext={`${volPct} percent`}
-                style={{ ['--cctv-vol' as string]: `${volPct}%` }}
-                onClick={(e) => e.stopPropagation()}
-                onPointerDown={(e) => {
-                  e.stopPropagation();
-                  onVolumeOpen(true);
-                }}
-                onChange={(e) => {
-                  onVolume(Number(e.target.value) / 100);
-                  onVolumeOpen(true);
-                }}
-              />
-            </label>
+            {trayVolume ? null : volumeSlider}
           </div>
         ) : null}
         {toolbarVisible && show('record') ? (
@@ -404,6 +431,22 @@ function FeedControls({
           </CtrlBtn>
         ) : null}
       </div>
+      {toolbarVisible && trayVolume && show('mute') && volumeOpen ? (
+        <div className="cctv-feed__vol-tray" role="group" aria-label="Camera volume">
+          <button
+            type="button"
+            className="cctv-feed__vol-mute"
+            title={muted ? 'Unmute' : 'Mute'}
+            onClick={(e) => {
+              stopNav(e);
+              onMute();
+            }}
+          >
+            {muted || volPct === 0 ? 'Unmute' : 'Mute'}
+          </button>
+          {volumeSlider}
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -576,6 +619,7 @@ function FeedInner({
         peekExpand={visibility.peekExpand}
         density={visibility.density}
         volumeOpen={volumeOpen}
+        docked={dockedControls}
         onMute={toggleMute}
         onVolume={setVolumeValue}
         onVolumeOpen={setVolumeOpen}
@@ -589,6 +633,7 @@ function FeedInner({
               setReverse(false);
               setSpeed(1);
               setPaused(false);
+              setVolumeOpen(false);
             }
             return next;
           });

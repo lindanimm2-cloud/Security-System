@@ -1601,11 +1601,12 @@ html[data-theme='light'] .ops-tile__add-label {
 }
 
 .ops-focus__video {
-  height: 240px;
+  min-height: 240px;
+  height: auto;
   position: relative;
   background: #0a0a0a;
-  flex: 0 0 240px;
-  overflow: hidden;
+  flex: 0 0 auto;
+  overflow: visible;
   display: flex;
   flex-direction: column;
 }

@@ -1712,9 +1712,13 @@ html[data-theme='light'] .cctv-mini__btn {
   transform: none;
   pointer-events: auto;
   justify-content: center;
+  align-items: stretch;
+  flex-direction: column;
+  gap: 0.35rem;
   padding: 0.4rem 0.5rem 0.5rem;
   background: color-mix(in srgb, #0a0a0a 92%, transparent);
   border-top: 1px solid rgba(255, 255, 255, 0.08);
+  overflow: visible;
 }
 
 .cctv-feed--docked .cctv-feed__controls-scrim {
@@ -1727,6 +1731,7 @@ html[data-theme='light'] .cctv-mini__btn {
   gap: 0.35rem;
   max-width: 100%;
   pointer-events: auto;
+  overflow: visible;
 }
 
 .cctv-feed--docked .cctv-feed__ctrl {
@@ -1739,6 +1744,85 @@ html[data-theme='light'] .cctv-mini__btn {
   font-size: 0.62rem;
   font-weight: 700;
   letter-spacing: 0.04em;
+}
+
+.cctv-feed--docked .cctv-feed__audio,
+.cctv-feed--docked .cctv-feed__audio.is-open {
+  max-width: none;
+  overflow: visible;
+}
+
+.cctv-feed--docked .cctv-feed__audio--tray .cctv-feed__vol {
+  display: none;
+}
+
+.cctv-feed__vol-tray {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  width: 100%;
+  min-width: 0;
+  padding: 0.35rem 0.45rem;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(12, 12, 12, 0.95);
+  box-sizing: border-box;
+}
+
+.cctv-feed__vol-tray .cctv-feed__vol {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  flex: 1 1 auto;
+  width: auto;
+  min-width: 0;
+  height: auto;
+  opacity: 1;
+  overflow: visible;
+  padding: 0;
+}
+
+.cctv-feed__vol-tray .cctv-feed__vol input[type='range'] {
+  flex: 1 1 auto;
+  min-width: 0;
+  width: auto;
+}
+
+.cctv-feed__vol-pct {
+  flex: 0 0 auto;
+  min-width: 2.4rem;
+  font-size: 0.68rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+  color: rgba(255, 255, 255, 0.85);
+  text-align: right;
+}
+
+.cctv-feed__vol-mute {
+  flex: 0 0 auto;
+  height: 1.6rem;
+  padding: 0 0.55rem;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.cctv-feed__vol-mute:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.cctv-feed--docked .cctv-feed__ctrl--rec,
+.cctv-feed--docked .cctv-feed__ctrl--rec.cctv-feed__ctrl--active {
+  color: #fb7185;
+  border-color: rgba(251, 113, 133, 0.45);
+  background: rgba(225, 29, 72, 0.16);
 }
 
 .cctv-feed--docked .cctv-feed__footer {

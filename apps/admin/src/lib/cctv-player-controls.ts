@@ -115,31 +115,32 @@ export function getVisibleControls(state: CctvPlayerUiState): CctvVisibleControl
 
   const width = Number.isFinite(containerWidth) ? containerWidth : 0;
   const wantPlaybackTools = isFullscreen || isExpanded || isPlayback || forceFullTransport;
+  // Docked focus / fullscreen: transport + live + audio + record always present.
   const controls = forceFullTransport
-    ? isPlayback
-      ? ([
-          'expand',
-          'rewind',
-          'play',
-          'forward',
-          'speed',
-          'live',
-          'mute',
-          'record',
-          'mini',
-          'snapshot',
-        ] as CctvControlId[])
-      : ([
-          'expand',
-          'rewind',
-          'play',
-          'forward',
-          'speed',
-          'mute',
-          'record',
-          'mini',
-          'snapshot',
-        ] as CctvControlId[])
+    ? ((isPlayback
+        ? [
+            'expand',
+            'rewind',
+            'play',
+            'forward',
+            'speed',
+            'live',
+            'mute',
+            'record',
+            'mini',
+            'snapshot',
+          ]
+        : [
+            'expand',
+            'rewind',
+            'play',
+            'forward',
+            'speed',
+            'mute',
+            'record',
+            'mini',
+            'snapshot',
+          ]) as CctvControlId[])
     : maxControlsForWidth(width, wantPlaybackTools, isPlayback);
 
   const density: CctvVisibleControls['density'] =
