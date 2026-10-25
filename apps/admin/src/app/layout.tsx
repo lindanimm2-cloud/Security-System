@@ -31,9 +31,7 @@ export const metadata: Metadata = {
 
 const themeScript = `
 (function() {
-  var PREF_KEY = '4ds-theme-preference';
   var LEGACY_KEY = '4ds-theme';
-  var USER_SET_KEY = '4ds-theme-user-set';
   function resolve(pref) {
     if (pref === 'light') return 'light';
     if (pref === 'dark') return 'dark';
@@ -58,12 +56,21 @@ const themeScript = `
     }
   }
   try {
+    var path = location.pathname || '';
+    var isControl = path.indexOf('/control-room') === 0;
+    var PREF_KEY = isControl ? '4ds-theme-preference-control' : '4ds-theme-preference';
+    var USER_SET_KEY = isControl ? '4ds-theme-user-set-control' : '4ds-theme-user-set';
+    // Control panel defaults to dark; other surfaces use the shared app default.
     var pref = 'dark';
     if (localStorage.getItem(USER_SET_KEY) === '1') {
       pref = localStorage.getItem(PREF_KEY);
       if (pref !== 'light' && pref !== 'dark' && pref !== 'system' && pref !== 'schedule') {
-        var legacy = localStorage.getItem(LEGACY_KEY);
-        pref = (legacy === 'light' || legacy === 'dark') ? legacy : 'dark';
+        if (!isControl) {
+          var legacy = localStorage.getItem(LEGACY_KEY);
+          pref = (legacy === 'light' || legacy === 'dark') ? legacy : 'dark';
+        } else {
+          pref = 'dark';
+        }
       }
     }
     document.documentElement.setAttribute('data-theme', resolve(pref || 'dark'));

@@ -26,6 +26,8 @@ export type ArcDeskEvent = {
   claimedByUserId?: string | null;
   claimedByName?: string | null;
   claimedAt?: string | null;
+  /** Linked live-map incident when dispatch/track has created one. */
+  incidentId?: string | null;
   responses?: Array<{
     code: string;
     label: string;

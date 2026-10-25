@@ -2,10 +2,15 @@ export type Theme = 'light' | 'dark';
 
 export type ThemePreference = 'light' | 'dark' | 'system' | 'schedule';
 
+/** App-wide vs control-panel scoped theme storage. */
+export type ThemeScope = 'app' | 'control';
+
 export const THEME_STORAGE_KEY = '4ds-theme';
 export const THEME_PREFERENCE_KEY = '4ds-theme-preference';
 /** Set when the user explicitly chooses a theme (toggle or settings). */
 export const THEME_USER_SET_KEY = '4ds-theme-user-set';
+export const THEME_CONTROL_PREFERENCE_KEY = '4ds-theme-preference-control';
+export const THEME_CONTROL_USER_SET_KEY = '4ds-theme-user-set-control';
 export const THEME_SCHEDULE_LIGHT_KEY = '4ds-theme-schedule-light';
 export const THEME_SCHEDULE_DARK_KEY = '4ds-theme-schedule-dark';
 export const THEME_SCHEDULE_CHANGED_EVENT = '4ds-theme-schedule-changed';
@@ -19,18 +24,38 @@ export const THEME_PREFERENCE_LABELS: Record<ThemePreference, string> = {
 
 export const THEME_PREFERENCE_HINTS: Record<ThemePreference, string> = {
   light: 'Always use light mode.',
-  dark: 'Always use dark mode across all portals.',
+  dark: 'Always use dark mode.',
   system: 'Match your device appearance setting.',
   schedule: 'Dark from 6:00 PM to 6:00 AM, light during the day.',
 };
 
 const DEFAULT_SCHEDULE_LIGHT = '06:00';
 const DEFAULT_SCHEDULE_DARK = '18:00';
-const DEFAULT_PREFERENCE: ThemePreference = 'dark';
+/** Control panel always opens dark until the operator picks another mode. */
+const DEFAULT_CONTROL_PREFERENCE: ThemePreference = 'dark';
+/** Marketing / portals keep the shared default. */
+const DEFAULT_APP_PREFERENCE: ThemePreference = 'dark';
 
 function parseScheduleHour(time: string): number {
   const [h] = time.split(':').map((part) => parseInt(part, 10));
   return Number.isFinite(h) ? h : 0;
+}
+
+export function getThemeScope(pathname?: string | null): ThemeScope {
+  if (!pathname) return 'app';
+  return pathname.startsWith('/control-room') ? 'control' : 'app';
+}
+
+function preferenceKey(scope: ThemeScope): string {
+  return scope === 'control' ? THEME_CONTROL_PREFERENCE_KEY : THEME_PREFERENCE_KEY;
+}
+
+function userSetKey(scope: ThemeScope): string {
+  return scope === 'control' ? THEME_CONTROL_USER_SET_KEY : THEME_USER_SET_KEY;
+}
+
+function defaultPreference(scope: ThemeScope): ThemePreference {
+  return scope === 'control' ? DEFAULT_CONTROL_PREFERENCE : DEFAULT_APP_PREFERENCE;
 }
 
 export function getScheduleHours(): { lightFrom: string; darkFrom: string } {
@@ -78,37 +103,44 @@ function isValidPreference(value: string | null): value is ThemePreference {
   return value === 'light' || value === 'dark' || value === 'system' || value === 'schedule';
 }
 
-export function getStoredPreference(): ThemePreference {
-  if (typeof window === 'undefined') return DEFAULT_PREFERENCE;
+export function getStoredPreference(scope: ThemeScope = 'app'): ThemePreference {
+  const fallback = defaultPreference(scope);
+  if (typeof window === 'undefined') return fallback;
 
-  // Until the user explicitly picks a theme, dark is primary everywhere.
-  if (localStorage.getItem(THEME_USER_SET_KEY) !== '1') {
-    return DEFAULT_PREFERENCE;
+  // Until the user explicitly picks a theme for this scope, use the scope default.
+  if (localStorage.getItem(userSetKey(scope)) !== '1') {
+    return fallback;
   }
 
-  const stored = localStorage.getItem(THEME_PREFERENCE_KEY);
+  const stored = localStorage.getItem(preferenceKey(scope));
   if (isValidPreference(stored)) return stored;
 
-  const legacy = localStorage.getItem(THEME_STORAGE_KEY);
-  if (legacy === 'light' || legacy === 'dark') return legacy;
+  // Legacy global key only applies to the app scope.
+  if (scope === 'app') {
+    const legacy = localStorage.getItem(THEME_STORAGE_KEY);
+    if (legacy === 'light' || legacy === 'dark') return legacy;
+  }
 
-  return DEFAULT_PREFERENCE;
+  return fallback;
 }
 
-export function getPreferredTheme(): Theme {
-  return resolveTheme(getStoredPreference());
+export function getPreferredTheme(scope: ThemeScope = 'app'): Theme {
+  return resolveTheme(getStoredPreference(scope));
 }
 
 export function applyThemePreference(
   preference: ThemePreference,
-  options?: { persist?: boolean },
+  options?: { persist?: boolean; scope?: ThemeScope },
 ) {
+  const scope = options?.scope ?? 'app';
   const resolved = resolveTheme(preference);
   document.documentElement.setAttribute('data-theme', resolved);
   if (options?.persist === false) return;
-  localStorage.setItem(THEME_PREFERENCE_KEY, preference);
-  localStorage.setItem(THEME_USER_SET_KEY, '1');
-  localStorage.removeItem(THEME_STORAGE_KEY);
+  localStorage.setItem(preferenceKey(scope), preference);
+  localStorage.setItem(userSetKey(scope), '1');
+  if (scope === 'app') {
+    localStorage.removeItem(THEME_STORAGE_KEY);
+  }
 }
 
 /** Apply theme for first paint / sync without treating it as a user choice. */

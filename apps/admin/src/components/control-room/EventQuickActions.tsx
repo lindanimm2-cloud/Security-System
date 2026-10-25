@@ -8,8 +8,13 @@ import { CctvLiveFeed, type CctvCamera } from '@/components/portal/CctvLiveFeed'
 import { adminApi, type ApiResponse } from '@/lib/api-client';
 import type { ArcDeskEvent, ArcMonitoringFile } from '@/lib/arc-desk';
 import { openCctvMiniPlayer } from '@/lib/cctv-mini-player';
+import { CONTROL_ROOM_ROUTES } from '@/lib/control-room-routes';
 import { normalizeOfficerStatus } from '@/lib/officer-status';
 import type { OpsIncident } from '@/lib/ops-incident';
+
+function isOpenIncidentStatus(status?: string | null) {
+  return !['RESOLVED', 'CLOSED', 'CANCELLED', 'FALSE_ALARM'].includes((status ?? '').toUpperCase());
+}
 
 function zoneLabel(zone?: string | null) {
   if (!zone) return 'Ready';
@@ -199,14 +204,24 @@ export function EventQuickActions(props: EventQuickActionsProps) {
     return bits;
   }, [file?.accessNotes, props]);
 
-  const trackHref =
-    props.kind === 'event'
-      ? `/control-room/emap?site=${props.event.propertyId}`
-      : props.incident.vehicleId
-        ? `/control-room/map?vehicle=${props.incident.vehicleId}`
-        : props.incident.siteId
-          ? `/control-room/map?site=${props.incident.siteId}`
-          : '/control-room/map';
+  const trackHref = useMemo(() => {
+    if (props.kind === 'incident') {
+      return `${CONTROL_ROOM_ROUTES.map}?incident=${props.incident.id}`;
+    }
+
+    // Live command map — never the site floor-plan e-map.
+    const linkedIncidentId =
+      props.event.incidentId ||
+      desk.incidents.find(
+        (incident) =>
+          incident.siteId === props.event.propertyId && isOpenIncidentStatus(incident.status),
+      )?.id;
+
+    if (linkedIncidentId) {
+      return `${CONTROL_ROOM_ROUTES.map}?incident=${linkedIncidentId}`;
+    }
+    return `${CONTROL_ROOM_ROUTES.map}?site=${props.event.propertyId}`;
+  }, [desk.incidents, props]);
 
   async function assignOfficer(officerId: string, officerName: string) {
     await run('Assigned', `Sent to ${officerName}`, async () => {

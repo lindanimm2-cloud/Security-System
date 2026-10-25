@@ -1,19 +1,23 @@
 'use client';
 
+import { usePathname } from 'next/navigation';
 import { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import {
   applyThemePreference,
   applyThemePreview,
   getStoredPreference,
+  getThemeScope,
   resolveTheme,
   THEME_SCHEDULE_CHANGED_EVENT,
   type Theme,
   type ThemePreference,
+  type ThemeScope,
 } from '@/lib/theme';
 
 type ThemeContextValue = {
   theme: Theme;
   preference: ThemePreference;
+  scope: ThemeScope;
   setPreference: (preference: ThemePreference) => void;
   toggleTheme: () => void;
 };
@@ -21,16 +25,18 @@ type ThemeContextValue = {
 const ThemeContext = createContext<ThemeContextValue | null>(null);
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
+  const scope = getThemeScope(pathname);
   const [preference, setPreferenceState] = useState<ThemePreference>('dark');
   const [theme, setThemeState] = useState<Theme>('dark');
   const [mounted, setMounted] = useState(false);
 
   const syncResolvedTheme = useCallback(
-    (nextPreference: ThemePreference, persist: boolean) => {
+    (nextPreference: ThemePreference, persist: boolean, nextScope: ThemeScope) => {
       const resolved = resolveTheme(nextPreference);
       setThemeState(resolved);
       if (persist) {
-        applyThemePreference(nextPreference);
+        applyThemePreference(nextPreference, { scope: nextScope });
       } else {
         applyThemePreview(nextPreference);
       }
@@ -39,25 +45,25 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   );
 
   useEffect(() => {
-    const initialPreference = getStoredPreference();
+    const initialPreference = getStoredPreference(scope);
     setPreferenceState(initialPreference);
     // Preview only — do not lock light/dark until the user toggles or picks settings.
-    syncResolvedTheme(initialPreference, false);
+    syncResolvedTheme(initialPreference, false, scope);
     setMounted(true);
-  }, [syncResolvedTheme]);
+  }, [scope, syncResolvedTheme]);
 
   useEffect(() => {
     if (!mounted) return;
 
     if (preference === 'system') {
       const media = window.matchMedia('(prefers-color-scheme: dark)');
-      const onChange = () => syncResolvedTheme('system', false);
+      const onChange = () => syncResolvedTheme('system', false, scope);
       media.addEventListener('change', onChange);
       return () => media.removeEventListener('change', onChange);
     }
 
     if (preference === 'schedule') {
-      const tick = () => syncResolvedTheme('schedule', false);
+      const tick = () => syncResolvedTheme('schedule', false, scope);
       tick();
       const id = window.setInterval(tick, 60_000);
       const onScheduleChange = () => tick();
@@ -69,11 +75,11 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     }
 
     return undefined;
-  }, [mounted, preference, syncResolvedTheme]);
+  }, [mounted, preference, scope, syncResolvedTheme]);
 
   function setPreference(next: ThemePreference) {
     setPreferenceState(next);
-    syncResolvedTheme(next, true);
+    syncResolvedTheme(next, true, scope);
   }
 
   function toggleTheme() {
@@ -82,7 +88,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <ThemeContext.Provider value={{ theme, preference, setPreference, toggleTheme }}>
+    <ThemeContext.Provider value={{ theme, preference, scope, setPreference, toggleTheme }}>
       {children}
     </ThemeContext.Provider>
   );

@@ -142,6 +142,24 @@ function MapContent() {
       if (incident) selectIncident(incident);
       return;
     }
+    const vehicleParam = searchParams.get('vehicle');
+    if (vehicleParam) {
+      const vehicle =
+        mapData.vehicles.find((v) => v.id === vehicleParam) ||
+        mapData.fleet?.find((v) => v.id === vehicleParam);
+      if (vehicle) {
+        setFlyTo({ lat: vehicle.lat, lng: vehicle.lng, zoom: 16 });
+        return;
+      }
+    }
+    const siteParam = searchParams.get('site');
+    if (siteParam) {
+      const property = mapData.properties.find((p) => p.id === siteParam);
+      if (property) {
+        setFlyTo({ lat: property.lat, lng: property.lng, zoom: 17 });
+        return;
+      }
+    }
     const focus = searchParams.get('focus');
     if (focus === 'users' && mapData.clients[0]) {
       setFlyTo({ lat: mapData.clients[0].lat, lng: mapData.clients[0].lng, zoom: 14 });
