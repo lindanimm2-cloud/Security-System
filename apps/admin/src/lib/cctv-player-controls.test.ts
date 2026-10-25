@@ -103,6 +103,7 @@ const base = {
   assert.ok(live.controls.includes('forward'));
   assert.ok(live.controls.includes('speed'));
   assert.ok(live.controls.includes('mute'));
+  assert.ok(live.controls.includes('record'));
   assert.ok(!live.controls.includes('live'));
 
   const playback = getVisibleControls({
@@ -113,6 +114,7 @@ const base = {
   });
   assert.ok(playback.controls.includes('live'));
   assert.ok(playback.controls.includes('speed'));
+  assert.ok(playback.controls.includes('record'));
 }
 
 // Width squeeze drops secondary before expand

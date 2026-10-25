@@ -1127,11 +1127,20 @@
   background: rgba(40, 40, 40, 0.85);
 }
 
+.cctv-feed__rec-dot {
+  fill: #ef4444;
+}
+
 .cctv-feed__ctrl--rec,
 .cctv-feed__ctrl--rec.cctv-feed__ctrl--active {
   color: #f87171;
   border-color: color-mix(in srgb, #dc2626 55%, rgba(255, 255, 255, 0.2));
   box-shadow: 0 0 0 1px color-mix(in srgb, #dc2626 35%, transparent);
+  background: rgba(220, 38, 38, 0.18);
+}
+
+.cctv-feed__ctrl--rec .cctv-feed__rec-dot {
+  fill: currentColor;
 }
 
 .cctv-feed__audio {

@@ -369,6 +369,24 @@ function FeedControls({
             </label>
           </div>
         ) : null}
+        {toolbarVisible && show('record') ? (
+          <CtrlBtn
+            title={recording ? 'Stop recording' : 'Start recording'}
+            active={recording}
+            danger={recording}
+            onClick={onRecord}
+          >
+            {recording ? (
+              <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+                <rect x="6" y="6" width="12" height="12" rx="1.5" />
+              </svg>
+            ) : (
+              <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+                <circle cx="12" cy="12" r="6.5" className="cctv-feed__rec-dot" />
+              </svg>
+            )}
+          </CtrlBtn>
+        ) : null}
         {toolbarVisible && show('mini') ? (
           <CtrlBtn title="Open mini player" onClick={onMini}>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
@@ -383,25 +401,6 @@ function FeedControls({
               <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
               <circle cx="12" cy="13" r="4" />
             </svg>
-          </CtrlBtn>
-        ) : null}
-        {toolbarVisible && show('record') ? (
-          <CtrlBtn
-            title={recording ? 'Stop recording' : 'Record'}
-            active={recording}
-            danger={recording}
-            onClick={onRecord}
-          >
-            {recording ? (
-              <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden>
-                <rect x="6" y="6" width="12" height="12" rx="1.5" />
-              </svg>
-            ) : (
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
-                <circle cx="12" cy="12" r="6" fill="currentColor" stroke="none" />
-                <circle cx="12" cy="12" r="9" />
-              </svg>
-            )}
           </CtrlBtn>
         ) : null}
       </div>
@@ -581,7 +580,19 @@ function FeedInner({
         onVolume={setVolumeValue}
         onVolumeOpen={setVolumeOpen}
         onMini={popMiniPlayer}
-        onRecord={() => setRecording((r) => !r)}
+        onRecord={() => {
+          setRecording((r) => {
+            const next = !r;
+            if (next) {
+              // Operator clips start from the live edge.
+              setIsPlayback(false);
+              setReverse(false);
+              setSpeed(1);
+              setPaused(false);
+            }
+            return next;
+          });
+        }}
         onPlay={() => {
           if (!isPlayback) enterPlayback({ reverse: false });
           setPaused((p) => !p);
